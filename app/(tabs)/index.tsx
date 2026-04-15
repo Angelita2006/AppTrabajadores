@@ -1,13 +1,15 @@
 import { Image } from "expo-image";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
 import { HelloWave } from "@/components/hello-wave";
+import { getEmpresa } from "@/components/models/types";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Link } from "expo-router";
 
 export default function HomeScreen() {
+  let empresa = getEmpresa();
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: "#6b8992", dark: "#2d3b3f" }}
@@ -20,25 +22,12 @@ export default function HomeScreen() {
     >
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title" style={styles.titleContainer}>
-          Welcome!
+          Registro Horario
         </ThemedText>
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit{" "}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{" "}
-          to see changes. Press{" "}
-          <ThemedText type="default">
-            {Platform.select({
-              ios: "cmd + d",
-              android: "cmd + m",
-              web: "F12",
-            })}
-          </ThemedText>{" "}
-          to open developer tools.
-        </ThemedText>
+        <ThemedText type="subtitle">Empresa {empresa?.nombre}</ThemedText>
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
         <Link href="/modal">

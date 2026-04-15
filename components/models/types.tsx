@@ -10,10 +10,12 @@ export interface Empresa {
 
 export interface Trabajador {
   id: number;
-  empresas: string[];
+  empresas?: string[];
   dni: string;
   nombre: string;
   puesto: string;
+  email: string;
+  password: string;
 }
 
 export interface Fichaje {
@@ -40,11 +42,25 @@ export const crearTrabajador = (
   nombre: string,
   dni: string,
   puesto: string,
+  email: string,
+  password: string,
   empresas: string[] = [],
 ): Trabajador => ({
   id: idsTrabajadores++,
   nombre,
   dni,
   puesto,
-  empresas,
+  email,
+  password,
 });
+
+export const getEmpresa = async (): Promise<Empresa | null> => {
+  try {
+    const response = await fetch("/api/empresa");
+    const data = await response.json();
+    return data as Empresa;
+  } catch (error) {
+    console.error("Error fetching empresa:", error);
+    return "Empresa no encontrada" as unknown as Empresa;
+  }
+};
