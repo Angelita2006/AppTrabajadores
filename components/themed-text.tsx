@@ -23,21 +23,24 @@ export function ThemedText({
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
 
-  return (
-    <Text
-      style={[
-        { color },
-        type === "default" ? styles.default : undefined,
-        type === "title" ? styles.title : undefined,
-        type === "defaultSemiBold" ? styles.defaultSemiBold : undefined,
-        type === "subtitle" ? styles.subtitle : undefined,
-        type === "link" ? styles.link : undefined,
-        type === "defaultBold" ? styles.defaultBold : undefined,
-        style,
-      ]}
-      {...rest}
-    />
-  );
+  const typeStyle = (() => {
+    switch (type) {
+      case "title":
+        return styles.title;
+      case "defaultSemiBold":
+        return styles.defaultSemiBold;
+      case "subtitle":
+        return styles.subtitle;
+      case "link":
+        return styles.link;
+      case "defaultBold":
+        return styles.defaultBold;
+      default:
+        return styles.default;
+    }
+  })();
+
+  return <Text style={[{ color }, typeStyle, style]} {...rest} />;
 }
 
 const styles = StyleSheet.create({
@@ -59,10 +62,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     lineHeight: 32,
+    color: "#191919",
   },
   subtitle: {
     fontSize: 20,
     fontWeight: "bold",
+    color: "#191919",
   },
   link: {
     lineHeight: 30,

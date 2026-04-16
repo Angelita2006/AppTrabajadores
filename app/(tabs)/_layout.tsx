@@ -15,6 +15,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          justifyContent: "center",
+          alignItems: "center",
+        },
       }}
     >
       <Tabs.Screen
@@ -44,6 +48,14 @@ export default function TabLayout() {
           ),
         }}
       />
+      {
+        <Tabs.Screen
+          name="empresas"
+          options={{
+            tabBarButton: () => null,
+          }}
+        />
+      }
     </Tabs>
   );
 }
