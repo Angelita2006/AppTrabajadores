@@ -1,8 +1,7 @@
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 
-import { HelloWave } from "@/components/hello-wave";
 import {
   crearFichaje,
   Empresa,
@@ -10,12 +9,16 @@ import {
   obtenerFichajes,
 } from "@/components/models/types";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
+import { ThemedButton } from "@/components/themed-button";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useTrabajador } from "@/context/TrabajadorContext";
+import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProp<any>>();
+
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
 
@@ -25,7 +28,10 @@ export default function HomeScreen() {
 
   const calcularHorasTrabajadas = () => {
     if (!trabajadorActual) return 0;
-    const fichajesTrabajador = obtenerFichajes(trabajadorActual.id);
+    const fichajesTrabajador = obtenerFichajes(
+      trabajadorActual.id,
+      empresaSeleccionada?.id || 0,
+    );
     const ultimaEntrada = fichajesTrabajador
       .filter((f) => f.tipo === "entrada")
       .pop();
@@ -49,8 +55,13 @@ export default function HomeScreen() {
         <ThemedText type="title" style={styles.titleContainer}>
           Registro Horario
         </ThemedText>
-        <HelloWave />
       </ThemedView>
+
+      <ThemedButton
+        title="Ir a pantalla Modal"
+        onPress={() => (navigation as any).navigate("modal")}
+      />
+
       <ThemedView style={styles.stepContainer}>
         <ThemedView style={styles.infoCard}>
           <ThemedText type="subtitle">
@@ -62,6 +73,7 @@ export default function HomeScreen() {
           </ThemedText>
         </ThemedView>
       </ThemedView>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedView style={styles.buttonRow}>
           <Pressable
@@ -139,7 +151,7 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">Fichar Horas Extra</ThemedText>
           </Pressable>
         </ThemedView>
-        <Link href="/(tabs)/empresas" asChild>
+        <Link href="/(tabs)" asChild>
           <Pressable style={styles.button}>
             <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
           </Pressable>

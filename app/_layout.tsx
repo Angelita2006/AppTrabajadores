@@ -13,7 +13,9 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
-
+// RootLayout es el componente principal que envuelve toda la aplicación. Proporciona el contexto del trabajador y el tema de colores
+// a través de los proveedores correspondientes. También define la estructura de navegación utilizando Stack de react-navigation,
+// con una pantalla principal (tabs) y una pantalla modal (modal).
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 

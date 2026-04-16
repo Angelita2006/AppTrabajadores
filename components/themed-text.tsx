@@ -1,7 +1,10 @@
-import { StyleSheet, Text, type TextProps } from "react-native";
-
 import { useThemeColor } from "@/hooks/use-theme-color";
-
+import { StyleSheet, Text, type TextProps } from "react-native";
+// Componente ThemedText que extiende el componente Text de React Native para agregar soporte de temas (claro y oscuro) y estilos predefinidos para diferentes tipos de texto (título, subtítulo, enlace, etc.).
+// Recibe las siguientes props:
+// - lightColor: el color del texto en modo claro (opcional).
+// - darkColor: el color del texto en modo oscuro (opcional).
+// - type: el tipo de texto (opcional).
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
@@ -13,7 +16,8 @@ export type ThemedTextProps = TextProps & {
     | "subtitle"
     | "link";
 };
-
+// Función ThemedText que utiliza el hook useThemeColor para determinar el color del texto según el tema actual (claro u oscuro),
+// y aplica estilos predefinidos según el tipo de texto especificado en las props.
 export function ThemedText({
   style,
   lightColor,
@@ -62,13 +66,13 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     lineHeight: 32,
-    color: "#191919",
-    backgroundColor: "#E0E0E0",
+    // color: "#191919",
+    // backgroundColor: "#E0E0E0",
   },
   subtitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#191919",
+    // color: "#191919",
   },
   link: {
     lineHeight: 30,

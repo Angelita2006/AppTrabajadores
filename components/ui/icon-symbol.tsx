@@ -29,6 +29,15 @@ const MAPPING = {
  * This ensures a consistent look across platforms, and optimal resource usage.
  * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
  */
+// Componente IconSymbol que muestra iconos personalizados en la aplicación utilizando MaterialIcons en Android y web, y SF Symbols en iOS.
+// Recibe las siguientes props:
+// - name: el nombre del icono a mostrar, que debe ser un valor válido para el componente SymbolView en iOS,
+// y debe tener una correspondencia en MaterialIcons para Android y web.
+// - size: el tamaño del icono (opcional, por defecto es 24).
+// - color: el color del icono, que se pasa como tintColor al componente SymbolView en iOS, y como color a MaterialIcons en Android y web.
+// - style: estilos adicionales para el contenedor del icono (opcional).
+// - weight: el peso del icono, que se pasa como prop al componente SymbolView en iOS (opcional, por defecto es 'regular').
+// En Android y web, el peso no se utiliza ya que MaterialIcons no tiene variantes de peso.
 export function IconSymbol({
   name,
   size = 24,
