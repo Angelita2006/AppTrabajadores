@@ -54,7 +54,8 @@ export default function VerEmpresas() {
           Empresas
         </ThemedText>
       </ThemedView>
-      <ThemedText>Empresas en las que trabajas.</ThemedText>
+      <ThemedText>Empresas disponibles.</ThemedText>
+
       <ThemedView style={styles.addContainer}>
         <ThemedText>Agregar nueva empresa:</ThemedText>
         <TextInput
