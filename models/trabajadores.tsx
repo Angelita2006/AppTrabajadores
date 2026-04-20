@@ -81,6 +81,9 @@ export const crearTrabajador = (
   puesto,
   email,
   password,
+  empresas: [],
+  horarios: [],
+  fichajes: [],
 });
 
 // obtiene todos los trabajadores

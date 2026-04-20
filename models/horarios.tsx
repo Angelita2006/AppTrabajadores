@@ -1,4 +1,4 @@
-import { Trabajador, obtenerTrabajadores } from "./trabajadores";
+import { obtenerTrabajadores, Trabajador } from "./trabajadores";
 
 let idsHorarios = 0;
 

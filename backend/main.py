@@ -31,7 +31,7 @@ app = FastAPI(
 Base.metadata.create_all(bind=engine)
 
 ###################### RUTAS PARA FICHAJES ####################
-@app.post("/fichajes/{idFichaje}/{idTrabajador}/{idEmpresa}")
+@app.post("/fichaje")
 def crear_fichaje(idTrabajador: int, idEmpresa: int, tipo: str):
     db = get_db() 
     fichaje = Fichaje(
@@ -47,7 +47,11 @@ def crear_fichaje(idTrabajador: int, idEmpresa: int, tipo: str):
     db.commit()
     db.refresh(fichaje)
     db.close()
-    return fichaje
+
+    uri = f"/fichaje/{fichaje.id}"
+    headers = {"Location": uri}
+
+    return JSONResponse(status_code=201, content=ItemSchema.from_orm(fichaje).dict(), headers=headers)
 
 @app.get("/fichajes")
 def obtener_fichajes():
@@ -66,7 +70,7 @@ def obtener_fichaje(idFichaje: int):
     return fichaje
 
 ####################### RUTAS PARA HORARIOS ####################
-@app.post("/horarios/{idHorario}/{idTrabajador}/{idEmpresa}")
+@app.post("/horario")
 def crear_horario(
     idTrabajador: int, 
     idEmpresa: int, 
@@ -93,7 +97,11 @@ def crear_horario(
     db.commit()
     db.refresh(horario)
     db.close()
-    return horario
+
+    uri = f"/horario/{horario.id}"
+    headers = {"Location": uri}
+
+    return JSONResponse(status_code=201, content=ItemSchema.from_orm(horario).dict(), headers=headers)
 
 @app.get("/horarios")
 def obtener_horarios():
@@ -119,7 +127,7 @@ def obtener_horarios_por_trabajador_y_empresa(idTrabajador: int, idEmpresa: int)
     return horarios
 
 #################### RUTAS PARA TRABAJADORES ####################
-@app.post("/trabajadores/{idTrabajador}")
+@app.post("/trabajador")
 def crear_trabajador(nombre: str, apellidos: str, dni: str, direccion: str, codigo_postal: str, poblacion: str, provincia: str, cuenta_bancaria: str, email: str, password: str):
     db = get_db()
     # Create a new Trabajador instance
@@ -135,6 +143,7 @@ def crear_trabajador(nombre: str, apellidos: str, dni: str, direccion: str, codi
         cuenta_bancaria=cuenta_bancaria,
         email=email,
         password=password,
+        fichajes=[],  # Inicializar la lista de fichajes vacía
         horarios=[],  # Inicializar la lista de horarios vacía
         empresas=[]  # Inicializar la lista de empresas vacía
     )
@@ -142,9 +151,13 @@ def crear_trabajador(nombre: str, apellidos: str, dni: str, direccion: str, codi
     db.commit()
     db.refresh(trabajador)
     db.close()
-    return trabajador
 
-@app.put("/trabajadores/{idTrabajador}/empresas/{idEmpresa}")
+    uri = f"/trabajador/{trabajador.id}"
+    headers = {"Location": uri}
+
+    return JSONResponse(status_code=201, content=ItemSchema.from_orm(trabajador).dict(), headers=headers)
+
+@app.put("/trabajador/{idTrabajador}/empresas/{idEmpresa}")
 def agregar_empresa_a_trabajador(idTrabajador: int, idEmpresa: int):    
     db = get_db()
     trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
@@ -160,7 +173,7 @@ def agregar_empresa_a_trabajador(idTrabajador: int, idEmpresa: int):
     db.close()
     return trabajador
 
-@app.put("/trabajadores/{idTrabajador}/horarios/{idHorario}")
+@app.put("/trabajador/{idTrabajador}/horarios/{idHorario}")
 def agregar_horario_a_trabajador(idTrabajador: int, idHorario: int):
     db = get_db()
     trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
@@ -171,6 +184,22 @@ def agregar_horario_a_trabajador(idTrabajador: int, idHorario: int):
         return {"error": "Horario no encontrado"}
     if horario not in trabajador.horarios:
         trabajador.horarios.append(horario)
+    db.commit()
+    db.refresh(trabajador)
+    db.close()
+    return trabajador
+
+@app.put("/trabajador/{idTrabajador}/fichajes/{idFichaje}")
+def agregar_horario_a_trabajador(idTrabajador: int, idFichaje: int):
+    db = get_db()
+    trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
+    if not trabajador:
+        return {"error": "Trabajador no encontrado"}
+    fichaje = db.query(Fichaje).filter(Fichaje.id == idFichaje).first()
+    if not horario:
+        return {"error": "Fichaje no encontrado"}
+    if fichaje not in trabajador.fichajes:
+        trabajador.fichajes.append(fichaje)
     db.commit()
     db.refresh(trabajador)
     db.close()
@@ -193,7 +222,7 @@ def obtener_trabajador(idTrabajador: int):
     return trabajador
 
 ##################### RUTAS PARA EMPRESAS ####################
-@app.post("/empresas/{idEmpresa}")
+@app.post("/empresa")
 def crear_empresa(nombre: str, cif: str, direccion: str, codigo_postal: str, poblacion: str, provincia: str):
     db = get_db()
     # Create a new Empresa instance
@@ -211,9 +240,13 @@ def crear_empresa(nombre: str, cif: str, direccion: str, codigo_postal: str, pob
     db.commit()
     db.refresh(empresa)
     db.close()
-    return empresa
 
-@app.put("/empresas/{idEmpresa}/trabajadores/{idTrabajador}")
+    uri = f"/empresa/{empresa.id}"
+    headers = {"Location": uri}
+
+    return JSONResponse(status_code=201, content=ItemSchema.from_orm(empresa).dict(), headers=headers)
+
+@app.put("/empresa/{idEmpresa}/trabajadores/{idTrabajador}")
 def agregar_trabajador_a_empresa(idEmpresa: int, idTrabajador: int):
     db = get_db()
     empresa = db.query(Empresa).filter(Empresa.id == idEmpresa).first()
