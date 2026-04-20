@@ -7,7 +7,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
-import { ProveedorTrabajador } from "@/context/TrabajadorContext";
+import { ProveedorTrabajador } from "../../context/TrabajadorContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {

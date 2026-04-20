@@ -2,19 +2,15 @@ import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 
-import {
-  crearFichaje,
-  Empresa,
-  getEmpresa,
-  obtenerFichajes,
-} from "@/components/models/types";
-import ParallaxScrollView from "@/components/parallax-scroll-view";
-import { ThemedButton } from "@/components/themed-button";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { useTrabajador } from "@/context/TrabajadorContext";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
+import ParallaxScrollView from "../../components/parallax-scroll-view";
+import { ThemedButton } from "../../components/themed-button";
+import { ThemedText } from "../../components/themed-text";
+import { ThemedView } from "../../components/themed-view";
+import { useTrabajador } from "../../context/TrabajadorContext";
+import { Empresa, getEmpresa } from "../../models/empresas";
+import { crearFichaje, obtenerFichajes } from "../../models/fichajes";
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -37,7 +33,7 @@ export default function HomeScreen() {
       .pop();
     if (!ultimaEntrada) return 0;
     const ahora = new Date();
-    const diffMs = ahora.getTime() - ultimaEntrada.fecha.getTime();
+    const diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
     return Math.floor(diffMs / (1000 * 60 * 60)); // hours
   };
 

@@ -1,14 +1,10 @@
-import {
-  crearTrabajador,
-  getTrabajadorByEmailYContraseña,
-  updateTrabajador,
-} from "@/components/models/types";
-import ParallaxScrollView from "@/components/parallax-scroll-view";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Fonts } from "@/constants/theme";
-import { useTrabajador } from "@/context/TrabajadorContext";
+import { crearTrabajador, getTrabajadorByEmailYContraseña, updateTrabajador } from "../../models/trabajadores";
+import ParallaxScrollView from "../../components/parallax-scroll-view";
+import { ThemedText } from "../../components/themed-text";
+import { ThemedView } from "../../components/themed-view";
+import { IconSymbol } from "../../components/ui/icon-symbol";
+import { Fonts } from "../../constants/theme";
+import { useTrabajador } from "../../context/TrabajadorContext";
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 // Componente VerPerfil que muestra la información del perfil del trabajador actual y permite iniciar o cerrar sesión. Utiliza el contexto

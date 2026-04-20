@@ -1,18 +1,14 @@
-import {
-  agregarEmpresa,
-  obtenerEmpresas,
-  // crearEmpresa,
-  obtenerEmpresasTrabajador,
-} from "@/components/models/types";
-import ParallaxScrollView from "@/components/parallax-scroll-view";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Fonts } from "@/constants/theme";
-import { useTrabajador } from "@/context/TrabajadorContext";
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput } from "react-native";
+import ParallaxScrollView from "../../components/parallax-scroll-view";
+import { ThemedText } from "../../components/themed-text";
+import { ThemedView } from "../../components/themed-view";
+import { IconSymbol } from "../../components/ui/icon-symbol";
+import { Fonts } from "../../constants/theme";
+import { useTrabajador } from "../../context/TrabajadorContext";
+import { agregarEmpresa, obtenerEmpresas } from "../../models/empresas";
+import { obtenerEmpresasTrabajador } from "../../models/trabajadores";
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
 // Utiliza el componente ParallaxScrollView para mostrar un encabezado con efecto parallax, y muestra una lista de empresas
