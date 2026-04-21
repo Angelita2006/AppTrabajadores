@@ -277,20 +277,13 @@ def agregar_trabajador_a_empresa(idEmpresa: int, idTrabajador: int):
     db.close()
     return empresa
 
-@app.get("/trabajadores")
-def obtener_trabajadores():
+@app.get("/empresas")
+def obtener_empresas():
     db = SessionLocal()
-    trabajadores = db.query(Trabajador).all()
+    trabajadores = db.query(Empresa).all()
     db.close()
     return trabajadores
 
-@app.get("/trabajadores/{idTrabajador}")
-def obtener_trabajador(idTrabajador: int):
-    db = SessionLocal()
-    trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
-    db.close()
-    if trabajador is None:
-        return {"error": "Trabajador no encontrado"}
-    return trabajador
+
 
 

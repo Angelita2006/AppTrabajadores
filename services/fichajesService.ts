@@ -11,7 +11,7 @@ export const agregarFichaje = async (
     const res = await api.post(`/fichaje`, {
       idTrabajador,
       idEmpresa,
-      tipo,
+      tipo: "entrada",
     });
     return res.data;
   } catch (error) {

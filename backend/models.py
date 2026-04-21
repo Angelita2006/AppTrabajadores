@@ -7,8 +7,8 @@ class Fichaje(Base):
     __tablename__ = "fichajes"
 
     id = Column(Integer, primary_key=True, index=True)
-    idTrabajador = Column(String, primary_key=True, index=True)
-    idEmpresa = Column(String, primary_key=True, index=True)
+    idTrabajador = Column(Integer, ForeignKey("trabajadores.id"), primary_key=True, index=True)
+    idEmpresa = Column(Integer, ForeignKey("empresas.id"), primary_key=True, index=True)
     tipo = Column(String, index=True)
     fecha_hora = Column(DateTime, index=True)
 
@@ -27,8 +27,8 @@ class Horario(Base):
     __tablename__ = "horarios"
 
     id = Column(Integer, primary_key=True, index=True)
-    idTrabajador = Column(String, primary_key=True, index=True)
-    idEmpresa = Column(String, primary_key=True, index=True)
+    idTrabajador = Column(Integer, ForeignKey("trabajadores.id"), primary_key=True, index=True)
+    idEmpresa = Column(Integer, ForeignKey("empresas.id"), primary_key=True, index=True)
     tipoJornada = Column(String, index=True)
     dias = Column(Integer, index=True)
     dias_semana = Column(String, index=True)
@@ -53,6 +53,7 @@ class Trabajador(Base):
     email = Column(String, unique=True, index=True)
     password = Column(String, index=True)
 
+    fichajes = relationship("Fichaje", back_populates="trabajador")
     horarios = relationship("Horario", back_populates="trabajador")
     empresas = relationship("Empresa", secondary=trabajador_empresa, back_populates="trabajadores")
 
@@ -71,6 +72,8 @@ class Empresa(Base):
     poblacion = Column(String, index=True)
     provincia = Column(String, index=True)
 
+    fichajes = relationship("Fichaje", back_populates="empresa")
+    horarios = relationship("Horario", back_populates="empresa")
     trabajadores = relationship("Trabajador", secondary=trabajador_empresa, back_populates="empresas")
 
     @classmethod
