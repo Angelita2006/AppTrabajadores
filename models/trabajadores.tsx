@@ -13,7 +13,7 @@ const trabajadores: Trabajador[] = [
     codigo_postal: "28080",
     poblacion: "Madrid",
     provincia: "Madrid",
-    cuenta_bancaria: "ES12345678901234567890",
+    cuenta_cotizacion: "ES12345678901234567890",
     puesto: "Desarrollador",
     email: "manolo@example.com",
     password: "password123",
@@ -27,7 +27,7 @@ const trabajadores: Trabajador[] = [
     codigo_postal: "28080",
     poblacion: "Madrid",
     provincia: "Madrid",
-    cuenta_bancaria: "ES9012345678901234567890",
+    cuenta_cotizacion: "ES9012345678901234567890",
     puesto: "Diseñadora",
     email: "maria@example.com",
     password: "password456",
@@ -47,7 +47,7 @@ export interface Trabajador {
   codigo_postal: string;
   poblacion: string;
   provincia: string;
-  cuenta_bancaria: string;
+  cuenta_cotizacion: string;
   puesto: string;
   email: string;
   password: string;
@@ -64,7 +64,7 @@ export const crearTrabajador = (
   codigo_postal: string,
   poblacion: string,
   provincia: string,
-  cuenta_bancaria: string,
+  cuenta_cotizacion: string,
   puesto: string,
   email: string,
   password: string,
@@ -77,7 +77,7 @@ export const crearTrabajador = (
   codigo_postal,
   poblacion,
   provincia,
-  cuenta_bancaria,
+  cuenta_cotizacion,
   puesto,
   email,
   password,

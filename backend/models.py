@@ -49,7 +49,7 @@ class Trabajador(Base):
     codigo_postal = Column(String, index=True)
     poblacion = Column(String, index=True)
     provincia = Column(String, index=True)
-    cuenta_bancaria = Column(String, index=True)
+    cuenta_cotizacion = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     password = Column(String, index=True)
 
@@ -57,9 +57,9 @@ class Trabajador(Base):
     horarios = relationship("Horario", back_populates="trabajador")
     empresas = relationship("Empresa", secondary=trabajador_empresa, back_populates="trabajadores")
 
-    @classmethod
-    def get_trabajador(cls, id_trabajador: int):
-        return cls.query.filter_by(id=id_trabajador).first()
+    # @classmethod
+    # def get_trabajador(cls, id_trabajador: int):
+    #     return cls.query.filter_by(id=id_trabajador).first()
 
 class Empresa(Base):
     __tablename__ = "empresas"
@@ -76,6 +76,6 @@ class Empresa(Base):
     horarios = relationship("Horario", back_populates="empresa")
     trabajadores = relationship("Trabajador", secondary=trabajador_empresa, back_populates="empresas")
 
-    @classmethod
-    def get_empresa(cls, id_empresa: int):
-        return cls.query.filter_by(id=id_empresa).first()
+    # @classmethod
+    # def get_empresa(cls, id_empresa: int):
+    #     return cls.query.filter_by(id=id_empresa).first()
