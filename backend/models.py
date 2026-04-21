@@ -1,5 +1,6 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Table, relationship
-from .database import Base
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Table
+from sqlalchemy.orm import relationship 
+from backend.database import Base
 
 # Definición de la tabla Fichaje
 class Fichaje(Base):

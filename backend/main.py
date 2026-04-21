@@ -1,13 +1,15 @@
+from pydantic import BaseModel
 from fastapi import FastAPI
-from backend.models import Horario
-from database import SessionLocal, engine, Base, get_db, next_id, datetime
-from models import Empresa, Fichaje, Trabajador
+from fastapi.responses import JSONResponse
+from datetime import datetime
+from backend.database import Base, SessionLocal, engine, get_db, next_id
+from backend.models import Empresa, Fichaje, Trabajador, Horario
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API para gestionar fichajes, horarios, trabajadores y empresas.",
     version="1.0.0",
-    openapi_url="/api",
+    # openapi_url="/api",
     openapi_tags=[
         {
             "name": "Fichajes",
@@ -30,6 +32,13 @@ app = FastAPI(
 
 Base.metadata.create_all(bind=engine)
 
+class ItemSchema(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
 ###################### RUTAS PARA FICHAJES ####################
 @app.post("/fichaje")
 def crear_fichaje(idTrabajador: int, idEmpresa: int, tipo: str):
@@ -51,14 +60,17 @@ def crear_fichaje(idTrabajador: int, idEmpresa: int, tipo: str):
     uri = f"/fichaje/{fichaje.id}"
     headers = {"Location": uri}
 
-    return JSONResponse(status_code=201, content=ItemSchema.from_orm(fichaje).dict(), headers=headers)
+    return JSONResponse(status_code=201, content=fichaje, headers=headers)
+    # return JSONResponse(status_code=201, content=ItemSchema.from_orm(fichaje).dict(), headers=headers)
 
 @app.get("/fichajes")
 def obtener_fichajes():
     db = SessionLocal()
-    fichajes = db.query(Fichaje).all()
-    db.close()
-    return fichajes
+    try:
+        fichajes = db.query(Fichaje).all()
+        return fichajes;
+    finally:
+        db.close()
 
 @app.get("/fichajes/{idFichaje}")
 def obtener_fichaje(idFichaje: int):
@@ -101,7 +113,8 @@ def crear_horario(
     uri = f"/horario/{horario.id}"
     headers = {"Location": uri}
 
-    return JSONResponse(status_code=201, content=ItemSchema.from_orm(horario).dict(), headers=headers)
+    return JSONResponse(status_code=201, content=horario, headers=headers)
+    # return JSONResponse(status_code=201, content=ItemSchema.from_orm(horario).dict(), headers=headers)
 
 @app.get("/horarios")
 def obtener_horarios():
@@ -155,7 +168,8 @@ def crear_trabajador(nombre: str, apellidos: str, dni: str, direccion: str, codi
     uri = f"/trabajador/{trabajador.id}"
     headers = {"Location": uri}
 
-    return JSONResponse(status_code=201, content=ItemSchema.from_orm(trabajador).dict(), headers=headers)
+    return JSONResponse(status_code=201, content=trabajador, headers=headers)
+    # return JSONResponse(status_code=201, content=ItemSchema.from_orm(trabajador).dict(), headers=headers)
 
 @app.put("/trabajador/{idTrabajador}/empresas/{idEmpresa}")
 def agregar_empresa_a_trabajador(idTrabajador: int, idEmpresa: int):    
@@ -190,13 +204,13 @@ def agregar_horario_a_trabajador(idTrabajador: int, idHorario: int):
     return trabajador
 
 @app.put("/trabajador/{idTrabajador}/fichajes/{idFichaje}")
-def agregar_horario_a_trabajador(idTrabajador: int, idFichaje: int):
+def agregar_fichaje_a_trabajador(idTrabajador: int, idFichaje: int):
     db = get_db()
     trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
     if not trabajador:
         return {"error": "Trabajador no encontrado"}
     fichaje = db.query(Fichaje).filter(Fichaje.id == idFichaje).first()
-    if not horario:
+    if not fichaje:
         return {"error": "Fichaje no encontrado"}
     if fichaje not in trabajador.fichajes:
         trabajador.fichajes.append(fichaje)
@@ -244,7 +258,8 @@ def crear_empresa(nombre: str, cif: str, direccion: str, codigo_postal: str, pob
     uri = f"/empresa/{empresa.id}"
     headers = {"Location": uri}
 
-    return JSONResponse(status_code=201, content=ItemSchema.from_orm(empresa).dict(), headers=headers)
+    return JSONResponse(status_code=201, content=empresa, headers=headers)
+    # return JSONResponse(status_code=201, content=ItemSchema.from_orm(empresa).dict(), headers=headers)
 
 @app.put("/empresa/{idEmpresa}/trabajadores/{idTrabajador}")
 def agregar_trabajador_a_empresa(idEmpresa: int, idTrabajador: int):

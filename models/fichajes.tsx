@@ -1,3 +1,4 @@
+
 let idsFichajes = 0;
 
 // datos de ejemplo de fichajes
@@ -28,20 +29,20 @@ export const crearFichaje = (
     tipo,
     fecha_hora: new Date(),
   };
-  fichajes.push(fichaje);
+  // fichajes.push(fichaje);
 
-  try {
-    fetch("/api/fichajes", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(fichaje),
-    });
-  } catch (error) {
-    console.error("Error al enviar el fichaje al backend:", error);
-  }
-  return fichaje;
+  // try {
+  //   fetch("/api/fichajes", {
+  //     method: "POST",
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //     body: JSON.stringify(fichaje),
+  //   });
+  // } catch (error) {
+  //   console.error("Error al enviar el fichaje al backend:", error);
+  // }
+  // return fichaje;
 };
 
 // obtiene los fichajes de un trabajador en una empresa específica

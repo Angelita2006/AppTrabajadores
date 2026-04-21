@@ -28,7 +28,7 @@ export const updateEmpresa = async (idEmpresa: number): Promise<Empresa> => {
 };
 
 // Función para obtener todos los fichajes
-export const obtenerEmpresas = async (): Promise<Empresa[]> => {
+export const getEmpresas = async (): Promise<Empresa[]> => {
   const res = await api.get("/empresas");
   return res.data;
 };

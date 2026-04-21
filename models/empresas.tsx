@@ -1,9 +1,10 @@
+import { getEmpresas } from "../services/empresasService";
 import { getTrabajadorById } from "./trabajadores";
 
 let idsEmpresas = 0;
 
 // datos de ejemplo de empresas
-const empresas: Empresa[] = [
+let empresas: Empresa[] = [
   {
     id: idsEmpresas++,
     nombre: "Bullastec",
@@ -106,6 +107,11 @@ export const getEmpresa = async (id: number): Promise<Empresa> => {
 };
 
 //obtiene todas las empresas disponibles
-export const obtenerEmpresas = (): Empresa[] => {
+// export const obtenerEmpresas = (): Empresa[] => {
+//   return empresas;
+// };
+
+export const obtenerEmpresas = async (): Promise<Empresa[]> => {
+  empresas = await Promise.resolve(getEmpresas());
   return empresas;
 };

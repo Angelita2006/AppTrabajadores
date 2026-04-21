@@ -92,10 +92,12 @@ export const obtenerTrabajadores = (): Trabajador[] => {
 };
 
 // obtiene las empresas a las que pertenece un trabajador
-export const obtenerEmpresasTrabajador = (trabajadorId: number): Empresa[] => {
+export const obtenerEmpresasTrabajador = async (
+  trabajadorId: number,
+): Promise<Empresa[]> => {
   const trabajador = trabajadores.find((t) => t.id === trabajadorId);
   if (!trabajador) return [];
-  return obtenerEmpresas().filter((e: { id: number }) =>
+  return (await obtenerEmpresas()).filter((e: { id: number }) =>
     trabajador.empresas?.includes(e.id),
   );
 };

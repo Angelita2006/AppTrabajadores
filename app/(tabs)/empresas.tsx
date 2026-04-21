@@ -1,13 +1,17 @@
 import { Link } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, TextInput } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet } from "react-native";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { Fonts } from "../../constants/theme";
 import { useTrabajador } from "../../context/TrabajadorContext";
-import { agregarEmpresa, obtenerEmpresas } from "../../models/empresas";
+import {
+  agregarEmpresa,
+  Empresa,
+  obtenerEmpresas,
+} from "../../models/empresas";
 import { obtenerEmpresasTrabajador } from "../../models/trabajadores";
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
@@ -28,19 +32,40 @@ export default function VerEmpresas() {
   const [empresas, setEmpresas] = useState(
     obtenerEmpresasTrabajador(trabajador?.id || 0),
   );
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoCif, setNuevoCif] = useState("");
+  // const [nuevoNombre, setNuevoNombre] = useState("");
+  // const [nuevoCif, setNuevoCif] = useState("");
   const { setEmpresaSeleccionada } = useTrabajador();
-  const empresasDisponibles = obtenerEmpresas();
+  // const empresasDisponibles = obtenerEmpresas();
+  const [empresasDisponibles, setEmpresasDisponibles] = useState<Empresa[]>([]);
 
-  //   const agregarEmpresa = () => {
-  //     if (nuevoNombre && nuevoCif) {
-  //       const nuevaEmpresa = crearEmpresa(nuevoNombre, nuevoCif);
-  //       setEmpresas([...empresas, nuevaEmpresa]);
-  //       setNuevoNombre("");
-  //       setNuevoCif("");
-  //     }
-  //   };
+  // Carga de empresas disponibles
+  useEffect(() => {
+    const cargarDatos = async () => {
+      const disponibles = await obtenerEmpresas();
+      setEmpresasDisponibles(disponibles);
+    };
+    cargarDatos();
+  }, []);
+
+  const handleSeleccionarDisponible = async (empresa: Empresa) => {
+    if (trabajadorId === 0) return alert("Inicia sesión primero");
+
+    try {
+      // 1. Llamamos a tu modelo para asociar la empresa al trabajador
+      // Nota: Asegúrate de que esta función exista en tu modelo 'empresas' o 'trabajadores'
+      await agregarEmpresa(trabajadorId, empresa.nombre, empresa.cif);
+
+      // 2. Actualizamos el estado local de 'empresas' (las del trabajador)
+      // para que aparezca en la lista de abajo inmediatamente
+      setEmpresas((prev) => [...prev, empresa]);
+
+      alert(`Empresa ${empresa.nombre} añadida a tu lista.`);
+    } catch (error) {
+      if (error instanceof Error)
+        alert("No se pudo añadir la empresa: " + error.message);
+      else alert("Error desconocido");
+    }
+  };
 
   return (
     // El componente principal se envuelve en un ParallaxScrollView que muestra un encabezado con un icono y un fondo de color que cambia
@@ -67,22 +92,28 @@ export default function VerEmpresas() {
         </ThemedText>
       </ThemedView>
       {
-        // Sección para mostrar las empresas disponibles, que se obtiene utilizando la función obtenerEmpresas. Cada empresa se muestra en
-        // una tarjeta con su nombre y CIF. También se incluye un formulario para agregar nuevas empresas, con campos de entrada para el nombre
-        // y CIF, y un botón para agregar la empresa.
+        // Sección de empresas disponibles que se pueden añadir a las empresas del trabajador.
       }
       <ThemedView style={styles.listContainer}>
-        <ThemedText>Empresas disponibles.</ThemedText>
+        <ThemedText>Empresas disponibles</ThemedText>
+
         {empresasDisponibles.map((empresa) => (
           <ThemedView key={empresa.id} style={styles.empresaCard}>
             <ThemedText type="default" style={styles.empresaText}>
               {empresa.nombre} - {empresa.cif}
             </ThemedText>
+
+            <Pressable
+              onPress={() => handleSeleccionarDisponible(empresa)}
+              style={styles.addbutton}
+            >
+              <IconSymbol name="chevron.right" size={24} color="#007AFF" />
+            </Pressable>
           </ThemedView>
         ))}
       </ThemedView>
 
-      <ThemedView style={styles.addContainer}>
+      {/* <ThemedView style={styles.addContainer}>
         <ThemedText>Agregar nueva empresa:</ThemedText>
         <TextInput
           placeholder="Nombre de la empresa"
@@ -98,27 +129,33 @@ export default function VerEmpresas() {
         />
         <Pressable
           style={styles.button}
-          onPress={() => {
+          onPress={async () => {
             if (trabajadorId === 0) {
               alert("No se ha iniciado sesión.");
-            } else {
+              return;
+            }
+            try {
               agregarEmpresa(trabajadorId, nuevoNombre, nuevoCif);
               setNuevoNombre("");
               setNuevoCif("");
+              alert("Empresa añadida correctamente.");
+            } catch (error) {
+              if (error instanceof Error)
+                alert("Error al guardar " + error.message);
+              else alert("Error desconocido");
             }
           }}
         >
           <ThemedText type="subtitle">Agregar Empresa</ThemedText>
         </Pressable>
-      </ThemedView>
+      </ThemedView> */}
       {
-        // Sección para mostrar las empresas asociadas al trabajador actual, que se obtiene utilizando la función obtenerEmpresasTrabajador.
-        // Cada empresa se muestra en una tarjeta con su nombre y CIF, y se incluyen botones para eliminar la empresa de la lista o seleccionarla
-        // como la empresa actual. Al eliminar una empresa, se actualiza el estado de las empresas para reflejar la eliminación. Al seleccionar
-        // una empresa, se actualiza el estado de la empresa seleccionada en el contexto del trabajador para que pueda ser utilizada en otras partes
-        // de la aplicación.
+        // Sección para mostrar las empresas asociadas al trabajador actual,
+        // que se obtiene utilizando la función obtenerEmpresasTrabajador.
       }
       <ThemedView style={styles.listContainer}>
+        <ThemedText>Mis empresas</ThemedText>
+
         {empresas.map((empresa) => (
           <ThemedView key={empresa.id} style={styles.empresaCard}>
             <ThemedText type="default" style={styles.empresaText}>
@@ -134,8 +171,11 @@ export default function VerEmpresas() {
               >
                 <ThemedText style={styles.buttonText}>Eliminar</ThemedText>
               </Pressable>
+
               <Pressable
-                onPress={() => setEmpresaSeleccionada(empresa)}
+                onPress={() => {
+                  setEmpresaSeleccionada(empresa);
+                }}
                 style={styles.selectButton}
               >
                 <ThemedText style={styles.buttonText}>Seleccionar</ThemedText>
@@ -153,8 +193,10 @@ export default function VerEmpresas() {
     </ParallaxScrollView>
   );
 }
+
 // Estilos para el componente VerEmpresas, que incluyen estilos para la imagen de encabezado, el contenedor del título,
 // las tarjetas de empresa, los botones y los campos de entrada.
+
 const styles = StyleSheet.create({
   // Estilo para la imagen de encabezado, que se posiciona de manera absoluta para crear un efecto de parallax.
   headerImage: {
@@ -233,6 +275,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: "center",
     marginTop: 16,
+  },
+  addbutton: {
+    padding: 10,
   },
   // Estilo para el contenedor de agregar empresa, que agrega un margen superior y un espacio entre los elementos.
   addContainer: {

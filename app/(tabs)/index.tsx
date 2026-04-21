@@ -2,6 +2,8 @@ import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 
+import { Horario } from "@/models/horarios";
+import { getHorarioTrabajadorEmpresa } from "@/services/horariosService";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
@@ -15,27 +17,40 @@ import { crearFichaje, obtenerFichajes } from "../../models/fichajes";
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp<any>>();
 
-  const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
+  const trabajadorId = trabajadorActual.id;
 
+  const [empresa, setEmpresa] = useState<Empresa | null>(null);
   useEffect(() => {
     getEmpresa(empresaSeleccionada?.id || 0).then(setEmpresa);
   }, [empresaSeleccionada]);
 
+  const [horario] = useState<Horario | null>(null);
+  useEffect(() => {
+    getHorarioTrabajadorEmpresa(empresaSeleccionada.id, trabajadorId);
+  });
+
   const calcularHorasTrabajadas = () => {
-    if (!trabajadorActual) return 0;
+    if (trabajadorId === 0) return alert("Inicia sesión primero");
+
     const fichajesTrabajador = obtenerFichajes(
       trabajadorActual.id,
       empresaSeleccionada?.id || 0,
     );
+
     const ultimaEntrada = fichajesTrabajador
       .filter((f) => f.tipo === "entrada")
       .pop();
-    if (!ultimaEntrada) return 0;
+
+    if (!ultimaEntrada) return alert("No hay ningún fichaje de entrada aún");
     const ahora = new Date();
     const diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
     return Math.floor(diffMs / (1000 * 60 * 60)); // hours
   };
+
+  function str(arg0: number | void): React.ReactNode {
+    throw new Error("Function not implemented.");
+  }
 
   return (
     <ParallaxScrollView
@@ -63,9 +78,12 @@ export default function HomeScreen() {
           <ThemedText type="subtitle">
             Empresa: {empresaSeleccionada?.nombre || empresa?.nombre}
           </ThemedText>
-          <ThemedText type="subtitle">Horario: 9:00 - 17:00</ThemedText>
           <ThemedText type="subtitle">
-            Horas trabajadas hoy: {calcularHorasTrabajadas()}
+            Horario: {horario?.hora_entrada?.toDateString()} a
+            {" " + horario?.hora_salida?.toDateString()}
+          </ThemedText>
+          <ThemedText type="subtitle">
+            Horas trabajadas hoy: {str(calcularHorasTrabajadas())}
           </ThemedText>
         </ThemedView>
       </ThemedView>
@@ -90,6 +108,7 @@ export default function HomeScreen() {
           >
             <ThemedText type="subtitle">Fichar Entrada</ThemedText>
           </Pressable>
+
           <Pressable
             style={styles.button}
             onPress={() => {
@@ -109,6 +128,7 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">Fichar Salida</ThemedText>
           </Pressable>
         </ThemedView>
+
         <ThemedView style={styles.buttonRow}>
           <Pressable
             style={styles.button}
@@ -128,6 +148,7 @@ export default function HomeScreen() {
           >
             <ThemedText type="subtitle">Fichar Descanso</ThemedText>
           </Pressable>
+
           <Pressable
             style={styles.button}
             onPress={() => {
@@ -147,6 +168,7 @@ export default function HomeScreen() {
             <ThemedText type="subtitle">Fichar Horas Extra</ThemedText>
           </Pressable>
         </ThemedView>
+
         <Link href="/(tabs)" asChild>
           <Pressable style={styles.button}>
             <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
