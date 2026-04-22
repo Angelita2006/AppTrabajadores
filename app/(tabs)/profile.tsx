@@ -1,12 +1,16 @@
-import { crearTrabajador, getTrabajadorByEmailYContraseña, updateTrabajador } from "../../models/trabajadores";
+import { useState } from "react";
+import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { Fonts } from "../../constants/theme";
 import { useTrabajador } from "../../context/TrabajadorContext";
-import { useState } from "react";
-import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import {
+  crearTrabajador,
+  editarTrabajador,
+  getTrabajadorByEmailYContraseña,
+} from "../../services/trabajadoresService";
 // Componente VerPerfil que muestra la información del perfil del trabajador actual y permite iniciar o cerrar sesión. Utiliza el contexto
 // del trabajador para acceder a la información del trabajador actual y actualizarla al iniciar sesión.
 // El componente muestra un formulario para ingresar el nombre, DNI, puesto, email y contraseña del trabajador cuando no hay una sesión iniciada.
@@ -22,7 +26,13 @@ export default function VerPerfil() {
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   const [nombre, setNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
   const [dni, setDni] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [codigo_postal, setCodigoPostal] = useState("");
+  const [poblacion, setPoblacion] = useState("");
+  const [provincia, setProvincia] = useState("");
+  const [cuenta_cotizacion, setCuentaCotizacion] = useState("");
   const [puesto, setPuesto] = useState("");
   const [email, setEmail] = useState("");
   const [contraseña, setContraseña] = useState("");
@@ -30,7 +40,13 @@ export default function VerPerfil() {
   const handleSignOut = () => {
     setIsSignedIn(false);
     setNombre("");
+    setApellidos("");
     setDni("");
+    setDireccion("");
+    setCodigoPostal("");
+    setPoblacion("");
+    setProvincia("");
+    setCuentaCotizacion("");
     setPuesto("");
     setEmail("");
     setContraseña("");
@@ -38,7 +54,19 @@ export default function VerPerfil() {
   };
 
   const handleRegister = () => {
-    const trabajador = crearTrabajador(nombre, dni, puesto, email, contraseña);
+    const trabajador = crearTrabajador(
+      nombre,
+      apellidos,
+      dni,
+      puesto,
+      direccion,
+      codigo_postal,
+      poblacion,
+      provincia,
+      cuenta_cotizacion,
+      email,
+      contraseña,
+    );
     setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Registro del trabajador completado correctamente");
     setIsSignedIn(true);
@@ -47,7 +75,13 @@ export default function VerPerfil() {
   const handleSignIn = async () => {
     let trabajador = getTrabajadorByEmailYContraseña(email, contraseña);
     setNombre((await trabajador).nombre);
+    setApellidos((await trabajador).apellidos);
     setDni((await trabajador).dni);
+    setDireccion((await trabajador).direccion);
+    setCodigoPostal((await trabajador).codigo_postal);
+    setPoblacion((await trabajador).poblacion);
+    setProvincia((await trabajador).provincia);
+    setCuentaCotizacion((await trabajador).cuenta_cotizacion);
     setPuesto((await trabajador).puesto);
     setTrabajadorActual(await trabajador);
     Alert.alert("Éxito", "Sesión del trabajador iniciada correctamente");
@@ -55,7 +89,20 @@ export default function VerPerfil() {
   };
 
   const handleSubmit = () => {
-    const trabajador = updateTrabajador(nombre, dni, puesto, email, contraseña);
+    const trabajador = editarTrabajador(
+      // id,
+      nombre,
+      apellidos,
+      dni,
+      puesto,
+      direccion,
+      codigo_postal,
+      poblacion,
+      provincia,
+      cuenta_cotizacion,
+      email,
+      contraseña,
+    );
     setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Información del perfil guardada correctamente");
     setIsSignedIn(true);
@@ -89,13 +136,22 @@ export default function VerPerfil() {
 
         <ThemedView style={styles.formContainer}>
           <ThemedText type="default" style={styles.label}>
-            Nombre completo
+            Nombre
           </ThemedText>
           <TextInput
             value={nombre}
             onChangeText={setNombre}
             style={styles.input}
             placeholder="Ingresa tu nombre"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Apellidos
+          </ThemedText>
+          <TextInput
+            value={apellidos}
+            onChangeText={setApellidos}
+            style={styles.input}
+            placeholder="Ingresa tus apellidos"
           />
           <ThemedText type="default" style={styles.label}>
             DNI
@@ -105,6 +161,51 @@ export default function VerPerfil() {
             onChangeText={setDni}
             style={styles.input}
             placeholder="Ingresa tu DNI"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Dirección
+          </ThemedText>
+          <TextInput
+            value={direccion}
+            onChangeText={setDireccion}
+            style={styles.input}
+            placeholder="Ingresa tu dirección"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Código Postal
+          </ThemedText>
+          <TextInput
+            value={codigo_postal}
+            onChangeText={setCodigoPostal}
+            style={styles.input}
+            placeholder="Ingresa tu código postal"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Población
+          </ThemedText>
+          <TextInput
+            value={poblacion}
+            onChangeText={setPoblacion}
+            style={styles.input}
+            placeholder="Ingresa tu población"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Provincia
+          </ThemedText>
+          <TextInput
+            value={provincia}
+            onChangeText={setProvincia}
+            style={styles.input}
+            placeholder="Ingresa tu provincia"
+          />
+          <ThemedText type="default" style={styles.label}>
+            Cuenta de cotización
+          </ThemedText>
+          <TextInput
+            value={cuenta_cotizacion}
+            onChangeText={setCuentaCotizacion}
+            style={styles.input}
+            placeholder="Ingresa tu cuenta de cotización"
           />
           <ThemedText type="default" style={styles.label}>
             Puesto
@@ -286,7 +387,25 @@ export default function VerPerfil() {
               Nombre: {nombre}
             </ThemedText>
             <ThemedText type="default" style={styles.profileText}>
+              Apellidos: {apellidos}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
               DNI: {dni}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
+              Dirección: {direccion}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
+              Código postal: {codigo_postal}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
+              Poblacion: {poblacion}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
+              Provincia: {provincia}
+            </ThemedText>
+            <ThemedText type="default" style={styles.profileText}>
+              Cuenta de cotización: {cuenta_cotizacion}
             </ThemedText>
             <ThemedText type="default" style={styles.profileText}>
               Puesto: {puesto}
@@ -358,16 +477,58 @@ export default function VerPerfil() {
               value={nombre}
               onChangeText={setNombre}
               style={styles.input}
-              placeholder="Ingresa tu nombre"
+            />
+            <ThemedText type="default" style={styles.label}>
+              Apellidos
+            </ThemedText>
+            <TextInput
+              value={apellidos}
+              onChangeText={setApellidos}
+              style={styles.input}
             />
             <ThemedText type="default" style={styles.label}>
               DNI
             </ThemedText>
+            <TextInput value={dni} onChangeText={setDni} style={styles.input} />
+            <ThemedText type="default" style={styles.label}>
+              Dirección
+            </ThemedText>
             <TextInput
-              value={dni}
-              onChangeText={setDni}
+              value={direccion}
+              onChangeText={setDireccion}
               style={styles.input}
-              placeholder="Ingresa tu DNI"
+            />
+            <ThemedText type="default" style={styles.label}>
+              Código postal
+            </ThemedText>
+            <TextInput
+              value={codigo_postal}
+              onChangeText={setCodigoPostal}
+              style={styles.input}
+            />
+            <ThemedText type="default" style={styles.label}>
+              Población
+            </ThemedText>
+            <TextInput
+              value={poblacion}
+              onChangeText={setPoblacion}
+              style={styles.input}
+            />
+            <ThemedText type="default" style={styles.label}>
+              Provincia
+            </ThemedText>
+            <TextInput
+              value={provincia}
+              onChangeText={setProvincia}
+              style={styles.input}
+            />
+            <ThemedText type="default" style={styles.label}>
+              Cuenta de cotización
+            </ThemedText>
+            <TextInput
+              value={cuenta_cotizacion}
+              onChangeText={setCuentaCotizacion}
+              style={styles.input}
             />
             <ThemedText type="default" style={styles.label}>
               Puesto
@@ -376,7 +537,6 @@ export default function VerPerfil() {
               value={puesto}
               onChangeText={setPuesto}
               style={styles.input}
-              placeholder="Ingresa tu puesto"
             />
           </ThemedView>
 

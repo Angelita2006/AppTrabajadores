@@ -1,9 +1,8 @@
 import { Trabajador } from "../models/trabajadores";
 import api from "./api";
 
-// Función para actualizar la información de un trabajador
-export const updateTrabajador = async (
-  id: number,
+// Función para registrar un nuevo trabajador
+export const crearTrabajador = async (
   dni: string,
   nombre: string,
   apellidos: string,
@@ -17,7 +16,43 @@ export const updateTrabajador = async (
   password: string,
 ): Promise<Trabajador> => {
   try {
-    const res = await api.put(`/trabajador/${id}`, {
+    const res = await api.post(`/trabajador`, {
+      dni,
+      nombre,
+      apellidos,
+      codigo_postal,
+      direccion,
+      poblacion,
+      provincia,
+      cuenta_bancaria,
+      puesto,
+      email,
+      password,
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error al actualizar el trabajador:", error);
+    throw error;
+  }
+};
+
+// Función para actualizar la información de un trabajador
+export const editarTrabajador = async (
+  // id: number,
+  dni: string,
+  nombre: string,
+  apellidos: string,
+  codigo_postal: string,
+  direccion: string,
+  poblacion: string,
+  provincia: string,
+  cuenta_bancaria: string,
+  puesto: string,
+  email: string,
+  password: string,
+): Promise<Trabajador> => {
+  try {
+    const res = await api.put(`/trabajador/${dni}`, {
       dni,
       nombre,
       apellidos,

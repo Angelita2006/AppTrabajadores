@@ -464,6 +464,51 @@ def editar_trabajador(
     
     finally:
         db.close()
+    
+@app.put("/trabajador/{dni}")
+def editar_trabajador_dni(
+    nombre: str, 
+    apellidos: str, 
+    dni: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str, 
+    cuenta_cotizacion: str, 
+    email: str, 
+    password: str
+):
+    db = get_db() 
+    try:
+        trabajador = db.query(Trabajador).filter(Trabajador.dni == dni).first()
+        if not trabajador:
+            return JSONResponse(status_code=404, content=f"Trabajador ({dni}) no encontrado.")
+
+        trabajador = Trabajador(
+            nombre=nombre,
+            apellidos=apellidos,
+            dni=dni,
+            direccion=direccion,
+            codigo_postal=codigo_postal,
+            poblacion=poblacion,
+            provincia=provincia,
+            cuenta_cotizacion=cuenta_cotizacion,
+            email=email,
+            password=password
+        )
+
+        db.update(trabajador)
+        db.commit()
+        db.refresh(trabajador)
+
+        return JSONResponse(status_code=201, content=jsonable_encoder(trabajador))
+
+    except OSError as error:
+        db.rollback()
+        return JSONResponse(status_code=400, content=f"Ha ocurrido un error: {error}")
+    
+    finally:
+        db.close()
 
 @app.delete("/trabajador/{idTrabajador}")
 def eliminar_trabajador(idTrabajador: int):
