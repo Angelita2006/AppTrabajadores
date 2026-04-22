@@ -73,14 +73,12 @@ export const editarTrabajador = async (
 };
 
 // Función para obtener un trabajador por su email y contraseña (para iniciar sesión)
-export const getTrabajadorByEmailYContraseña = async (
+export const getTrabajadorByEmailYPassword = async (
   email: string,
-  contraseña: string,
+  password: string,
 ): Promise<Trabajador> => {
   try {
-    const response = await api.get(
-      `/trabajador?email=${email}&contraseña=${contraseña}`,
-    );
+    const response = await api.get(`/trabajador/${email}/${password}`);
     return response.data;
   } catch (error) {
     console.error("Error al obtener el trabajador:", error);

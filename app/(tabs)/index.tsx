@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet } from "react-native";
 
 import { Horario } from "@/models/horarios";
 import { getHorarioTrabajadorEmpresa } from "@/services/horariosService";
+// import { obtenerEmpresasTrabajador } from "@/services/trabajadoresService";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
@@ -11,27 +12,49 @@ import { ThemedButton } from "../../components/themed-button";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { useTrabajador } from "../../context/TrabajadorContext";
-import { Empresa, getEmpresa } from "../../models/empresas";
+// import { Empresa } from "../../models/empresas";
 import { crearFichaje, obtenerFichajes } from "../../models/fichajes";
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp<any>>();
 
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
-  const trabajadorId = trabajadorActual.id;
+  // const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
-  const [empresa, setEmpresa] = useState<Empresa | null>(null);
-  useEffect(() => {
-    getEmpresa(empresaSeleccionada?.id || 0).then(setEmpresa);
-  }, [empresaSeleccionada]);
+  // // 2. Cargamos los datos después del primer renderizado
+  // useEffect(() => {
+  //   async function cargar() {
+  //     // Si no hay trabajador aún, no hacemos nada
+  //     if (!trabajadorActual?.id) return;
 
-  const [horario] = useState<Horario | null>(null);
+  //     try {
+  //       const data = await obtenerEmpresasTrabajador(trabajadorActual.id);
+  //       setEmpresas(data);
+  //     } catch (error) {
+  //       console.error("Error cargando empresas:", error);
+  //     }
+  //   }
+  //   cargar();
+  // }, [trabajadorActual?.id]);
+
+  const [horario, setHorario] = useState<Horario | null>(null);
+
   useEffect(() => {
-    getHorarioTrabajadorEmpresa(empresaSeleccionada.id, trabajadorId);
-  });
+    async function cargarHorario() {
+      // Protección: si no hay empresa o trabajador, no pedimos el horario
+      if (empresaSeleccionada?.id && trabajadorActual?.id) {
+        const h = await getHorarioTrabajadorEmpresa(
+          empresaSeleccionada.id,
+          trabajadorActual.id,
+        );
+        setHorario(h);
+      }
+    }
+    cargarHorario();
+  }, [empresaSeleccionada?.id, trabajadorActual?.id]);
 
   const calcularHorasTrabajadas = () => {
-    if (trabajadorId === 0) return alert("Inicia sesión primero");
+    if (!trabajadorActual?.id) return;
 
     const fichajesTrabajador = obtenerFichajes(
       trabajadorActual.id,
@@ -47,10 +70,6 @@ export default function HomeScreen() {
     const diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
     return Math.floor(diffMs / (1000 * 60 * 60)); // hours
   };
-
-  function str(arg0: number | void): React.ReactNode {
-    throw new Error("Function not implemented.");
-  }
 
   return (
     <ParallaxScrollView
@@ -76,14 +95,14 @@ export default function HomeScreen() {
       <ThemedView style={styles.stepContainer}>
         <ThemedView style={styles.infoCard}>
           <ThemedText type="subtitle">
-            Empresa: {empresaSeleccionada?.nombre || empresa?.nombre}
+            Empresa: {empresaSeleccionada?.nombre || ""}
           </ThemedText>
           <ThemedText type="subtitle">
-            Horario: {horario?.hora_entrada?.toDateString()} a
-            {" " + horario?.hora_salida?.toDateString()}
+            Horario: {horario?.hora_entrada?.toDateString()} a{" "}
+            {horario?.hora_salida?.toDateString()}
           </ThemedText>
           <ThemedText type="subtitle">
-            Horas trabajadas hoy: {str(calcularHorasTrabajadas())}
+            Horas trabajadas hoy: {calcularHorasTrabajadas() || 0}
           </ThemedText>
         </ThemedView>
       </ThemedView>
@@ -169,7 +188,7 @@ export default function HomeScreen() {
           </Pressable>
         </ThemedView>
 
-        <Link href="/(tabs)" asChild>
+        <Link href="/(tabs)/empresas" asChild>
           <Pressable style={styles.button}>
             <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
           </Pressable>

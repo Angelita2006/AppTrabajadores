@@ -7,12 +7,12 @@ import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { Fonts } from "../../constants/theme";
 import { useTrabajador } from "../../context/TrabajadorContext";
+import { Empresa } from "../../models/empresas";
+import { getEmpresas } from "../../services/empresasService";
 import {
-  agregarEmpresa,
-  Empresa,
-  obtenerEmpresas,
-} from "../../models/empresas";
-import { obtenerEmpresasTrabajador } from "../../models/trabajadores";
+  agregarEmpresaATrabajador,
+  obtenerEmpresasTrabajador,
+} from "../../services/trabajadoresService";
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
 // Utiliza el componente ParallaxScrollView para mostrar un encabezado con efecto parallax, y muestra una lista de empresas
@@ -29,9 +29,15 @@ export default function VerEmpresas() {
   // utilizando la función obtenerEmpresas.
   const trabajador = useTrabajador().trabajadorActual;
   const trabajadorId = trabajador?.id || 0;
-  const [empresas, setEmpresas] = useState(
-    obtenerEmpresasTrabajador(trabajador?.id || 0),
-  );
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+
+  useEffect(() => {
+    const cargarMisEmpresas = async () => {
+      const data = await obtenerEmpresasTrabajador(trabajador?.id || 0);
+      setEmpresas(data);
+    };
+    cargarMisEmpresas();
+  }, [trabajador?.id]);
   // const [nuevoNombre, setNuevoNombre] = useState("");
   // const [nuevoCif, setNuevoCif] = useState("");
   const { setEmpresaSeleccionada } = useTrabajador();
@@ -41,7 +47,7 @@ export default function VerEmpresas() {
   // Carga de empresas disponibles
   useEffect(() => {
     const cargarDatos = async () => {
-      const disponibles = await obtenerEmpresas();
+      const disponibles = await getEmpresas();
       setEmpresasDisponibles(disponibles);
     };
     cargarDatos();
@@ -51,15 +57,12 @@ export default function VerEmpresas() {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
     try {
-      // 1. Llamamos a tu modelo para asociar la empresa al trabajador
-      // Nota: Asegúrate de que esta función exista en tu modelo 'empresas' o 'trabajadores'
-      await agregarEmpresa(trabajadorId, empresa.nombre, empresa.cif);
+      await agregarEmpresaATrabajador(trabajadorId, empresa.id);
 
-      // 2. Actualizamos el estado local de 'empresas' (las del trabajador)
-      // para que aparezca en la lista de abajo inmediatamente
+      // Actualizamos el estado local agregando la nueva empresa al array
       setEmpresas((prev) => [...prev, empresa]);
 
-      alert(`Empresa ${empresa.nombre} añadida a tu lista.`);
+      alert(`Empresa ${empresa.nombre} añadida.`);
     } catch (error) {
       if (error instanceof Error)
         alert("No se pudo añadir la empresa: " + error.message);

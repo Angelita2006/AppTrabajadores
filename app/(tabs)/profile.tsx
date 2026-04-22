@@ -9,7 +9,7 @@ import { useTrabajador } from "../../context/TrabajadorContext";
 import {
   crearTrabajador,
   editarTrabajador,
-  getTrabajadorByEmailYContraseña,
+  getTrabajadorByEmailYPassword,
 } from "../../services/trabajadoresService";
 // Componente VerPerfil que muestra la información del perfil del trabajador actual y permite iniciar o cerrar sesión. Utiliza el contexto
 // del trabajador para acceder a la información del trabajador actual y actualizarla al iniciar sesión.
@@ -35,7 +35,7 @@ export default function VerPerfil() {
   const [cuenta_cotizacion, setCuentaCotizacion] = useState("");
   const [puesto, setPuesto] = useState("");
   const [email, setEmail] = useState("");
-  const [contraseña, setContraseña] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSignOut = () => {
     setIsSignedIn(false);
@@ -49,7 +49,7 @@ export default function VerPerfil() {
     setCuentaCotizacion("");
     setPuesto("");
     setEmail("");
-    setContraseña("");
+    setPassword("");
     Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente");
   };
 
@@ -65,7 +65,7 @@ export default function VerPerfil() {
       provincia,
       cuenta_cotizacion,
       email,
-      contraseña,
+      password,
     );
     setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Registro del trabajador completado correctamente");
@@ -73,7 +73,7 @@ export default function VerPerfil() {
   };
 
   const handleSignIn = async () => {
-    let trabajador = getTrabajadorByEmailYContraseña(email, contraseña);
+    let trabajador = getTrabajadorByEmailYPassword(email, password);
     setNombre((await trabajador).nombre);
     setApellidos((await trabajador).apellidos);
     setDni((await trabajador).dni);
@@ -101,7 +101,7 @@ export default function VerPerfil() {
       provincia,
       cuenta_cotizacion,
       email,
-      contraseña,
+      password,
     );
     setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Información del perfil guardada correctamente");
@@ -230,8 +230,8 @@ export default function VerPerfil() {
             Contraseña
           </ThemedText>
           <TextInput
-            value={contraseña}
-            onChangeText={setContraseña}
+            value={password}
+            onChangeText={setPassword}
             secureTextEntry
             style={styles.input}
             placeholder="Ingresa tu contraseña"
@@ -240,8 +240,8 @@ export default function VerPerfil() {
             Confirmar contraseña
           </ThemedText>
           <TextInput
-            value={contraseña}
-            onChangeText={setContraseña}
+            value={password}
+            onChangeText={setPassword}
             secureTextEntry
             style={styles.input}
             placeholder="Confirma tu contraseña"
@@ -318,8 +318,8 @@ export default function VerPerfil() {
           </ThemedText>
 
           <TextInput
-            value={contraseña}
-            onChangeText={setContraseña}
+            value={password}
+            onChangeText={setPassword}
             secureTextEntry
             style={styles.input}
             placeholder="Ingresa tu contraseña"
