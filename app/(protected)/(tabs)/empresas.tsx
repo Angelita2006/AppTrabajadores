@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
+<<<<<<< HEAD:app/(protected)/(tabs)/empresas.tsx
 import ParallaxScrollView from "../../../components/parallax-scroll-view";
 import { ThemedText } from "../../../components/themed-text";
 import { ThemedView } from "../../../components/themed-view";
@@ -13,6 +14,20 @@ import {
   obtenerEmpresas,
 } from "../../../models/empresas";
 import { obtenerEmpresasTrabajador } from "../../../models/trabajadores";
+=======
+import ParallaxScrollView from "../../components/parallax-scroll-view";
+import { ThemedText } from "../../components/themed-text";
+import { ThemedView } from "../../components/themed-view";
+import { IconSymbol } from "../../components/ui/icon-symbol";
+import { Fonts } from "../../constants/theme";
+import { useTrabajador } from "../../context/TrabajadorContext";
+import { Empresa } from "../../models/empresas";
+import { getEmpresas } from "../../services/empresasService";
+import {
+  agregarEmpresaATrabajador,
+  obtenerEmpresasTrabajador,
+} from "../../services/trabajadoresService";
+>>>>>>> 3ec269deabd0f210a6e0ec2ee983de6548804641:app/(tabs)/empresas.tsx
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
 // Utiliza el componente ParallaxScrollView para mostrar un encabezado con efecto parallax, y muestra una lista de empresas
@@ -24,7 +39,20 @@ export default function VerEmpresas() {
   const trabajador = useTrabajador().trabajadorActual;
   const trabajadorId = trabajador?.id || 0;
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+<<<<<<< HEAD:app/(protected)/(tabs)/empresas.tsx
   
+=======
+
+  useEffect(() => {
+    const cargarMisEmpresas = async () => {
+      const data = await obtenerEmpresasTrabajador(trabajador?.id || 0);
+      setEmpresas(data);
+    };
+    cargarMisEmpresas();
+  }, [trabajador?.id]);
+  // const [nuevoNombre, setNuevoNombre] = useState("");
+  // const [nuevoCif, setNuevoCif] = useState("");
+>>>>>>> 3ec269deabd0f210a6e0ec2ee983de6548804641:app/(tabs)/empresas.tsx
   const { setEmpresaSeleccionada } = useTrabajador();
 
   const [empresasDisponibles, setEmpresasDisponibles] = useState<Empresa[]>([]);
@@ -32,7 +60,7 @@ export default function VerEmpresas() {
   // Carga de empresas disponibles
   useEffect(() => {
     const cargarDatos = async () => {
-      const disponibles = await obtenerEmpresas();
+      const disponibles = await getEmpresas();
       setEmpresasDisponibles(disponibles);
     };
     cargarDatos();
@@ -59,9 +87,18 @@ export default function VerEmpresas() {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
     try {
+<<<<<<< HEAD:app/(protected)/(tabs)/empresas.tsx
       await agregarEmpresa(trabajadorId, empresa);
       setEmpresas((prev) => [...prev, empresa]);
       alert(`Empresa ${empresa.nombre} añadida a tu lista.`);
+=======
+      await agregarEmpresaATrabajador(trabajadorId, empresa.id);
+
+      // Actualizamos el estado local agregando la nueva empresa al array
+      setEmpresas((prev) => [...prev, empresa]);
+
+      alert(`Empresa ${empresa.nombre} añadida.`);
+>>>>>>> 3ec269deabd0f210a6e0ec2ee983de6548804641:app/(tabs)/empresas.tsx
     } catch (error) {
       if (error instanceof Error)
         alert("No se pudo añadir la empresa: " + error.message);

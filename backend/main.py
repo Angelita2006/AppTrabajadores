@@ -737,6 +737,23 @@ def obtener_trabajador(idTrabajador: int):
     finally:
         db.close()
 
+@app.get("/trabajador/{email}/{password}")
+def obtener_trabajador_email_password(email: str, password: str):
+    db = get_db()
+    try:
+        trabajador = db.query(Trabajador).filter(Trabajador.email == email, Trabajador.password == password).first()
+    
+        if not trabajador:
+            return JSONResponse(status_code=404, content=f"Trabajador ({email}) no encontrado.")
+
+        return JSONResponse(status_code=201, content=jsonable_encoder(trabajador)) 
+    
+    except OSError as error:
+        return JSONResponse(status_code=400, content=f"Ha ocurrido un error: {error}")
+
+    finally:
+        db.close()
+
 ##################### RUTAS PARA EMPRESAS ####################
 @app.post("/empresa")
 def crear_empresa(

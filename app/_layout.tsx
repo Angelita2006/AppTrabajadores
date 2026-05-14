@@ -4,6 +4,7 @@ import {
   ThemeProvider,
 } from '@react-navigation/native';
 
+<<<<<<< HEAD
 import {
   Stack,
   useRouter,
@@ -24,6 +25,10 @@ import { ProveedorTrabajador } from '@/context/TrabajadorContext';
 import { useAuthStore } from '@/store/authStore';
 
 SplashScreen.preventAutoHideAsync();
+=======
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ProveedorTrabajador } from "../context/TrabajadorContext";
+>>>>>>> 3ec269deabd0f210a6e0ec2ee983de6548804641
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
