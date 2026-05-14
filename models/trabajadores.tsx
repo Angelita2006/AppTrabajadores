@@ -1,37 +1,24 @@
+import api from "../services/api";
 import { Empresa, obtenerEmpresas } from "./empresas";
 
 let idsTrabajadores = 0;
 
 // datos de ejemplo de trabajadores
 const trabajadores: Trabajador[] = [
-  // {
-  //   id: idsTrabajadores++,
-  //   dni: "12345678A",
-  //   nombre: "Manolo",
-  //   apellidos: "Pérez",
-  //   direccion: "Calle Falsa 123",
-  //   codigo_postal: "28080",
-  //   poblacion: "Madrid",
-  //   provincia: "Madrid",
-  //   cuenta_cotizacion: "ES12345678901234567890",
-  //   puesto: "Desarrollador",
-  //   email: "manolo@example.com",
-  //   password: "password123",
-  // },
-  // {
-  //   id: idsTrabajadores++,
-  //   dni: "87654321B",
-  //   nombre: "María",
-  //   apellidos: "Gómez",
-  //   direccion: "Avenida Principal 456",
-  //   codigo_postal: "28080",
-  //   poblacion: "Madrid",
-  //   provincia: "Madrid",
-  //   cuenta_cotizacion: "ES9012345678901234567890",
-  //   puesto: "Diseñadora",
-  //   email: "maria@example.com",
-  //   password: "password456",
-  // },
+  {
+    id: idsTrabajadores++,
+    dni: "12345678A",
+    nombre: "Manolo",
+    apellidos: "Pérez",
+    direccion: "Calle Falsa 123",
+    codigo_postal: "28080",
+    poblacion: "Madrid",
+    provincia: "Madrid",
+    cuenta_cotizacion: "ES12345678901234567890",
+    puesto: "Desarrollador",
+    email: "manolo@example.com",
+    password: "password123",
+  }
 ];
 
 // modelo de Trabajador
@@ -103,14 +90,18 @@ export const obtenerEmpresasTrabajador = async (
 };
 
 // obtiene un trabajador por su id
-export const getTrabajadorById = async (id: number): Promise<Trabajador> => {
+export const getTrabajadorById = async (
+  id: number,
+): Promise<Trabajador | null> => {
+  const trabajadorLocal = trabajadores.find((t) => t.id === id);
+  if (trabajadorLocal) return trabajadorLocal;
+
   try {
-    const response = await fetch(`/api/trabajador?id=${id}`);
-    const data = (await response).json();
-    return data as unknown as Trabajador;
+    const response = await api.get(`/trabajador?id=${id}`);
+    return response.data;
   } catch (error) {
     console.error("Error fetching trabajador:", error);
-    return "Trabajador no encontrado" as unknown as Trabajador;
+    return null;
   }
 };
 

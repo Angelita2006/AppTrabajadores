@@ -2,35 +2,83 @@ import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
-} from "@react-navigation/native";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import "react-native-reanimated";
+} from '@react-navigation/native';
 
-import { ProveedorTrabajador } from "../../context/TrabajadorContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  Stack,
+  useRouter,
+  useSegments,
+} from 'expo-router';
 
-export const unstable_settings = {
-  anchor: "(tabs)",
-};
-// RootLayout es el componente principal que envuelve toda la aplicación. Proporciona el contexto del trabajador y el tema de colores
-// a través de los proveedores correspondientes. También define la estructura de navegación utilizando Stack de react-navigation,
-// con una pantalla principal (tabs) y una pantalla modal (modal).
+import * as SplashScreen from 'expo-splash-screen';
+
+import { StatusBar } from 'expo-status-bar';
+
+import { useEffect } from 'react';
+
+import 'react-native-reanimated';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+import { ProveedorTrabajador } from '@/context/TrabajadorContext';
+import { useAuthStore } from '@/store/authStore';
+
+SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+
+  const segments = useSegments();
+
+  const {
+    user,
+    loading,
+    loadSession,
+  } = useAuthStore();
+
+  useEffect(() => {
+    async function prepare() {
+      await loadSession();
+
+      await SplashScreen.hideAsync();
+    }
+
+    prepare();
+  }, [loadSession]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inPublicGroup = segments.includes('(public)');
+
+    if (!user && !inPublicGroup) {
+      // Redirect to login if not authenticated
+      router.replace('/(public)'); // Assuming login is at app/(public)/index.tsx
+    } else if (user && inPublicGroup) {
+      // Redirect to protected area if authenticated but in public group
+      // Use the actual leaf route, e.g., '/' or '/(tabs)'
+      router.replace('/(tabs)'); // Assuming protected tabs start at app/(protected)/(tabs)/_layout.tsx or app/(protected)/(tabs)/index.tsx
+    }
+  }, [user, loading, segments, router]);
+
+  if (loading) {
+    return null;
+  }
 
   return (
-    <ProveedorTrabajador>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", title: "Modal" }}
-          />
-        </Stack>
+    <ThemeProvider
+      value={
+        colorScheme === 'dark'
+          ? DarkTheme
+          : DefaultTheme
+      }
+    >
+      <ProveedorTrabajador>
+        <Stack screenOptions={{ headerShown: false }} />
+
         <StatusBar style="auto" />
-      </ThemeProvider>
-    </ProveedorTrabajador>
+      </ProveedorTrabajador>
+    </ThemeProvider>
   );
 }

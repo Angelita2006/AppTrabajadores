@@ -1,41 +1,32 @@
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
-import ParallaxScrollView from "../../components/parallax-scroll-view";
-import { ThemedText } from "../../components/themed-text";
-import { ThemedView } from "../../components/themed-view";
-import { IconSymbol } from "../../components/ui/icon-symbol";
-import { Fonts } from "../../constants/theme";
-import { useTrabajador } from "../../context/TrabajadorContext";
+import ParallaxScrollView from "../../../components/parallax-scroll-view";
+import { ThemedText } from "../../../components/themed-text";
+import { ThemedView } from "../../../components/themed-view";
+import { IconSymbol } from "../../../components/ui/icon-symbol";
+import { Fonts } from "../../../constants/theme";
+import { useTrabajador } from "../../../context/TrabajadorContext";
 import {
   agregarEmpresa,
   Empresa,
   obtenerEmpresas,
-} from "../../models/empresas";
-import { obtenerEmpresasTrabajador } from "../../models/trabajadores";
+} from "../../../models/empresas";
+import { obtenerEmpresasTrabajador } from "../../../models/trabajadores";
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
 // Utiliza el componente ParallaxScrollView para mostrar un encabezado con efecto parallax, y muestra una lista de empresas
 // disponibles con opciones para eliminar o seleccionar cada empresa. También incluye un formulario para agregar nuevas empresas.
-// Recibe las siguientes props:
-// - No recibe props directamente, pero utiliza el contexto de Trabajador para obtener información sobre el trabajador actual y
-// las empresas asociadas a él.
 export default function VerEmpresas() {
   // Obtenemos el trabajador actual del contexto para poder mostrar las empresas asociadas a él y permitir agregar nuevas empresas.
   // Si no hay un trabajador actual, se asume un ID de 0 para evitar errores al obtener las empresas.
   // El estado empresas se inicializa con las empresas asociadas al trabajador actual, utilizando la función obtenerEmpresasTrabajador.
-  // También se definen estados para el nuevo nombre y CIF de la empresa que se desea agregar, y se obtiene la función
-  // setEmpresaSeleccionada del contexto para permitir seleccionar una empresa. Además, se obtiene la lista de empresas disponibles
-  // utilizando la función obtenerEmpresas.
   const trabajador = useTrabajador().trabajadorActual;
   const trabajadorId = trabajador?.id || 0;
-  const [empresas, setEmpresas] = useState(
-    obtenerEmpresasTrabajador(trabajador?.id || 0),
-  );
-  // const [nuevoNombre, setNuevoNombre] = useState("");
-  // const [nuevoCif, setNuevoCif] = useState("");
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  
   const { setEmpresaSeleccionada } = useTrabajador();
-  // const empresasDisponibles = obtenerEmpresas();
+
   const [empresasDisponibles, setEmpresasDisponibles] = useState<Empresa[]>([]);
 
   // Carga de empresas disponibles
@@ -47,18 +38,29 @@ export default function VerEmpresas() {
     cargarDatos();
   }, []);
 
+  useEffect(() => {
+    const cargarEmpresasTrabajador = async () => {
+      if (trabajadorId === 0) {
+        setEmpresas([]);
+        return;
+      }
+      try {
+        const empresasUsuario = await obtenerEmpresasTrabajador(trabajadorId);
+        setEmpresas(empresasUsuario);
+      } catch (error) {
+        console.error("Error cargando empresas del trabajador:", error);
+      }
+    };
+
+    cargarEmpresasTrabajador();
+  }, [trabajadorId]);
+
   const handleSeleccionarDisponible = async (empresa: Empresa) => {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
     try {
-      // 1. Llamamos a tu modelo para asociar la empresa al trabajador
-      // Nota: Asegúrate de que esta función exista en tu modelo 'empresas' o 'trabajadores'
-      await agregarEmpresa(trabajadorId, empresa.nombre, empresa.cif);
-
-      // 2. Actualizamos el estado local de 'empresas' (las del trabajador)
-      // para que aparezca en la lista de abajo inmediatamente
+      await agregarEmpresa(trabajadorId, empresa);
       setEmpresas((prev) => [...prev, empresa]);
-
       alert(`Empresa ${empresa.nombre} añadida a tu lista.`);
     } catch (error) {
       if (error instanceof Error)

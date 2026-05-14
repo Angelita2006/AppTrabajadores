@@ -1,4 +1,3 @@
-
 let idsFichajes = 0;
 
 // datos de ejemplo de fichajes
@@ -6,10 +5,11 @@ const fichajes: Fichaje[] = [];
 
 // modelo de Fichaje
 export interface Fichaje {
-  id: number;
+  idFichaje: number;
   idTrabajador: number;
-  idEmpresa?: number;
+  idEmpresa: number;
   tipo: "entrada" | "salida" | "descanso" | "horas_extra";
+  fecha: string; 
   fecha_hora: Date;
   //   ubicacion?: { lat: number; lng: number };
 }
@@ -23,26 +23,16 @@ export const crearFichaje = (
   tipo: "entrada" | "salida" | "descanso" | "horas_extra",
 ): Fichaje => {
   const fichaje = {
-    id: idsFichajes++,
+    idFichaje: idsFichajes++,
     idTrabajador,
     idEmpresa,
     tipo,
+    fecha: new Date().toISOString(),
     fecha_hora: new Date(),
   };
-  // fichajes.push(fichaje);
+  fichajes.push(fichaje);
 
-  // try {
-  //   fetch("/api/fichajes", {
-  //     method: "POST",
-  //     headers: {
-  //       "Content-Type": "application/json",
-  //     },
-  //     body: JSON.stringify(fichaje),
-  //   });
-  // } catch (error) {
-  //   console.error("Error al enviar el fichaje al backend:", error);
-  // }
-  // return fichaje;
+  return fichaje;
 };
 
 // obtiene los fichajes de un trabajador en una empresa específica

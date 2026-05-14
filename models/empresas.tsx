@@ -1,3 +1,4 @@
+import api from "../services/api";
 import { getEmpresas } from "../services/empresasService";
 import { getTrabajadorById } from "./trabajadores";
 
@@ -49,31 +50,33 @@ export interface Empresa {
 // Funciones para manejar las empresas
 
 // agrega una empresa a un trabajador y viceversa
-export const agregarEmpresa = (
+export const agregarEmpresa = async (
   trabajadorId: number,
-  nombre: string,
-  cif: string,
-) => {
-  let trabajador = getTrabajadorById(trabajadorId);
-  let empresa = { nombre, cif } as unknown as Empresa;
-  Promise.resolve(trabajador).then((trabajador) => {
-    if (trabajador && empresa) {
-      // si el trabajador no tiene la empresa en su lista, la agregamos
-      if (!trabajador.empresas?.find((id) => id === empresa.id)) {
-        trabajador.empresas = [];
-        trabajador.empresas.push(empresa.id);
-      }
-      // si la empresa no tiene el trabajador en su lista, lo agregamos
-      if (
-        !empresa.trabajadores?.find(
-          (trabajadorId) => trabajadorId === trabajador.id,
-        )
-      ) {
-        empresa.trabajadores = [];
-        empresa.trabajadores.push(trabajadorId);
-      }
-    }
-  });
+  empresa: Empresa,
+): Promise<Empresa> => {
+  const trabajador = await getTrabajadorById(trabajadorId);
+  if (!trabajador || typeof trabajador.id !== "number") {
+    throw new Error("Trabajador no encontrado");
+  }
+
+  let empresaExistente = empresas.find((e) => e.id === empresa.id);
+  if (!empresaExistente) {
+    empresas.push(empresa);
+    empresaExistente = empresa;
+  }
+
+  if (!trabajador.empresas?.includes(empresaExistente.id)) {
+    trabajador.empresas = [...(trabajador.empresas ?? []), empresaExistente.id];
+  }
+
+  if (!empresaExistente.trabajadores?.includes(trabajador.id)) {
+    empresaExistente.trabajadores = [
+      ...(empresaExistente.trabajadores ?? []),
+      trabajador.id,
+    ];
+  }
+
+  return empresaExistente;
 };
 
 // crea una nueva empresa
@@ -95,21 +98,18 @@ export const crearEmpresa = (
 });
 
 // obtiene una empresa por su id
-export const getEmpresa = async (id: number): Promise<Empresa> => {
+export const getEmpresa = async (id: number): Promise<Empresa | null> => {
+  const empresaLocal = empresas.find((e) => e.id === id);
+  if (empresaLocal) return empresaLocal;
+
   try {
-    const response = await fetch(`/empresas?id=${id}`);
-    const data = (await response).json();
-    return data as unknown as Empresa;
+    const response = await api.get(`/empresas/${id}`);
+    return response.data;
   } catch (error) {
     console.error("Error fetching empresa:", error);
-    return "Empresa no encontrada" as unknown as Empresa;
+    return null;
   }
 };
-
-//obtiene todas las empresas disponibles
-// export const obtenerEmpresas = (): Empresa[] => {
-//   return empresas;
-// };
 
 export const obtenerEmpresas = async (): Promise<Empresa[]> => {
   empresas = await Promise.resolve(getEmpresas());
