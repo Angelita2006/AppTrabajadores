@@ -18,7 +18,7 @@ const trabajadores: Trabajador[] = [
     puesto: "Desarrollador",
     email: "manolo@example.com",
     password: "password123",
-  }
+  },
 ];
 
 // modelo de Trabajador
@@ -140,3 +140,20 @@ export const updateTrabajador = (
   }
   throw new Error("Trabajador no encontrado");
 };
+
+export const obtenerTrabajadorPorUsuarioId = (usuarioId: any): Trabajador => {
+  const trabajador = trabajadores.find((t) => t.id === usuarioId);
+  if (!trabajador) {
+    throw new Error("Trabajador no encontrado");
+  }
+  return trabajador;
+};
+
+// export const eliminarTrabajador = (id: number): void => {
+//   const index = trabajadores.findIndex((t) => t.id === id);
+//   if (index !== -1) {
+//     trabajadores.splice(index, 1);
+//   } else {
+//     throw new Error("Trabajador no encontrado");
+//   }
+// };

@@ -56,8 +56,7 @@ export const ProveedorTrabajador: React.FC<{ children: ReactNode }> = ({
     </ContextoTrabajadorConst.Provider>
   );
 };
-// useTrabajador es un hook personalizado que permite a los componentes acceder al contexto del trabajador actual y la empresa seleccionada.
-// Si el hook se utiliza fuera del proveedor de contexto, se lanza un error para indicar que debe usarse dentro de un ProveedorTrabajador.
+
 export const useTrabajador = () => {
   const context = useContext(ContextoTrabajadorConst);
   if (!context) {
