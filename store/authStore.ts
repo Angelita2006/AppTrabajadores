@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
 
 type User = {
   id: number;
@@ -12,86 +12,65 @@ type AuthState = {
   token: string | null;
   loading: boolean;
 
-  login: (
-    user: User,
-    token: string,
-  ) => Promise<void>;
+  login: (user: User, token: string) => Promise<void>;
 
   logout: () => Promise<void>;
 
   loadSession: () => Promise<void>;
 };
 
-export const useAuthStore = create<AuthState>(
-  (set) => ({
-    user: null,
-    token: null,
-    loading: true,
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  token: null,
+  loading: true,
 
-    login: async (user, token) => {
-      await AsyncStorage.setItem(
-        'token',
-        token,
-      );
+  login: async (user, token) => {
+    await AsyncStorage.setItem("token", token);
 
-      await AsyncStorage.setItem(
-        'user',
-        JSON.stringify(user),
-      );
+    await AsyncStorage.setItem("user", JSON.stringify(user));
 
-      set({
-        user,
-        token,
-      });
-    },
+    set({
+      user,
+      token,
+    });
+  },
 
-    logout: async () => {
-      await AsyncStorage.removeItem(
-        'token',
-      );
+  logout: async () => {
+    await AsyncStorage.removeItem("token");
 
-      await AsyncStorage.removeItem(
-        'user',
-      );
+    await AsyncStorage.removeItem("user");
 
-      set({
-        user: null,
-        token: null,
-      });
-    },
+    set({
+      user: null,
+      token: null,
+    });
+  },
 
-    loadSession: async () => {
-      try {
-        const token =
-          await AsyncStorage.getItem(
-            'token',
-          );
+  loadSession: async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
 
-        const userString =
-          await AsyncStorage.getItem(
-            'user',
-          );
+      const userString = await AsyncStorage.getItem("user");
 
-        if (token && userString) {
-          set({
-            token,
-            user: JSON.parse(userString),
-            loading: false,
-          });
-
-          return;
-        }
-
+      if (token && userString) {
         set({
+          token,
+          user: JSON.parse(userString),
           loading: false,
         });
-      } catch (error) {
-        console.error(error);
 
-        set({
-          loading: false,
-        });
+        return;
       }
-    },
-  }),
-);
+
+      set({
+        loading: false,
+      });
+    } catch (error) {
+      console.error(error);
+
+      set({
+        loading: false,
+      });
+    }
+  },
+}));

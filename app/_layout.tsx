@@ -2,33 +2,15 @@ import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
-} from '@react-navigation/native';
-
-<<<<<<< HEAD
-import {
-  Stack,
-  useRouter,
-  useSegments,
-} from 'expo-router';
-
-import * as SplashScreen from 'expo-splash-screen';
-
-import { StatusBar } from 'expo-status-bar';
-
-import { useEffect } from 'react';
-
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-import { ProveedorTrabajador } from '@/context/TrabajadorContext';
-import { useAuthStore } from '@/store/authStore';
-
-SplashScreen.preventAutoHideAsync();
-=======
-import { useColorScheme } from "@/hooks/use-color-scheme";
+} from "@react-navigation/native";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import "react-native-reanimated";
 import { ProveedorTrabajador } from "../context/TrabajadorContext";
->>>>>>> 3ec269deabd0f210a6e0ec2ee983de6548804641
+import { useColorScheme } from "../hooks/use-color-scheme";
+import { useAuthStore } from "../store/authStore";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -36,11 +18,7 @@ export default function RootLayout() {
 
   const segments = useSegments();
 
-  const {
-    user,
-    loading,
-    loadSession,
-  } = useAuthStore();
+  const { user, loading, loadSession } = useAuthStore();
 
   useEffect(() => {
     async function prepare() {
@@ -55,15 +33,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading) return;
 
-    const inPublicGroup = segments.includes('(public)');
+    //***//
+    const inPublicGroup = (segments as readonly string[]).includes("(public)");
 
     if (!user && !inPublicGroup) {
       // Redirect to login if not authenticated
-      router.replace('/(public)'); // Assuming login is at app/(public)/index.tsx
+      router.replace("/(public)" as unknown as any); // cast to avoid TS route type error
     } else if (user && inPublicGroup) {
       // Redirect to protected area if authenticated but in public group
       // Use the actual leaf route, e.g., '/' or '/(tabs)'
-      router.replace('/(tabs)'); // Assuming protected tabs start at app/(protected)/(tabs)/_layout.tsx or app/(protected)/(tabs)/index.tsx
+      router.replace("/(tabs)" as unknown as any); // cast to avoid TS route type error
     }
   }, [user, loading, segments, router]);
 
@@ -72,13 +51,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider
-      value={
-        colorScheme === 'dark'
-          ? DarkTheme
-          : DefaultTheme
-      }
-    >
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <ProveedorTrabajador>
         <Stack screenOptions={{ headerShown: false }} />
 

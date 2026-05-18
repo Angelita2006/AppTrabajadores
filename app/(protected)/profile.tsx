@@ -6,19 +6,20 @@ import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { Fonts } from "../../constants/theme";
 import { useTrabajador } from "../../context/TrabajadorContext";
+import { ficharTrabajador } from "../../services/fichajesService";
 import {
   crearTrabajador,
   editarTrabajador,
   getTrabajadorByEmailYPassword,
 } from "../../services/trabajadoresService";
 
-// Componente VerPerfil que muestra la información del perfil del trabajador actual y permite iniciar o cerrar sesión. Utiliza el contexto
-// del trabajador para acceder a la información del trabajador actual y actualizarla al iniciar sesión.
-// El componente muestra un formulario para ingresar el nombre, DNI, puesto, email y contraseña del trabajador cuando no hay una sesión iniciada.
-// Al hacer clic en el botón "Iniciar sesión", se crea un nuevo trabajador con la información ingresada y se actualiza el contexto con el
-// trabajador actual. Si ya hay una sesión iniciada, se muestra la información del perfil y un botón para cerrar sesión, que restablece el estado
-// y muestra una alerta de cierre de sesión exitoso.
+interface Fichaje {
+  tipo: string;
+  fecha: string;
+}
+
 export default function VerPerfil() {
+  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
   const [pantalla, setPantalla] = useState<
     "registro" | "inicio" | "perfil" | "editar"
   >("inicio");
@@ -36,10 +37,11 @@ export default function VerPerfil() {
   const [cuenta_cotizacion, setCuentaCotizacion] = useState("");
   const [puesto, setPuesto] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [contraseña, setContraseña] = useState("");
 
   const handleSignOut = () => {
     setIsSignedIn(false);
+    setTrabajadorActual(null);
     setNombre("");
     setApellidos("");
     setDni("");
@@ -50,67 +52,95 @@ export default function VerPerfil() {
     setCuentaCotizacion("");
     setPuesto("");
     setEmail("");
-    setPassword("");
+    setContraseña("");
+    setFichajes([]);
     Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente");
   };
 
-  const handleRegister = () => {
-    const trabajador = crearTrabajador(
-      nombre,
-      apellidos,
-      dni,
-      puesto,
-      direccion,
-      codigo_postal,
-      poblacion,
-      provincia,
-      cuenta_cotizacion,
-      email,
-      password,
-    );
-    setTrabajadorActual(trabajador as any);
-    Alert.alert("Éxito", "Registro del trabajador completado correctamente");
-    setIsSignedIn(true);
+  const handleRegister = async () => {
+    try {
+      const trabajador = await crearTrabajador(
+        dni,
+        nombre,
+        apellidos,
+        codigo_postal,
+        direccion,
+        poblacion,
+        provincia,
+        cuenta_cotizacion,
+        puesto,
+        email,
+        contraseña,
+      );
+      setTrabajadorActual(trabajador);
+      setIsSignedIn(true);
+      setPantalla("perfil");
+      Alert.alert("Éxito", "Registro del trabajador completado correctamente");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo registrar el trabajador.");
+      console.error(error);
+    }
   };
 
   const handleSignIn = async () => {
-    let trabajador = getTrabajadorByEmailYPassword(email, password);
-    setNombre((await trabajador).nombre);
-    setApellidos((await trabajador).apellidos);
-    setDni((await trabajador).dni);
-    setDireccion((await trabajador).direccion);
-    setCodigoPostal((await trabajador).codigo_postal);
-    setPoblacion((await trabajador).poblacion);
-    setProvincia((await trabajador).provincia);
-    setCuentaCotizacion((await trabajador).cuenta_cotizacion);
-    setPuesto((await trabajador).puesto);
-
-    setTrabajadorActual((await trabajador) as any);
-
-    Alert.alert("Éxito", "Sesión del trabajador iniciada correctamente");
-    setIsSignedIn(true);
+    try {
+      const trabajador = await getTrabajadorByEmailYPassword(email, contraseña);
+      setNombre(trabajador.nombre);
+      setApellidos(trabajador.apellidos);
+      setDni(trabajador.dni);
+      setDireccion(trabajador.direccion);
+      setCodigoPostal(trabajador.codigo_postal);
+      setPoblacion(trabajador.poblacion);
+      setProvincia(trabajador.provincia);
+      setCuentaCotizacion(trabajador.cuenta_cotizacion);
+      setPuesto(trabajador.puesto);
+      setTrabajadorActual(trabajador);
+      setIsSignedIn(true);
+      setPantalla("perfil");
+      Alert.alert("Éxito", "Sesión del trabajador iniciada correctamente");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "No se pudo iniciar sesión. Revisa tus credenciales.",
+      );
+      console.error(error);
+    }
   };
 
   const handleSubmit = async () => {
-    const trabajador = editarTrabajador(
-      // id,
-      nombre,
-      apellidos,
-      dni,
-      puesto,
-      direccion,
-      codigo_postal,
-      poblacion,
-      provincia,
-      cuenta_cotizacion,
-      email,
-      password,
-    );
+    try {
+      const trabajador = await editarTrabajador(
+        dni,
+        nombre,
+        apellidos,
+        codigo_postal,
+        direccion,
+        poblacion,
+        provincia,
+        cuenta_cotizacion,
+        puesto,
+        email,
+        contraseña,
+      );
+      setTrabajadorActual(trabajador);
+      setIsSignedIn(true);
+      setPantalla("perfil");
+      Alert.alert("Éxito", "Información del perfil guardada correctamente");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo guardar la información del perfil.");
+      console.error(error);
+    }
+  };
 
-    setTrabajadorActual((await trabajador) as any);
-
-    Alert.alert("Éxito", "Información del perfil guardada correctamente");
-    setIsSignedIn(true);
+  const handleFichar = async (tipo: string) => {
+    try {
+      const nuevoFichaje = await ficharTrabajador(tipo);
+      setFichajes([...fichajes, nuevoFichaje]);
+      Alert.alert("Éxito", `Fichaje de ${tipo} registrado correctamente.`);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo registrar el fichaje.");
+      console.error(error);
+    }
   };
 
   if (pantalla === "registro" && !isSignedIn) {
@@ -149,6 +179,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu nombre"
           />
+
           <ThemedText type="default" style={styles.label}>
             Apellidos
           </ThemedText>
@@ -158,6 +189,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tus apellidos"
           />
+
           <ThemedText type="default" style={styles.label}>
             DNI
           </ThemedText>
@@ -167,6 +199,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu DNI"
           />
+
           <ThemedText type="default" style={styles.label}>
             Dirección
           </ThemedText>
@@ -176,6 +209,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu dirección"
           />
+
           <ThemedText type="default" style={styles.label}>
             Código Postal
           </ThemedText>
@@ -185,6 +219,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu código postal"
           />
+
           <ThemedText type="default" style={styles.label}>
             Población
           </ThemedText>
@@ -194,6 +229,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu población"
           />
+
           <ThemedText type="default" style={styles.label}>
             Provincia
           </ThemedText>
@@ -203,6 +239,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu provincia"
           />
+
           <ThemedText type="default" style={styles.label}>
             Cuenta de cotización
           </ThemedText>
@@ -212,6 +249,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu cuenta de cotización"
           />
+
           <ThemedText type="default" style={styles.label}>
             Puesto
           </ThemedText>
@@ -221,6 +259,7 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu puesto"
           />
+
           <ThemedText type="default" style={styles.label}>
             Email
           </ThemedText>
@@ -231,22 +270,24 @@ export default function VerPerfil() {
             style={styles.input}
             placeholder="Ingresa tu email"
           />
+
           <ThemedText type="default" style={styles.label}>
             Contraseña
           </ThemedText>
           <TextInput
-            value={password}
-            onChangeText={setPassword}
+            value={contraseña}
+            onChangeText={setContraseña}
             secureTextEntry
             style={styles.input}
             placeholder="Ingresa tu contraseña"
           />
+
           <ThemedText type="default" style={styles.label}>
             Confirmar contraseña
           </ThemedText>
           <TextInput
-            value={password}
-            onChangeText={setPassword}
+            value={contraseña}
+            onChangeText={setContraseña}
             secureTextEntry
             style={styles.input}
             placeholder="Confirma tu contraseña"
@@ -254,18 +295,11 @@ export default function VerPerfil() {
         </ThemedView>
 
         <ThemedView style={styles.buttonContainer}>
-          <Pressable
-            style={styles.signInButton}
-            onPress={() => {
-              handleRegister();
-              setPantalla("perfil");
-            }}
-          >
+          <Pressable style={styles.signInButton} onPress={handleRegister}>
             <ThemedText type="subtitle" style={styles.buttonText}>
               Registrarse
             </ThemedText>
           </Pressable>
-
           <Pressable
             style={styles.signInButton}
             onPress={() => setPantalla("inicio")}
@@ -309,7 +343,6 @@ export default function VerPerfil() {
           <ThemedText type="default" style={styles.label}>
             Email
           </ThemedText>
-
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -321,10 +354,9 @@ export default function VerPerfil() {
           <ThemedText type="default" style={styles.label}>
             Contraseña
           </ThemedText>
-
           <TextInput
-            value={password}
-            onChangeText={setPassword}
+            value={contraseña}
+            onChangeText={setContraseña}
             secureTextEntry
             style={styles.input}
             placeholder="Ingresa tu contraseña"
@@ -332,18 +364,11 @@ export default function VerPerfil() {
         </ThemedView>
 
         <ThemedView style={styles.buttonContainer}>
-          <Pressable
-            style={styles.signInButton}
-            onPress={() => {
-              handleSignIn();
-              setPantalla("perfil");
-            }}
-          >
+          <Pressable style={styles.signInButton} onPress={handleSignIn}>
             <ThemedText type="subtitle" style={styles.buttonText}>
               Iniciar sesión
             </ThemedText>
           </Pressable>
-
           <Pressable
             style={styles.signInButton}
             onPress={() => setPantalla("registro")}
@@ -384,7 +409,7 @@ export default function VerPerfil() {
         </ThemedView>
 
         <View>
-          <ThemedView style={[styles.profileContainer]}>
+          <ThemedView style={styles.profileContainer}>
             <ThemedText type="subtitle" style={styles.profileTitle}>
               Información del Perfil
             </ThemedText>
@@ -404,7 +429,7 @@ export default function VerPerfil() {
               Código postal: {codigo_postal}
             </ThemedText>
             <ThemedText type="default" style={styles.profileText}>
-              Poblacion: {poblacion}
+              Población: {poblacion}
             </ThemedText>
             <ThemedText type="default" style={styles.profileText}>
               Provincia: {provincia}
@@ -423,18 +448,39 @@ export default function VerPerfil() {
           <ThemedView style={styles.buttonContainer}>
             <Pressable
               style={styles.signOutButton}
-              onPress={() => setPantalla("editar")}
+              onPress={() => handleFichar("entrada")}
             >
               <ThemedText type="subtitle" style={styles.buttonText}>
-                Editar perfil
+                Fichar Entrada
               </ThemedText>
             </Pressable>
+            <Pressable
+              style={styles.signOutButton}
+              onPress={() => handleFichar("salida")}
+            >
+              <ThemedText type="subtitle" style={styles.buttonText}>
+                Fichar Salida
+              </ThemedText>
+            </Pressable>
+          </ThemedView>
 
+          <ThemedView style={styles.historyContainer}>
+            <ThemedText type="subtitle" style={styles.historyTitle}>
+              Historial de Fichajes
+            </ThemedText>
+            {fichajes.map((fichaje, index) => (
+              <ThemedText key={index} type="default" style={styles.historyText}>
+                {fichaje.tipo} - {fichaje.fecha}
+              </ThemedText>
+            ))}
+          </ThemedView>
+
+          <ThemedView style={styles.buttonContainer}>
             <Pressable
               style={styles.signOutButton}
               onPress={() => {
                 handleSignOut();
-                setPantalla("registro");
+                setPantalla("inicio");
               }}
             >
               <ThemedText type="subtitle" style={styles.buttonText}>
@@ -483,6 +529,7 @@ export default function VerPerfil() {
               onChangeText={setNombre}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Apellidos
             </ThemedText>
@@ -491,10 +538,12 @@ export default function VerPerfil() {
               onChangeText={setApellidos}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               DNI
             </ThemedText>
             <TextInput value={dni} onChangeText={setDni} style={styles.input} />
+
             <ThemedText type="default" style={styles.label}>
               Dirección
             </ThemedText>
@@ -503,6 +552,7 @@ export default function VerPerfil() {
               onChangeText={setDireccion}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Código postal
             </ThemedText>
@@ -511,6 +561,7 @@ export default function VerPerfil() {
               onChangeText={setCodigoPostal}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Población
             </ThemedText>
@@ -519,6 +570,7 @@ export default function VerPerfil() {
               onChangeText={setPoblacion}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Provincia
             </ThemedText>
@@ -527,6 +579,7 @@ export default function VerPerfil() {
               onChangeText={setProvincia}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Cuenta de cotización
             </ThemedText>
@@ -535,6 +588,7 @@ export default function VerPerfil() {
               onChangeText={setCuentaCotizacion}
               style={styles.input}
             />
+
             <ThemedText type="default" style={styles.label}>
               Puesto
             </ThemedText>
@@ -545,13 +599,7 @@ export default function VerPerfil() {
             />
           </ThemedView>
 
-          <Pressable
-            style={styles.signInButton}
-            onPress={() => {
-              handleSubmit();
-              setPantalla("perfil");
-            }}
-          >
+          <Pressable style={styles.signInButton} onPress={handleSubmit}>
             <ThemedText type="subtitle" style={styles.buttonText}>
               Guardar cambios
             </ThemedText>
@@ -563,23 +611,17 @@ export default function VerPerfil() {
 }
 
 const styles = StyleSheet.create({
-  // Estilo para la imagen de fondo del header, que se posiciona de manera absoluta para crear el efecto parallax, y
-  // tiene un color gris para simular una imagen de fondo.
   headerImage: {
     color: "#808080",
     bottom: -90,
     left: -35,
     position: "absolute",
   },
-  // Estilo para el contenedor del título de cada sección, que organiza el título en una fila con un icono y un fondo claro para
-  // destacar el título.
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  // Estilo para el contenedor del formulario de registro e inicio de sesión, que tiene un fondo claro, bordes redondeados y
-  // un borde de color para resaltar la sección del formulario.
   formContainer: {
     padding: 20,
     backgroundColor: "#F3E5F5",
@@ -588,8 +630,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CE93D8",
   },
-  // Estilo para las etiquetas de los campos del formulario, que tienen un tamaño de fuente más grande, negrita y
-  // un margen para separarlas de los campos de entrada.
   label: {
     fontSize: 16,
     fontWeight: "bold",
@@ -597,7 +637,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#333",
   },
-  // Estilo para los campos de entrada de texto, que tienen un borde, fondo blanco, padding y un tamaño de fuente legible.
   input: {
     borderWidth: 1,
     borderColor: "#CCC",
@@ -606,8 +645,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     fontSize: 16,
   },
-  // Estilo para el botón de iniciar sesión, que tiene un fondo azul para indicar una acción de inicio de sesión, y
-  // un estilo similar al botón de cerrar sesión para mantener la coherencia visual.
   signInButton: {
     backgroundColor: "#007AFF",
     padding: 15,
@@ -615,8 +652,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     margin: 10,
   },
-  // Estilo para el botón de cerrar sesión, que tiene un fondo rojo para indicar una acción de cierre de sesión, y
-  // un estilo similar al botón de iniciar sesión para mantener la coherencia visual.
   signOutButton: {
     backgroundColor: "#FF3B30",
     padding: 15,
@@ -624,19 +659,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     margin: 10,
   },
-  // Estilo para el contenedor de los botones de cada empresa, que organiza los botones en una fila con espacio entre ellos.
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "flex-start",
     gap: 10,
   },
-  // Estilo para el texto de los botones, que define el color y el tamaño de fuente.
   buttonText: {
     color: "white",
     fontSize: 18,
   },
-  // Estilo para el contenedor del perfil, que tiene un fondo claro, bordes redondeados y un borde de color para resaltar
-  // la sección de información del perfil.
   profileContainer: {
     padding: 20,
     backgroundColor: "#E8F5E8",
@@ -645,7 +676,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#A5D6A7",
   },
-  // Estilo para el título de la sección de perfil, que es más grande y en negrita para destacar la información del perfil.
   profileTitle: {
     fontSize: 20,
     fontWeight: "bold",
@@ -653,10 +683,29 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#333",
   },
-  // Estilo para el texto de la información del perfil, que tiene un tamaño de fuente legible y un color oscuro para facilitar la lectura.
   profileText: {
     fontSize: 16,
     marginBottom: 10,
     color: "#333",
+  },
+  historyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#333",
+  },
+  historyText: {
+    fontSize: 14,
+    color: "#000",
+    marginBottom: 5,
+  },
+  historyContainer: {
+    padding: 20,
+    backgroundColor: "#F3E5F5",
+    borderRadius: 10,
+    margin: 10,
+    borderWidth: 1,
+    borderColor: "#CE93D8",
   },
 });

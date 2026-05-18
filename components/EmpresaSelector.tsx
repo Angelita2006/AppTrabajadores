@@ -1,7 +1,4 @@
-import { useTrabajador } from '@/context/TrabajadorContext';
-import { Empresa } from '@/models/empresas';
-import { useFichajeStore } from '@/store/useFichajeStore';
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   FlatList,
   Modal,
@@ -9,8 +6,11 @@ import {
   SafeAreaView,
   StyleSheet,
   View,
-} from 'react-native';
-import { ThemedText } from './themed-text';
+} from "react-native";
+import { useTrabajador } from "../context/TrabajadorContext";
+import { Empresa } from "../models/empresas";
+import { useFichajeStore } from "../store/useFichajeStore";
+import { ThemedText } from "./themed-text";
 
 export const EmpresaSelector = () => {
   const [showModal, setShowModal] = useState(false);
@@ -24,13 +24,10 @@ export const EmpresaSelector = () => {
 
   return (
     <>
-      <Pressable
-        style={styles.button}
-        onPress={() => setShowModal(true)}
-      >
+      <Pressable style={styles.button} onPress={() => setShowModal(true)}>
         <View style={styles.contenedor}>
           <ThemedText style={styles.label}>
-            {empresaSeleccionada?.nombre || 'Seleccionar empresa'}
+            {empresaSeleccionada?.nombre || "Seleccionar empresa"}
           </ThemedText>
           <ThemedText style={styles.chevron}>▼</ThemedText>
         </View>
@@ -83,80 +80,80 @@ export const EmpresaSelector = () => {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: "#E2E8F0",
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginVertical: 8,
   },
   contenedor: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: "600",
+    color: "#0F172A",
   },
   chevron: {
     fontSize: 12,
-    color: '#64748B',
+    color: "#64748B",
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: "#E2E8F0",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "700",
+    color: "#0F172A",
   },
   closeButton: {
     fontSize: 24,
-    color: '#64748B',
+    color: "#64748B",
   },
   empresaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: "#F1F5F9",
   },
   empresaItemSelected: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: "#F0F9FF",
   },
   radio: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   radioBullet: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#2563EB',
+    backgroundColor: "#2563EB",
   },
   empresaNombre: {
     fontSize: 16,
-    color: '#0F172A',
-    fontWeight: '500',
+    color: "#0F172A",
+    fontWeight: "500",
   },
 });

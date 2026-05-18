@@ -1,18 +1,16 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ThemedText } from './themed-text';
-import { useTrabajador } from '@/context/TrabajadorContext';
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { useTrabajador } from "../context/TrabajadorContext";
+import { ThemedText } from "./themed-text";
 
 export const Header = () => {
   const { trabajadorActual } = useTrabajador();
 
-  const nombre = trabajadorActual?.nombre?.split(' ')[0] || 'Trabajador';
+  const nombre = trabajadorActual?.nombre?.split(" ")[0] || "Trabajador";
 
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.saludo}>
-        Hola {nombre} 👋
-      </ThemedText>
+      <ThemedText style={styles.saludo}>Hola {nombre} 👋</ThemedText>
     </View>
   );
 };
@@ -23,7 +21,7 @@ const styles = StyleSheet.create({
   },
   saludo: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontWeight: "700",
+    color: "#0F172A",
   },
 });

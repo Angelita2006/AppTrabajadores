@@ -72,6 +72,29 @@ export const editarTrabajador = async (
   }
 };
 
+// Función para obtener todos los trabajadores
+export const obtenerTrabajadores = async (): Promise<Trabajador[]> => {
+  const res = await api.get(`/trabajadores`);
+  return res.data;
+};
+
+// Función para obtener las empresas asociadas a un trabajador
+export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
+  const res = await api.get(`/trabajador/${idTrabajador}/empresas`);
+  return res.data;
+};
+
+// Función para asociar una empresa a un trabajador
+export const agregarEmpresaATrabajador = async (
+  idTrabajador: number,
+  idEmpresa: number,
+) => {
+  const res = await api.post(
+    `trabajador/${idTrabajador}/empresas/${idEmpresa}`,
+  );
+  return res.data;
+};
+
 // Función para obtener un trabajador por su email y contraseña (para iniciar sesión)
 export const getTrabajadorByEmailYPassword = async (
   email: string,
@@ -84,25 +107,4 @@ export const getTrabajadorByEmailYPassword = async (
     console.error("Error al obtener el trabajador:", error);
     throw error;
   }
-};
-
-// Función para obtener todos los trabajadores
-export const obtenerTrabajadores = async (): Promise<Trabajador[]> => {
-  const res = await api.get(`/trabajadores`);
-  return res.data;
-};
-
-export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
-  const res = await api.get(`/trabajador/${idTrabajador}/empresas`);
-  return res.data;
-};
-
-export const agregarEmpresaATrabajador = async (
-  idTrabajador: number,
-  idEmpresa: number,
-) => {
-  const res = await api.post(
-    `trabajador/${idTrabajador}/empresas/${idEmpresa}`,
-  );
-  return res.data;
 };

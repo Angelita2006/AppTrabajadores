@@ -1,33 +1,36 @@
-import React from 'react';
-import { View, StyleSheet, Pressable, Alert } from 'react-native';
-import { ThemedText } from './themed-text';
-import { useEstadoFichaje } from '@/hooks/useCurrentTimer';
-import { crearFichaje } from '@/models/fichajes';
-import { useFichajeStore } from '@/store/useFichajeStore';
-import { useTrabajador } from '@/context/TrabajadorContext';
+import React from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { useTrabajador } from "../context/TrabajadorContext";
+import { useEstadoFichaje } from "../hooks/useCurrentTimer";
+import { crearFichaje } from "../models/fichajes";
+import { useFichajeStore } from "../store/useFichajeStore";
+import { ThemedText } from "./themed-text";
 
 type QuickAction = {
   label: string;
   icon: string;
-  tipo: 'descanso' | 'fin_descanso';
+  tipo: "descanso" | "fin_descanso";
   color: string;
 };
 
-const ACCIONES_QUICK: Record<'trabajando' | 'descanso' | 'fuera', QuickAction[]> = {
+const ACCIONES_QUICK: Record<
+  "trabajando" | "descanso" | "fuera",
+  QuickAction[]
+> = {
   trabajando: [
     {
-      label: 'Iniciar descanso',
-      icon: '☕',
-      tipo: 'descanso',
-      color: '#F59E0B',
+      label: "Iniciar descanso",
+      icon: "☕",
+      tipo: "descanso",
+      color: "#F59E0B",
     },
   ],
   descanso: [
     {
-      label: 'Fin descanso',
-      icon: '🔄',
-      tipo: 'fin_descanso',
-      color: '#16A34A',
+      label: "Fin descanso",
+      icon: "🔄",
+      tipo: "fin_descanso",
+      color: "#16A34A",
     },
   ],
   fuera: [],
@@ -42,20 +45,20 @@ export const QuickActions = () => {
 
   if (acciones.length === 0) return null;
 
-  const handleAccion = (tipo: 'descanso' | 'fin_descanso') => {
+  const handleAccion = (tipo: "descanso" | "fin_descanso") => {
     if (!trabajadorActual) return;
 
     try {
-      const tipoFichaje = tipo === 'fin_descanso' ? 'entrada' : tipo;
+      const tipoFichaje = tipo === "fin_descanso" ? "entrada" : tipo;
       crearFichaje(trabajadorActual.id, empresaId, tipoFichaje);
       useFichajeStore.getState().cargarFichajesToday();
 
       Alert.alert(
-        'Éxito',
-        `${tipo === 'descanso' ? 'Descanso' : 'Fin de descanso'} registrado`,
+        "Éxito",
+        `${tipo === "descanso" ? "Descanso" : "Fin de descanso"} registrado`,
       );
     } catch (error) {
-      Alert.alert('Error', 'No se pudo registrar la acción');
+      Alert.alert("Error", "No se pudo registrar la acción");
     }
   };
 
@@ -86,31 +89,31 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: "600",
+    color: "#64748B",
     marginBottom: 10,
   },
   botones: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   boton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 2,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
   },
   icon: {
     fontSize: 16,
   },
   texto: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

@@ -1,5 +1,5 @@
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { Text, type TextProps } from "react-native";
+import { useThemeColor } from "../hooks/use-theme-color";
 
 export type ThemedButtonProps = TextProps & {
   title: string;

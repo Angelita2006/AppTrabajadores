@@ -2,9 +2,6 @@ import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 
-import { Horario } from "@/models/horarios";
-import { getHorarioTrabajadorEmpresa } from "@/services/horariosService";
-// import { obtenerEmpresasTrabajador } from "@/services/trabajadoresService";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
@@ -12,30 +9,14 @@ import { ThemedButton } from "../../components/themed-button";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { useTrabajador } from "../../context/TrabajadorContext";
-// import { Empresa } from "../../models/empresas";
 import { crearFichaje, obtenerFichajes } from "../../models/fichajes";
+import { Horario } from "../../models/horarios";
+import { getHorarioTrabajadorEmpresa } from "../../services/horariosService";
 
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp<any>>();
 
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
-  // const [empresas, setEmpresas] = useState<Empresa[]>([]);
-
-  // // 2. Cargamos los datos después del primer renderizado
-  // useEffect(() => {
-  //   async function cargar() {
-  //     // Si no hay trabajador aún, no hacemos nada
-  //     if (!trabajadorActual?.id) return;
-
-  //     try {
-  //       const data = await obtenerEmpresasTrabajador(trabajadorActual.id);
-  //       setEmpresas(data);
-  //     } catch (error) {
-  //       console.error("Error cargando empresas:", error);
-  //     }
-  //   }
-  //   cargar();
-  // }, [trabajadorActual?.id]);
 
   const [horario, setHorario] = useState<Horario | null>(null);
 
@@ -76,7 +57,7 @@ export default function HomeScreen() {
       headerBackgroundColor={{ light: "#6b8992", dark: "#2d3b3f" }}
       headerImage={
         <Image
-          source={require("@/assets/images/partial-react-logo.png")}
+          source={require("../../assets/images/partial-react-logo.png")}
           style={styles.reactLogo}
         />
       }
@@ -188,7 +169,7 @@ export default function HomeScreen() {
           </Pressable>
         </ThemedView>
 
-        <Link href="/(tabs)/empresas" asChild>
+        <Link href="/(protected)/empresas" asChild>
           <Pressable style={styles.button}>
             <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
           </Pressable>

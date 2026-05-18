@@ -1,32 +1,32 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ThemedText } from './themed-text';
-import { useEstadoFichaje } from '@/hooks/useCurrentTimer';
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { useEstadoFichaje } from "../hooks/useCurrentTimer";
+import { ThemedText } from "./themed-text";
 
 const ESTADO_VISUAL = {
   fuera: {
-    icon: '●',
-    label: 'Sin actividad',
-    color: '#64748B',
-    background: '#F1F5F9',
+    icon: "●",
+    label: "Sin actividad",
+    color: "#64748B",
+    background: "#F1F5F9",
   },
   trabajando: {
-    icon: '●',
-    label: 'Trabajando',
-    color: '#16A34A',
-    background: '#F0FDF4',
+    icon: "●",
+    label: "Trabajando",
+    color: "#16A34A",
+    background: "#F0FDF4",
   },
   descanso: {
-    icon: '●',
-    label: 'En descanso',
-    color: '#F59E0B',
-    background: '#FFFBEB',
+    icon: "●",
+    label: "En descanso",
+    color: "#F59E0B",
+    background: "#FFFBEB",
   },
 };
 
 export const EstadoActualCard = () => {
   const { estado, horaUltimo } = useEstadoFichaje();
-  const visual = ESTADO_VISUAL[estado];
+  const visual = ESTADO_VISUAL[estado as keyof typeof ESTADO_VISUAL];
 
   return (
     <View style={[styles.card, { backgroundColor: visual.background }]}>
@@ -39,9 +39,7 @@ export const EstadoActualCard = () => {
             {visual.label}
           </ThemedText>
           {horaUltimo && (
-            <ThemedText style={styles.hora}>
-              Desde las {horaUltimo}
-            </ThemedText>
+            <ThemedText style={styles.hora}>Desde las {horaUltimo}</ThemedText>
           )}
         </View>
       </View>
@@ -56,8 +54,8 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   contenedor: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   icon: {
@@ -69,10 +67,10 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   hora: {
     fontSize: 14,
-    color: '#64748B',
+    color: "#64748B",
   },
 });

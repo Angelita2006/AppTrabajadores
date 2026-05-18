@@ -2,9 +2,9 @@ import type { PropsWithChildren, ReactElement } from "react";
 import { StyleSheet } from "react-native";
 import Animated from "react-native-reanimated";
 
-import { ThemedView } from "@/components/themed-view";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { ThemedView } from "../components/themed-view";
+import { useColorScheme } from "../hooks/use-color-scheme";
+import { useThemeColor } from "../hooks/use-theme-color";
 
 // altura fija para el header de la vista de scroll con efecto parallax
 // (efecto de desplazamiento con imagen de fondo que se mueve a diferente velocidad que el contenido)

@@ -1,36 +1,36 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { ThemedText } from './themed-text';
-import { useFichajeStore, EstadoFichaje } from '@/store/useFichajeStore';
-import { crearFichaje } from '@/models/fichajes';
-import { useTrabajador } from '@/context/TrabajadorContext';
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
+import { useTrabajador } from "../context/TrabajadorContext";
+import { crearFichaje } from "../models/fichajes";
+import { EstadoFichaje, useFichajeStore } from "../store/useFichajeStore";
+import { ThemedText } from "./themed-text";
 
 const ESTADO_CONFIG: Record<
   EstadoFichaje,
   {
     label: string;
-    tipo: 'entrada' | 'salida' | 'descanso' | 'fin_descanso';
+    tipo: "entrada" | "salida" | "descanso";
     backgroundColor: string;
     textColor: string;
   }
 > = {
   fuera: {
-    label: 'Fichar Entrada',
-    tipo: 'entrada',
-    backgroundColor: '#16A34A',
-    textColor: '#FFFFFF',
+    label: "Fichar Entrada",
+    tipo: "entrada",
+    backgroundColor: "#16A34A",
+    textColor: "#FFFFFF",
   },
   trabajando: {
-    label: 'Fichar Salida',
-    tipo: 'salida',
-    backgroundColor: '#DC2626',
-    textColor: '#FFFFFF',
+    label: "Fichar Salida",
+    tipo: "salida",
+    backgroundColor: "#DC2626",
+    textColor: "#FFFFFF",
   },
   descanso: {
-    label: 'Finalizar Descanso',
-    tipo: 'fin_descanso',
-    backgroundColor: '#F59E0B',
-    textColor: '#FFFFFF',
+    label: "Finalizar Descanso",
+    tipo: "descanso",
+    backgroundColor: "#F59E0B",
+    textColor: "#FFFFFF",
   },
 };
 
@@ -44,7 +44,7 @@ export const MainActionButton = () => {
 
   const handlePress = async () => {
     if (!trabajadorActual) {
-      Alert.alert('Error', 'Inicia sesión primero');
+      Alert.alert("Error", "Inicia sesión primero");
       return;
     }
 
@@ -56,14 +56,17 @@ export const MainActionButton = () => {
       useFichajeStore.getState().cargarFichajesToday();
 
       Alert.alert(
-        'Éxito',
-        `${config.label.replace('Fichar ', '').replace('Finalizar ', '')} registrada a las ${new Date().toLocaleTimeString('es-ES', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}`,
+        "Éxito",
+        `${config.label.replace("Fichar ", "").replace("Finalizar ", "")} registrada a las ${new Date().toLocaleTimeString(
+          "es-ES",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        )}`,
       );
     } catch (error) {
-      Alert.alert('Error', 'No se pudo registrar el fichaje');
+      Alert.alert("Error", "No se pudo registrar el fichaje");
       console.error(error);
     } finally {
       setLoading(false);
@@ -96,10 +99,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginVertical: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -110,6 +113,6 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
