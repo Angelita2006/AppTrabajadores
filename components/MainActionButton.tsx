@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 import { useTrabajador } from "../context/TrabajadorContext";
-import { crearFichaje } from "../models/fichajes";
+import { crearFichaje } from "../src/services/fichajesService";
 import { EstadoFichaje, useFichajeStore } from "../store/useFichajeStore";
 import { ThemedText } from "./themed-text";
 

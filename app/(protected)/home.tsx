@@ -2,23 +2,22 @@ import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet } from "react-native";
 
-import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Link } from "expo-router";
 import ParallaxScrollView from "../../components/parallax-scroll-view";
-import { ThemedButton } from "../../components/themed-button";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import {
   ProveedorTrabajador,
   useTrabajador,
 } from "../../context/TrabajadorContext";
-import { crearFichaje, obtenerFichajes } from "../../models/fichajes";
-import { Horario } from "../../models/horarios";
-import { getHorarioTrabajadorEmpresa } from "../../services/horariosService";
+import { Horario } from "../../src/models/horarios";
+import {
+  crearFichaje,
+  obtenerFichajesEmpresaTrabajador,
+} from "../../src/services/fichajesService";
+import { obtenerHorarioTrabajadorEmpresa } from "../../src/services/horariosService";
 
 export default function HomeScreen() {
-  const navigation = useNavigation<NavigationProp<any>>();
-
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
 
   const [horario, setHorario] = useState<Horario | null>(null);
@@ -27,11 +26,11 @@ export default function HomeScreen() {
     async function cargarHorario() {
       // Protección: si no hay empresa o trabajador, no pedimos el horario
       if (empresaSeleccionada?.id && trabajadorActual?.id) {
-        const h = await getHorarioTrabajadorEmpresa(
+        const h = await obtenerHorarioTrabajadorEmpresa(
           empresaSeleccionada.id,
           trabajadorActual.id,
         );
-        setHorario(h);
+        setHorario(h as Horario);
       }
     }
     cargarHorario();
@@ -40,7 +39,7 @@ export default function HomeScreen() {
   const calcularHorasTrabajadas = () => {
     if (!trabajadorActual?.id) return;
 
-    const fichajesTrabajador = obtenerFichajes(
+    const fichajesTrabajador = obtenerFichajesEmpresaTrabajador(
       trabajadorActual.id,
       empresaSeleccionada?.id || 0,
     );
@@ -72,22 +71,33 @@ export default function HomeScreen() {
           </ThemedText>
         </ThemedView>
 
-        <ThemedButton
-          title="Ir a pantalla Modal"
-          onPress={() => (navigation as any).navigate("modal")}
-        />
-
         <ThemedView style={styles.stepContainer}>
           <ThemedView style={styles.infoCard}>
             <ThemedText type="subtitle">
-              Empresa: {empresaSeleccionada?.nombre || ""}
+              Hola {trabajadorActual?.nombre || ""}
             </ThemedText>
             <ThemedText type="subtitle">
-              Horario: {horario?.hora_entrada?.toDateString()} a{" "}
-              {horario?.hora_salida?.toDateString()}
+              [ {empresaSeleccionada?.nombre || ""} ]
             </ThemedText>
             <ThemedText type="subtitle">
-              Horas trabajadas hoy: {calcularHorasTrabajadas() || 0}
+              Horario: {horario?.hora_entrada1?.toDateString()} a{" "}
+              {horario?.hora_salida1?.toDateString()}
+              if (horario?.hora_entrada2 && horario?.hora_salida2){" "}
+              {
+                <>
+                  {" "}
+                  y {horario?.hora_entrada2?.toDateString()} a{" "}
+                  {horario?.hora_salida2?.toDateString()}
+                </>
+              }
+            </ThemedText>
+            <ThemedText type="subtitle">
+              - {trabajadorActual?.estado}
+            </ThemedText>
+            <ThemedText type="subtitle">
+              Tiempo trabajado hoy
+              <br></br>
+              {calcularHorasTrabajadas() || 0}
             </ThemedText>
           </ThemedView>
         </ThemedView>
@@ -173,7 +183,7 @@ export default function HomeScreen() {
             </Pressable>
           </ThemedView>
 
-          <Link href="/(protected)/empresas" asChild>
+          <Link href="../(protected)/empresas" asChild>
             <Pressable style={styles.button}>
               <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
             </Pressable>

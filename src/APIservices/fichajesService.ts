@@ -56,9 +56,7 @@ export const updateFichaje = async (idFichaje: number): Promise<Fichaje> => {
 };
 
 // Función para fichar un trabajador
-export const ficharTrabajador = async (
-  tipo: string
-): Promise<Fichaje> => {
+export const ficharTrabajador = async (tipo: string): Promise<Fichaje> => {
   try {
     const response = await api.post("/fichaje", {
       idTrabajador: 1, // Reemplazar con el ID del trabajador actual

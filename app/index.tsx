@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { useTrabajador } from "../context/TrabajadorContext";
-import { obtenerTrabajadorPorUsuarioId } from "../models/trabajadores";
+import { getTrabajadorById } from "../src/services/trabajadoresService";
 import { useAuthStore } from "../store/authStore";
 
 export default function IndexRedirect() {
@@ -14,9 +14,9 @@ export default function IndexRedirect() {
     if (loading) return;
 
     if (user) {
-      const trabajador = obtenerTrabajadorPorUsuarioId(user.id);
+      const trabajador = getTrabajadorById(user.id);
       setTrabajadorActual(trabajador);
-      router.replace("/(protected)/index" as unknown as any);
+      router.replace("/(protected)/home" as unknown as any);
     } else {
       router.replace("/(public)/login" as unknown as any);
     }

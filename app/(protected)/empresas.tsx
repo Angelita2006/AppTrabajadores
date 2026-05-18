@@ -7,12 +7,12 @@ import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { Fonts } from "../../constants/theme";
 import { useTrabajador } from "../../context/TrabajadorContext";
-import { Empresa, agregarEmpresa } from "../../models/empresas";
-import { getEmpresas } from "../../services/empresasService";
+import { Empresa } from "../../src/models/empresas";
 import {
   agregarEmpresaATrabajador,
-  obtenerEmpresasTrabajador,
-} from "../../services/trabajadoresService";
+  obtenerEmpresas,
+} from "../../src/services/empresasService";
+import { obtenerEmpresasTrabajador } from "../../src/services/trabajadoresService";
 
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario agregar nuevas empresas,
 // eliminar empresas existentes y seleccionar una empresa para trabajar con ella.
@@ -33,8 +33,7 @@ export default function VerEmpresas() {
     };
     cargarMisEmpresas();
   }, [trabajador?.id]);
-  // const [nuevoNombre, setNuevoNombre] = useState("");
-  // const [nuevoCif, setNuevoCif] = useState("");
+
   const { setEmpresaSeleccionada } = useTrabajador();
 
   const [empresasDisponibles, setEmpresasDisponibles] = useState<Empresa[]>([]);
@@ -42,7 +41,7 @@ export default function VerEmpresas() {
   // Carga de empresas disponibles
   useEffect(() => {
     const cargarDatos = async () => {
-      const disponibles = await getEmpresas();
+      const disponibles = await obtenerEmpresas();
       setEmpresasDisponibles(disponibles);
     };
     cargarDatos();
@@ -69,7 +68,7 @@ export default function VerEmpresas() {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
     try {
-      await agregarEmpresa(trabajadorId, empresa);
+      await agregarEmpresaATrabajador(trabajadorId, empresa.id);
       setEmpresas((prev) => [...prev, empresa]);
       alert(`Empresa ${empresa.nombre} añadida a tu lista.`);
       await agregarEmpresaATrabajador(trabajadorId, empresa.id);
@@ -130,43 +129,6 @@ export default function VerEmpresas() {
           </ThemedView>
         ))}
       </ThemedView>
-
-      {/* <ThemedView style={styles.addContainer}>
-        <ThemedText>Agregar nueva empresa:</ThemedText>
-        <TextInput
-          placeholder="Nombre de la empresa"
-          value={nuevoNombre}
-          onChangeText={setNuevoNombre}
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="CIF"
-          value={nuevoCif}
-          onChangeText={setNuevoCif}
-          style={styles.input}
-        />
-        <Pressable
-          style={styles.button}
-          onPress={async () => {
-            if (trabajadorId === 0) {
-              alert("No se ha iniciado sesión.");
-              return;
-            }
-            try {
-              agregarEmpresa(trabajadorId, nuevoNombre, nuevoCif);
-              setNuevoNombre("");
-              setNuevoCif("");
-              alert("Empresa añadida correctamente.");
-            } catch (error) {
-              if (error instanceof Error)
-                alert("Error al guardar " + error.message);
-              else alert("Error desconocido");
-            }
-          }}
-        >
-          <ThemedText type="subtitle">Agregar Empresa</ThemedText>
-        </Pressable>
-      </ThemedView> */}
       {
         // Sección para mostrar las empresas asociadas al trabajador actual,
         // que se obtiene utilizando la función obtenerEmpresasTrabajador.
@@ -203,7 +165,7 @@ export default function VerEmpresas() {
         ))}
       </ThemedView>
 
-      <Link href="/" asChild>
+      <Link href="../" asChild>
         <Pressable style={styles.button}>
           <ThemedText type="subtitle">Volver</ThemedText>
         </Pressable>

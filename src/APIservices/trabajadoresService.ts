@@ -1,4 +1,4 @@
-import { Trabajador } from "../models/trabajadores";
+import { Estado, Trabajador } from "../models/trabajadores";
 import api from "./api";
 
 // Función para registrar un nuevo trabajador
@@ -31,14 +31,13 @@ export const crearTrabajador = async (
     });
     return res.data;
   } catch (error) {
-    console.error("Error al actualizar el trabajador:", error);
+    console.error("Error al crear el trabajador:", error);
     throw error;
   }
 };
 
 // Función para actualizar la información de un trabajador
 export const editarTrabajador = async (
-  // id: number,
   dni: string,
   nombre: string,
   apellidos: string,
@@ -48,6 +47,7 @@ export const editarTrabajador = async (
   provincia: string,
   cuenta_bancaria: string,
   puesto: string,
+  estado: Estado,
   email: string,
   password: string,
 ): Promise<Trabajador> => {
@@ -62,6 +62,7 @@ export const editarTrabajador = async (
       provincia,
       cuenta_bancaria,
       puesto,
+      estado,
       email,
       password,
     });

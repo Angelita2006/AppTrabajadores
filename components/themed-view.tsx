@@ -1,6 +1,6 @@
 import { View, type ViewProps } from "react-native";
-
 import { useThemeColor } from "../hooks/use-theme-color";
+
 // Componente ThemedView que utiliza el hook useThemeColor para determinar el color de fondo según el tema actual (claro u oscuro),
 // y aplica ese color al estilo del componente View. Recibe las siguientes props:
 // - lightColor: el color de fondo en modo claro (opcional).

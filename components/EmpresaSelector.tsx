@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useTrabajador } from "../context/TrabajadorContext";
-import { Empresa } from "../models/empresas";
+import { Empresa } from "../src/models/empresas";
 import { useFichajeStore } from "../store/useFichajeStore";
 import { ThemedText } from "./themed-text";
 

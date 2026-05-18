@@ -1,14 +1,13 @@
 import { Tabs } from "expo-router";
 import { IconSymbol } from "../components/ui/icon-symbol";
 import { ProveedorTrabajador } from "../context/TrabajadorContext";
-// import { useColorScheme } from "../hooks/use-color-scheme";
 
 export default function TabLayout() {
   return (
     <ProveedorTrabajador>
       <Tabs>
         <Tabs.Screen
-          name="(protected)/index"
+          name="(protected)/home"
           options={{
             title: "Inicio",
             tabBarIcon: ({ color }) => (
@@ -17,7 +16,7 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="(public)/login"
+          name="(protected)/profile"
           options={{
             title: "Perfil",
             tabBarIcon: ({ color }) => (

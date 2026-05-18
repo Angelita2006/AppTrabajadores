@@ -2,7 +2,7 @@ import React from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { useTrabajador } from "../context/TrabajadorContext";
 import { useEstadoFichaje } from "../hooks/useCurrentTimer";
-import { crearFichaje } from "../models/fichajes";
+import { crearFichaje } from "../src/services/fichajesService";
 import { useFichajeStore } from "../store/useFichajeStore";
 import { ThemedText } from "./themed-text";
 

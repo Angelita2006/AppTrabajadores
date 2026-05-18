@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { obtenerFichajes } from "../models/fichajes";
+import { obtenerFichajes } from "../src/fichajes";
 
 export type EstadoFichaje = "fuera" | "trabajando" | "descanso";
 
