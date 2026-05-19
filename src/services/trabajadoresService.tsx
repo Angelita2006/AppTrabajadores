@@ -93,7 +93,7 @@ export const obtenerEmpresasTrabajador = async (
 };
 
 // obtiene un trabajador por su id
-export const getTrabajadorById = async (id: number): Promise<Trabajador> => {
+export const getTrabajadorById = (id: number): Trabajador => {
   try {
     const trabajador = trabajadores.find((t) => t.id === id);
     return trabajador || ("Trabajador no encontrado" as unknown as Trabajador);

@@ -9,14 +9,14 @@ export default function TabLayout() {
         <Tabs.Screen
           name="(protected)/home"
           options={{
-            title: "Inicio",
+            title: "Registro Horario",
             tabBarIcon: ({ color }) => (
               <IconSymbol size={28} name="house.fill" color={color} />
             ),
           }}
         />
         <Tabs.Screen
-          name="(protected)/profile"
+          name="index"
           options={{
             title: "Perfil",
             tabBarIcon: ({ color }) => (
@@ -29,11 +29,7 @@ export default function TabLayout() {
           options={{
             title: "Empresas",
             tabBarIcon: ({ color }) => (
-              <IconSymbol
-                size={28}
-                name="house.and.flag.circle"
-                color={color}
-              />
+              <IconSymbol size={28} name="briefcase.fill" color={color} />
             ),
           }}
         />

@@ -1,6 +1,6 @@
 import React, { createContext, ReactNode, useContext, useState } from "react";
-import { Empresa } from "../src/empresas";
-import { Trabajador } from "../src/trabajadores";
+import { Empresa } from "../src/models/empresas";
+import { Trabajador } from "../src/models/trabajadores";
 
 // Contexto para manejar el estado global del trabajador actual y la empresa seleccionada en la aplicación.
 // Proporciona un proveedor de contexto (ProveedorTrabajador) que envuelve la aplicación y un hook personalizado (useTrabajador)
@@ -9,7 +9,7 @@ interface ContextoTrabajador {
   trabajadorActual: Trabajador | null;
   setTrabajadorActual: (trabajador: Trabajador | null) => void;
   empresaSeleccionada: Empresa | null;
-  setEmpresaSeleccionada: (empresaId: Empresa | null) => void;
+  setEmpresaSeleccionada: (empresa: Empresa | null) => void;
   empresas: Empresa[];
   setEmpresas: (empresas: Empresa[]) => void;
   seleccionarEmpresa: (empresaId: number) => void;
@@ -35,7 +35,7 @@ export const ProveedorTrabajador: React.FC<{ children: ReactNode }> = ({
 
   const seleccionarEmpresa = (empresaId: number) => {
     const empresa = empresas.find((e) => e.id === empresaId) ?? null;
-    setEmpresaSeleccionada(empresa); // ✅ siempre establece, nunca deselecciona
+    setEmpresaSeleccionada(empresa);
   };
 
   return (

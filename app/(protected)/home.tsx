@@ -1,9 +1,8 @@
-import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet } from "react-native";
+import { Alert, Animated, Pressable, StyleSheet } from "react-native";
 
 import { Link } from "expo-router";
-import ParallaxScrollView from "../../components/parallax-scroll-view";
+import { HelloWave } from "../../components/hello-wave";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import {
@@ -26,11 +25,11 @@ export default function HomeScreen() {
     async function cargarHorario() {
       // Protección: si no hay empresa o trabajador, no pedimos el horario
       if (empresaSeleccionada?.id && trabajadorActual?.id) {
-        const h = await obtenerHorarioTrabajadorEmpresa(
+        const horario = obtenerHorarioTrabajadorEmpresa(
           empresaSeleccionada.id,
           trabajadorActual.id,
         );
-        setHorario(h as Horario);
+        setHorario(horario);
       }
     }
     cargarHorario();
@@ -48,160 +47,180 @@ export default function HomeScreen() {
       .filter((f) => f.tipo === "entrada")
       .pop();
 
-    if (!ultimaEntrada) return alert("No hay ningún fichaje de entrada aún");
+    //if (!ultimaEntrada) return alert("No hay ningún fichaje de entrada aún");
     const ahora = new Date();
-    const diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
+    let diffMs = 0;
+    if (ultimaEntrada)
+      diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
     return Math.floor(diffMs / (1000 * 60 * 60)); // hours
   };
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#6b8992", dark: "#2d3b3f" }}
-      headerImage={
-        <Image
-          source={require("../../assets/images/partial-react-logo.png")}
-          style={styles.reactLogo}
-        />
-      }
-    >
-      <ProveedorTrabajador>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="title" style={styles.titleContainer}>
-            Registro Horario
-          </ThemedText>
-        </ThemedView>
+    <>
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+      >
+        <ProveedorTrabajador>
+          {(empresaSeleccionada?.id && trabajadorActual?.id && (
+            <>
+              <ThemedView style={styles.stepContainer}>
+                <ThemedView style={styles.infoCard}>
+                  <ThemedText type="subtitle">
+                    Hola {trabajadorActual?.nombre || ""} <HelloWave />
+                  </ThemedText>
+                  <ThemedText type="subtitle">
+                    [ {empresaSeleccionada?.nombre || ""} ]
+                  </ThemedText>
+                  <ThemedText type="subtitle">
+                    Horario:{" "}
+                    {horario?.hora_entrada1?.getHours() ||
+                      "00" +
+                        ":" +
+                        (horario?.hora_entrada1?.getMinutes() || "00")}{" "}
+                    a{" "}
+                    {horario?.hora_salida1?.getHours() ||
+                      "00" +
+                        ":" +
+                        (horario?.hora_salida1?.getMinutes() || "00")}
+                    {horario?.hora_entrada2 && horario?.hora_salida2 && (
+                      <>
+                        {" "}
+                        y{" "}
+                        {horario?.hora_entrada2?.getHours() ||
+                          "00" +
+                            ":" +
+                            (horario?.hora_entrada2?.getMinutes() || "00")}{" "}
+                        a{" "}
+                        {horario?.hora_salida2?.getHours() ||
+                          "00" +
+                            ":" +
+                            (horario?.hora_salida2?.getMinutes() || "00")}
+                      </>
+                    )}
+                  </ThemedText>
+                  <ThemedText type="subtitle">
+                    ·{" "}
+                    {trabajadorActual?.estado?.toString() || "Sin fichajes aún"}{" "}
+                    ·
+                  </ThemedText>
+                  <ThemedText type="subtitle">
+                    {`Tiempo trabajado hoy\n${calcularHorasTrabajadas() || 0}`}
+                  </ThemedText>
+                </ThemedView>
+              </ThemedView>
+              <ThemedView style={styles.stepContainer}>
+                <ThemedView style={styles.buttonRow}>
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => {
+                      if (trabajadorActual) {
+                        crearFichaje(
+                          trabajadorActual.id,
+                          empresaSeleccionada?.id || 0,
+                          "entrada",
+                        );
+                        Alert.alert(
+                          "Fichaje",
+                          `Entrada registrada a las ${new Date().toLocaleTimeString()}`,
+                        );
+                      }
+                    }}
+                  >
+                    <ThemedText type="subtitle">Fichar Entrada</ThemedText>
+                  </Pressable>
 
-        <ThemedView style={styles.stepContainer}>
-          <ThemedView style={styles.infoCard}>
-            <ThemedText type="subtitle">
-              Hola {trabajadorActual?.nombre || ""}
-            </ThemedText>
-            <ThemedText type="subtitle">
-              [ {empresaSeleccionada?.nombre || ""} ]
-            </ThemedText>
-            <ThemedText type="subtitle">
-              Horario: {horario?.hora_entrada1?.toDateString()} a{" "}
-              {horario?.hora_salida1?.toDateString()}
-              if (horario?.hora_entrada2 && horario?.hora_salida2){" "}
-              {
-                <>
-                  {" "}
-                  y {horario?.hora_entrada2?.toDateString()} a{" "}
-                  {horario?.hora_salida2?.toDateString()}
-                </>
-              }
-            </ThemedText>
-            <ThemedText type="subtitle">
-              - {trabajadorActual?.estado}
-            </ThemedText>
-            <ThemedText type="subtitle">
-              Tiempo trabajado hoy
-              <br></br>
-              {calcularHorasTrabajadas() || 0}
-            </ThemedText>
-          </ThemedView>
-        </ThemedView>
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => {
+                      if (trabajadorActual) {
+                        crearFichaje(
+                          trabajadorActual.id,
+                          empresaSeleccionada?.id || 0,
+                          "salida",
+                        );
+                        Alert.alert(
+                          "Fichaje",
+                          `Salida registrada a las ${new Date().toLocaleTimeString()}`,
+                        );
+                      }
+                    }}
+                  >
+                    <ThemedText type="subtitle">Fichar Salida</ThemedText>
+                  </Pressable>
+                </ThemedView>
 
-        <ThemedView style={styles.stepContainer}>
-          <ThemedView style={styles.buttonRow}>
-            <Pressable
-              style={styles.button}
-              onPress={() => {
-                if (trabajadorActual) {
-                  crearFichaje(
-                    trabajadorActual.id,
-                    empresaSeleccionada?.id || 0,
-                    "entrada",
-                  );
-                  Alert.alert(
-                    "Fichaje",
-                    `Entrada registrada a las ${new Date().toLocaleTimeString()}`,
-                  );
-                }
-              }}
-            >
-              <ThemedText type="subtitle">Fichar Entrada</ThemedText>
-            </Pressable>
+                <ThemedView style={styles.buttonRow}>
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => {
+                      if (trabajadorActual) {
+                        crearFichaje(
+                          trabajadorActual.id,
+                          empresaSeleccionada?.id || 0,
+                          "descanso",
+                        );
+                        Alert.alert(
+                          "Fichaje",
+                          `Descanso registrado a las ${new Date().toLocaleTimeString()}`,
+                        );
+                      }
+                    }}
+                  >
+                    <ThemedText type="subtitle">Fichar Descanso</ThemedText>
+                  </Pressable>
 
-            <Pressable
-              style={styles.button}
-              onPress={() => {
-                if (trabajadorActual) {
-                  crearFichaje(
-                    trabajadorActual.id,
-                    empresaSeleccionada?.id || 0,
-                    "salida",
-                  );
-                  Alert.alert(
-                    "Fichaje",
-                    `Salida registrada a las ${new Date().toLocaleTimeString()}`,
-                  );
-                }
-              }}
-            >
-              <ThemedText type="subtitle">Fichar Salida</ThemedText>
-            </Pressable>
-          </ThemedView>
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => {
+                      if (trabajadorActual) {
+                        crearFichaje(
+                          trabajadorActual.id,
+                          empresaSeleccionada?.id || 0,
+                          "horas_extra",
+                        );
+                        Alert.alert(
+                          "Fichaje",
+                          `Horas extra registradas a las ${new Date().toLocaleTimeString()}`,
+                        );
+                      }
+                    }}
+                  >
+                    <ThemedText type="subtitle">Fichar Horas Extra</ThemedText>
+                  </Pressable>
+                </ThemedView>
 
-          <ThemedView style={styles.buttonRow}>
-            <Pressable
-              style={styles.button}
-              onPress={() => {
-                if (trabajadorActual) {
-                  crearFichaje(
-                    trabajadorActual.id,
-                    empresaSeleccionada?.id || 0,
-                    "descanso",
-                  );
-                  Alert.alert(
-                    "Fichaje",
-                    `Descanso registrado a las ${new Date().toLocaleTimeString()}`,
-                  );
-                }
-              }}
-            >
-              <ThemedText type="subtitle">Fichar Descanso</ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={styles.button}
-              onPress={() => {
-                if (trabajadorActual) {
-                  crearFichaje(
-                    trabajadorActual.id,
-                    empresaSeleccionada?.id || 0,
-                    "horas_extra",
-                  );
-                  Alert.alert(
-                    "Fichaje",
-                    `Horas extra registradas a las ${new Date().toLocaleTimeString()}`,
-                  );
-                }
-              }}
-            >
-              <ThemedText type="subtitle">Fichar Horas Extra</ThemedText>
-            </Pressable>
-          </ThemedView>
-
-          <Link href="../(protected)/empresas" asChild>
-            <Pressable style={styles.button}>
-              <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
-            </Pressable>
-          </Link>
-        </ThemedView>
-      </ProveedorTrabajador>
-    </ParallaxScrollView>
+                <Link href="../(protected)/empresas" asChild>
+                  <Pressable style={styles.button}>
+                    <ThemedText type="subtitle">Cambiar de Empresa</ThemedText>
+                  </Pressable>
+                </Link>
+              </ThemedView>
+            </>
+          )) || (
+            <ThemedView style={styles.infoCard}>
+              <ThemedText type="subtitle">
+                Inicia sesión y selecciona una empresa para ver tu horario y
+                poder fichar.
+              </ThemedText>
+            </ThemedView>
+          )}
+        </ProveedorTrabajador>
+      </Animated.ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   titleContainer: {
+    backgroundColor: "#e0e0e000",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    color: "#333",
+    color: "#38565a",
   },
   stepContainer: {
+    backgroundColor: "#e0e0e000",
     gap: 8,
     marginBottom: 8,
   },
@@ -213,7 +232,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   button: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#38565a",
     padding: 10,
     borderRadius: 5,
     alignItems: "center",
@@ -221,7 +240,7 @@ const styles = StyleSheet.create({
     margin: 5,
   },
   infoCard: {
-    backgroundColor: "#E0F7FA",
+    backgroundColor: "#38565a",
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
@@ -229,6 +248,7 @@ const styles = StyleSheet.create({
     borderColor: "#B2EBF2",
   },
   buttonRow: {
+    backgroundColor: "#e0e0e000",
     flexDirection: "row",
     justifyContent: "space-between",
   },
