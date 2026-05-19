@@ -41,10 +41,17 @@ export default function VerEmpresas() {
   useEffect(() => {
     const cargarDatos = async () => {
       const disponibles = await obtenerEmpresas();
+      obtenerEmpresasTrabajador(trabajadorId).then((asociadas) => {
+        const asociadasIds = asociadas.map((e) => e.id);
+        const filtradas = disponibles.filter(
+          (e) => !asociadasIds.includes(e.id),
+        );
+        setEmpresasDisponibles(filtradas);
+      });
       setEmpresasDisponibles(disponibles);
     };
     cargarDatos();
-  }, []);
+  }, [trabajadorId]);
 
   useEffect(() => {
     const cargarEmpresasTrabajador = async () => {
@@ -67,6 +74,10 @@ export default function VerEmpresas() {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
     try {
+      const nuevasDisponibles = empresasDisponibles.filter(
+        (e) => e.id !== empresa.id,
+      );
+      setEmpresasDisponibles(nuevasDisponibles);
       await agregarEmpresaATrabajador(trabajadorId, empresa.id);
 
       // Actualizamos el estado local agregando la nueva empresa al array
@@ -78,6 +89,14 @@ export default function VerEmpresas() {
         alert("No se pudo añadir la empresa: " + error.message);
       else alert("Error desconocido");
     }
+  };
+
+  const handleEliminarEmpresa = (empresaId: number) => {
+    setEmpresas(empresas.filter((e) => e.id !== empresaId));
+    setEmpresasDisponibles([
+      ...empresasDisponibles,
+      empresas.find((e) => e.id === empresaId)!,
+    ]);
   };
 
   return (
@@ -117,9 +136,7 @@ export default function VerEmpresas() {
 
               <ThemedView style={styles.buttonContainer}>
                 <Pressable
-                  onPress={() => {
-                    setEmpresas(empresas.filter((e) => e.id !== empresa.id));
-                  }}
+                  onPress={() => handleEliminarEmpresa(empresa.id)}
                   style={styles.deleteButton}
                 >
                   <ThemedText style={styles.buttonText}>Eliminar</ThemedText>

@@ -1,5 +1,7 @@
+import { fichajes } from "../mock/fichajesMock";
 import { trabajadores } from "../mock/trabajadoresMock";
 import { Empresa } from "../models/empresas";
+import { Fichaje } from "../models/fichajes";
 import { Estado, Trabajador } from "../models/trabajadores";
 import { obtenerEmpresas } from "./empresasService";
 
@@ -117,4 +119,19 @@ export const getTrabajadorByEmailYContraseña = async (
     console.error("Error fetching trabajador:", error);
     return "Trabajador no encontrado" as unknown as Trabajador;
   }
+};
+
+export const getUltimoFichajeTrabajador = (idTrabajador: number): Fichaje => {
+  const trabajador = trabajadores.find((t) => t.id === idTrabajador);
+  if (!trabajador || !trabajador.fichajes || trabajador.fichajes.length === 0) {
+    return "Sin fichajes aún" as unknown as Fichaje;
+  }
+  let ultimoFichaje: Fichaje = {} as unknown as Fichaje; // Inicializamos con un valor vacío
+  trabajador.fichajes.forEach((f) => {
+    const fichaje = fichajes.find((fi) => fi.id === f) || ({} as Fichaje);
+    if (!ultimoFichaje || fichaje.fecha > ultimoFichaje.fecha) {
+      ultimoFichaje = fichaje;
+    }
+  });
+  return ultimoFichaje;
 };

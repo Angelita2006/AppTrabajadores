@@ -13,8 +13,8 @@ export const crearFichaje = (
     idTrabajador,
     idEmpresa,
     tipo,
-    fecha: new Date().toISOString(),
-    fecha_hora: new Date(),
+    fecha: Date.now(),
+    fecha_hora: new Date(Date.now()),
   };
   fichajes.push(fichaje);
 

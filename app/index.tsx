@@ -13,6 +13,7 @@ import { useTrabajador } from "../context/TrabajadorContext";
 import { Estado } from "../src/models/trabajadores";
 import {
   crearTrabajador,
+  editarEstadoTrabajador,
   editarTrabajador,
   getTrabajadorByEmailYContraseña,
 } from "../src/services/trabajadoresService";
@@ -71,13 +72,14 @@ export default function VerPerfil() {
       email,
       password,
     );
-    setTrabajadorActual(trabajador as any);
+    setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Registro del trabajador completado correctamente");
     setIsSignedIn(true);
   };
 
   const handleSignIn = async () => {
     let trabajador = getTrabajadorByEmailYContraseña(email, password);
+    editarEstadoTrabajador((await trabajador).dni, Estado.Activo);
     setNombre((await trabajador).nombre);
     setApellidos((await trabajador).apellidos);
     setDni((await trabajador).dni);
@@ -87,9 +89,7 @@ export default function VerPerfil() {
     setProvincia((await trabajador).provincia);
     setCuentaCotizacion((await trabajador).cuenta_cotizacion);
     setPuesto((await trabajador).puesto);
-    setEstado(Estado.Activo);
-    setTrabajadorActual((await trabajador) as any);
-
+    setTrabajadorActual(await trabajador);
     Alert.alert("Éxito", "Sesión del trabajador iniciada correctamente");
     setIsSignedIn(true);
   };
@@ -110,7 +110,7 @@ export default function VerPerfil() {
       password,
     );
 
-    setTrabajadorActual((await trabajador) as any);
+    setTrabajadorActual(await trabajador);
 
     Alert.alert("Éxito", "Información del perfil guardada correctamente");
     setIsSignedIn(true);
