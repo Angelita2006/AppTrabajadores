@@ -1,9 +1,8 @@
 import { fichajes } from "../mock/fichajesMock";
 import { trabajadores } from "../mock/trabajadoresMock";
-import { Empresa } from "../models/empresas";
 import { Fichaje } from "../models/fichajes";
 import { Estado, Trabajador } from "../models/trabajadores";
-import { obtenerEmpresas } from "./empresasService";
+// import { obtenerEmpresas } from "./empresasService";
 
 let idsTrabajadores = Math.max(...trabajadores.map((t) => t.id), 0);
 
@@ -84,15 +83,16 @@ export const editarEstadoTrabajador = (
 };
 
 // obtiene las empresas a las que pertenece un trabajador
-export const obtenerEmpresasTrabajador = async (
-  trabajadorId: number,
-): Promise<Empresa[]> => {
-  const trabajador = trabajadores.find((t) => t.id === trabajadorId);
-  if (!trabajador) return [];
-  return (await obtenerEmpresas()).filter((e: { id: number }) =>
-    trabajador.empresas?.includes(e.id),
-  );
-};
+// export const obtenerEmpresasTrabajador = async (
+//   trabajadorId: number,
+// ): Promise<Empresa[]> => {
+//   const { obtenerEmpresas } = await require("./empresasService");
+//   const trabajador = trabajadores.find((t) => t.id === trabajadorId);
+//   if (!trabajador) return [];
+//   return (await obtenerEmpresas()).filter((e: { id: number }) =>
+//     trabajador.empresas?.includes(e.id),
+//   );
+// };
 
 // obtiene un trabajador por su id
 export const getTrabajadorById = (id: number): Trabajador => {

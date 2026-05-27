@@ -6,7 +6,7 @@ export const fichajes: Fichaje[] = [
     idTrabajador: 1,
     idEmpresa: 1,
     tipo: "entrada",
-    fecha: new Date().toISOString(),
+    fecha: parseInt(new Date().toISOString()),
     fecha_hora: new Date(),
   },
   {
@@ -14,7 +14,7 @@ export const fichajes: Fichaje[] = [
     idTrabajador: 1,
     idEmpresa: 1,
     tipo: "salida",
-    fecha: new Date().toISOString(),
+    fecha: parseInt(new Date().toISOString()),
     fecha_hora: new Date(),
   },
 ];

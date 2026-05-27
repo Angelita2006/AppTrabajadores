@@ -1,6 +1,6 @@
 import { empresas } from "../mock/empresasMock";
 import { Empresa } from "../models/empresas";
-import { getTrabajadorById } from "./trabajadoresService";
+// import { getTrabajadorById } from "./trabajadoresService";
 
 let idsEmpresas = Math.max(...empresas.map((e) => e.id), 0);
 
@@ -46,33 +46,34 @@ export const editarEmpresa = (
 };
 
 // agrega una empresa a un trabajador y viceversa
-export const agregarEmpresaATrabajador = async (
-  trabajadorId: number,
-  empresaId: number,
-): Promise<Empresa> => {
-  const trabajador = await getTrabajadorById(trabajadorId);
-  if (!trabajador || typeof trabajador.id !== "number") {
-    throw new Error("Trabajador no encontrado");
-  }
+// export const agregarEmpresaATrabajador = async (
+//   trabajadorId: number,
+//   empresaId: number,
+// ): Promise<Empresa> => {
+//   const { getTrabajadorById } = await require("./trabajadoresService");
+//   const trabajador = await getTrabajadorById(trabajadorId);
+//   if (!trabajador || typeof trabajador.id !== "number") {
+//     throw new Error("Trabajador no encontrado");
+//   }
 
-  let empresaExistente = empresas.find((e) => e.id === empresaId);
-  if (!empresaExistente) {
-    throw new Error("Empresa no encontrada");
-  }
+//   let empresaExistente = empresas.find((e) => e.id === empresaId);
+//   if (!empresaExistente) {
+//     throw new Error("Empresa no encontrada");
+//   }
 
-  if (!trabajador.empresas?.includes(empresaExistente.id)) {
-    trabajador.empresas = [...(trabajador.empresas ?? []), empresaExistente.id];
-  }
+//   if (!trabajador.empresas?.includes(empresaExistente.id)) {
+//     trabajador.empresas = [...(trabajador.empresas ?? []), empresaExistente.id];
+//   }
 
-  if (!empresaExistente.trabajadores?.includes(trabajador.id)) {
-    empresaExistente.trabajadores = [
-      ...(empresaExistente.trabajadores ?? []),
-      trabajador.id,
-    ];
-  }
+//   if (!empresaExistente.trabajadores?.includes(trabajador.id)) {
+//     empresaExistente.trabajadores = [
+//       ...(empresaExistente.trabajadores ?? []),
+//       trabajador.id,
+//     ];
+//   }
 
-  return empresaExistente;
-};
+//   return empresaExistente;
+// };
 
 // obtener todas las empresas
 export const obtenerEmpresas = async (): Promise<Empresa[]> => {

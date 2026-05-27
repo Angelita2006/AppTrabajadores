@@ -1,16 +1,16 @@
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, Pressable, StyleSheet } from "react-native";
+import { Animated, StyleSheet, TouchableOpacity } from "react-native";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { useTrabajador } from "../../context/TrabajadorContext";
 import { Empresa } from "../../src/models/empresas";
+import { obtenerEmpresas } from "../../src/services/empresasService";
 import {
   agregarEmpresaATrabajador,
-  obtenerEmpresas,
-} from "../../src/services/empresasService";
-import { obtenerEmpresasTrabajador } from "../../src/services/trabajadoresService";
+  obtenerEmpresasTrabajador,
+} from "../../src/services/shared/sharedService";
 
 // Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario seleccionar una empresa para trabajar con ella.
 export default function VerEmpresas() {
@@ -103,7 +103,10 @@ export default function VerEmpresas() {
     // El componente principal se envuelve en un ParallaxScrollView que muestra un encabezado con un icono y un fondo de color que cambia
     // según el tema (claro u oscuro).
     <>
-      <Animated.ScrollView style={{ flex: 1 }}>
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+      >
         <ThemedView style={styles.listContainer}>
           <ThemedText style={styles.titleContainer}>
             Empresas disponibles
@@ -115,12 +118,12 @@ export default function VerEmpresas() {
                 {empresa.nombre} - {empresa.cif}
               </ThemedText>
 
-              <Pressable
+              <TouchableOpacity
                 onPress={() => handleSeleccionarDisponible(empresa)}
                 style={styles.addbutton}
               >
                 <IconSymbol name="chevron.right" size={24} color="#007AFF" />
-              </Pressable>
+              </TouchableOpacity>
             </ThemedView>
           ))}
         </ThemedView>
@@ -135,14 +138,14 @@ export default function VerEmpresas() {
               </ThemedText>
 
               <ThemedView style={styles.buttonContainer}>
-                <Pressable
+                <TouchableOpacity
                   onPress={() => handleEliminarEmpresa(empresa.id)}
                   style={styles.deleteButton}
                 >
                   <ThemedText style={styles.buttonText}>Eliminar</ThemedText>
-                </Pressable>
+                </TouchableOpacity>
                 {(empresa.id !== empresaSeleccionada?.id && (
-                  <Pressable
+                  <TouchableOpacity
                     onPress={() => {
                       handleSeleccionarEmpresa(empresa);
                     }}
@@ -151,7 +154,7 @@ export default function VerEmpresas() {
                     <ThemedText style={styles.buttonText}>
                       Seleccionar
                     </ThemedText>
-                  </Pressable>
+                  </TouchableOpacity>
                 )) || (
                   <ThemedView
                     style={[
@@ -170,9 +173,9 @@ export default function VerEmpresas() {
         </ThemedView>
 
         <Link href="../" asChild>
-          <Pressable style={styles.button}>
+          <TouchableOpacity style={styles.button}>
             <ThemedText type="subtitle">Volver</ThemedText>
-          </Pressable>
+          </TouchableOpacity>
         </Link>
       </Animated.ScrollView>
     </>
@@ -198,6 +201,7 @@ const styles = StyleSheet.create({
   listContainer: {
     backgroundColor: "#e0e0e000",
     marginTop: 16,
+    margin: 5,
   },
   // Estilo para la tarjeta de cada empresa, que agrega padding, un fondo claro, bordes redondeados, un margen inferior y un borde.
   empresaCard: {
@@ -221,6 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     gap: 10,
+    margin: 5,
   },
   // Estilo para el botón de eliminar empresa, que define un fondo rojo, padding, bordes redondeados y alineación centrada.
   deleteButton: {
@@ -246,10 +251,12 @@ const styles = StyleSheet.create({
   // Estilo para el botón de agregar empresa, que define un fondo azul, padding, bordes redondeados, alineación centrada y un margen superior.
   button: {
     backgroundColor: "#007AFF",
-    padding: 10,
+    padding: 25,
     borderRadius: 5,
     alignItems: "center",
     marginTop: 16,
+    margin: 5,
+    alignSelf: "center",
   },
   addbutton: {
     padding: 10,
