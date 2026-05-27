@@ -1,7 +1,7 @@
-import { fichajes } from "../mock/fichajesMock";
 import { trabajadores } from "../mock/trabajadoresMock";
 import { Fichaje } from "../models/fichajes";
 import { Estado, Trabajador } from "../models/trabajadores";
+import { getFichajeTrabajadorEmpresa } from "./fichajesService";
 // import { obtenerEmpresas } from "./empresasService";
 
 let idsTrabajadores = Math.max(...trabajadores.map((t) => t.id), 0);
@@ -121,17 +121,21 @@ export const getTrabajadorByEmailYContraseña = async (
   }
 };
 
-export const getUltimoFichajeTrabajador = (idTrabajador: number): Fichaje => {
+export const getUltimoFichajeTrabajador = (
+  idTrabajador: number,
+  idEmpresa: number,
+): Fichaje | null => {
   const trabajador = trabajadores.find((t) => t.id === idTrabajador);
+
+  // Si no existe el trabajador o no tiene un array de fichajes válido o está vacío
   if (!trabajador || !trabajador.fichajes || trabajador.fichajes.length === 0) {
-    return "Sin fichajes aún" as unknown as Fichaje;
+    return null; // Retornamos null limpiamente
   }
-  let ultimoFichaje: Fichaje = {} as unknown as Fichaje; // Inicializamos con un valor vacío
-  trabajador.fichajes.forEach((f) => {
-    const fichaje = fichajes.find((fi) => fi.id === f) || ({} as Fichaje);
-    if (!ultimoFichaje || fichaje.fecha > ultimoFichaje.fecha) {
-      ultimoFichaje = fichaje;
-    }
-  });
-  return ultimoFichaje;
+
+  // Accedemos al último elemento por posición SIN usar .pop()
+  return getFichajeTrabajadorEmpresa(
+    trabajador.fichajes[trabajador.fichajes.length - 1],
+    idTrabajador,
+    idEmpresa,
+  );
 };

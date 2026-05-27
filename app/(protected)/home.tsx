@@ -1,11 +1,6 @@
 import { Link } from "expo-router";
-import React, { useEffect, useState } from "react";
-import {
-  Animated,
-  StyleSheet,
-  Text,
-  TouchableOpacity
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Animated, StyleSheet, Text, TouchableOpacity } from "react-native";
 import { HelloWave } from "../../components/hello-wave";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
@@ -65,14 +60,36 @@ export default function HomeScreen() {
   useEffect(() => {
     async function cargarUltimoFichaje() {
       if (trabajadorActual?.id) {
-        const fichaje = getUltimoFichajeTrabajador(trabajadorActual.id);
+        const fichaje = getUltimoFichajeTrabajador(
+          trabajadorActual.id,
+          empresaSeleccionada?.id || 0,
+        );
         setUltimoFichaje(fichaje);
       }
     }
     cargarUltimoFichaje();
-  }, [trabajadorActual?.id]);
+  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
 
-  const calcularHorasTrabajadas = () => {
+  // const calcularHorasTrabajadas = () => {
+  //   if (!trabajadorActual?.id) return 0;
+
+  //   const fichajesTrabajador = obtenerFichajesEmpresaTrabajador(
+  //     trabajadorActual.id,
+  //     empresaSeleccionada?.id || 0,
+  //   );
+
+  //   const ultimaEntrada = fichajesTrabajador
+  //     .filter((f) => f.tipo === "entrada")
+  //     .pop();
+
+  //   const ahora = new Date();
+  //   let diffMs = 0;
+  //   if (ultimaEntrada)
+  //     diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
+  //   return Math.floor(diffMs / (1000 * 60 * 60));
+  // };
+
+  const horasTrabajadas = useMemo(() => {
     if (!trabajadorActual?.id) return 0;
 
     const fichajesTrabajador = obtenerFichajesEmpresaTrabajador(
@@ -84,12 +101,16 @@ export default function HomeScreen() {
       .filter((f) => f.tipo === "entrada")
       .pop();
 
+    if (!ultimaEntrada) return 0;
+
+    // Asegúrate de que fecha_hora sea un objeto Date válido
+    const fechaEntrada = new Date(ultimaEntrada.fecha_hora);
     const ahora = new Date();
-    let diffMs = 0;
-    if (ultimaEntrada)
-      diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
+    const diffMs = ahora.getTime() - fechaEntrada.getTime();
+
     return Math.floor(diffMs / (1000 * 60 * 60));
-  };
+  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
+  // Añadimos ultimoFichaje para que se actualice al pulsar el botón
 
   const formatearHora = (fechaInput: any) => {
     if (!fechaInput) return "00:00";
@@ -119,7 +140,7 @@ export default function HomeScreen() {
                 Hola {trabajadorActual?.nombre || "Usuario"} <HelloWave />
               </ThemedText>
               <ThemedText type="subtitle">
-                [ {empresaSeleccionada?.nombre || "Empresa"} ]
+                {"\n"}[ {empresaSeleccionada?.nombre || "Empresa"} ]
               </ThemedText>
 
               <ThemedText type="subtitle">
@@ -134,7 +155,7 @@ export default function HomeScreen() {
                 }
               </ThemedText>
               <ThemedText type="subtitle">
-                ·{" "}
+                {"\n"}·{" "}
                 {
                   Estado[
                     Number.parseInt(trabajadorActual?.estado?.toString() || "0")
@@ -143,10 +164,11 @@ export default function HomeScreen() {
                 ·
               </ThemedText>
               <ThemedText type="subtitle">
-                {`Tiempo trabajado hoy\n${calcularHorasTrabajadas() || 0}`}
+                {`\nTiempo trabajado hoy\n${horasTrabajadas}`}
               </ThemedText>
+
               <ThemedText type="subtitle">
-                {`Último fichaje ${ultimoFichaje?.tipo ? "de " + ultimoFichaje.tipo : ""}\n${ultimoFichaje?.fecha ? new Date(ultimoFichaje.fecha).toLocaleString() : "No hay fichajes aún"}`}
+                {`\nÚltimo fichaje ${ultimoFichaje ? "\n" + ultimoFichaje.tipo.toUpperCase() : ""}\n${ultimoFichaje?.fecha ? new Date(ultimoFichaje.fecha).toLocaleString() : "No hay fichajes aún"}`}
               </ThemedText>
             </ThemedView>
           </ThemedView>
