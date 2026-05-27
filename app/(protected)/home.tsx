@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Animated, StyleSheet, Text, TouchableOpacity } from "react-native";
+// Añade ScrollView a tu importación de react-native
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
 import { HelloWave } from "../../components/hello-wave";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
@@ -20,29 +21,18 @@ export default function HomeScreen() {
   const [horario, setHorario] = useState<Horario | null>(null);
   const [ultimoFichaje, setUltimoFichaje] = useState<Fichaje | null>(null);
 
-  const handleFichar = (
-    tipo: "entrada" | "salida" | "descanso" | "horas_extra",
-  ) => {
-    crearFichaje(trabajadorActual?.id || 0, empresaSeleccionada?.id || 0, tipo);
-    // Alert.alert("Fichar", `¿Deseas fichar ${tipo}?`, [
-    //   { text: "Cancelar", style: "cancel" },
-    //   {
-    //     text: "Confirmar",
-    //     onPress: () => {
-    //       crearFichaje(
-    //         trabajadorActual?.id || 0,
-    //         empresaSeleccionada?.id || 0,
-    //         tipo,
-    //       );
+  const handleFichar = useMemo(() => {
+    return (tipo: "entrada" | "salida" | "descanso" | "horas_extra") => {
+      if (!trabajadorActual?.id || !empresaSeleccionada?.id) return;
 
-    //       Alert.alert(
-    //         "Fichaje realizado",
-    //         `Has fichado ${tipo} correctamente.`,
-    //       );
-    //     },
-    //   },
-    // ]);
-  };
+      try {
+        // Forzamos la espera de la creación en BD/API
+        crearFichaje(trabajadorActual.id, empresaSeleccionada.id, tipo);
+      } catch (error) {
+        console.error("Error al fichar:", error);
+      }
+    };
+  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
 
   useEffect(() => {
     async function cargarHorario() {
@@ -70,25 +60,6 @@ export default function HomeScreen() {
     cargarUltimoFichaje();
   }, [trabajadorActual?.id, empresaSeleccionada?.id]);
 
-  // const calcularHorasTrabajadas = () => {
-  //   if (!trabajadorActual?.id) return 0;
-
-  //   const fichajesTrabajador = obtenerFichajesEmpresaTrabajador(
-  //     trabajadorActual.id,
-  //     empresaSeleccionada?.id || 0,
-  //   );
-
-  //   const ultimaEntrada = fichajesTrabajador
-  //     .filter((f) => f.tipo === "entrada")
-  //     .pop();
-
-  //   const ahora = new Date();
-  //   let diffMs = 0;
-  //   if (ultimaEntrada)
-  //     diffMs = ahora.getTime() - ultimaEntrada.fecha_hora.getTime();
-  //   return Math.floor(diffMs / (1000 * 60 * 60));
-  // };
-
   const horasTrabajadas = useMemo(() => {
     if (!trabajadorActual?.id) return 0;
 
@@ -110,7 +81,7 @@ export default function HomeScreen() {
 
     return Math.floor(diffMs / (1000 * 60 * 60));
   }, [trabajadorActual?.id, empresaSeleccionada?.id]);
-  // Añadimos ultimoFichaje para que se actualice al pulsar el botón
+  // // Añadimos ultimoFichaje para que se actualice al pulsar el botón
 
   const formatearHora = (fechaInput: any) => {
     if (!fechaInput) return "00:00";
@@ -128,9 +99,9 @@ export default function HomeScreen() {
   const tieneDatos = !!(empresaSeleccionada?.id && trabajadorActual?.id);
 
   return (
-    <Animated.ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
     >
       {tieneDatos ? (
         <>
@@ -193,11 +164,7 @@ export default function HomeScreen() {
             <ThemedView style={styles.buttonRow}>
               <TouchableOpacity
                 style={styles.buttonFichar}
-                onPress={() =>
-                  setTimeout(() => {
-                    handleFichar("descanso");
-                  }, 0)
-                }
+                onPress={() => handleFichar("descanso")}
               >
                 <Text style={styles.textFichar}>Fichar Descanso</Text>
               </TouchableOpacity>
@@ -231,7 +198,7 @@ export default function HomeScreen() {
           </Link>
         </ThemedView>
       )}
-    </Animated.ScrollView>
+    </ScrollView>
   );
 }
 
@@ -254,11 +221,12 @@ const styles = StyleSheet.create({
   buttonRow: {
     backgroundColor: "transparent",
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     alignItems: "center",
-    margin: 10,
+    marginVertical: 10,
+    marginHorizontal: 10,
     gap: 10,
-    maxWidth: "100%",
+    width: "100%",
   },
   button: {
     backgroundColor: "#38565a",
