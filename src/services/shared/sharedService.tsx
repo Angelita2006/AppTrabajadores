@@ -1,6 +1,9 @@
 import { empresas } from "../../mock/empresasMock";
+import { horarios } from "../../mock/horariosMock";
 import { trabajadores } from "../../mock/trabajadoresMock";
 import { Empresa } from "../../models/empresas";
+import { Horario } from "../../models/horarios";
+import { Trabajador } from "../../models/trabajadores";
 import { obtenerEmpresas } from "../empresasService";
 import { getTrabajadorById } from "../trabajadoresService";
 
@@ -40,4 +43,18 @@ export const agregarEmpresaATrabajador = async (
   }
 
   return empresaExistente;
+};
+
+// obtiene los trabajadores que pertenecen a una empresa
+export const obtenerTrabajadoresPorEmpresa = async (
+  empresaId: number,
+): Promise<Trabajador[]> => {
+  return trabajadores.filter((t) => (t.empresas ?? []).includes(empresaId));
+};
+
+// obtiene los horarios asociados a una empresa
+export const obtenerHorariosPorEmpresa = async (
+  empresaId: number,
+): Promise<Horario[]> => {
+  return horarios.filter((h) => h.idEmpresa === empresaId);
 };

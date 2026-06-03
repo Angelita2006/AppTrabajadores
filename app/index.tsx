@@ -17,15 +17,20 @@ import {
   editarTrabajador,
   getTrabajadorByEmailYContraseña,
 } from "../src/services/trabajadoresService";
+import { useFichajeStore } from "../store/useFichajeStore";
 
 export default function VerPerfil() {
+  // Pantalla actual de la vista: inicio de sesión, registro, perfil o edición.
   const [pantalla, setPantalla] = useState<
     "registro" | "inicio" | "perfil" | "editar"
   >("inicio");
-  const { setTrabajadorActual } = useTrabajador();
+
+  // Contexto global para actualizar el trabajador actual y la empresa seleccionada.
+  const { setTrabajadorActual, setEmpresaSeleccionada, setEmpresas } =
+    useTrabajador();
   const [isSignedIn, setIsSignedIn] = useState(false);
 
-  // Estados del formulario
+  // Campos del formulario y datos del trabajador.
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [dni, setDni] = useState("");
@@ -40,8 +45,13 @@ export default function VerPerfil() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState(""); // CORREGIDO: Nuevo estado
 
+  // Maneja el cierre de sesión del usuario, limpiando todos los campos locales.
   const handleSignOut = () => {
     setIsSignedIn(false);
+    setTrabajadorActual(null);
+    setEmpresaSeleccionada(null);
+    setEmpresas([]);
+    useFichajeStore.getState().resetStore();
     setNombre("");
     setApellidos("");
     setDni("");
@@ -54,12 +64,18 @@ export default function VerPerfil() {
     setEstado(Estado.Inactivo);
     setEmail("");
     setPassword("");
+    setConfirmPassword("");
     Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente");
   };
 
   const handleRegister = () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Por favor, ingresa tu email y contraseña");
+    if (!email || !password || !confirmPassword) {
+      Alert.alert("Error", "Por favor, completa todos los campos de registro");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Las contraseñas no coinciden");
       return;
     }
 
@@ -79,6 +95,7 @@ export default function VerPerfil() {
     setTrabajadorActual(trabajador);
     Alert.alert("Éxito", "Registro del trabajador completado correctamente");
     setIsSignedIn(true);
+    setPantalla("perfil");
   };
 
   const handleSignIn = async () => {
@@ -144,14 +161,12 @@ export default function VerPerfil() {
   if (pantalla === "perfil" && isSignedIn) {
     return (
       <Animated.ScrollView
-        style={{ flex: 1 }}
+        style={styles.page}
         contentContainerStyle={[
           styles.scrollContent,
           {
             justifyContent: "center",
             alignItems: "center",
-            padding: 20,
-            backgroundColor: "rgb(21, 23, 24)", // Mismo fondo oscuro
           },
         ]}
       >
@@ -293,14 +308,12 @@ export default function VerPerfil() {
   if (pantalla === "editar" && isSignedIn) {
     return (
       <Animated.ScrollView
-        style={{ flex: 1 }}
+        style={styles.page}
         contentContainerStyle={[
           styles.scrollContent,
           {
             justifyContent: "center",
             alignItems: "center",
-            padding: 20,
-            backgroundColor: "rgb(21, 23, 24)",
           },
         ]}
       >
@@ -444,14 +457,12 @@ export default function VerPerfil() {
   if (pantalla === "registro") {
     return (
       <Animated.ScrollView
-        style={{ flex: 1 }}
+        style={styles.page}
         contentContainerStyle={[
           styles.scrollContent,
           {
             justifyContent: "center",
             alignItems: "center",
-            padding: 20,
-            backgroundColor: "rgb(21, 23, 24)",
           },
         ]}
       >
@@ -665,113 +676,115 @@ export default function VerPerfil() {
 }
 
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: "#071826",
+    padding: 20,
+  },
   containerCenter: {
-    backgroundColor: "rgb(21, 23, 24)",
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    textAlign: "center",
     padding: 20,
+    backgroundColor: "#071826",
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 40,
   },
-  titleContainer: {
-    padding: 20,
-    alignItems: "center",
-  },
   mainTitle: {
-    marginBottom: 20,
+    marginBottom: 24,
+    color: "#e2f6ff",
+    fontSize: 32,
+    fontWeight: "800",
+    textAlign: "center",
   },
   formContainer: {
     width: "100%",
-    maxWidth: 350,
+    maxWidth: 520,
+    backgroundColor: "#0f2a45",
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#14436d",
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 5,
   },
   label: {
     fontSize: 14,
-    marginBottom: 5,
+    marginBottom: 8,
     fontWeight: "600",
+    color: "#cde9ff",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 15,
-    backgroundColor: "#fff",
+    borderColor: "#14436d",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    backgroundColor: "#0a304f",
+    color: "#f8fafc",
   },
   button: {
-    backgroundColor: "#38565a",
-    padding: 15,
-    borderRadius: 6,
+    backgroundColor: "#16c2d9",
+    padding: 16,
+    borderRadius: 16,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
   },
   buttonText: {
-    color: "#fff",
+    color: "#ffffff",
     fontWeight: "bold",
+    fontSize: 16,
   },
   linkButton: {
-    marginTop: 15,
+    marginTop: 18,
     alignItems: "center",
   },
   linkText: {
-    color: "#38565a",
+    color: "#7dd3fc",
     textDecorationLine: "underline",
+    fontWeight: "600",
   },
-  profileContainer: {
-    padding: 20,
-    backgroundColor: "#e8f5e800",
-    borderRadius: 10,
-    margin: 10,
-    borderWidth: 1,
-    borderColor: "#A5D6A7",
-  },
-  // Estilo para el título de la sección de perfil, que es más grande y en negrita para destacar la información del perfil.
   profileTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-    textAlign: "center",
-    color: "#333",
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 20,
+    color: "#e2f6ff",
   },
-  // Estilo para el texto de la información del perfil, que tiene un tamaño de fuente legible y un color oscuro para facilitar la lectura.
   profileText: {
     fontSize: 16,
     marginBottom: 10,
-    color: "#333",
+    color: "#cde9ff",
   },
-  signInButton: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    margin: 10,
-  },
-  // Estilo para el botón de cerrar sesión, que tiene un fondo rojo para indicar una acción de cierre de sesión, y
-  // un estilo similar al botón de iniciar sesión para mantener la coherencia visual.
   signOutButton: {
-    backgroundColor: "#FF3B30",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "#ef5b5b",
+    padding: 14,
+    borderRadius: 14,
     alignItems: "center",
     margin: 10,
   },
   buttonContainer: {
-    backgroundColor: "#f3e5f500",
     flexDirection: "row",
     justifyContent: "center",
     gap: 10,
   },
   row: {
-    flexDirection: "row", // Alinea los hijos de forma horizontal
-    justifyContent: "space-between", // Distribuye el espacio de manera uniforme
-    gap: 12, // Añade separación física entre el input izquierdo y el derecho
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
     width: "100%",
-    backgroundColor: "transparent", // Evita cajas blancas de fondo
+    backgroundColor: "transparent",
   },
   column: {
-    flex: 1, // Obliga a ambas columnas a medir exactamente lo mismo (50% cada una)
+    flex: 1,
     backgroundColor: "transparent",
   },
 });

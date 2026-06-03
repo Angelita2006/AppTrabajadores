@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { obtenerFichajes } from "../src/fichajes";
+import { obtenerFichajesEmpresaTrabajador } from "../src/services/fichajesService";
 
 export type EstadoFichaje = "fuera" | "trabajando" | "descanso";
 
@@ -19,6 +19,7 @@ interface FichajeStore {
   registrarFichaje: (
     tipo: "entrada" | "salida" | "descanso" | "fin_descanso",
   ) => void;
+  resetStore: () => void;
 }
 
 export const useFichajeStore = create<FichajeStore>((set, get) => ({
@@ -40,7 +41,10 @@ export const useFichajeStore = create<FichajeStore>((set, get) => ({
     if (!trabajadorId || !empresaId) return;
 
     try {
-      const fichajes = obtenerFichajes(trabajadorId, empresaId);
+      const fichajes = obtenerFichajesEmpresaTrabajador(
+        trabajadorId,
+        empresaId,
+      );
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
 
@@ -74,5 +78,14 @@ export const useFichajeStore = create<FichajeStore>((set, get) => ({
     // Placeholder - la lógica de registro irá aquí
 
     get().cargarFichajesToday();
+  },
+  resetStore: () => {
+    set({
+      trabajadorId: 0,
+      empresaId: 0,
+      fichajeHoy: [],
+      estadoActual: "fuera",
+      ultimoFichaje: null,
+    });
   },
 }));

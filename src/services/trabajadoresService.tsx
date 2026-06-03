@@ -95,13 +95,13 @@ export const editarEstadoTrabajador = (
 // };
 
 // obtiene un trabajador por su id
-export const getTrabajadorById = (id: number): Trabajador => {
+export const getTrabajadorById = (id: number): Trabajador | null => {
   try {
     const trabajador = trabajadores.find((t) => t.id === id);
-    return trabajador || ("Trabajador no encontrado" as unknown as Trabajador);
+    return trabajador ?? null;
   } catch (error) {
     console.error("Error fetching trabajador:", error);
-    return "Trabajador no encontrado" as unknown as Trabajador;
+    return null;
   }
 };
 
@@ -109,15 +109,15 @@ export const getTrabajadorById = (id: number): Trabajador => {
 export const getTrabajadorByEmailYContraseña = async (
   email: string,
   password: string,
-): Promise<Trabajador> => {
+): Promise<Trabajador | null> => {
   try {
     const trabajador = trabajadores.find(
       (t) => t.email === email && t.password === password,
     );
-    return trabajador || ("Trabajador no encontrado" as unknown as Trabajador);
+    return trabajador ?? null;
   } catch (error) {
     console.error("Error fetching trabajador:", error);
-    return "Trabajador no encontrado" as unknown as Trabajador;
+    return null;
   }
 };
 

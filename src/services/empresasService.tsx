@@ -81,12 +81,12 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
 };
 
 // obtiene una empresa por su id
-export const getEmpresaById = async (id: number): Promise<Empresa> => {
+export const getEmpresaById = async (id: number): Promise<Empresa | null> => {
   try {
     const empresa = empresas.find((e) => e.id === id);
-    return empresa || ("Empresa no encontrada" as unknown as Empresa);
+    return empresa ?? null;
   } catch (error) {
     console.error("Error fetching empresa:", error);
-    return "Empresa no encontrada" as unknown as Empresa;
+    return null;
   }
 };

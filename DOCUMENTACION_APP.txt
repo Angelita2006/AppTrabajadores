@@ -1,0 +1,210 @@
+DOCUMENTACIÓN COMPLETA DE AppTrabajadores
+
+1. PROPÓSITO GENERAL
+-------------------
+AppTrabajadores es una aplicación construida con Expo y React Native que gestiona el fichaje de trabajadores en empresas.
+Permite iniciar sesión, registrar usuarios, seleccionar empresas, fichar entradas, salidas, descansos y horas extra.
+Adicionalmente ofrece soporte de roles: "user" para trabajadores normales y "admin" para un perfil con visibilidad 
+ampliada sobre empresas, sus trabajadores con sus horarios y sus fichajes en las empresas.
+
+2. ARQUITECTURA DEL PROYECTO
+----------------------------
+- app/: Contiene las pantallas de la aplicación y la navegación basada en archivos.
+- app/(protected)/: Pantallas de área protegida que se muestran después de iniciar sesión.
+- components/: Componentes reutilizables para UI y temas.
+- constants/: Temas y colores globales.
+- context/: Contexto global para trabajador y empresa seleccionada.
+- src/models/: Definiciones de tipos y estructuras de datos.
+- src/services/: Lógica de negocio local usando datos mock.
+- src/mock/: Datos de ejemplo para trabajadores, empresas, horarios y fichajes.
+- hooks/: Hooks personalizados para el tema de colores y esquema de color.
+- README.md: documento inicial generado por Expo.
+
+3. NAVEGACIÓN Y RUTAS
+---------------------
+La aplicación usa Expo Router con enrutamiento basado en archivos.
+- app/index.tsx: pantalla principal de login, registro, perfil y edición de perfil.
+- app/(protected)/home.tsx: pantalla de fichaje y resumen del trabajador.
+- app/(protected)/empresas.tsx: pantalla de selección y gestión de empresas.
+
+4. CONTEXTO GLOBAL: TrabajadorContext.tsx
+-----------------------------------------
+Este archivo define el contexto compartido entre las pantallas:
+- trabajadorActual: datos del trabajador logueado.
+- setTrabajadorActual: función para actualizar el trabajador actual.
+- empresaSeleccionada: empresa sobre la que se trabaja actualmente.
+- setEmpresaSeleccionada: función para cambiar la empresa activa.
+- empresas: lista de empresas cargadas en la sesión.
+- setEmpresas: actualiza la lista de empresas.
+- seleccionarEmpresa: busca una empresa por id y la marca como seleccionada.
+
+5. MODELOS DE DATOS
+-------------------
+5.1 Trabajador (src/models/trabajadores.tsx)
+- id, dni, nombre, apellidos, dirección, email, password, puesto, cuenta de cotización.
+- role?: "user" | "admin" para control de permisos.
+- empresas?: ids de empresas asociadas.
+- fichajes?: ids de fichajes registrados.
+- horarios?: ids de horarios asignados.
+- estado: usa la enumeración Estado para definir si está activo, descansando, etc.
+
+5.2 Empresa (src/models/empresas.tsx)
+- id, nombre, cif, direccion, poblacion, provincia, codigo_postal.
+- trabajadores?: ids de trabajadores vinculados.
+
+5.3 Fichaje (src/models/fichajes.tsx)
+- id, idTrabajador, idEmpresa, tipo (entrada/salida/descanso/horas_extra).
+- fecha: timestamp numérico.
+- fecha_hora: objeto Date.
+
+5.4 Horario (src/models/horarios.tsx)
+- id, idTrabajador, idEmpresa, tipoJornada, dias, diasSemana.
+- hora_entrada1, hora_salida1, hora_entrada2, hora_salida2.
+
+6. SERVICIOS Y DATOS MOCK
+-------------------------
+Los servicios están implementados en src/services/* y usan datos de ejemplo de src/mock/*.
+Este diseño simula un backend ligero dentro de la app.
+
+6.1 src/services/empresasService.tsx
+- obtenerEmpresas(): devuelve todas las empresas.
+- getEmpresaById(id): busca empresa por id.
+- crearEmpresa / editarEmpresa: funciones para crear y editar empresas en memoria.
+
+6.2 src/services/trabajadoresService.tsx
+- crearTrabajador(): genera un nuevo trabajador local.
+- editarTrabajador(): actualiza campos del trabajador a partir de su dni.
+- editarEstadoTrabajador(): cambia el estado del trabajador.
+- getTrabajadorById(): busca trabajador por id.
+- getTrabajadorByEmailYContraseña(): login por email y password.
+- getUltimoFichajeTrabajador(): devuelve el último fichaje existente.
+
+6.3 src/services/fichajesService.tsx
+- crearFichaje(): registra un nuevo fichaje y lo asocia al trabajador.
+- obtenerFichajesEmpresaTrabajador(): lista fichajes de un trabajador en una empresa.
+- getFichajeTrabajadorEmpresa(): busca un fichaje por id dentro de una empresa/trabajador.
+
+6.4 src/services/horariosService.tsx
+- obtenerHorarioTrabajadorEmpresa(): devuelve el horario asignado de un trabajador para una empresa.
+- obtenerHorarios(): devuelve todos los horarios.
+
+6.5 src/services/shared/sharedService.tsx
+- obtenerEmpresasTrabajador(): devuelve empresas vinculadas a un trabajador.
+- agregarEmpresaATrabajador(): asocia una empresa a un trabajador y viceversa.
+- obtenerTrabajadoresPorEmpresa(): devuelve los trabajadores vinculados a una empresa.
+- obtenerHorariosPorEmpresa(): devuelve horarios de una empresa.
+
+6.6 Datos mock de ejemplo
+- trabajadoresMock.tsx: contiene a Manolo (user) y Angelita (admin).
+- empresasMock.tsx: tres empresas de ejemplo, con trabajadores vinculados.
+- horariosMock.tsx: horarios asociados a cada trabajador/empresa.
+- fichajesMock.tsx: ejemplos iniciales de fichajes.
+
+7. COMPONENTES REUTILIZABLES
+---------------------------
+7.1 ThemedText
+- Componente que mejora <Text> de React Native.
+- Soporta tipos: default, title, subtitle, link, defaultBold, defaultSemiBold.
+- Usa el hook useThemeColor para obtener el color según el tema activo.
+
+7.2 ThemedView
+- Componente que mejora <View> de React Native.
+- Permite aplicar colores definidos por tema y se usa como contenedor principal.
+
+7.3 useThemeColor / use-color-scheme
+- useThemeColor elige el color a partir del esquema de color activo (claro/oscuro).
+- Colors se define en constants/theme.ts.
+
+8. PANTALLAS PRINCIPALES
+------------------------
+8.1 app/index.tsx (VerPerfil)
+- Controla cuatro estados de pantalla: inicio, registro, perfil y editar.
+- `handleSignIn()` valida credenciales con `getTrabajadorByEmailYContraseña`.
+- `handleRegister()` crea trabajador y establece sesión.
+- `handleSubmit()` guarda cambios en el perfil del trabajador.
+- Visualmente usa una tarjeta central con fondo oscuro, bordes redondeados y botones azules.
+- La pantalla de Login muestra el formulario de email y contraseña.
+- La pantalla de Registro agrega datos personales y campos para confirmar contraseña.
+- La pantalla de Perfil muestra datos del trabajador y permite editar o cerrar sesión.
+- La pantalla Editar permite actualizar campos del perfil.
+
+8.2 app/(protected)/home.tsx
+- Pantalla principal de fichaje después de seleccionar una empresa.
+- Carga horario, último fichaje y permite fichar tipos:
+  entrada, salida, descanso y horas extra.
+- `handleFichar()` crea un nuevo registro de fichaje con `crearFichaje`.
+- El estado `fichajeVersion` fuerza recarga cuando se registra un fichaje.
+- Si el usuario es admin y hay empresa seleccionada, carga todos los trabajadores de la empresa.
+- Calcula horas trabajadas hoy con `useMemo` usando la última entrada.
+- Muestra una tarjeta de información con el saludo, horario, estado y último fichaje.
+- Incluye botones para fichar y un enlace para cambiar de empresa.
+
+8.3 app/(protected)/empresas.tsx
+- Muestra las empresas disponibles y las empresas del trabajador.
+- Si el usuario es admin, muestra todas las empresas y oculta la lista de empresas disponibles.
+- Si el usuario es normal, permite añadir empresas disponibles a su lista.
+- `handleSeleccionarEmpresa()` actualiza la empresa activa en el contexto.
+- `handleSeleccionarDisponible()` asocia una empresa nueva al trabajador.
+- `handleEliminarEmpresa()` elimina una empresa de la lista local de usuario.
+- Usa tarjetas con fondo azul oscuro, bordes redondeados y botones de selección.
+
+9. ESTILOS GENERALES Y DISEÑO
+-----------------------------
+La interfaz adopta una paleta profesional en tonos azul oscuro y cian:
+- Fondo principal: #071826
+- Tarjetas secundarias: #0f2a45 / #0d3c60
+- Bordes: #14436d
+- Botones principales: #16c2d9
+- Texto claro: #e2f6ff / #cde9ff
+- Enlaces y acentos: #7dd3fc
+
+Las pantallas usan componentes con:
+- bordes redondeados (`borderRadius: 16` o `24`)
+- sombras suaves (`shadowOpacity`, `shadowRadius`, `elevation`)
+- espaciado generoso (`padding: 16`, `marginTop: 16`)
+- tipografías legibles y peso semibold para etiquetas.
+
+10. ROLES Y PERMISOS
+--------------------
+- `role: "user"`: trabajador normal. Puede ver solo sus propias empresas, su horario y fichar.
+- `role: "admin"`: usuario administrador. Puede ver todas las empresas y, al seleccionar una empresa, ver la lista de trabajadores y sus horarios.
+- El rol se define en `src/mock/trabajadoresMock.tsx` para los datos de ejemplo.
+
+11. FLUJO DE USUARIO
+--------------------
+1. El usuario abre la app en `app/index.tsx`.
+2. Inicia sesión o se registra.
+3. Tras el login, el perfil puede verse y editarse.
+4. El usuario navega a `app/(protected)/empresas.tsx` para seleccionar o añadir una empresa.
+5. Una vez seleccionada la empresa, accede a `app/(protected)/home.tsx` para fichar.
+6. Si es admin, en `home.tsx` ve trabajadores de la empresa seleccionada.
+
+12. OTRAS OBSERVACIONES
+----------------------
+- El proyecto usa React Native y Expo Router, lo que facilita el soporte web y móvil.
+- `app/index.tsx` utiliza `Animated.ScrollView` para permitir desplazamiento en formularios largos.
+- La lógica de negocio se mantiene local con datos mock, lo que permite probar la app sin backend.
+- `src/APIservices/` existe como carpeta alternativa de servicios, pero las pantallas actuales usan `src/services/` y `src/mock/`.
+- `README.md` es el README generado por Expo y puede reemplazarse por esta documentación si se desea.
+
+13. ARCHIVOS PRINCIPALES
+------------------------
+- app/index.tsx: login, registro, perfil y edición de perfil.
+- app/(protected)/home.tsx: pantalla de fichaje y resumen.
+- app/(protected)/empresas.tsx: selección y gestión de empresas.
+- context/TrabajadorContext.tsx: contexto para trabajador/empresa.
+- src/models/: tipos y estructuras.
+- src/services/: lógica de negocio local.
+- src/mock/: datos de ejemplo.
+- components/themed-text.tsx / components/themed-view.tsx: componentes de UI con tema.
+- hooks/use-theme-color.ts: hook para elegir colores según tema.
+
+14. USO PROFESIONAL
+------------------
+Este proyecto sirve como una app de control de presencia.
+Es adecuado para:
+- validar pantallas de fichaje y selección de empresa.
+- demostrar roles de administrador y trabajador.
+- usar como base para integrar un backend real más adelante.
+
+FIN DE LA DOCUMENTACIÓN.

@@ -12,51 +12,74 @@ import {
   obtenerEmpresasTrabajador,
 } from "../../src/services/shared/sharedService";
 
-// Componente para mostrar y gestionar las empresas disponibles en la aplicación. Permite al usuario seleccionar una empresa para trabajar con ella.
+// VerEmpresas es la pantalla donde el trabajador puede ver sus empresas y seleccionar cuál va a usar.
+// Los administradores ven todas las empresas, mientras que los usuarios normales solo ven las empresas ya asociadas a su cuenta.
 export default function VerEmpresas() {
-  // Obtenemos el trabajador actual del contexto para poder mostrar las empresas asociadas a él y permitir agregar nuevas empresas.
-  // Si no hay un trabajador actual, se asume un ID de 0 para evitar errores al obtener las empresas.
-  // El estado empresas se inicializa con las empresas asociadas al trabajador actual, utilizando la función obtenerEmpresasTrabajador.
+  // Contexto global del trabajador: información del usuario logueado y sus permisos.
   const trabajador = useTrabajador().trabajadorActual;
+
+  // Guardamos el id del trabajador para evitar usar undefined en las consultas.
   const trabajadorId = trabajador?.id || 0;
+
+  // Estado local de empresas que el usuario puede ver o seleccionar.
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
+  // Carga inicial de empresas según el rol del trabajador.
+  // - Si es admin, carga todas las empresas.
+  // - Si no, carga solo las empresas vinculadas al trabajador.
   useEffect(() => {
     const cargarMisEmpresas = async () => {
-      const data = await obtenerEmpresasTrabajador(trabajador?.id || 0);
-      setEmpresas(data);
+      if (trabajador?.role === "admin") {
+        const todas = await obtenerEmpresas();
+        setEmpresas(todas);
+      } else {
+        const data = await obtenerEmpresasTrabajador(trabajador?.id || 0);
+        setEmpresas(data);
+      }
     };
     cargarMisEmpresas();
-  }, [trabajador?.id]);
+  }, [trabajador?.id, trabajador?.role]);
 
+  // Obtenemos desde el contexto la empresa actualmente seleccionada y su setter.
   const { empresaSeleccionada, setEmpresaSeleccionada } = useTrabajador();
 
+  // Al seleccionar una empresa la guardamos en el contexto para que otras pantallas la usen.
   const handleSeleccionarEmpresa = (empresa: Empresa) => {
     setEmpresaSeleccionada(empresa);
   };
 
+  // Empresas que un usuario normal puede añadir. Los admins no usan esta lista.
   const [empresasDisponibles, setEmpresasDisponibles] = useState<Empresa[]>([]);
 
-  // Carga de empresas disponibles
+  // Carga empresas que no estén ya asociadas al trabajador.
+  // Esto permite ofrecer solo las empresas disponibles para añadir.
   useEffect(() => {
     const cargarDatos = async () => {
+      if (trabajador?.role === "admin") {
+        setEmpresasDisponibles([]);
+        return;
+      }
+
       const disponibles = await obtenerEmpresas();
-      obtenerEmpresasTrabajador(trabajadorId).then((asociadas) => {
-        const asociadasIds = asociadas.map((e) => e.id);
-        const filtradas = disponibles.filter(
-          (e) => !asociadasIds.includes(e.id),
-        );
-        setEmpresasDisponibles(filtradas);
-      });
-      setEmpresasDisponibles(disponibles);
+      const asociadas = await obtenerEmpresasTrabajador(trabajadorId);
+      const asociadasIds = asociadas.map((e) => e.id);
+      const filtradas = disponibles.filter((e) => !asociadasIds.includes(e.id));
+      setEmpresasDisponibles(filtradas);
     };
     cargarDatos();
-  }, [trabajadorId]);
+  }, [trabajador?.role, trabajadorId]);
 
+  // Re-carga de las empresas del trabajador cuando cambia el usuario o su rol.
+  // Esto permite mantener la lista sincronizada tras acciones como añadir empresas.
   useEffect(() => {
     const cargarEmpresasTrabajador = async () => {
       if (trabajadorId === 0) {
         setEmpresas([]);
+        return;
+      }
+      if (trabajador?.role === "admin") {
+        const todas = await obtenerEmpresas();
+        setEmpresas(todas);
         return;
       }
       try {
@@ -68,8 +91,10 @@ export default function VerEmpresas() {
     };
 
     cargarEmpresasTrabajador();
-  }, [trabajadorId]);
+  }, [trabajadorId, trabajador?.role]);
 
+  // Añade una empresa disponible al trabajador y actualiza el estado local.
+  // También elimina la empresa de la lista de disponibles para evitar duplicados.
   const handleSeleccionarDisponible = async (empresa: Empresa) => {
     if (trabajadorId === 0) return alert("Inicia sesión primero");
 
@@ -80,7 +105,7 @@ export default function VerEmpresas() {
       setEmpresasDisponibles(nuevasDisponibles);
       await agregarEmpresaATrabajador(trabajadorId, empresa.id);
 
-      // Actualizamos el estado local agregando la nueva empresa al array
+      // Actualizamos el estado local agregando la nueva empresa al array.
       setEmpresas((prev) => [...prev, empresa]);
 
       alert(`Empresa ${empresa.nombre} añadida.`);
@@ -91,42 +116,48 @@ export default function VerEmpresas() {
     }
   };
 
+  // Eliminar empresa de la lista local del trabajador.
+  // Esta acción no actualiza la base de datos remota porque la app usa datos mock.
+  // Se mantiene la empresa en disponibles para poder volver a añadirla.
   const handleEliminarEmpresa = (empresaId: number) => {
+    const empresaEliminada = empresas.find((e) => e.id === empresaId);
     setEmpresas(empresas.filter((e) => e.id !== empresaId));
-    setEmpresasDisponibles([
-      ...empresasDisponibles,
-      empresas.find((e) => e.id === empresaId)!,
-    ]);
+
+    if (empresaEliminada) {
+      setEmpresasDisponibles([...empresasDisponibles, empresaEliminada]);
+    }
   };
 
   return (
-    // El componente principal se envuelve en un ParallaxScrollView que muestra un encabezado con un icono y un fondo de color que cambia
-    // según el tema (claro u oscuro).
+    // Animated.ScrollView se usa para que la pantalla pueda desplazarse cuando hay muchas empresas.
+    // El uso de estilos compartidos hace la UI consistente con el tema general de la app.
     <>
       <Animated.ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+        style={styles.page}
+        contentContainerStyle={styles.pageContent}
       >
-        <ThemedView style={styles.listContainer}>
-          <ThemedText style={styles.titleContainer}>
-            Empresas disponibles
-          </ThemedText>
+        {trabajador?.role !== "admin" && (
+          <ThemedView style={styles.listContainer}>
+            <ThemedText style={styles.titleContainer}>
+              Empresas disponibles
+            </ThemedText>
 
-          {empresasDisponibles.map((empresa) => (
-            <ThemedView key={empresa.id} style={styles.empresaCard}>
-              <ThemedText type="default" style={styles.empresaText}>
-                {empresa.nombre} - {empresa.cif}
-              </ThemedText>
+            {empresasDisponibles.map((empresa) => (
+              <ThemedView key={empresa.id} style={styles.empresaCard}>
+                <ThemedText type="default" style={styles.empresaText}>
+                  {empresa.nombre} - {empresa.cif}
+                </ThemedText>
 
-              <TouchableOpacity
-                onPress={() => handleSeleccionarDisponible(empresa)}
-                style={styles.addbutton}
-              >
-                <IconSymbol name="chevron.right" size={24} color="#007AFF" />
-              </TouchableOpacity>
-            </ThemedView>
-          ))}
-        </ThemedView>
+                <TouchableOpacity
+                  onPress={() => handleSeleccionarDisponible(empresa)}
+                  style={styles.addbutton}
+                >
+                  <IconSymbol name="chevron.right" size={24} color="#7dd3fc" />
+                </TouchableOpacity>
+              </ThemedView>
+            ))}
+          </ThemedView>
+        )}
 
         <ThemedView style={styles.listContainer}>
           <ThemedText style={styles.titleContainer}>Mis empresas</ThemedText>
@@ -156,12 +187,7 @@ export default function VerEmpresas() {
                     </ThemedText>
                   </TouchableOpacity>
                 )) || (
-                  <ThemedView
-                    style={[
-                      styles.selectButton,
-                      { backgroundColor: "#34C759" },
-                    ]}
-                  >
+                  <ThemedView style={styles.selectedButton}>
                     <ThemedText style={styles.buttonText}>
                       Seleccionada
                     </ThemedText>
@@ -173,7 +199,7 @@ export default function VerEmpresas() {
         </ThemedView>
 
         <Link href="../" asChild>
-          <TouchableOpacity style={styles.button}>
+          <TouchableOpacity style={styles.backButton}>
             <ThemedText type="subtitle">Volver</ThemedText>
           </TouchableOpacity>
         </Link>
@@ -184,13 +210,20 @@ export default function VerEmpresas() {
 
 // Estilos
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: "#071826",
+  },
+  pageContent: {
+    flexGrow: 1,
+    padding: 20,
+    paddingBottom: 40,
+  },
   // Estilo para el contenedor del título, que organiza el título en una fila con un espacio entre los elementos.
   titleContainer: {
-    color: "#000000",
+    color: "#e2f6ff",
     fontSize: 24,
     fontWeight: "bold",
-    flexDirection: "row",
-    gap: 8,
     padding: 16,
   },
   // Estilo para el link de navegación, que agrega un margen superior para separarlo del contenido.
@@ -199,29 +232,38 @@ const styles = StyleSheet.create({
   },
   // Estilo para el contenedor de la lista de empresas, que agrega un margen superior para separarlo del título.
   listContainer: {
-    backgroundColor: "#e0e0e000",
+    backgroundColor: "#082f4d",
     marginTop: 16,
     margin: 5,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#14436d",
   },
   // Estilo para la tarjeta de cada empresa, que agrega padding, un fondo claro, bordes redondeados, un margen inferior y un borde.
   empresaCard: {
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#aeadac",
-    marginBottom: 10,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#0d3c60",
+    marginBottom: 12,
     justifyContent: "space-between",
     flexDirection: "row",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 3,
   },
+  // Cada tarjeta representa una empresa y contiene las acciones que se pueden realizar sobre ella.
   // Estilo para el texto de cada empresa, que define el tamaño de fuente, el margen inferior y el color.
   empresaText: {
     fontSize: 16,
     marginBottom: 10,
-    color: "#333",
+    color: "#e2f6ff",
   },
   // Estilo para el contenedor de los botones de cada empresa, que organiza los botones en una fila con espacio entre ellos.
   buttonContainer: {
-    backgroundColor: "#e0e0e000",
+    backgroundColor: "transparent",
     flexDirection: "row",
     justifyContent: "flex-start",
     gap: 10,
@@ -229,34 +271,53 @@ const styles = StyleSheet.create({
   },
   // Estilo para el botón de eliminar empresa, que define un fondo rojo, padding, bordes redondeados y alineación centrada.
   deleteButton: {
-    backgroundColor: "#FF3B30",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 5,
+    backgroundColor: "#ef5b5b",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     alignItems: "center",
   },
   // Estilo para el botón de seleccionar empresa, que define un fondo azul, padding, bordes redondeados y alineación centrada.
   selectButton: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 5,
+    backgroundColor: "#16c2d9",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     alignItems: "center",
   },
   // Estilo para el texto de los botones, que define el color blanco y un tamaño de fuente.
   buttonText: {
     color: "white",
     fontSize: 14,
+    fontWeight: "700",
   },
   // Estilo para el botón de agregar empresa, que define un fondo azul, padding, bordes redondeados, alineación centrada y un margen superior.
   button: {
-    backgroundColor: "#007AFF",
-    padding: 25,
-    borderRadius: 5,
+    backgroundColor: "#16c2d9",
+    padding: 18,
+    borderRadius: 16,
     alignItems: "center",
     marginTop: 16,
     margin: 5,
     alignSelf: "center",
+    minWidth: 140,
+  },
+  backButton: {
+    backgroundColor: "#0f2a45",
+    padding: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 16,
+    margin: 5,
+    alignSelf: "center",
+    minWidth: 140,
+  },
+  selectedButton: {
+    backgroundColor: "#34C759",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignItems: "center",
   },
   addbutton: {
     padding: 10,

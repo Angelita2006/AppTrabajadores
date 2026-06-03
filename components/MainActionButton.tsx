@@ -48,6 +48,11 @@ export const MainActionButton = () => {
       return;
     }
 
+    if (!empresaId) {
+      Alert.alert("Error", "Selecciona una empresa antes de fichar");
+      return;
+    }
+
     setLoading(true);
     try {
       crearFichaje(trabajadorActual.id, empresaId, config.tipo);

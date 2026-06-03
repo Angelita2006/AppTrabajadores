@@ -1,14 +1,22 @@
 import { Link } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 // Añade ScrollView a tu importación de react-native
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from "react-native";
 import { HelloWave } from "../../components/hello-wave";
 import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { useTrabajador } from "../../context/TrabajadorContext";
 import { Fichaje } from "../../src/models/fichajes";
 import { Horario } from "../../src/models/horarios";
-import { Estado } from "../../src/models/trabajadores";
+import { Estado, Trabajador } from "../../src/models/trabajadores";
+
+import { CalendarTrabajador } from "../../components/Calendar";
 import {
   crearFichaje,
   obtenerFichajesEmpresaTrabajador,
@@ -17,29 +25,73 @@ import { obtenerHorarioTrabajadorEmpresa } from "../../src/services/horariosServ
 import { getUltimoFichajeTrabajador } from "../../src/services/trabajadoresService";
 
 export default function HomeScreen() {
+  // Contexto global: trabajador y empresa seleccionada.
+  // El contexto proviene de context/TrabajadorContext.tsx y se usa para compartir
+  // el trabajador actual y la empresa seleccionada entre pantallas.
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
-  const [horario, setHorario] = useState<Horario | null>(null);
-  const [ultimoFichaje, setUltimoFichaje] = useState<Fichaje | null>(null);
 
-  const handleFichar = useMemo(() => {
-    return (tipo: "entrada" | "salida" | "descanso" | "horas_extra") => {
+  // Estado local de la pantalla:
+  // - horario: horario de trabajo para el trabajador y la empresa actuales.
+  // - empresaTrabajadores: lista de trabajadores de la empresa (solo para admin).
+  // - ultimoFichaje: último registro de fichaje realizado por el trabajador.
+  // - fichajeVersion: contador para forzar recargas de información tras fichar.
+  const [horario, setHorario] = useState<Horario | null>(null);
+  const [empresaTrabajadores, setEmpresaTrabajadores] = useState<Trabajador[]>(
+    [],
+  );
+  const [ultimoFichaje, setUltimoFichaje] = useState<Fichaje | null>(null);
+  const [fichajeVersion, setFichajeVersion] = useState(0);
+  const [estado, setEstado] = useState<Estado>(
+    trabajadorActual?.estado || Estado.Inactivo,
+  );
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  const handleFichar = useCallback(
+    async (tipo: "entrada" | "salida" | "descanso" | "horas_extra") => {
       if (!trabajadorActual?.id || !empresaSeleccionada?.id) return;
 
       try {
-        // Forzamos la espera de la creación en BD/API
-        crearFichaje(trabajadorActual.id, empresaSeleccionada.id, tipo);
+        const nuevoFichaje = await crearFichaje(
+          trabajadorActual.id,
+          empresaSeleccionada.id,
+          tipo,
+        );
+
+        if (nuevoFichaje) {
+          setUltimoFichaje(nuevoFichaje);
+        }
+
+        setEstado(
+          tipo === "entrada"
+            ? Estado.Trabajando
+            : tipo === "salida"
+              ? Estado.Activo
+              : tipo === "descanso"
+                ? Estado.Descansando
+                : tipo === "horas_extra"
+                  ? Estado.HorasExtra
+                  : /*tipo === "vacaciones" ? Estado.Vacaciones :*/ Estado.Activo,
+        );
+
+        setFichajeVersion((prev) => prev + 1);
+
+        Alert.alert(
+          "Fichaje registrado",
+          `Has fichado ${tipo} a las ${new Date(nuevoFichaje.fecha).toLocaleTimeString()}`,
+        );
       } catch (error) {
         console.error("Error al fichar:", error);
       }
-    };
-  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
+    },
+    [trabajadorActual?.id, empresaSeleccionada?.id],
+  );
 
   useEffect(() => {
     async function cargarHorario() {
       if (empresaSeleccionada?.id && trabajadorActual?.id) {
         const horario = obtenerHorarioTrabajadorEmpresa(
-          empresaSeleccionada.id,
           trabajadorActual.id,
+          empresaSeleccionada.id,
         );
         setHorario(horario);
       }
@@ -48,40 +100,106 @@ export default function HomeScreen() {
   }, [empresaSeleccionada?.id, trabajadorActual?.id]);
 
   useEffect(() => {
+    // Ejecuta la función cada segundo
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    // Limpia el intervalo al desmontar el componente
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     async function cargarUltimoFichaje() {
       if (trabajadorActual?.id) {
         const fichaje = getUltimoFichajeTrabajador(
           trabajadorActual.id,
           empresaSeleccionada?.id || 0,
         );
+        if (fichaje?.tipo === "entrada") {
+          setEstado(Estado.Trabajando);
+        } else if (fichaje?.tipo === "descanso") {
+          setEstado(Estado.Descansando);
+        } else if (fichaje?.tipo === "horas_extra") {
+          setEstado(Estado.HorasExtra);
+        } else if (fichaje?.tipo === "salida") {
+          setEstado(Estado.Activo);
+        }
         setUltimoFichaje(fichaje);
       }
     }
     cargarUltimoFichaje();
-  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
+  }, [trabajadorActual?.id, empresaSeleccionada?.id, fichajeVersion]);
 
-  const horasTrabajadas = useMemo(() => {
+  useEffect(() => {
+    // El administrador puede ver todos los trabajadores de la empresa seleccionada.
+    // Esta carga se ejecuta solo cuando cambia el rol o la empresa seleccionada.
+    async function cargarTrabajadoresEmpresa() {
+      if (
+        trabajadorActual?.role === "admin" &&
+        empresaSeleccionada?.id !== undefined
+      ) {
+        const { obtenerTrabajadoresPorEmpresa } =
+          await import("../../src/services/shared/sharedService");
+        const t = await obtenerTrabajadoresPorEmpresa(empresaSeleccionada.id);
+        setEmpresaTrabajadores(t);
+      } else {
+        setEmpresaTrabajadores([]);
+      }
+    }
+    cargarTrabajadoresEmpresa();
+  }, [trabajadorActual?.role, empresaSeleccionada?.id]);
+
+  // Calcula el tiempo trabajado hoy en horas desde la última entrada registrada.
+  const tiempoTrabajado = useMemo(() => {
     if (!trabajadorActual?.id) return 0;
 
-    const fichajesTrabajador = obtenerFichajesEmpresaTrabajador(
+    const fichajesTrabajadorHoy = obtenerFichajesEmpresaTrabajador(
       trabajadorActual.id,
       empresaSeleccionada?.id || 0,
-    );
+    ).filter((f) => {
+      const fechaFichaje = new Date(f.fecha);
+      const hoy = currentTime;
+      return (
+        fechaFichaje.getDate() === hoy.getDate() &&
+        fechaFichaje.getMonth() === hoy.getMonth() &&
+        fechaFichaje.getFullYear() === hoy.getFullYear()
+      );
+    });
 
-    const ultimaEntrada = fichajesTrabajador
-      .filter((f) => f.tipo === "entrada")
-      .pop();
+    let horasTrabajadas = 0;
+    let minutosTrabajados = 0;
 
-    if (!ultimaEntrada) return 0;
+    for (let i = 0; i < fichajesTrabajadorHoy.length; i++) {
+      const fichaje = fichajesTrabajadorHoy[i];
+      if (fichaje.tipo === "entrada") {
+        const salida = fichajesTrabajadorHoy.find(
+          (f) =>
+            f.tipo === "salida" &&
+            new Date(f.fecha).getTime() > new Date(fichaje.fecha).getTime(),
+        );
+        if (salida) {
+          // Si hay salida registrada, calcula el tiempo hasta la salida
+          const diff =
+            new Date(salida.fecha).getTime() -
+            new Date(fichaje.fecha).getTime();
+          horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
+          minutosTrabajados += Math.floor(
+            (diff % (1000 * 60 * 60)) / (1000 * 60),
+          );
+        } else {
+          // Si no hay salida registrada, calcula el tiempo hasta ahora
+          const diff = new Date().getTime() - new Date(fichaje.fecha).getTime();
+          horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
+          minutosTrabajados += Math.floor(
+            (diff % (1000 * 60 * 60)) / (1000 * 60),
+          );
+        }
+      }
+    }
 
-    // Asegúrate de que fecha_hora sea un objeto Date válido
-    const fechaEntrada = new Date(ultimaEntrada.fecha_hora);
-    const ahora = new Date();
-    const diffMs = ahora.getTime() - fechaEntrada.getTime();
-
-    return Math.floor(diffMs / (1000 * 60 * 60));
-  }, [trabajadorActual?.id, empresaSeleccionada?.id]);
-  // // Añadimos ultimoFichaje para que se actualice al pulsar el botón
+    return horasTrabajadas + " horas y " + minutosTrabajados + " minutos";
+  }, [trabajadorActual?.id, empresaSeleccionada?.id, currentTime]);
 
   const formatearHora = (fechaInput: any) => {
     if (!fechaInput) return "00:00";
@@ -96,13 +214,16 @@ export default function HomeScreen() {
     return `${horas}:${minutos}`;
   };
 
+  // Determina si hay datos suficientes para mostrar la pantalla principal.
   const tieneDatos = !!(empresaSeleccionada?.id && trabajadorActual?.id);
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-    >
+    <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
+      <ThemedView style={styles.timeBanner}>
+        <ThemedText type="subtitle">
+          Hora actual: {formatearHora(currentTime)}
+        </ThemedText>
+      </ThemedView>
       {tieneDatos ? (
         <>
           <ThemedView style={styles.stepContainer}>
@@ -127,22 +248,130 @@ export default function HomeScreen() {
               </ThemedText>
               <ThemedText type="subtitle">
                 {"\n"}·{" "}
-                {
-                  Estado[
-                    Number.parseInt(trabajadorActual?.estado?.toString() || "0")
-                  ]
-                }{" "}
+                {(estado === Estado.Trabajando && "Trabajando") ||
+                  (estado === Estado.Activo && "Activo") ||
+                  (estado === Estado.Descansando && "Descansando") ||
+                  (estado === Estado.HorasExtra && "Haciendo Horas Extra") ||
+                  (estado === Estado.Vacaciones && "De Vacaciones") ||
+                  "Inactivo"}{" "}
                 ·
               </ThemedText>
               <ThemedText type="subtitle">
-                {`\nTiempo trabajado hoy\n${horasTrabajadas}`}
+                {`\nTiempo trabajado hoy\n${tiempoTrabajado}`}
               </ThemedText>
 
               <ThemedText type="subtitle">
                 {`\nÚltimo fichaje ${ultimoFichaje ? "\n" + ultimoFichaje.tipo.toUpperCase() : ""}\n${ultimoFichaje?.fecha ? new Date(ultimoFichaje.fecha).toLocaleString() : "No hay fichajes aún"}`}
               </ThemedText>
+
+              <ThemedText type="subtitle">
+                Fichajes:
+                {
+                  obtenerFichajesEmpresaTrabajador(
+                    trabajadorActual.id,
+                    empresaSeleccionada?.id || 0,
+                  ).length
+                }
+                <ThemedText style={{ fontSize: 20, marginBottom: 6 }}>
+                  {"\n\n"}📅 Calendario del trabajador
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🟢 Días trabajados
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🔴 Días no trabajados
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🔵 Días a trabajar
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🟡 Días para no trabajar
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🟣 Días de vacaciones
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                  {"\n"}🟤 Días de baja
+                </ThemedText>
+                {"\n"}
+                <CalendarTrabajador
+                  trabajadorId={trabajadorActual.id}
+                  empresaId={empresaSeleccionada?.id || 0}
+                />
+              </ThemedText>
             </ThemedView>
           </ThemedView>
+
+          {/* Admin view: show trabajadores and horarios for the selected empresa */}
+          {trabajadorActual?.role === "admin" &&
+            empresaTrabajadores.length > 0 && (
+              <ThemedView style={styles.infoCard}>
+                <ThemedText type="subtitle">
+                  Trabajadores en empresa:
+                </ThemedText>
+                {empresaTrabajadores.map((t) => {
+                  if (t === trabajadorActual)
+                    return (
+                      <ThemedView key={t.id} style={{ marginTop: 8 }}>
+                        <ThemedText type="subtitle">
+                          {t.nombre} {t.apellidos} - {t.puesto}
+                        </ThemedText>
+                      </ThemedView>
+                    );
+                  const horarioTrabajador = obtenerHorarioTrabajadorEmpresa(
+                    t.id,
+                    empresaSeleccionada?.id || 0,
+                  );
+                  return (
+                    <ThemedView key={t.id} style={{ marginTop: 8 }}>
+                      <ThemedText type="subtitle">
+                        {t.nombre} {t.apellidos} - {t.puesto}
+                      </ThemedText>
+                      <ThemedText type="subtitle">
+                        Horario:{" "}
+                        {formatearHora(horarioTrabajador?.hora_entrada1)} a{" "}
+                        {formatearHora(horarioTrabajador?.hora_salida1)}
+                      </ThemedText>
+                      <ThemedText type="subtitle">
+                        Fichajes:
+                        {
+                          obtenerFichajesEmpresaTrabajador(
+                            t.id,
+                            empresaSeleccionada?.id || 0,
+                          ).length
+                        }
+                        <ThemedText style={{ fontSize: 20, marginBottom: 6 }}>
+                          {"\n\n"}📅 Calendario del trabajador
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🟢 Días trabajados
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🔴 Días no trabajados
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🔵 Días a trabajar
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🟡 Días para no trabajar
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🟣 Días de vacaciones
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                          {"\n"}🟤 Días de baja
+                        </ThemedText>
+                        {"\n"}
+                        <CalendarTrabajador
+                          trabajadorId={t.id}
+                          empresaId={empresaSeleccionada?.id || 0}
+                        />
+                      </ThemedText>
+                    </ThemedView>
+                  );
+                })}
+              </ThemedView>
+            )}
 
           <ThemedView style={styles.stepContainer}>
             <ThemedView style={styles.buttonRow}>
@@ -177,7 +406,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </ThemedView>
 
-            <Link href="../(protected)/empresas" asChild>
+            <Link href="../empresas" asChild>
               <TouchableOpacity style={styles.button}>
                 <Text style={styles.textFichar}>Cambiar de Empresa</Text>
               </TouchableOpacity>
@@ -191,7 +420,7 @@ export default function HomeScreen() {
             fichar.
           </ThemedText>
 
-          <Link href="../(protected)/empresas" asChild>
+          <Link href="../empresas" asChild>
             <TouchableOpacity style={styles.button}>
               <Text style={styles.textFichar}>Seleccionar Empresa</Text>
             </TouchableOpacity>
@@ -203,66 +432,88 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  page: {
     flex: 1,
+    backgroundColor: "#071826",
   },
-  scrollContent: {
+  pageContent: {
     flexGrow: 1,
+    padding: 20,
     paddingBottom: 40,
   },
   infotitle: {
-    color: "#38565a",
+    color: "#cde9ff",
     fontSize: 18,
     textAlign: "center",
   },
   stepContainer: {
     backgroundColor: "transparent",
+    marginBottom: 16,
   },
   buttonRow: {
-    backgroundColor: "transparent",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginVertical: 10,
-    marginHorizontal: 10,
-    gap: 10,
-    width: "100%",
+    gap: 12,
   },
   button: {
-    backgroundColor: "#38565a",
-    padding: 12,
-    borderRadius: 5,
+    backgroundColor: "#1e9eb8",
+    padding: 14,
+    borderRadius: 16,
     alignItems: "center",
     flex: 1,
-    margin: 10,
+    margin: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
   },
   buttonFichar: {
-    backgroundColor: "#38565a",
-    paddingVertical: 15,
-    borderRadius: 8,
+    backgroundColor: "#1e9eb8",
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: "center",
     flex: 1,
+    // shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   textFichar: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
     textAlign: "center",
   },
   infoCard: {
-    backgroundColor: "#38565a",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: "#0f2a45",
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#B2EBF2",
-    margin: 5,
+    borderColor: "#14436d",
+    // shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    elevation: 4,
   },
   infoContainer: {
-    backgroundColor: "transparent",
-    gap: 8,
-    marginBottom: 8,
-    padding: 15,
+    backgroundColor: "#0f2a45",
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#14436d",
+  },
+  timeBanner: {
+    backgroundColor: "#0f2a45",
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#14436d",
     alignItems: "center",
   },
 });

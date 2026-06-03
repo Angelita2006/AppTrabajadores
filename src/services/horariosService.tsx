@@ -6,10 +6,12 @@ import { Horario } from "../models/horarios";
 export const obtenerHorarioTrabajadorEmpresa = (
   idTrabajador: number,
   idEmpresa: number,
-): Horario => {
-  return horarios.find(
-    (h) => h.idTrabajador === idTrabajador && h.idEmpresa === idEmpresa,
-  ) as Horario;
+): Horario | null => {
+  return (
+    horarios.find(
+      (h) => h.idTrabajador === idTrabajador && h.idEmpresa === idEmpresa,
+    ) ?? null
+  );
 };
 
 // obtiene todos los horarios

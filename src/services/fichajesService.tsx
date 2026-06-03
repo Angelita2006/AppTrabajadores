@@ -1,7 +1,8 @@
 import { fichajes } from "../mock/fichajesMock";
+import { trabajadores } from "../mock/trabajadoresMock";
 import { Fichaje } from "../models/fichajes";
 
-let idsFichajes = Math.max(...fichajes.map((f) => f.id), 0);
+let idsFichajes = Math.max(...fichajes.map((f) => f.id), 0) + 1;
 
 export const crearFichaje = (
   idTrabajador: number,
@@ -17,6 +18,15 @@ export const crearFichaje = (
     fecha_hora: new Date(Date.now()),
   };
   fichajes.push(fichaje);
+
+  try {
+    const trabajador = trabajadores.find((t) => t.id === idTrabajador);
+    if (trabajador) {
+      trabajador.fichajes = [...(trabajador.fichajes ?? []), fichaje.id];
+    }
+  } catch (e) {
+    console.error("No se pudo asociar el fichaje al trabajador:", e);
+  }
 
   return fichaje;
 };
