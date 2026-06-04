@@ -198,6 +198,11 @@ export default function HomeScreen() {
       }
     }
 
+    if (horasTrabajadas === 0) return minutosTrabajados + " minutos";
+    if (minutosTrabajados === 0)
+      if (horasTrabajadas === 0) return "No has fichado entrada hoy";
+      else return horasTrabajadas + " horas";
+
     return horasTrabajadas + " horas y " + minutosTrabajados + " minutos";
   }, [trabajadorActual?.id, empresaSeleccionada?.id, currentTime]);
 
