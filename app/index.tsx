@@ -183,7 +183,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={nombre}
                   editable={false} // Bloqueado, solo visualización
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -191,7 +191,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={apellidos}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
             </ThemedView>
@@ -203,7 +203,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={dni}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -211,7 +211,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={direccion}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
             </ThemedView>
@@ -223,7 +223,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={codigo_postal}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -231,7 +231,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={poblacion}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
             </ThemedView>
@@ -243,7 +243,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={provincia}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -253,7 +253,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={cuenta_cotizacion}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
             </ThemedView>
@@ -265,7 +265,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={puesto}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -273,7 +273,7 @@ export default function VerPerfil() {
                 <TextInput
                   value={email}
                   editable={false}
-                  style={[styles.input, { opacity: 0.8, color: "#555" }]}
+                  style={[styles.input, { opacity: 0.8, color: "#94a3b8" }]}
                 />
               </ThemedView>
             </ThemedView>
@@ -331,6 +331,7 @@ export default function VerPerfil() {
                   value={nombre}
                   onChangeText={setNombre}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -339,6 +340,7 @@ export default function VerPerfil() {
                   value={apellidos}
                   onChangeText={setApellidos}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -351,6 +353,7 @@ export default function VerPerfil() {
                   value={dni}
                   onChangeText={setDni}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -359,6 +362,8 @@ export default function VerPerfil() {
                   value={direccion}
                   onChangeText={setDireccion}
                   style={styles.input}
+                  placeholder="Dirección"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -372,6 +377,7 @@ export default function VerPerfil() {
                   onChangeText={setCodigoPostal}
                   style={styles.input}
                   keyboardType="number-pad"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -380,6 +386,7 @@ export default function VerPerfil() {
                   value={poblacion}
                   onChangeText={setPoblacion}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -392,6 +399,7 @@ export default function VerPerfil() {
                   value={provincia}
                   onChangeText={setProvincia}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -402,6 +410,7 @@ export default function VerPerfil() {
                   value={cuenta_cotizacion}
                   onChangeText={setCuentaCotizacion}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -414,6 +423,7 @@ export default function VerPerfil() {
                   value={puesto}
                   onChangeText={setPuesto}
                   style={styles.input}
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -422,6 +432,8 @@ export default function VerPerfil() {
                   value={email}
                   onChangeText={setEmail}
                   style={styles.input}
+                  placeholder="Email"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -481,6 +493,7 @@ export default function VerPerfil() {
                   onChangeText={setNombre}
                   style={styles.input}
                   placeholder="Nombre"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -490,6 +503,7 @@ export default function VerPerfil() {
                   onChangeText={setApellidos}
                   style={styles.input}
                   placeholder="Apellidos"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -503,6 +517,7 @@ export default function VerPerfil() {
                   onChangeText={setDni}
                   style={styles.input}
                   placeholder="DNI"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -512,6 +527,7 @@ export default function VerPerfil() {
                   onChangeText={setDireccion}
                   style={styles.input}
                   placeholder="Dirección"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -526,6 +542,7 @@ export default function VerPerfil() {
                   style={styles.input}
                   placeholder="C.P."
                   keyboardType="number-pad"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -535,6 +552,7 @@ export default function VerPerfil() {
                   onChangeText={setPoblacion}
                   style={styles.input}
                   placeholder="Población"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -548,6 +566,7 @@ export default function VerPerfil() {
                   onChangeText={setProvincia}
                   style={styles.input}
                   placeholder="Provincia"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -559,6 +578,7 @@ export default function VerPerfil() {
                   onChangeText={setCuentaCotizacion}
                   style={styles.input}
                   placeholder="Nº Cotización"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -572,6 +592,7 @@ export default function VerPerfil() {
                   onChangeText={setPuesto}
                   style={styles.input}
                   placeholder="Puesto"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -583,6 +604,7 @@ export default function VerPerfil() {
                   style={styles.input}
                   placeholder="ejemplo@correo.com"
                   autoCapitalize="none"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -597,6 +619,7 @@ export default function VerPerfil() {
                   secureTextEntry
                   style={styles.input}
                   placeholder="Contraseña"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
               <ThemedView style={styles.column}>
@@ -609,6 +632,7 @@ export default function VerPerfil() {
                   secureTextEntry
                   style={styles.input}
                   placeholder="Confirma"
+                  placeholderTextColor="#94a3b8"
                 />
               </ThemedView>
             </ThemedView>
@@ -647,6 +671,7 @@ export default function VerPerfil() {
           style={styles.input}
           placeholder="ejemplo@correo.com"
           autoCapitalize="none"
+          placeholderTextColor="#94a3b8"
         />
 
         <ThemedText style={styles.label}>Contraseña</ThemedText>
@@ -656,6 +681,7 @@ export default function VerPerfil() {
           secureTextEntry
           style={styles.input}
           placeholder="Tu contraseña"
+          placeholderTextColor="#94a3b8"
         />
 
         <TouchableOpacity style={styles.button} onPress={handleSignIn}>
@@ -685,9 +711,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    textAlign: "center",
     padding: 20,
     backgroundColor: "#071826",
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#14436d",
+    width: "100%",
   },
   scrollContent: {
     flexGrow: 1,

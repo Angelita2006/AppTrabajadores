@@ -19,7 +19,7 @@ const COLORS = {
   worked: "#4CAF50", // green
   notWorked: "#F44336", // red
   mustWork: "#2196F3", // blue
-  dontHaveToWork: "#FFEB3B", // yellow
+  dontHaveToWork: "#a08a5c", // beige
   holiday: "#F5DEB3", // beige
   sick: "#9E9E9E", // grey
   todayBorder: "#000",

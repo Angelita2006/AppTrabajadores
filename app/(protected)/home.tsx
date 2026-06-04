@@ -270,35 +270,36 @@ export default function HomeScreen() {
               </ThemedText>
 
               <ThemedText type="subtitle">
-                Fichajes:
+                {/* {"\n"}Fichajes:
                 {
                   obtenerFichajesEmpresaTrabajador(
                     trabajadorActual.id,
                     empresaSeleccionada?.id || 0,
                   ).length
-                }
-                <ThemedText style={{ fontSize: 20, marginBottom: 6 }}>
+                } */}
+                <ThemedText style={styles.infotitle2}>
                   {"\n\n"}📅 Calendario del trabajador
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                <ThemedText style={styles.infosubtitle}>
                   {"\n"}🟢 Días trabajados
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                <ThemedText style={styles.infosubtitle}>
                   {"\n"}🔴 Días no trabajados
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                <ThemedText style={styles.infosubtitle}>
                   {"\n"}🔵 Días a trabajar
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
-                  {"\n"}🟡 Días para no trabajar
+                <ThemedText style={styles.infosubtitle}>
+                  {"\n"}🟡 Días libres
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                <ThemedText style={styles.infosubtitle}>
                   {"\n"}🟣 Días de vacaciones
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                <ThemedText style={styles.infosubtitle}>
                   {"\n"}🟤 Días de baja
                 </ThemedText>
-                {"\n"}
+                <ThemedText style={styles.infosubtitle}>{"\n"}</ThemedText>
+                <ThemedText style={styles.infosubtitle}>{"\n"}</ThemedText>
                 <CalendarTrabajador
                   trabajadorId={trabajadorActual.id}
                   empresaId={empresaSeleccionada?.id || 0}
@@ -317,9 +318,17 @@ export default function HomeScreen() {
                 {empresaTrabajadores.map((t) => {
                   if (t === trabajadorActual)
                     return (
-                      <ThemedView key={t.id} style={{ marginTop: 8 }}>
+                      <ThemedView
+                        key={t.id}
+                        style={{
+                          marginTop: 8,
+                          backgroundColor: "transparent",
+                          padding: 12,
+                          borderRadius: 16,
+                        }}
+                      >
                         <ThemedText type="subtitle">
-                          {t.nombre} {t.apellidos} - {t.puesto}
+                          · {t.nombre} {t.apellidos} - {t.puesto}
                         </ThemedText>
                       </ThemedView>
                     );
@@ -328,9 +337,17 @@ export default function HomeScreen() {
                     empresaSeleccionada?.id || 0,
                   );
                   return (
-                    <ThemedView key={t.id} style={{ marginTop: 8 }}>
+                    <ThemedView
+                      key={t.id}
+                      style={{
+                        marginTop: 8,
+                        backgroundColor: "transparent",
+                        padding: 12,
+                        borderRadius: 16,
+                      }}
+                    >
                       <ThemedText type="subtitle">
-                        {t.nombre} {t.apellidos} - {t.puesto}
+                        · {t.nombre} {t.apellidos} - {t.puesto}
                       </ThemedText>
                       <ThemedText type="subtitle">
                         Horario:{" "}
@@ -338,35 +355,40 @@ export default function HomeScreen() {
                         {formatearHora(horarioTrabajador?.hora_salida1)}
                       </ThemedText>
                       <ThemedText type="subtitle">
-                        Fichajes:
+                        Fichajes:{" "}
                         {
                           obtenerFichajesEmpresaTrabajador(
                             t.id,
                             empresaSeleccionada?.id || 0,
                           ).length
                         }
-                        <ThemedText style={{ fontSize: 20, marginBottom: 6 }}>
+                        <ThemedText style={styles.infotitle2}>
                           {"\n\n"}📅 Calendario del trabajador
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                        <ThemedText style={styles.infosubtitle}>
                           {"\n"}🟢 Días trabajados
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                        <ThemedText style={styles.infosubtitle}>
                           {"\n"}🔴 Días no trabajados
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                        <ThemedText style={styles.infosubtitle}>
                           {"\n"}🔵 Días a trabajar
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
-                          {"\n"}🟡 Días para no trabajar
+                        <ThemedText style={styles.infosubtitle}>
+                          {"\n"}🟡 Días libres
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                        <ThemedText style={styles.infosubtitle}>
                           {"\n"}🟣 Días de vacaciones
                         </ThemedText>
-                        <ThemedText style={{ fontSize: 12, marginBottom: 6 }}>
+                        <ThemedText style={styles.infosubtitle}>
                           {"\n"}🟤 Días de baja
                         </ThemedText>
-                        {"\n"}
+                        <ThemedText style={styles.infosubtitle}>
+                          {"\n"}
+                        </ThemedText>
+                        <ThemedText style={styles.infosubtitle}>
+                          {"\n"}
+                        </ThemedText>
                         <CalendarTrabajador
                           trabajadorId={t.id}
                           empresaId={empresaSeleccionada?.id || 0}
@@ -461,6 +483,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 10,
     gap: 12,
+    backgroundColor: "transparent",
   },
   button: {
     backgroundColor: "#1e9eb8",
@@ -498,10 +521,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#14436d",
-    // shadowColor: "#000",
+    shadowColor: "transparent",
     shadowOpacity: 0.14,
     shadowRadius: 14,
     elevation: 4,
+    alignItems: "center",
   },
   infoContainer: {
     backgroundColor: "#0f2a45",
@@ -519,6 +543,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#14436d",
+    alignItems: "center",
+  },
+  infotitle2: {
+    fontSize: 18,
+    marginBottom: 6,
+    alignItems: "center",
+  },
+  infosubtitle: {
+    fontSize: 12,
+    marginBottom: 6,
     alignItems: "center",
   },
 });

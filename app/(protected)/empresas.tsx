@@ -152,7 +152,7 @@ export default function VerEmpresas() {
                   onPress={() => handleSeleccionarDisponible(empresa)}
                   style={styles.addbutton}
                 >
-                  <IconSymbol name="chevron.right" size={24} color="#7dd3fc" />
+                  <IconSymbol name="chevron.down" size={24} color="#7dd3fc" />
                 </TouchableOpacity>
               </ThemedView>
             ))}
@@ -164,35 +164,43 @@ export default function VerEmpresas() {
 
           {empresas.map((empresa) => (
             <ThemedView key={empresa.id} style={styles.empresaCard}>
-              <ThemedText type="default" style={styles.empresaText}>
-                {empresa.nombre} - {empresa.cif}
-              </ThemedText>
-
-              <ThemedView style={styles.buttonContainer}>
-                <TouchableOpacity
-                  onPress={() => handleEliminarEmpresa(empresa.id)}
-                  style={styles.deleteButton}
-                >
-                  <ThemedText style={styles.buttonText}>Eliminar</ThemedText>
-                </TouchableOpacity>
-                {(empresa.id !== empresaSeleccionada?.id && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      handleSeleccionarEmpresa(empresa);
-                    }}
-                    style={styles.selectButton}
-                  >
-                    <ThemedText style={styles.buttonText}>
-                      Seleccionar
-                    </ThemedText>
-                  </TouchableOpacity>
-                )) || (
-                  <ThemedView style={styles.selectedButton}>
-                    <ThemedText style={styles.buttonText}>
-                      Seleccionada
-                    </ThemedText>
+              <ThemedView style={styles.stepContainer}>
+                <ThemedView style={styles.row}>
+                  {/* <IconSymbol name="building" size={24} color="#7dd3fc" /> */}
+                  <ThemedText type="default" style={styles.empresaText}>
+                    {empresa.nombre} - {empresa.cif}
+                  </ThemedText>
+                </ThemedView>
+                <ThemedView style={styles.row}>
+                  <ThemedView style={styles.buttonContainer}>
+                    <TouchableOpacity
+                      onPress={() => handleEliminarEmpresa(empresa.id)}
+                      style={styles.deleteButton}
+                    >
+                      <ThemedText style={styles.buttonText}>
+                        Eliminar
+                      </ThemedText>
+                    </TouchableOpacity>
+                    {(empresa.id !== empresaSeleccionada?.id && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          handleSeleccionarEmpresa(empresa);
+                        }}
+                        style={styles.selectButton}
+                      >
+                        <ThemedText style={styles.buttonText}>
+                          Seleccionar
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )) || (
+                      <ThemedView style={styles.selectedButton}>
+                        <ThemedText style={styles.buttonText}>
+                          Seleccionada
+                        </ThemedText>
+                      </ThemedView>
+                    )}
                   </ThemedView>
-                )}
+                </ThemedView>
               </ThemedView>
             </ThemedView>
           ))}
@@ -230,6 +238,13 @@ const styles = StyleSheet.create({
   link: {
     marginTop: 16,
   },
+  stepContainer: {
+    backgroundColor: "transparent",
+    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "100%",
+  },
   // Estilo para el contenedor de la lista de empresas, que agrega un margen superior para separarlo del título.
   listContainer: {
     backgroundColor: "#082f4d",
@@ -247,27 +262,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#0d3c60",
     marginBottom: 12,
     justifyContent: "space-between",
-    flexDirection: "row",
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 3,
+    alignSelf: "center",
+    width: "100%",
   },
   // Cada tarjeta representa una empresa y contiene las acciones que se pueden realizar sobre ella.
   // Estilo para el texto de cada empresa, que define el tamaño de fuente, el margen inferior y el color.
-  empresaText: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: "#e2f6ff",
-  },
+  // empresaText: {
+  //   fontSize: 16,
+  //   marginBottom: 10,
+  //   color: "#e2f6ff",
+  //   width: "100%",
+  //   flexDirection: "row",
+  //   justifyContent: "center",
+  // },
   // Estilo para el contenedor de los botones de cada empresa, que organiza los botones en una fila con espacio entre ellos.
   buttonContainer: {
     backgroundColor: "transparent",
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     gap: 10,
     margin: 5,
+    width: "100%",
   },
   // Estilo para el botón de eliminar empresa, que define un fondo rojo, padding, bordes redondeados y alineación centrada.
   deleteButton: {
@@ -285,12 +305,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  // Estilo para el texto de los botones, que define el color blanco y un tamaño de fuente.
-  buttonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "700",
-  },
+  // // Estilo para el texto de los botones, que define el color blanco y un tamaño de fuente.
+  // buttonText: {
+  //   color: "white",
+  //   fontSize: 14,
+  //   fontWeight: "700",
+  //   width: "100%",
+  // },
   // Estilo para el botón de agregar empresa, que define un fondo azul, padding, bordes redondeados, alineación centrada y un margen superior.
   button: {
     backgroundColor: "#16c2d9",
@@ -334,5 +355,30 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 4,
     backgroundColor: "#fff",
+  },
+  // Modifica este estilo para centrar el texto correctamente
+  empresaText: {
+    fontSize: 16,
+    color: "#e2f6ff",
+    textAlign: "center", // Centra el texto dentro de su contenedor
+    width: "100%",
+  },
+
+  // Modifica este estilo para centrar el texto dentro del botón
+  buttonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center", // Centra el texto del botón si este se estira
+  },
+
+  // Modifica este para asegurar que la fila no altere el flujo
+  row: {
+    flexDirection: "row",
+    justifyContent: "center", // Centra la fila horizontalmente
+    alignItems: "center", // Centra la fila verticalmente
+    marginVertical: 4, // Reduce un poco el espacio vertical si se ve muy separado
+    backgroundColor: "transparent",
+    width: "100%",
   },
 });
