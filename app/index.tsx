@@ -10,13 +10,13 @@ import {
 import { ThemedText } from "../components/themed-text";
 import { ThemedView } from "../components/themed-view";
 import { useTrabajador } from "../context/TrabajadorContext";
-import { Estado } from "../src/models/trabajadores";
 import {
   crearTrabajador,
   editarEstadoTrabajador,
   editarTrabajador,
   getTrabajadorByEmailYContraseña,
-} from "../src/services/trabajadoresService";
+} from "../src/DBservices/trabajadoresService";
+import { Estado } from "../src/models/trabajadores";
 import { useFichajeStore } from "../store/useFichajeStore";
 
 export default function VerPerfil() {
@@ -26,11 +26,15 @@ export default function VerPerfil() {
   >("inicio");
 
   // Contexto global para actualizar el trabajador actual y la empresa seleccionada.
-  const { setTrabajadorActual, setEmpresaSeleccionada, setEmpresas } =
-    useTrabajador();
+  const {
+    trabajadorActual,
+    setTrabajadorActual,
+    setEmpresaSeleccionada,
+    setEmpresas,
+  } = useTrabajador();
   const [isSignedIn, setIsSignedIn] = useState(false);
 
-  // Campos del formulario y datos del trabajador.
+  let trabajadorId = trabajadorActual?.id || 0;
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [dni, setDni] = useState("");
@@ -68,7 +72,7 @@ export default function VerPerfil() {
     Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente");
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
       Alert.alert("Error", "Por favor, completa todos los campos de registro");
       return;
@@ -88,11 +92,12 @@ export default function VerPerfil() {
       codigo_postal,
       poblacion,
       provincia,
+      estado,
       cuenta_cotizacion,
       email,
       password,
     );
-    setTrabajadorActual(trabajador);
+    setTrabajadorActual(await trabajador);
     Alert.alert("Éxito", "Registro del trabajador completado correctamente");
     setIsSignedIn(true);
     setPantalla("perfil");
@@ -137,16 +142,16 @@ export default function VerPerfil() {
 
   const handleSubmit = async () => {
     const trabajador = editarTrabajador(
-      dni,
+      trabajadorId,
       nombre,
       apellidos,
+      dni,
+      puesto,
       direccion,
       codigo_postal,
       poblacion,
       provincia,
       cuenta_cotizacion,
-      puesto,
-      estado,
       email,
       password,
     );

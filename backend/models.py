@@ -10,6 +10,7 @@ class Fichaje(Base):
     idTrabajador = Column(Integer, ForeignKey("trabajadores.id"), primary_key=True, index=True)
     idEmpresa = Column(Integer, ForeignKey("empresas.id"), primary_key=True, index=True)
     tipo = Column(String, index=True)
+    fecha = Column(Integer, index=True)
     fecha_hora = Column(DateTime, index=True)
 
     trabajador = relationship("Trabajador", back_populates="fichajes")
@@ -31,9 +32,11 @@ class Horario(Base):
     idEmpresa = Column(Integer, ForeignKey("empresas.id"), primary_key=True, index=True)
     tipoJornada = Column(String, index=True)
     dias = Column(Integer, index=True)
-    dias_semana = Column(String, index=True)
-    hora_entrada = Column(DateTime, index=True)
-    hora_salida = Column(DateTime, index=True)
+    diasSemana = Column("dias_semana", String, index=True)
+    hora_entrada1 = Column("hora_entrada1", DateTime, index=True)
+    hora_salida1 = Column("hora_salida1", DateTime, index=True)
+    hora_entrada2 = Column("hora_entrada2", DateTime, index=True, nullable=True)
+    hora_salida2 = Column("hora_salida2", DateTime, index=True, nullable=True)
 
     trabajador = relationship("Trabajador", back_populates="horarios")
     empresa = relationship("Empresa", back_populates="horarios")
@@ -42,9 +45,12 @@ class Trabajador(Base):
     __tablename__ = "trabajadores"
 
     id = Column(Integer, primary_key=True, index=True)
+    role = Column(String, index=True, nullable=True)
+    estado = Column(String, index=True, nullable=True)
     nombre = Column(String, index=True)
     apellidos = Column(String, index=True)
     dni = Column(String, unique=True, index=True)
+    puesto = Column(String, index=True)
     direccion = Column(String, index=True)
     codigo_postal = Column(String, index=True)
     poblacion = Column(String, index=True)

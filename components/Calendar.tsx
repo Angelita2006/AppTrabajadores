@@ -1,6 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTrabajador } from "../context/TrabajadorContext";
+import { Fichaje } from "../src/models/fichajes";
+import { Horario } from "../src/models/horarios";
 import { obtenerFichajesEmpresaTrabajador } from "../src/services/fichajesService";
 import { obtenerHorarioTrabajadorEmpresa } from "../src/services/horariosService";
 import { ThemedText } from "./themed-text";
@@ -50,14 +52,33 @@ export const CalendarTrabajador: React.FC<Props> = ({
   const displayYear = year ?? today.getFullYear();
   const displayMonth = month ?? today.getMonth();
 
-  const horario = obtenerHorarioTrabajadorEmpresa(
-    trabajadorId || 0,
-    empresaId || 0,
-  );
-  const fichajes = obtenerFichajesEmpresaTrabajador(
-    trabajadorId || 0,
-    empresaId || 0,
-  );
+  const [horario, setHorario] = useState<Horario | null>(null);
+  const [fichajes, setFichajes] = useState<Fichaje[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!trabajadorId || !empresaId) {
+        setHorario(null);
+        setFichajes([]);
+        return;
+      }
+
+      try {
+        const [horarioData, fichajesData] = await Promise.all([
+          obtenerHorarioTrabajadorEmpresa(trabajadorId, empresaId),
+          obtenerFichajesEmpresaTrabajador(trabajadorId, empresaId),
+        ]);
+        setHorario(horarioData);
+        setFichajes(fichajesData);
+      } catch (error) {
+        console.error("Error cargando calendario:", error);
+        setHorario(null);
+        setFichajes([]);
+      }
+    };
+
+    loadData();
+  }, [trabajadorId, empresaId]);
 
   const holidaysNorm = useMemo(
     () =>

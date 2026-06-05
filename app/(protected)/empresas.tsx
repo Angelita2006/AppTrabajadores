@@ -5,12 +5,12 @@ import { ThemedText } from "../../components/themed-text";
 import { ThemedView } from "../../components/themed-view";
 import { IconSymbol } from "../../components/ui/icon-symbol";
 import { useTrabajador } from "../../context/TrabajadorContext";
-import { Empresa } from "../../src/models/empresas";
-import { obtenerEmpresas } from "../../src/services/empresasService";
+import { obtenerEmpresas } from "../../src/DBservices/empresasService";
 import {
   agregarEmpresaATrabajador,
   obtenerEmpresasTrabajador,
-} from "../../src/services/shared/sharedService";
+} from "../../src/DBservices/sharedService";
+import { Empresa } from "../../src/models/empresas";
 
 // VerEmpresas es la pantalla donde el trabajador puede ver sus empresas y seleccionar cuál va a usar.
 // Los administradores ven todas las empresas, mientras que los usuarios normales solo ven las empresas ya asociadas a su cuenta.

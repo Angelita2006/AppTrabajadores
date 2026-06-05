@@ -11,9 +11,9 @@ def get_db():
     db = SessionLocal()
     return db
 
-def next_id(object: object):
+def next_id(model):
     db = get_db()
-    last_object = db.query(object).order_by(object.id.desc()).first()
+    last_object = db.query(model).order_by(model.id.desc()).first()
     db.close()
     if last_object:
         return last_object.id + 1

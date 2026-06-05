@@ -1,24 +1,25 @@
 import { create } from "zustand";
-import { obtenerFichajesEmpresaTrabajador } from "../src/services/fichajesService";
+import {
+    crearFichaje,
+    obtenerFichajesEmpresaTrabajador,
+} from "../src/services/fichajesService";
 
 export type EstadoFichaje = "fuera" | "trabajando" | "descanso";
 
 interface FichajeStore {
-  // Estado
   trabajadorId: number;
   empresaId: number;
   fichajeHoy: any[];
   estadoActual: EstadoFichaje;
   ultimoFichaje: any | null;
 
-  // Acciones
   setTrabajador: (id: number) => void;
-  setEmpresa: (id: number) => void;
-  cargarFichajesToday: () => void;
+  setEmpresa: (id: number) => Promise<void>;
+  cargarFichajesToday: () => Promise<void>;
   calcularEstado: () => EstadoFichaje;
   registrarFichaje: (
     tipo: "entrada" | "salida" | "descanso" | "fin_descanso",
-  ) => void;
+  ) => Promise<void>;
   resetStore: () => void;
 }
 
@@ -31,17 +32,17 @@ export const useFichajeStore = create<FichajeStore>((set, get) => ({
 
   setTrabajador: (id: number) => set({ trabajadorId: id }),
 
-  setEmpresa: (id: number) => {
+  setEmpresa: async (id: number) => {
     set({ empresaId: id });
-    get().cargarFichajesToday();
+    await get().cargarFichajesToday();
   },
 
-  cargarFichajesToday: () => {
+  cargarFichajesToday: async () => {
     const { trabajadorId, empresaId } = get();
     if (!trabajadorId || !empresaId) return;
 
     try {
-      const fichajes = obtenerFichajesEmpresaTrabajador(
+      const fichajes = await obtenerFichajesEmpresaTrabajador(
         trabajadorId,
         empresaId,
       );
@@ -74,11 +75,18 @@ export const useFichajeStore = create<FichajeStore>((set, get) => ({
     return "fuera";
   },
 
-  registrarFichaje: (tipo) => {
-    // Placeholder - la lógica de registro irá aquí
+  registrarFichaje: async (tipo) => {
+    const { trabajadorId, empresaId } = get();
+    if (!trabajadorId || !empresaId) return;
 
-    get().cargarFichajesToday();
+    try {
+      await crearFichaje(trabajadorId, empresaId, tipo);
+      await get().cargarFichajesToday();
+    } catch (error) {
+      console.error("Error registrando fichaje:", error);
+    }
   },
+
   resetStore: () => {
     set({
       trabajadorId: 0,

@@ -20,9 +20,9 @@ import { CalendarTrabajador } from "../../components/Calendar";
 import {
   crearFichaje,
   obtenerFichajesEmpresaTrabajador,
-} from "../../src/services/fichajesService";
-import { obtenerHorarioTrabajadorEmpresa } from "../../src/services/horariosService";
-import { getUltimoFichajeTrabajador } from "../../src/services/trabajadoresService";
+} from "../../src/DBservices/fichajesService";
+import { obtenerHorarioTrabajadorEmpresa } from "../../src/DBservices/horariosService";
+import { getUltimoFichajeTrabajador } from "../../src/DBservices/trabajadoresService";
 
 export default function HomeScreen() {
   // Contexto global: trabajador y empresa seleccionada.
@@ -89,7 +89,7 @@ export default function HomeScreen() {
   useEffect(() => {
     async function cargarHorario() {
       if (empresaSeleccionada?.id && trabajadorActual?.id) {
-        const horario = obtenerHorarioTrabajadorEmpresa(
+        const horario = await obtenerHorarioTrabajadorEmpresa(
           trabajadorActual.id,
           empresaSeleccionada.id,
         );
@@ -157,7 +157,7 @@ export default function HomeScreen() {
     const fichajesTrabajadorHoy = obtenerFichajesEmpresaTrabajador(
       trabajadorActual.id,
       empresaSeleccionada?.id || 0,
-    ).filter((f) => {
+    ).filter((f: { fecha: string | number | Date }) => {
       const fechaFichaje = new Date(f.fecha);
       const hoy = currentTime;
       return (
@@ -174,7 +174,7 @@ export default function HomeScreen() {
       const fichaje = fichajesTrabajadorHoy[i];
       if (fichaje.tipo === "entrada") {
         const salida = fichajesTrabajadorHoy.find(
-          (f) =>
+          (f: { tipo: string; fecha: string | number | Date }) =>
             f.tipo === "salida" &&
             new Date(f.fecha).getTime() > new Date(fichaje.fecha).getTime(),
         );
@@ -315,7 +315,7 @@ export default function HomeScreen() {
                 <ThemedText type="subtitle">
                   Trabajadores en empresa:
                 </ThemedText>
-                {empresaTrabajadores.map((t) => {
+                {empresaTrabajadores.map(async (t) => {
                   if (t === trabajadorActual)
                     return (
                       <ThemedView
@@ -351,8 +351,11 @@ export default function HomeScreen() {
                       </ThemedText>
                       <ThemedText type="subtitle">
                         Horario:{" "}
-                        {formatearHora(horarioTrabajador?.hora_entrada1)} a{" "}
-                        {formatearHora(horarioTrabajador?.hora_salida1)}
+                        {formatearHora(
+                          (await horarioTrabajador)?.hora_entrada1,
+                        )}{" "}
+                        a{" "}
+                        {formatearHora((await horarioTrabajador)?.hora_salida1)}
                       </ThemedText>
                       <ThemedText type="subtitle">
                         Fichajes:{" "}

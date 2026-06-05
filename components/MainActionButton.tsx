@@ -55,10 +55,10 @@ export const MainActionButton = () => {
 
     setLoading(true);
     try {
-      crearFichaje(trabajadorActual.id, empresaId, config.tipo);
+      await crearFichaje(trabajadorActual.id, empresaId, config.tipo);
 
       // Recargar estado
-      useFichajeStore.getState().cargarFichajesToday();
+      await useFichajeStore.getState().cargarFichajesToday();
 
       Alert.alert(
         "Éxito",

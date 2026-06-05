@@ -13,7 +13,6 @@ export interface Trabajador {
   empresas?: number[];
   fichajes?: number[];
   horarios?: number[];
-  // role: 'user' = normal trabajador, 'admin' = can see/manage all empresas
   role?: "user" | "admin";
   dni: string;
   nombre: string;
