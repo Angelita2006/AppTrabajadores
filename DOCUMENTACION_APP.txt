@@ -207,4 +207,10 @@ Es adecuado para:
 - demostrar roles de administrador y trabajador.
 - usar como base para integrar un backend real más adelante.
 
-FIN DE LA DOCUMENTACIÓN.
+Comando para ejecutar la api del backend: 
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Comando para ejecutar la aplicación web:
+npx expo start --web
+Ejecutar la aplicación android:
+Abrir el emulador android y ejecutar el comando
+npx expo start --android

@@ -112,7 +112,7 @@ export default function HomeScreen() {
   useEffect(() => {
     async function cargarUltimoFichaje() {
       if (trabajadorActual?.id) {
-        const fichaje = getUltimoFichajeTrabajador(
+        const fichaje = await getUltimoFichajeTrabajador(
           trabajadorActual.id,
           empresaSeleccionada?.id || 0,
         );
@@ -151,60 +151,66 @@ export default function HomeScreen() {
   }, [trabajadorActual?.role, empresaSeleccionada?.id]);
 
   // Calcula el tiempo trabajado hoy en horas desde la última entrada registrada.
-  const tiempoTrabajado = useMemo(() => {
-    if (!trabajadorActual?.id) return 0;
+  const tiempoTrabajado = useMemo(
+    () => async () => {
+      if (!trabajadorActual?.id) return 0;
 
-    const fichajesTrabajadorHoy = obtenerFichajesEmpresaTrabajador(
-      trabajadorActual.id,
-      empresaSeleccionada?.id || 0,
-    ).filter((f: { fecha: string | number | Date }) => {
-      const fechaFichaje = new Date(f.fecha);
-      const hoy = currentTime;
-      return (
-        fechaFichaje.getDate() === hoy.getDate() &&
-        fechaFichaje.getMonth() === hoy.getMonth() &&
-        fechaFichaje.getFullYear() === hoy.getFullYear()
-      );
-    });
-
-    let horasTrabajadas = 0;
-    let minutosTrabajados = 0;
-
-    for (let i = 0; i < fichajesTrabajadorHoy.length; i++) {
-      const fichaje = fichajesTrabajadorHoy[i];
-      if (fichaje.tipo === "entrada") {
-        const salida = fichajesTrabajadorHoy.find(
-          (f: { tipo: string; fecha: string | number | Date }) =>
-            f.tipo === "salida" &&
-            new Date(f.fecha).getTime() > new Date(fichaje.fecha).getTime(),
+      const fichajesTrabajadorHoy = await (
+        await obtenerFichajesEmpresaTrabajador(
+          trabajadorActual.id,
+          empresaSeleccionada?.id || 0,
+        )
+      ).filter((f: { fecha: string | number | Date }) => {
+        const fechaFichaje = new Date(f.fecha);
+        const hoy = currentTime;
+        return (
+          fechaFichaje.getDate() === hoy.getDate() &&
+          fechaFichaje.getMonth() === hoy.getMonth() &&
+          fechaFichaje.getFullYear() === hoy.getFullYear()
         );
-        if (salida) {
-          // Si hay salida registrada, calcula el tiempo hasta la salida
-          const diff =
-            new Date(salida.fecha).getTime() -
-            new Date(fichaje.fecha).getTime();
-          horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
-          minutosTrabajados += Math.floor(
-            (diff % (1000 * 60 * 60)) / (1000 * 60),
+      });
+
+      let horasTrabajadas = 0;
+      let minutosTrabajados = 0;
+
+      for (let i = 0; i < fichajesTrabajadorHoy.length; i++) {
+        const fichaje = fichajesTrabajadorHoy[i];
+        if (fichaje.tipo === "entrada") {
+          const salida = fichajesTrabajadorHoy.find(
+            (f: { tipo: string; fecha: string | number | Date }) =>
+              f.tipo === "salida" &&
+              new Date(f.fecha).getTime() > new Date(fichaje.fecha).getTime(),
           );
-        } else {
-          // Si no hay salida registrada, calcula el tiempo hasta ahora
-          const diff = new Date().getTime() - new Date(fichaje.fecha).getTime();
-          horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
-          minutosTrabajados += Math.floor(
-            (diff % (1000 * 60 * 60)) / (1000 * 60),
-          );
+          if (salida) {
+            // Si hay salida registrada, calcula el tiempo hasta la salida
+            const diff =
+              new Date(salida.fecha).getTime() -
+              new Date(fichaje.fecha).getTime();
+            horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
+            minutosTrabajados += Math.floor(
+              (diff % (1000 * 60 * 60)) / (1000 * 60),
+            );
+          } else {
+            // Si no hay salida registrada, calcula el tiempo hasta ahora
+            const diff =
+              new Date().getTime() - new Date(fichaje.fecha).getTime();
+            horasTrabajadas += Math.floor(diff / (1000 * 60 * 60));
+            minutosTrabajados += Math.floor(
+              (diff % (1000 * 60 * 60)) / (1000 * 60),
+            );
+          }
         }
       }
-    }
 
-    if (horasTrabajadas === 0) return minutosTrabajados + " minutos";
-    if (minutosTrabajados === 0)
-      if (horasTrabajadas === 0) return "No has fichado entrada hoy";
-      else return horasTrabajadas + " horas";
+      if (horasTrabajadas === 0) return minutosTrabajados + " minutos";
+      if (minutosTrabajados === 0)
+        if (horasTrabajadas === 0) return "No has fichado entrada hoy";
+        else return horasTrabajadas + " horas";
 
-    return horasTrabajadas + " horas y " + minutosTrabajados + " minutos";
-  }, [trabajadorActual?.id, empresaSeleccionada?.id, currentTime]);
+      return horasTrabajadas + " horas y " + minutosTrabajados + " minutos";
+    },
+    [trabajadorActual?.id, empresaSeleccionada?.id, currentTime],
+  );
 
   const formatearHora = (fechaInput: any) => {
     if (!fechaInput) return "00:00";
@@ -360,9 +366,11 @@ export default function HomeScreen() {
                       <ThemedText type="subtitle">
                         Fichajes:{" "}
                         {
-                          obtenerFichajesEmpresaTrabajador(
-                            t.id,
-                            empresaSeleccionada?.id || 0,
+                          (
+                            await obtenerFichajesEmpresaTrabajador(
+                              t.id,
+                              empresaSeleccionada?.id || 0,
+                            )
                           ).length
                         }
                         <ThemedText style={styles.infotitle2}>

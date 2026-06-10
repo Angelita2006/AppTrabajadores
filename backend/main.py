@@ -1,9 +1,8 @@
 from pydantic import BaseModel
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from datetime import date, datetime
+from datetime import datetime
 from backend.database import Base, SessionLocal, engine, get_db, next_id
 from sqlalchemy.exc import IntegrityError
 from backend.models import Empresa, Fichaje, Trabajador, Horario
@@ -32,22 +31,14 @@ app = FastAPI(
     ] 
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 Base.metadata.create_all(bind=engine)
-## Error al hacer llamadas por 422 Unprocessable Entity, revisar el formato de las fechas en el body de las peticiones
+
 ###################### RUTAS PARA FICHAJES ####################
 @app.post("/fichaje")
 def crear_fichaje(
-    idTrabajador: int = Body(...), 
-    idEmpresa: int = Body(...), 
-    tipo: str = Body(...)
+    idTrabajador: int, 
+    idEmpresa: int, 
+    tipo: str
 ):
     db = get_db() 
     try:
@@ -69,6 +60,8 @@ def crear_fichaje(
             empresa=empresa 
         )
         db.add(fichaje)
+        # agregar_fichaje_a_trabajador(idTrabajador, fichaje.id)
+
         db.commit()
         db.refresh(fichaje)
 
@@ -87,14 +80,14 @@ def crear_fichaje(
 @app.put("/fichaje/{idFichaje}")
 def editar_fichaje(
     idFichaje: int, 
-    idTrabajador: int = Body(...), 
-    idEmpresa: int = Body(...), 
-    tipo: str = Body(...), 
-    fecha_hora: str = Body(...)
+    idTrabajador: int, 
+    idEmpresa: int, 
+    tipo: str, 
+    fecha_hora: str
 ):
     db = get_db() 
     try:
-        fecha = datetime.strptime(fecha_hora, "%Y-%m-%d %H:%M:%S")
+        # fecha_hora = datetime.strptime(fecha_hora, "%Y-%m-%d %H:%M:%S")
 
         trabajador = db.query(Trabajador).filter(Trabajador.id == idTrabajador).first()
         if not trabajador:
@@ -104,20 +97,19 @@ def editar_fichaje(
         if not empresa:
             return JSONResponse(status_code=404, content=f"Empresa ({idEmpresa}) no encontrada.")
         
-        fichaje = db.query(Fichaje).filter(Fichaje.id == idFichaje).first()
+        fichaje = db.query(Fichaje).filter(Fichaje.id == idFichaje, Fichaje.idTrabajador == idTrabajador, Fichaje.idEmpresa == idEmpresa, Fichaje.tipo == tipo, Fichaje.fecha_hora == fecha_hora)
         if not fichaje:
             return JSONResponse(status_code=404, content=f"Fichaje {idFichaje} no encontrado.")
 
         fichaje = Fichaje(
-            id=next_id(Fichaje), 
+            idFichaje=idFichaje, 
             idTrabajador=idTrabajador,
             idEmpresa=idEmpresa,
             tipo=tipo,
-            fecha_hora=datetime.now(), 
-            trabajador=trabajador,
-            empresa=empresa 
+            fecha_hora=fecha_hora
         )
-        db.add(fichaje)
+
+        db.query(Fichaje).filter(Fichaje.id == idFichaje).update(fichaje)
         db.commit()
         db.refresh(fichaje)
 
@@ -175,7 +167,7 @@ def obtener_fichajes_trabajador_empresa(idTrabajador: int, idEmpresa: int):
         if not empresa:
             return JSONResponse(status_code=404, content=f"Empresa ({idEmpresa}) no encontrada.")
 
-        fichajes = db.query(Fichaje).filter(Fichaje.idTrabajador == idTrabajador, Fichaje.idEmpresa == idEmpresa).all()
+        fichajes = db.query(Fichaje).all()
         return JSONResponse(status_code=201, content=jsonable_encoder(fichajes))
 
     except OSError as error:
@@ -203,15 +195,13 @@ def obtener_fichaje(idFichaje: int):
 ####################### RUTAS PARA HORARIOS ####################
 @app.post("/horario")
 def crear_horario(
-    idTrabajador: int = Body(...), 
-    idEmpresa: int = Body(...), 
-    tipoJornada: str = Body(...), 
-    dias: int = Body(...), 
-    diasSemana: str = Body(...), 
-    hora_entrada1: str = Body(...), 
-    hora_salida1: str = Body(...), 
-    hora_entrada2: str | None = Body(None), 
-    hora_salida2: str | None = Body(None),
+    idTrabajador: int, 
+    idEmpresa: int, 
+    tipoJornada: str, 
+    dias: int, 
+    dias_semana: str, 
+    hora_entrada: str, 
+    hora_salida: str
 ):
     db = get_db()  
     try:
@@ -229,14 +219,13 @@ def crear_horario(
             idEmpresa=idEmpresa,
             tipoJornada=tipoJornada,
             dias=dias,
-            diasSemana=diasSemana,
-            hora_entrada1=datetime.strptime(hora_entrada1, "%H:%M:%S"),
-            hora_salida1=datetime.strptime(hora_salida1, "%H:%M:%S"),
-            hora_entrada2=datetime.strptime(hora_entrada2, "%H:%M:%S") if hora_entrada2 else None,
-            hora_salida2=datetime.strptime(hora_salida2, "%H:%M:%S") if hora_salida2 else None,
+            dias_semana=dias_semana,
+            hora_entrada=datetime.strptime(hora_entrada, "%H"),
+            hora_salida=datetime.strptime(hora_salida, "%H"),
             trabajador=trabajador, 
             empresa=empresa 
         )
+        # agregar_horario_a_trabajador(idTrabajador, horario.id)
         db.add(horario)
         db.commit()
         db.refresh(horario)
@@ -256,15 +245,13 @@ def crear_horario(
 @app.put("/horario/{idHorario}")
 def editar_horario(
     idHorario: int, 
-    idTrabajador: int = Body(...), 
-    idEmpresa: int = Body(...), 
-    tipoJornada: str = Body(...), 
-    dias: int = Body(...), 
-    diasSemana: str = Body(...), 
-    hora_entrada1: str = Body(...), 
-    hora_salida1: str = Body(...), 
-    hora_entrada2: str | None = Body(None), 
-    hora_salida2: str | None = Body(None),
+    idTrabajador: int, 
+    idEmpresa: int, 
+    tipoJornada: str, 
+    dias: int, 
+    dias_semana: str, 
+    hora_entrada: str, 
+    hora_salida: str
 ):
     db = get_db() 
     try:
@@ -276,26 +263,22 @@ def editar_horario(
         if not empresa:
             return JSONResponse(status_code=404, content=f"Empresa ({idEmpresa}) no encontrada.")
         
-        horario = db.query(Horario).filter(Horario.id == idHorario).first()
+        horario = db.query(Horario).filter(Horario.id == idHorario, Horario.idTrabajador == idTrabajador, Horario.idEmpresa == idEmpresa)
         if not horario:
             return JSONResponse(status_code=404, content=f"Horario {idHorario} no encontrado.")
 
-        
         horario = Horario(
             idHorario=idHorario, 
             idTrabajador=idTrabajador,
             idEmpresa=idEmpresa,
             tipoJornada=tipoJornada,
             dias=dias,
-            diasSemana=diasSemana,
-            hora_entrada1=hora_entrada1,
-            hora_salida1=hora_salida1,
-            hora_entrada2=hora_entrada2,
-            hora_salida2=hora_salida2
+            diasSemana=dias_semana,
+            hora_entrada=hora_entrada,
+            hora_salida=hora_salida
         )
 
         db.query(Horario).filter(Horario.id == idHorario).update(horario)
-
         db.commit()
         db.refresh(horario)
 
@@ -384,18 +367,16 @@ def obtener_horario(idHorario: int):
 #################### RUTAS PARA TRABAJADORES ####################
 @app.post("/trabajador")
 def crear_trabajador(
-    nombre: str = Body(...), 
-    apellidos: str = Body(...), 
-    dni: str = Body(...), 
-    puesto: str = Body(...), 
-    direccion: str = Body(...), 
-    codigo_postal: str = Body(...), 
-    poblacion: str = Body(...), 
-    provincia: str = Body(...), 
-    estado: str = Body(...), 
-    cuenta_cotizacion: str = Body(...), 
-    email: str = Body(...), 
-    password: str = Body(...)
+    nombre: str, 
+    apellidos: str, 
+    dni: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str, 
+    cuenta_cotizacion: str, 
+    email: str, 
+    password: str
 ):
     db = get_db()
     try:
@@ -408,16 +389,19 @@ def crear_trabajador(
             nombre=nombre,
             apellidos=apellidos,
             dni=dni,
-            puesto=puesto,
             direccion=direccion,
             codigo_postal=codigo_postal,
             poblacion=poblacion,
             provincia=provincia,
-            estado=estado,
             cuenta_cotizacion=cuenta_cotizacion,
             email=email,
-            password=password
+            password=password,
+            fichajes=[],  
+            horarios=[],
+            empresas=[] 
         )
+        # for empresa in trabajador.empresas:
+        #     agregar_trabajador_a_empresa(empresa.id, trabajador.id)
         db.add(trabajador)
         db.commit()
         db.refresh(trabajador)
@@ -437,18 +421,16 @@ def crear_trabajador(
 @app.put("/trabajador/{idTrabajador}")
 def editar_trabajador(
     idTrabajador: int, 
-    nombre: str = Body(...), 
-    apellidos: str = Body(...), 
-    dni: str = Body(...), 
-    puesto: str = Body(...), 
-    direccion: str = Body(...), 
-    codigo_postal: str = Body(...), 
-    poblacion: str = Body(...), 
-    provincia: str = Body(...), 
-    estado: str = Body(...), 
-    cuenta_cotizacion: str = Body(...), 
-    email: str = Body(...), 
-    password: str = Body(...)
+    nombre: str, 
+    apellidos: str, 
+    dni: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str, 
+    cuenta_cotizacion: str, 
+    email: str, 
+    password: str
 ):
     db = get_db() 
     try:
@@ -485,18 +467,16 @@ def editar_trabajador(
     
 @app.put("/trabajador/{dni}")
 def editar_trabajador_dni(
-    dni: str,
-    nombre: str = Body(...), 
-    apellidos: str = Body(...), 
-    puesto: str = Body(...), 
-    direccion: str = Body(...), 
-    codigo_postal: str = Body(...), 
-    poblacion: str = Body(...), 
-    provincia: str = Body(...), 
-    estado: str = Body(...), 
-    cuenta_cotizacion: str = Body(...), 
-    email: str = Body(...), 
-    password: str = Body(...)
+    nombre: str, 
+    apellidos: str, 
+    dni: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str, 
+    cuenta_cotizacion: str, 
+    email: str, 
+    password: str
 ):
     db = get_db() 
     try:
@@ -522,30 +502,6 @@ def editar_trabajador_dni(
         db.refresh(trabajador)
 
         return JSONResponse(status_code=201, content=jsonable_encoder(trabajador))
-
-    except OSError as error:
-        db.rollback()
-        return JSONResponse(status_code=400, content=f"Ha ocurrido un error: {error}")
-    
-    finally:
-        db.close()
-
-@app.patch("/trabajador/{dni}/estado")
-def editar_estado_trabajador(
-    dni: str,
-    estado: str
-):
-    db = get_db()
-    try:
-        trabajador = db.query(Trabajador).filter(Trabajador.dni == dni).first()
-        if not trabajador:
-            return JSONResponse(status_code=404, content=f"Trabajador ({dni}) no encontrado.")
-
-        trabajador.set_estado(estado)
-        db.commit()
-        db.refresh(trabajador)
-
-        return JSONResponse(status_code=200, content=jsonable_encoder(trabajador))
 
     except OSError as error:
         db.rollback()
@@ -615,10 +571,10 @@ def eliminar_empresa_a_trabajador(idTrabajador: int, idEmpresa: int):
         if not empresa:
             return JSONResponse(status_code=404, content=f"Empresa ({idEmpresa}) no encontrada.")
         
-        if empresa in trabajador.empresas:
+        if empresa not in trabajador.empresas:
             trabajador.empresas.remove(empresa)
         else:
-            return JSONResponse(status_code=404, content=f"El empresa ({empresa.id}) no existe en la lista de empresas del trabajador {trabajador.nombre} {trabajador.apellidos}.")
+            return JSONResponse(status_code=404, content=f"El empresa ({empresa.id}) ya existe en la lista de empresas del trabajador {trabajador.nombre} {trabajador.apellidos}.")
 
         db.commit()
         db.refresh(trabajador)
@@ -801,12 +757,12 @@ def obtener_trabajador_email_password(email: str, password: str):
 ##################### RUTAS PARA EMPRESAS ####################
 @app.post("/empresa")
 def crear_empresa(
-    nombre: str = Body(...), 
-    cif: str = Body(...), 
-    direccion: str = Body(...), 
-    codigo_postal: str = Body(...), 
-    poblacion: str = Body(...), 
-    provincia: str = Body(...)
+    nombre: str, 
+    cif: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str
 ):
     db = get_db()
     try:
@@ -821,7 +777,8 @@ def crear_empresa(
             direccion=direccion,
             codigo_postal=codigo_postal,
             poblacion=poblacion,
-            provincia=provincia
+            provincia=provincia,
+            trabajadores=[]
         )
         db.add(empresa)
         db.commit()
@@ -842,12 +799,12 @@ def crear_empresa(
 @app.put("/empresa/{idEmpresa}")
 def editar_empresa(
     idEmpresa: int, 
-    nombre: str = Body(...), 
-    cif: str = Body(...), 
-    direccion: str = Body(...), 
-    codigo_postal: str = Body(...), 
-    poblacion: str = Body(...), 
-    provincia: str = Body(...)
+    nombre: str, 
+    cif: str, 
+    direccion: str, 
+    codigo_postal: str, 
+    poblacion: str, 
+    provincia: str
 ):
     db = get_db() 
     try:
@@ -856,15 +813,15 @@ def editar_empresa(
             return JSONResponse(status_code=404, content=f"Empresa ({idEmpresa}) no encontrada.")
 
         empresa = Empresa(
-            id=next_id(Empresa),
+            idEmpresa=idEmpresa, 
             nombre=nombre,
             cif=cif,
             direccion=direccion,
             codigo_postal=codigo_postal,
             poblacion=poblacion,
-            provincia=provincia,
-            trabajadores=[]
+            provincia=provincia
         )
+
         db.query(Empresa).filter(Empresa.id == idEmpresa).update(empresa)
         db.commit()
         db.refresh(empresa)
