@@ -2,10 +2,10 @@ import { Fichaje } from "../models/fichajes";
 import api from "./api";
 
 // Función para crear un fichaje nuevo
-export const agregarFichaje = async (
+export const crearFichaje = async (
   idTrabajador: number,
   idEmpresa: number,
-  tipo: string, // Permitir tanto "entrada" como "salida"
+  tipo: "entrada" | "salida" | "descanso" | "horas_extra",
 ): Promise<Fichaje> => {
   try {
     const res = await api.post(`/fichaje`, {
