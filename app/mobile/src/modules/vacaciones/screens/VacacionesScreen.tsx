@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
-import { mockDb, Vacacion } from "@/services/api/mockDb";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { mockDb, Vacacion } from "../../../services/api/mockDb";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 export default function VacacionesScreen() {
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
@@ -35,17 +35,38 @@ export default function VacacionesScreen() {
   };
 
   return (
-    <AppScreen title="Vacaciones" subtitle="Solicitudes en memoria con estados de aprobación.">
+    <AppScreen
+      title="Vacaciones"
+      subtitle="Solicitudes en memoria con estados de aprobación."
+    >
       <Row>
         <StatCard label="Solicitudes" value={String(vacaciones.length)} />
-        <StatCard label="Pendientes" value={String(vacaciones.filter((item) => item.estado === "pendiente").length)} tone="warning" />
+        <StatCard
+          label="Pendientes"
+          value={String(
+            vacaciones.filter((item) => item.estado === "pendiente").length,
+          )}
+          tone="warning"
+        />
       </Row>
       <Card>
         <ThemedText style={styles.title}>Nueva solicitud</ThemedText>
         <View style={styles.formRow}>
-          <TextInput value={fechaInicio} onChangeText={setFechaInicio} style={styles.input} />
-          <TextInput value={fechaFin} onChangeText={setFechaFin} style={styles.input} />
-          <TextInput value={motivo} onChangeText={setMotivo} style={styles.inputWide} />
+          <TextInput
+            value={fechaInicio}
+            onChangeText={setFechaInicio}
+            style={styles.input}
+          />
+          <TextInput
+            value={fechaFin}
+            onChangeText={setFechaFin}
+            style={styles.input}
+          />
+          <TextInput
+            value={motivo}
+            onChangeText={setMotivo}
+            style={styles.inputWide}
+          />
         </View>
         <Pressable style={styles.button} onPress={solicitar}>
           <ThemedText style={styles.buttonText}>Enviar solicitud</ThemedText>
@@ -53,9 +74,13 @@ export default function VacacionesScreen() {
       </Card>
       {vacaciones.map((vacacion) => (
         <Card key={vacacion.id}>
-          <ThemedText style={styles.title}>{vacacion.fechaInicio} - {vacacion.fechaFin}</ThemedText>
+          <ThemedText style={styles.title}>
+            {vacacion.fechaInicio} - {vacacion.fechaFin}
+          </ThemedText>
           <ThemedText style={styles.body}>{vacacion.motivo}</ThemedText>
-          <ThemedText style={styles.status}>Estado: {vacacion.estado}</ThemedText>
+          <ThemedText style={styles.status}>
+            Estado: {vacacion.estado}
+          </ThemedText>
         </Card>
       ))}
     </AppScreen>

@@ -1,4 +1,7 @@
-import { Estado, Trabajador } from "@/modules/trabajadores/types/trabajador";
+import {
+  Estado,
+  Trabajador,
+} from "../../src/modules/trabajadores/types/trabajador";
 
 export const trabajadores: Trabajador[] = [
   {

@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { obtenerFichajesEmpresaTrabajador } from "@/modules/fichajes/api/fichajesService";
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
-import { obtenerHorarioTrabajadorEmpresa } from "@/modules/horarios/api/horariosService";
-import { Horario } from "@/modules/horarios/types/horario";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
+import { obtenerFichajesEmpresaTrabajador } from "../../../modules/fichajes/api/fichajesService";
+import { Fichaje } from "../../../modules/fichajes/types/fichaje";
+import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/horariosService";
+import { Horario } from "../../../modules/horarios/types/horario";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
 
 type Props = {
   trabajadorId?: number;

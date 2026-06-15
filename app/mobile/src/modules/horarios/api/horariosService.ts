@@ -1,5 +1,5 @@
-import { Horario } from "@/modules/horarios/types/horario";
-import { mockDb } from "@/services/api/mockDb";
+import { Horario } from "../../../modules/horarios/types/horario";
+import { mockDb } from "../../../services/api/mockDb";
 
 export const crearHorario = async (): Promise<Horario> => {
   throw new Error("crearHorario no implementado en mock");

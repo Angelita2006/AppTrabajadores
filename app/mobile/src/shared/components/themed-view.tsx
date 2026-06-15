@@ -1,19 +1,32 @@
 import { View, type ViewProps } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useThemeColor } from "../../hooks/use-theme-color";
 
-// Componente ThemedView que utiliza el hook useThemeColor para determinar el color de fondo según el tema actual (claro u oscuro),
-// y aplica ese color al estilo del componente View. Recibe las siguientes props:
-// - lightColor: el color de fondo en modo claro (opcional).
-// - darkColor: el color de fondo en modo oscuro (opcional).
+/**
+ * Propiedades para el componente ThemedView.
+ *
+ * Extiende todas las propiedades estándar de un contenedor nativo (ViewProps)
+ * y añade dos propiedades opcionales para controlar el color de fondo
+ * según el tema del dispositivo (Claro u Oscuro).
+ *
+ * @property {string} [lightColor] - Color de fondo que se aplicará en el modo claro.
+ * @property {string} [darkColor] - Color de fondo que se aplicará en el modo oscuro.
+ */
+
 export type ThemedViewProps = ViewProps & {
   lightColor?: string;
   darkColor?: string;
 };
-// Función ThemedView que utiliza el hook useThemeColor para determinar el color de fondo según el tema actual (claro u oscuro), y aplica ese color al estilo del componente View. Recibe las siguientes props:
-// - lightColor: el color de fondo en modo claro (opcional).
-// - darkColor: el color de fondo en modo oscuro (opcional).
-// - style: estilos adicionales para el componente View (opcional).
-// - otherProps: otras props que se pasan al componente View (opcional).
+
+/**
+ * Contenedor `View` adaptable que cambia su color de fondo automáticamente
+ * según el tema del sistema (Claro / Oscuro).
+ *
+ * @param lightColor - Color de fondo personalizado para el modo claro (opcional).
+ * @param darkColor - Color de fondo personalizado para el modo oscuro (opcional).
+ * @param style - Estilos adicionales que se fusionarán con el fondo (opcional).
+ * @param otherProps - Cualquier otra propiedad nativa de un componente `View`.
+ */
+
 export function ThemedView({
   style,
   lightColor,

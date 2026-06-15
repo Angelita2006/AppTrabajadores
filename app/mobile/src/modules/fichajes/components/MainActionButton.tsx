@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
-import { crearFichaje } from "@/modules/fichajes/api/fichajesService";
-import { EstadoFichaje, useFichajeStore } from "@/modules/fichajes/store/useFichajeStore";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
+import { crearFichaje } from "../../../modules/fichajes/api/fichajesService";
+import {
+  EstadoFichaje,
+  useFichajeStore,
+} from "../../../modules/fichajes/store/useFichajeStore";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
 
 const ESTADO_CONFIG: Record<
   EstadoFichaje,

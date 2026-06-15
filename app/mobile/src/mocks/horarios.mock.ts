@@ -1,4 +1,4 @@
-import { Horario } from "@/modules/horarios/types/horario";
+import { Horario } from "../../src/modules/horarios/types/horario";
 
 export const horarios: Horario[] = [
   {

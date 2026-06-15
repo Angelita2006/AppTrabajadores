@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
-import { ProveedorTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { IconSymbol } from "@/shared/ui/icon-symbol";
+import { ProveedorTrabajador } from "../src/modules/trabajadores/store/TrabajadorContext";
+import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
 export default function TabLayout() {
   return (

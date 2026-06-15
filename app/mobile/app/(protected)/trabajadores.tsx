@@ -1,1 +1,2 @@
-export { default } from "@/modules/trabajadores/screens/TrabajadoresScreen";
+export { default } from "../../src/modules/trabajadores/screens/TrabajadoresScreen";
+

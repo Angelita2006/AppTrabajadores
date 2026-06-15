@@ -1,4 +1,4 @@
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
+import { Fichaje } from "../../src/modules/fichajes/types/fichaje";
 
 let ayeralas10 = new Date();
 ayeralas10.setDate(ayeralas10.getDate() - 1);

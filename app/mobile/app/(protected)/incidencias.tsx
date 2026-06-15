@@ -1,1 +1,2 @@
-export { default } from "@/modules/incidencias/screens/IncidenciasScreen";
+export { default } from "../../src/modules/incidencias/screens/IncidenciasScreen";
+

@@ -1,8 +1,11 @@
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
-import { Horario } from "@/modules/horarios/types/horario";
-import { Estado, Trabajador } from "@/modules/trabajadores/types/trabajador";
-import { mockDb } from "@/services/api/mockDb";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { Fichaje } from "../../../modules/fichajes/types/fichaje";
+import { Horario } from "../../../modules/horarios/types/horario";
+import {
+  Estado,
+  Trabajador,
+} from "../../../modules/trabajadores/types/trabajador";
+import { mockDb } from "../../../services/api/mockDb";
 
 const normalizeEstado = (estado: Estado | string): Estado =>
   typeof estado === "number"
@@ -128,8 +131,7 @@ export const getTrabajadorByEmailYPassword = async (
   return trabajador;
 };
 
-export const obtenerTrabajadorPorEmailYPassword =
-  getTrabajadorByEmailYPassword;
+export const obtenerTrabajadorPorEmailYPassword = getTrabajadorByEmailYPassword;
 
 export const obtenerEmpresasTrabajador = async (
   idTrabajador: number,

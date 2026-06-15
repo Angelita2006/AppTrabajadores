@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { obtenerHorarios } from "@/modules/horarios/api/horariosService";
-import { Horario } from "@/modules/horarios/types/horario";
-import { obtenerTrabajadores } from "@/modules/trabajadores/api/trabajadoresService";
-import { Trabajador } from "@/modules/trabajadores/types/trabajador";
-import { ThemedText } from "@/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
+import { obtenerHorarios } from "../../../modules/horarios/api/horariosService";
+import { Horario } from "../../../modules/horarios/types/horario";
+import { obtenerTrabajadores } from "../../../modules/trabajadores/api/trabajadoresService";
+import { Trabajador } from "../../../modules/trabajadores/types/trabajador";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 const time = (date: Date) =>
-  new Date(date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  new Date(date).toLocaleTimeString("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 export default function HorariosScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -26,7 +29,9 @@ export default function HorariosScreen() {
 
   const trabajadorNombre = (id: number) => {
     const trabajador = trabajadores.find((item) => item.id === id);
-    return trabajador ? `${trabajador.nombre} ${trabajador.apellidos}` : `Trabajador ${id}`;
+    return trabajador
+      ? `${trabajador.nombre} ${trabajador.apellidos}`
+      : `Trabajador ${id}`;
   };
 
   return (
@@ -42,8 +47,12 @@ export default function HorariosScreen() {
         <Card key={horario.id}>
           <View style={styles.header}>
             <View>
-              <ThemedText style={styles.title}>{trabajadorNombre(horario.idTrabajador)}</ThemedText>
-              <ThemedText style={styles.meta}>{horario.tipoJornada} · {horario.diasSemana}</ThemedText>
+              <ThemedText style={styles.title}>
+                {trabajadorNombre(horario.idTrabajador)}
+              </ThemedText>
+              <ThemedText style={styles.meta}>
+                {horario.tipoJornada} · {horario.diasSemana}
+              </ThemedText>
             </View>
             <View style={styles.hours}>
               <ThemedText style={styles.hoursText}>
@@ -53,7 +62,8 @@ export default function HorariosScreen() {
           </View>
           {horario.hora_entrada2 && horario.hora_salida2 ? (
             <ThemedText style={styles.body}>
-              Segundo tramo: {time(horario.hora_entrada2)} - {time(horario.hora_salida2)}
+              Segundo tramo: {time(horario.hora_entrada2)} -{" "}
+              {time(horario.hora_salida2)}
             </ThemedText>
           ) : null}
         </Card>

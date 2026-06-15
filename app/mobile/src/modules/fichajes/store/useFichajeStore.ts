@@ -2,7 +2,7 @@ import { create } from "zustand";
 import {
   crearFichaje,
   obtenerFichajesEmpresaTrabajador,
-} from "@/modules/fichajes/api/fichajesService";
+} from "../../../modules/fichajes/api/fichajesService";
 
 export type EstadoFichaje = "fuera" | "trabajando" | "descanso";
 

@@ -1,6 +1,6 @@
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { Trabajador } from "@/modules/trabajadores/types/trabajador";
-import { mockDb } from "@/services/api/mockDb";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { Trabajador } from "../../../modules/trabajadores/types/trabajador";
+import { mockDb } from "../../../services/api/mockDb";
 
 export const crearEmpresa = async (
   nombre: string,

@@ -5,27 +5,34 @@ import {
 } from "expo-web-browser";
 import { type ComponentProps } from "react";
 
+/**
+ * Propiedades para el componente ExternalLink.
+ * Modifica la propiedad 'href' original de Expo Router para asegurar que use rutas válidas.
+ */
 type Props = Omit<ComponentProps<typeof Link>, "href"> & {
+  /** La URL o enlace externo que se desea abrir (ej: 'https://google.com'). */
   href: Href & string;
 };
 
-// Componente ExternalLink que extiende el componente Link de expo-router para abrir enlaces externos en un navegador web.
-// Recibe las siguientes props:
-// - href: la URL del enlace externo a abrir, que debe ser una cadena de texto válida.
-// - ...rest: cualquier otra prop que se desee pasar al componente Link, como estilos, clases, etc.
+/**
+ * Componente interactivo para abrir enlaces de forma segura fuera de la aplicación.
+ * Abre una pestaña nueva en la web, o un navegador interno integrado en celulares (iOS/Android).
+ */
 export function ExternalLink({ href, ...rest }: Props) {
   return (
     <Link
-      target="_blank"
+      target="_blank" // Abre en pestaña nueva si se ejecuta en una computadora (Navegador Web)
       {...rest}
       href={href}
       onPress={async (event) => {
+        // Verifica si la aplicación se está ejecutando en un celular
         if (process.env.EXPO_OS !== "web") {
-          // Prevent the default behavior of linking to the default browser on native.
+          // 1. Cancela la acción por defecto para que el teléfono no abra Google Chrome o Safari fuera de tu app
           event.preventDefault();
-          // Open the link in an in-app browser.
+
+          // 2. Abre el enlace en una ventana interna sin sacar al usuario de tu aplicación
           await openBrowserAsync(href, {
-            presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
+            presentationStyle: WebBrowserPresentationStyle.AUTOMATIC, // Estilo visual automático según el sistema del celular
           });
         }
       }}

@@ -7,10 +7,10 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { useFichajeStore } from "@/modules/fichajes/store/useFichajeStore";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { useFichajeStore } from "../../../modules/fichajes/store/useFichajeStore";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
 
 export const EmpresaSelector = () => {
   const [showModal, setShowModal] = useState(false);

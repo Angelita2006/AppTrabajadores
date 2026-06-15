@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { obtenerEmpresas } from "@/modules/empresas/api/empresasService";
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
+import { obtenerEmpresas } from "../../../modules/empresas/api/empresasService";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 export default function EmpresasScreen() {
   const {
@@ -26,8 +26,14 @@ export default function EmpresasScreen() {
           );
     setListaEmpresas(visibles);
     setEmpresas(visibles);
-    if (!empresaSeleccionada && visibles[0]) setEmpresaSeleccionada(visibles[0]);
-  }, [empresaSeleccionada, setEmpresaSeleccionada, setEmpresas, trabajadorActual]);
+    if (!empresaSeleccionada && visibles[0])
+      setEmpresaSeleccionada(visibles[0]);
+  }, [
+    empresaSeleccionada,
+    setEmpresaSeleccionada,
+    setEmpresas,
+    trabajadorActual,
+  ]);
 
   useEffect(() => {
     cargar();
@@ -40,7 +46,11 @@ export default function EmpresasScreen() {
     >
       <Row>
         <StatCard label="Empresas visibles" value={String(empresas.length)} />
-        <StatCard label="Empresa activa" value={empresaSeleccionada?.nombre ?? "Sin seleccionar"} tone="success" />
+        <StatCard
+          label="Empresa activa"
+          value={empresaSeleccionada?.nombre ?? "Sin seleccionar"}
+          tone="success"
+        />
       </Row>
       <View style={styles.grid}>
         {empresas.map((empresa) => {
@@ -49,7 +59,9 @@ export default function EmpresasScreen() {
             <Card key={empresa.id}>
               <View style={styles.companyHeader}>
                 <View style={styles.logo}>
-                  <ThemedText style={styles.logoText}>{empresa.nombre.slice(0, 2).toUpperCase()}</ThemedText>
+                  <ThemedText style={styles.logoText}>
+                    {empresa.nombre.slice(0, 2).toUpperCase()}
+                  </ThemedText>
                 </View>
                 <View style={styles.companyInfo}>
                   <ThemedText style={styles.title}>{empresa.nombre}</ThemedText>

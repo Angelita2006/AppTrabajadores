@@ -4,10 +4,10 @@ import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 import {
   getTrabajadorByEmailYPassword,
   obtenerEmpresasTrabajador,
-} from "@/modules/trabajadores/api/trabajadoresService";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
+} from "../../../modules/trabajadores/api/trabajadoresService";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 export default function PerfilScreen() {
   const {
@@ -17,7 +17,9 @@ export default function PerfilScreen() {
     setEmpresaSeleccionada,
     empresaSeleccionada,
   } = useTrabajador();
-  const [email, setEmail] = useState(trabajadorActual?.email ?? "admin@app.test");
+  const [email, setEmail] = useState(
+    trabajadorActual?.email ?? "admin@app.test",
+  );
   const [password, setPassword] = useState("admin123");
 
   const login = async () => {
@@ -28,7 +30,10 @@ export default function PerfilScreen() {
       setEmpresas(empresas);
       setEmpresaSeleccionada(empresas[0] ?? null);
     } catch {
-      Alert.alert("Login demo", "Usa admin@app.test / admin123 o carlos@app.test / demo123");
+      Alert.alert(
+        "Login demo",
+        "Usa admin@app.test / admin123 o carlos@app.test / demo123",
+      );
     }
   };
 
@@ -44,9 +49,16 @@ export default function PerfilScreen() {
       subtitle="Sesión demo en memoria. No se guarda nada en servidor."
     >
       <Row>
-        <StatCard label="Usuario" value={trabajadorActual?.nombre ?? "Sin sesión"} tone={trabajadorActual ? "success" : "warning"} />
+        <StatCard
+          label="Usuario"
+          value={trabajadorActual?.nombre ?? "Sin sesión"}
+          tone={trabajadorActual ? "success" : "warning"}
+        />
         <StatCard label="Rol" value={trabajadorActual?.role ?? "-"} />
-        <StatCard label="Empresa activa" value={empresaSeleccionada?.nombre ?? "-"} />
+        <StatCard
+          label="Empresa activa"
+          value={empresaSeleccionada?.nombre ?? "-"}
+        />
       </Row>
 
       <Card>
@@ -54,11 +66,21 @@ export default function PerfilScreen() {
         <View style={styles.formRow}>
           <View style={styles.field}>
             <ThemedText style={styles.label}>Email</ThemedText>
-            <TextInput value={email} onChangeText={setEmail} style={styles.input} autoCapitalize="none" />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+              autoCapitalize="none"
+            />
           </View>
           <View style={styles.field}>
             <ThemedText style={styles.label}>Contraseña</ThemedText>
-            <TextInput value={password} onChangeText={setPassword} style={styles.input} secureTextEntry />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+              secureTextEntry
+            />
           </View>
         </View>
         <View style={styles.actions}>
@@ -66,11 +88,14 @@ export default function PerfilScreen() {
             <ThemedText style={styles.buttonText}>Entrar</ThemedText>
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={logout}>
-            <ThemedText style={styles.secondaryButtonText}>Cerrar sesión</ThemedText>
+            <ThemedText style={styles.secondaryButtonText}>
+              Cerrar sesión
+            </ThemedText>
           </Pressable>
         </View>
         <ThemedText style={styles.help}>
-          Credenciales demo: admin@app.test / admin123 · carlos@app.test / demo123
+          Credenciales demo: admin@app.test / admin123 · carlos@app.test /
+          demo123
         </ThemedText>
       </Card>
 
@@ -78,11 +103,20 @@ export default function PerfilScreen() {
         <Card>
           <ThemedText style={styles.title}>Datos del trabajador</ThemedText>
           <View style={styles.detailGrid}>
-            <Detail label="Nombre" value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`} />
+            <Detail
+              label="Nombre"
+              value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`}
+            />
             <Detail label="DNI" value={trabajadorActual.dni} />
             <Detail label="Puesto" value={trabajadorActual.puesto} />
-            <Detail label="Localidad" value={`${trabajadorActual.poblacion}, ${trabajadorActual.provincia}`} />
-            <Detail label="Cuenta cotización" value={trabajadorActual.cuenta_cotizacion} />
+            <Detail
+              label="Localidad"
+              value={`${trabajadorActual.poblacion}, ${trabajadorActual.provincia}`}
+            />
+            <Detail
+              label="Cuenta cotización"
+              value={trabajadorActual.cuenta_cotizacion}
+            />
             <Detail label="Email" value={trabajadorActual.email} />
           </View>
         </Card>

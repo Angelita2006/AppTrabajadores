@@ -1,1 +1,2 @@
-export { default } from "@/modules/fichajes/screens/HomeScreen";
+export { default } from "../../src/modules/fichajes/screens/HomeScreen";
+

@@ -7,9 +7,9 @@ import {
   useState,
 } from "react";
 
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { Trabajador } from "@/modules/trabajadores/types/trabajador";
-import { mockDb } from "@/services/api/mockDb";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { Trabajador } from "../../../modules/trabajadores/types/trabajador";
+import { mockDb } from "../../../services/api/mockDb";
 
 interface TrabajadorContextValue {
   trabajadorActual: Trabajador | null;
@@ -26,22 +26,24 @@ const TrabajadorContext = createContext<TrabajadorContextValue | undefined>(
 );
 
 export function ProveedorTrabajador({ children }: { children: ReactNode }) {
-  const [trabajadorActual, setTrabajadorActual] =
-    useState<Trabajador | null>(null);
+  const [trabajadorActual, setTrabajadorActual] = useState<Trabajador | null>(
+    null,
+  );
   const [empresaSeleccionada, setEmpresaSeleccionada] =
     useState<Empresa | null>(null);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([mockDb.getTrabajador(1), mockDb.getEmpresasTrabajador(1)]).then(
-      ([trabajador, empresasIniciales]) => {
-        if (!mounted) return;
-        setTrabajadorActual(trabajador);
-        setEmpresas(empresasIniciales);
-        setEmpresaSeleccionada(empresasIniciales[0] ?? null);
-      },
-    );
+    Promise.all([
+      mockDb.getTrabajador(1),
+      mockDb.getEmpresasTrabajador(1),
+    ]).then(([trabajador, empresasIniciales]) => {
+      if (!mounted) return;
+      setTrabajadorActual(trabajador);
+      setEmpresas(empresasIniciales);
+      setEmpresaSeleccionada(empresasIniciales[0] ?? null);
+    });
     return () => {
       mounted = false;
     };

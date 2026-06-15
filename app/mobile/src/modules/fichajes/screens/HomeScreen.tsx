@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 
-import { EmpresaSelector } from "@/modules/empresas/components/EmpresaSelector";
-import { crearFichaje, obtenerFichajesEmpresaTrabajador } from "@/modules/fichajes/api/fichajesService";
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
-import { obtenerHorarioTrabajadorEmpresa } from "@/modules/horarios/api/horariosService";
-import { Horario } from "@/modules/horarios/types/horario";
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
-import { ThemedText } from "@/shared/components/themed-text";
+import { EmpresaSelector } from "../../../modules/empresas/components/EmpresaSelector";
+import {
+  crearFichaje,
+  obtenerFichajesEmpresaTrabajador,
+} from "../../../modules/fichajes/api/fichajesService";
+import { Fichaje } from "../../../modules/fichajes/types/fichaje";
+import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/horariosService";
+import { Horario } from "../../../modules/horarios/types/horario";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 const formatTime = (date?: Date | number) =>
-  date ? new Date(date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+  date
+    ? new Date(date).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "--:--";
 
 const estadoFromUltimo = (fichaje?: Fichaje) => {
   if (!fichaje || fichaje.tipo === "salida") return "Fuera de jornada";
@@ -27,8 +35,14 @@ export default function HomeScreen() {
   const cargarDatos = useCallback(async () => {
     if (!trabajadorActual?.id || !empresaSeleccionada?.id) return;
     const [fichajesData, horarioData] = await Promise.all([
-      obtenerFichajesEmpresaTrabajador(trabajadorActual.id, empresaSeleccionada.id),
-      obtenerHorarioTrabajadorEmpresa(trabajadorActual.id, empresaSeleccionada.id),
+      obtenerFichajesEmpresaTrabajador(
+        trabajadorActual.id,
+        empresaSeleccionada.id,
+      ),
+      obtenerHorarioTrabajadorEmpresa(
+        trabajadorActual.id,
+        empresaSeleccionada.id,
+      ),
     ]);
     setFichajes(fichajesData);
     setHorario(horarioData);
@@ -42,7 +56,9 @@ export default function HomeScreen() {
   const estado = estadoFromUltimo(ultimoFichaje);
   const horasHoy = useMemo(() => {
     const entrada = fichajes.find((fichaje) => fichaje.tipo === "entrada");
-    const salida = [...fichajes].reverse().find((fichaje) => fichaje.tipo === "salida");
+    const salida = [...fichajes]
+      .reverse()
+      .find((fichaje) => fichaje.tipo === "salida");
     if (!entrada) return "0 h";
     const fin = salida?.fecha ?? Date.now();
     const hours = Math.max(0, (fin - entrada.fecha) / 36e5);
@@ -65,18 +81,41 @@ export default function HomeScreen() {
     >
       <EmpresaSelector />
       <Row>
-        <StatCard label="Estado actual" value={estado} tone={estado === "Trabajando" ? "success" : "neutral"} />
+        <StatCard
+          label="Estado actual"
+          value={estado}
+          tone={estado === "Trabajando" ? "success" : "neutral"}
+        />
         <StatCard label="Horas hoy" value={horasHoy} />
-        <StatCard label="Ultimo fichaje" value={formatTime(ultimoFichaje?.fecha)} />
+        <StatCard
+          label="Ultimo fichaje"
+          value={formatTime(ultimoFichaje?.fecha)}
+        />
       </Row>
 
       <Card>
         <ThemedText style={styles.sectionTitle}>Acciones rápidas</ThemedText>
         <View style={styles.actions}>
-          <ActionButton label="Entrada" tone="success" onPress={() => registrar("entrada")} />
-          <ActionButton label="Descanso" tone="warning" onPress={() => registrar("descanso")} />
-          <ActionButton label="Fin descanso" tone="neutral" onPress={() => registrar("fin_descanso")} />
-          <ActionButton label="Salida" tone="danger" onPress={() => registrar("salida")} />
+          <ActionButton
+            label="Entrada"
+            tone="success"
+            onPress={() => registrar("entrada")}
+          />
+          <ActionButton
+            label="Descanso"
+            tone="warning"
+            onPress={() => registrar("descanso")}
+          />
+          <ActionButton
+            label="Fin descanso"
+            tone="neutral"
+            onPress={() => registrar("fin_descanso")}
+          />
+          <ActionButton
+            label="Salida"
+            tone="danger"
+            onPress={() => registrar("salida")}
+          />
         </View>
       </Card>
 
@@ -92,12 +131,18 @@ export default function HomeScreen() {
       <Card>
         <ThemedText style={styles.sectionTitle}>Actividad de hoy</ThemedText>
         {fichajes.length === 0 ? (
-          <ThemedText style={styles.body}>Todavía no hay fichajes registrados.</ThemedText>
+          <ThemedText style={styles.body}>
+            Todavía no hay fichajes registrados.
+          </ThemedText>
         ) : (
           fichajes.map((fichaje) => (
             <View key={fichaje.id} style={styles.listRow}>
-              <ThemedText style={styles.listTitle}>{fichaje.tipo.replace("_", " ")}</ThemedText>
-              <ThemedText style={styles.listMeta}>{formatTime(fichaje.fecha)}</ThemedText>
+              <ThemedText style={styles.listTitle}>
+                {fichaje.tipo.replace("_", " ")}
+              </ThemedText>
+              <ThemedText style={styles.listMeta}>
+                {formatTime(fichaje.fecha)}
+              </ThemedText>
             </View>
           ))
         )}

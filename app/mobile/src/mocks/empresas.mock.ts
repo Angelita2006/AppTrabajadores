@@ -1,4 +1,4 @@
-import { Empresa } from "@/modules/empresas/types/empresa";
+import { Empresa } from "../../src/modules/empresas/types/empresa";
 
 export const empresas: Empresa[] = [
   {

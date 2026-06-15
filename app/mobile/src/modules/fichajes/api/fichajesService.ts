@@ -1,5 +1,5 @@
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
-import { mockDb } from "@/services/api/mockDb";
+import { Fichaje } from "../../../modules/fichajes/types/fichaje";
+import { mockDb } from "../../../services/api/mockDb";
 
 export const crearFichaje = async (
   idTrabajador: number,

@@ -5,10 +5,11 @@ import { SymbolWeight } from "expo-symbols";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
 /**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ * Iconos y simbolos utilizados en la aplicación.
+ * - Material Icons: [Icons Directory](https://icons.expo.fyi).
+ * - SF Symbols: [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
+
 const MAPPING = {
   "house.fill": "home",
   "paperplane.fill": "send",
@@ -26,19 +27,16 @@ const MAPPING = {
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
+ * Un componente de icono que utiliza SF Symbols nativos en iOS y Material Icons en Android y web.
+ * Esto asegura una apariencia consistente en todas las plataformas y un uso óptimo de los recursos.
+ * Los nombres de los iconos se basan en SF Symbols y requieren un mapeo manual a Material Icons.
+ * Recibe las siguientes props:
+ * - name: el nombre del icono a mostrar, que debe tener una correspondencia en MaterialIcons para Android y web.
+ * - size: el tamaño del icono (opcional, por defecto es 24).
+ * - color: el color del icono, que se pasa como tintColor al componente SymbolView en iOS, y como color a MaterialIcons en Android y web.
+ * - style: estilos adicionales para el contenedor del icono (opcional).
  */
-// Componente IconSymbol que muestra iconos personalizados en la aplicación utilizando MaterialIcons en Android y web, y SF Symbols en iOS.
-// Recibe las siguientes props:
-// - name: el nombre del icono a mostrar, que debe ser un valor válido para el componente SymbolView en iOS,
-// y debe tener una correspondencia en MaterialIcons para Android y web.
-// - size: el tamaño del icono (opcional, por defecto es 24).
-// - color: el color del icono, que se pasa como tintColor al componente SymbolView en iOS, y como color a MaterialIcons en Android y web.
-// - style: estilos adicionales para el contenedor del icono (opcional).
-// - weight: el peso del icono, que se pasa como prop al componente SymbolView en iOS (opcional, por defecto es 'regular').
-// En Android y web, el peso no se utiliza ya que MaterialIcons no tiene variantes de peso.
+
 export function IconSymbol({
   name,
   size = 24,

@@ -1,7 +1,7 @@
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { Horario } from "@/modules/horarios/types/horario";
-import { Trabajador } from "@/modules/trabajadores/types/trabajador";
-import { mockDb } from "@/services/api/mockDb";
+import { Empresa } from "../../../modules/empresas/types/empresa";
+import { Horario } from "../../../modules/horarios/types/horario";
+import { Trabajador } from "../../../modules/trabajadores/types/trabajador";
+import { mockDb } from "../../../services/api/mockDb";
 
 export const obtenerEmpresasTrabajador = async (
   trabajadorId: number,

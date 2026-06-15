@@ -1,1 +1,2 @@
-export { default } from "@/modules/horarios/screens/HorariosScreen";
+export { default } from "../../src/modules/horarios/screens/HorariosScreen";
+

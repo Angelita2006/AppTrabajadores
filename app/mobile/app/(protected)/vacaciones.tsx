@@ -1,1 +1,2 @@
-export { default } from "@/modules/vacaciones/screens/VacacionesScreen";
+export { default } from "../../src/modules/vacaciones/screens/VacacionesScreen";
+

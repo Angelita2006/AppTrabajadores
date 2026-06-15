@@ -1,7 +1,10 @@
-import { Empresa } from "@/modules/empresas/types/empresa";
-import { Fichaje } from "@/modules/fichajes/types/fichaje";
-import { Horario } from "@/modules/horarios/types/horario";
-import { Estado, Trabajador } from "@/modules/trabajadores/types/trabajador";
+import { Empresa } from "../../modules/empresas/types/empresa";
+import { Fichaje } from "../../modules/fichajes/types/fichaje";
+import { Horario } from "../../modules/horarios/types/horario";
+import {
+  Estado,
+  Trabajador,
+} from "../../modules/trabajadores/types/trabajador";
 
 export type Vacacion = {
   id: number;
@@ -23,10 +26,24 @@ export type Incidencia = {
   descripcion: string;
 };
 
+// Almacena la fecha y hora exacta del momento actual
 const today = new Date();
+
+/**
+ * Genera un objeto de fecha con el día de hoy, pero modificando la hora y los minutos.
+ * Utiliza los segundos y milisegundos puestos a cero de forma exacta.
+ *
+ * @param hour - La hora del día en formato de 24 horas (ej: 14 para las 2:00 PM).
+ * @param minute - Los minutos del reloj. Por defecto es 0 si no se indica.
+ * @returns Un nuevo objeto Date con el tiempo exacto configurado.
+ */
 const atHour = (hour: number, minute = 0) => {
+  // 1. Crea una copia limpia con el día, mes y año de hoy
   const date = new Date(today);
+
+  // 2. Ajusta los parámetros: (horas, minutos, segundos, milisegundos)
   date.setHours(hour, minute, 0, 0);
+
   return date;
 };
 
@@ -200,11 +217,29 @@ let incidencias: Incidencia[] = [
     descripcion: "Retraso por incidencia de transporte.",
   },
 ];
-
+/**
+ * Genera de forma automática el siguiente identificador (ID) numérico correlativo.
+ * Busca el ID más alto dentro de la lista que recibe y le suma 1.
+ *
+ * @param items - Arreglo de objetos que contienen una propiedad numérica 'id'.
+ * @returns El siguiente ID disponible (mínimo 1).
+ */
 const nextId = <T extends { id: number }>(items: T[]) =>
   Math.max(0, ...items.map((item) => item.id)) + 1;
 
+/**
+ * Base de datos simulada en memoria (Mock DB) para la gestión del sistema FICHAPP.
+ * Todas las funciones emulan operaciones asíncronas utilizando promesas (async/await).
+ */
 export const mockDb = {
+  // ==========================================
+  // TRABAJADORES
+  // ==========================================
+
+  /**
+   * Autentica a un usuario verificando su correo electrónico y contraseña.
+   * No distingue entre mayúsculas y minúsculas en el email.
+   */
   async login(email: string, password: string) {
     return (
       trabajadores.find(
@@ -214,32 +249,55 @@ export const mockDb = {
       ) ?? null
     );
   },
+
+  /** Obtiene la lista completa con todos los trabajadores registrados. */
   async getTrabajadores() {
     return trabajadores;
   },
+
+  /** Busca un trabajador específico por su identificador único. */
   async getTrabajador(id: number) {
     return trabajadores.find((trabajador) => trabajador.id === id) ?? null;
   },
+
+  /** Registra un nuevo empleado asignándole automáticamente un ID consecutivo. */
   async createTrabajador(data: Omit<Trabajador, "id">) {
     const trabajador = { ...data, id: nextId(trabajadores) };
     trabajadores = [...trabajadores, trabajador];
     return trabajador;
   },
+
+  /** Modifica los datos de un trabajador existente buscando por su ID. */
   async updateTrabajador(id: number, data: Partial<Trabajador>) {
     let updated: Trabajador | null = null;
     trabajadores = trabajadores.map((trabajador) => {
-      if (trabajador.id !== id && trabajador.dni !== data.dni) return trabajador;
+      // Si no coincide el ID o se intenta duplicar un DNI, mantiene los datos intactos
+      if (trabajador.id !== id && trabajador.dni !== data.dni)
+        return trabajador;
       updated = { ...trabajador, ...data };
       return updated;
     });
     return updated;
   },
+
+  // ==========================================
+  // EMPRESAS
+  // ==========================================
+
+  /** Obtiene la lista completa de todas las empresas de la plataforma. */
   async getEmpresas() {
     return empresas;
   },
+
+  /** Busca una empresa específica por su identificador único. */
   async getEmpresa(id: number) {
     return empresas.find((empresa) => empresa.id === id) ?? null;
   },
+
+  /**
+   * Obtiene las empresas vinculadas a un trabajador.
+   * Si el usuario tiene rol 'admin', devuelve todas las empresas disponibles.
+   */
   async getEmpresasTrabajador(idTrabajador: number) {
     const trabajador = trabajadores.find((item) => item.id === idTrabajador);
     if (trabajador?.role === "admin") return empresas;
@@ -247,7 +305,10 @@ export const mockDb = {
       empresa.trabajadores?.includes(idTrabajador),
     );
   },
+
+  /** Crea una vinculación mutua de IDs entre un trabajador y una empresa sin duplicados. */
   async addEmpresaTrabajador(idTrabajador: number, idEmpresa: number) {
+    // Agrega la empresa al perfil del trabajador
     trabajadores = trabajadores.map((trabajador) =>
       trabajador.id === idTrabajador
         ? {
@@ -258,6 +319,7 @@ export const mockDb = {
           }
         : trabajador,
     );
+    // Agrega el trabajador al perfil de la empresa
     empresas = empresas.map((empresa) =>
       empresa.id === idEmpresa
         ? {
@@ -269,9 +331,17 @@ export const mockDb = {
         : empresa,
     );
   },
+
+  // ==========================================
+  // FICHAJES
+  // ==========================================
+
+  /** Obtiene el historial global de fichajes registrados en la aplicación. */
   async getFichajes() {
     return fichajes;
   },
+
+  /** Obtiene y ordena de forma cronológica los fichajes de un empleado en una empresa particular. */
   async getFichajesTrabajadorEmpresa(idTrabajador: number, idEmpresa: number) {
     return fichajes
       .filter(
@@ -279,8 +349,10 @@ export const mockDb = {
           fichaje.idTrabajador === idTrabajador &&
           fichaje.idEmpresa === idEmpresa,
       )
-      .sort((a, b) => a.fecha - b.fecha);
+      .sort((a, b) => a.fecha - b.fecha); // Ordena de más antiguo a más reciente
   },
+
+  /** Registra un evento de fichaje (entrada/salida) capturando el momento exacto en tiempo real. */
   async createFichaje(
     idTrabajador: number,
     idEmpresa: number,
@@ -292,15 +364,23 @@ export const mockDb = {
       idTrabajador,
       idEmpresa,
       tipo,
-      fecha: fechaHora.getTime(),
-      fecha_hora: fechaHora,
+      fecha: fechaHora.getTime(), // Almacena la marca de tiempo numérica (timestamp)
+      fecha_hora: fechaHora, // Almacena el objeto Date original
     };
     fichajes = [...fichajes, fichaje];
     return fichaje;
   },
+
+  // ==========================================
+  // HORARIOS
+  // ==========================================
+
+  /** Obtiene la lista completa de horarios laborales configurados. */
   async getHorarios() {
     return horarios;
   },
+
+  /** Obtiene el cuadrante de horario asignado a un trabajador en una empresa específica. */
   async getHorarioTrabajadorEmpresa(idTrabajador: number, idEmpresa: number) {
     return (
       horarios.find(
@@ -310,9 +390,17 @@ export const mockDb = {
       ) ?? null
     );
   },
+
+  // ==========================================
+  // VACACIONES
+  // ==========================================
+
+  /** Obtiene todas las solicitudes de vacaciones del sistema. */
   async getVacaciones() {
     return vacaciones;
   },
+
+  /** Genera una nueva solicitud de vacaciones que se guarda inicialmente en estado 'pendiente'. */
   async createVacacion(data: Omit<Vacacion, "id" | "estado">) {
     const vacacion: Vacacion = {
       ...data,
@@ -322,9 +410,17 @@ export const mockDb = {
     vacaciones = [...vacaciones, vacacion];
     return vacacion;
   },
+
+  // ==========================================
+  // INCIDENCIAS
+  // ==========================================
+
+  /** Obtiene el reporte total de incidencias registradas. */
   async getIncidencias() {
     return incidencias;
   },
+
+  /** Registra un reporte de incidencia o problema asignándole por defecto el estado 'abierta'. */
   async createIncidencia(data: Omit<Incidencia, "id" | "estado">) {
     const incidencia: Incidencia = {
       ...data,

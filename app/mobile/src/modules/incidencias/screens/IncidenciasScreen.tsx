@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { useTrabajador } from "@/modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "@/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "@/shared/ui/AppSurface";
-import { Incidencia, mockDb } from "@/services/api/mockDb";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { Incidencia, mockDb } from "../../../services/api/mockDb";
+import { ThemedText } from "../../../shared/components/themed-text";
+import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
 export default function IncidenciasScreen() {
   const { trabajadorActual, empresaSeleccionada } = useTrabajador();
@@ -33,15 +33,28 @@ export default function IncidenciasScreen() {
   };
 
   return (
-    <AppScreen title="Incidencias" subtitle="Registro de correcciones y ausencias pendiente de revisión.">
+    <AppScreen
+      title="Incidencias"
+      subtitle="Registro de correcciones y ausencias pendiente de revisión."
+    >
       <Row>
         <StatCard label="Incidencias" value={String(incidencias.length)} />
-        <StatCard label="Abiertas" value={String(incidencias.filter((item) => item.estado !== "resuelta").length)} tone="warning" />
+        <StatCard
+          label="Abiertas"
+          value={String(
+            incidencias.filter((item) => item.estado !== "resuelta").length,
+          )}
+          tone="warning"
+        />
       </Row>
       <Card>
         <ThemedText style={styles.title}>Nueva incidencia</ThemedText>
         <View style={styles.formRow}>
-          <TextInput value={descripcion} onChangeText={setDescripcion} style={styles.input} />
+          <TextInput
+            value={descripcion}
+            onChangeText={setDescripcion}
+            style={styles.input}
+          />
           <Pressable style={styles.button} onPress={crear}>
             <ThemedText style={styles.buttonText}>Crear incidencia</ThemedText>
           </Pressable>
@@ -49,9 +62,13 @@ export default function IncidenciasScreen() {
       </Card>
       {incidencias.map((incidencia) => (
         <Card key={incidencia.id}>
-          <ThemedText style={styles.title}>{incidencia.tipo.replace("_", " ")}</ThemedText>
+          <ThemedText style={styles.title}>
+            {incidencia.tipo.replace("_", " ")}
+          </ThemedText>
           <ThemedText style={styles.body}>{incidencia.descripcion}</ThemedText>
-          <ThemedText style={styles.status}>{incidencia.fecha} · {incidencia.estado}</ThemedText>
+          <ThemedText style={styles.status}>
+            {incidencia.fecha} · {incidencia.estado}
+          </ThemedText>
         </Card>
       ))}
     </AppScreen>
@@ -59,10 +76,20 @@ export default function IncidenciasScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { color: "#0F172A", fontSize: 18, fontWeight: "800", textTransform: "capitalize" },
+  title: {
+    color: "#0F172A",
+    fontSize: 18,
+    fontWeight: "800",
+    textTransform: "capitalize",
+  },
   body: { color: "#475569" },
   status: { color: "#2563EB", fontWeight: "800", textTransform: "capitalize" },
-  formRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  formRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
   input: {
     backgroundColor: "#F8FAFC",
     borderColor: "#CBD5E1",

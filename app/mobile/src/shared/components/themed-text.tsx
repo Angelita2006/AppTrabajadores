@@ -1,13 +1,21 @@
 import { StyleSheet, Text, type TextProps } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
-// Componente ThemedText que extiende el componente Text de React Native para agregar soporte de temas (claro y oscuro) y estilos predefinidos para diferentes tipos de texto (título, subtítulo, enlace, etc.).
-// Recibe las siguientes props:
-// - lightColor: el color del texto en modo claro (opcional).
-// - darkColor: el color del texto en modo oscuro (opcional).
-// - type: el tipo de texto (opcional).
+import { useThemeColor } from "../../hooks/use-theme-color";
+
+/**
+ * Propiedades para el componente ThemedText.
+ * Extiende las propiedades nativas de un Text de React Native.
+ */
 export type ThemedTextProps = TextProps & {
+  /** Color del texto usado exclusivamente en el modo claro. */
   lightColor?: string;
+
+  /** Color del texto usado exclusivamente en el modo oscuro. */
   darkColor?: string;
+
+  /**
+   * Variante visual del texto que define su tamaño y peso.
+   * @default "default"
+   */
   type?:
     | "default"
     | "title"
@@ -16,8 +24,11 @@ export type ThemedTextProps = TextProps & {
     | "subtitle"
     | "link";
 };
-// Función ThemedText que utiliza el hook useThemeColor para determinar el color del texto según el tema actual (claro u oscuro),
-// y aplica estilos predefinidos según el tipo de texto especificado en las props.
+
+/**
+ * Componente de texto inteligente que adapta su color automáticamente
+ * según el tema activo del dispositivo (claro u oscuro).
+ */
 export function ThemedText({
   style,
   lightColor,
@@ -25,8 +36,10 @@ export function ThemedText({
   type = "default",
   ...rest
 }: ThemedTextProps) {
+  // Obtiene el color de texto correcto según el tema actual del sistema
   const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
 
+  // Asigna el estilo correspondiente según la variante seleccionada
   const typeStyle = (() => {
     switch (type) {
       case "title":
@@ -48,39 +61,64 @@ export function ThemedText({
 }
 
 const styles = StyleSheet.create({
+  // texto para párrafos y descripciones
   default: {
-    fontSize: 16,
-    lineHeight: 24,
+    // color del texto (gris)
     color: "#E0E0E0",
+    // tamaño de texto (16)
+    fontSize: 16,
+    // espacio vertical de 24 px entre líneas
+    lineHeight: 24,
   },
+  // texto seminegrita
   defaultSemiBold: {
+    // color del texto (gris)
+    color: "#E0E0E0",
+    // tamaño de texto (16)
     fontSize: 16,
-    lineHeight: 24,
+    // peso del texto, negrita suave
     fontWeight: "600",
-    color: "#E0E0E0",
-  },
-  defaultBold: {
-    fontSize: 16,
+    // espacio vertical de 24 px entre líneas
     lineHeight: 24,
-    fontWeight: "bold",
-    color: "#E0E0E0",
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    lineHeight: 32,
+  // texto negrita
+  defaultBold: {
+    // color del texto (gris)
     color: "#E0E0E0",
-    // backgroundColor: "#E0E0E0",
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#E0E0E0",
-    // backgroundColor: "#E0E0E0",
-  },
-  link: {
-    lineHeight: 30,
+    // tamaño de texto (16)
     fontSize: 16,
+    // peso del texto, negrita
+    fontWeight: "bold",
+    // espacio vertical de 24 px entre líneas
+    lineHeight: 24,
+  },
+  // título enorme
+  title: {
+    // color del texto (gris)
+    color: "#E0E0E0",
+    // tamaño de texto (32)
+    fontSize: 32,
+    // peso del texto, negrita
+    fontWeight: "bold",
+    // espacio vertical de 32 px entre líneas
+    lineHeight: 32,
+  },
+  // subtítulo mediano
+  subtitle: {
+    // color del texto (gris)
+    color: "#E0E0E0",
+    // tamaño de texto (20)
+    fontSize: 20,
+    // peso del texto, negrita
+    fontWeight: "bold",
+  },
+  // texto para enlaces o botones web
+  link: {
+    // color del texto (azul)
     color: "#0a7ea4",
+    // tamaño de texto (16)
+    fontSize: 16,
+    // espacio vertical de 30 px entre líneas
+    lineHeight: 30,
   },
 });

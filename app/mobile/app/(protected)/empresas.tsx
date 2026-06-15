@@ -1,1 +1,2 @@
-export { default } from "@/modules/empresas/screens/EmpresasScreen";
+export { default } from "../../src/modules/empresas/screens/EmpresasScreen";
+
