@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 // import {
 //   getTrabajadorByEmailYPassword,
 //   obtenerEmpresasTrabajador,
@@ -30,9 +37,9 @@ export default function PerfilScreen() {
 
   // Estados locales para controlar el formulario de acceso
   const [email, setEmail] = useState(
-    trabajadorActual?.email ?? "admin@app.test", // Email inicial por defecto
+    trabajadorActual?.email ?? "angelita@example.com", // Email inicial por defecto
   );
-  const [password, setPassword] = useState("admin123"); // Contraseña inicial por defecto
+  const [password, setPassword] = useState("password123"); // Contraseña inicial por defecto
   const [isObscured, setIsObscured] = useState(true); // Controla si se oculta la contraseña
 
   /**
@@ -54,7 +61,7 @@ export default function PerfilScreen() {
       // Muestra un cuadro de ayuda si el correo o contraseña son incorrectos
       Alert.alert(
         "Login demo",
-        "Usa admin@app.test / admin123 o carlos@app.test / demo123",
+        "Usa admin@example.com / admin123 o angelita@example.com / password123",
       );
     }
   };
@@ -102,6 +109,15 @@ export default function PerfilScreen() {
               autoCapitalize="none" // Evita que el celular ponga mayúscula en la primera letra
             />
           </View>
+
+          {Platform.OS === "web" && (
+            <style>{`
+    input::-ms-reveal, 
+    input::-ms-clear { 
+      display: none !important; 
+    }
+  `}</style>
+          )}
 
           {/* Campo: Contraseña con botón de visibilidad integrado */}
           <View style={styles.field}>
@@ -194,6 +210,7 @@ function Detail({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   // estilo del título, color azul oscuro, tamaño 18 y negrita
   title: {

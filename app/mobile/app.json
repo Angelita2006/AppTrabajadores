@@ -7,7 +7,7 @@
     "icon": "./assets/icons/icon.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
-    "usesCleartextTraffic": true,
+    // "usesCleartextTraffic": true,
     "ios": {
       "supportsTablet": true
     },

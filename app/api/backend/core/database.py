@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -9,13 +11,24 @@ Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
-    return db
+    try:
+        yield db 
+    finally:
+        db.close()  
+
+@contextmanager
+def get_db_context():
+    db = SessionLocal()
+    try:
+        yield db 
+    finally:
+        db.close()  
 
 def next_id(model):
-    db = get_db()
-    last_object = db.query(model).order_by(model.id.desc()).first()
-    db.close()
-    if last_object:
-        return last_object.id + 1
-    else:
-        return 1
+    with get_db_context() as db:
+        last_object = db.query(model).order_by(model.id.desc()).first()
+        db.close()
+        if last_object:
+            return last_object.id + 1
+        else:
+            return 1
