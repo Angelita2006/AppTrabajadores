@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.database import Base, engine
 from routes import empresa, fichaje, horario, trabajador, vacacion, incidencia
 
-
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, horarios, trabajadores y empresas de FICHAPP.",
@@ -23,9 +22,13 @@ app.add_middleware(
 )
 
 # Registro de las URIs y enrutadores modulares en el núcleo de la aplicación FastAPI
-app.include_router(empresa.router, prefix="/api")
-app.include_router(fichaje.router, prefix="/api")
-app.include_router(horario.router, prefix="/api")
-app.include_router(trabajador.router, prefix="/api")
-app.include_router(vacacion.router, prefix="/api")
-app.include_router(incidencia.router, prefix="/api")
+app.include_router(empresa.router)
+app.include_router(fichaje.router)
+app.include_router(horario.router) 
+app.include_router(trabajador.router)
+app.include_router(vacacion.router)
+app.include_router(incidencia.router)
+
+@app.get("/")
+def read_root():
+    return {"mensaje": "¡Conexión exitosa desde React Native!"}

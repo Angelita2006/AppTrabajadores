@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "AppTrabajadores",
-    "slug": "AppTrabajadores",
+    "name": "Fichapp",
+    "slug": "Fichapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
-    "scheme": "apptrabajadores",
+    "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
+    "usesCleartextTraffic": true,
     "ios": {
       "supportsTablet": true
     },
@@ -24,6 +25,14 @@
       "favicon": "./assets/icons/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -51,7 +60,7 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#E6F4FE",
           "androidMode": "default",
-          "androidCollapsedTitle": "AppTrabajadores Notifications"
+          "androidCollapsedTitle": "Fichapp Notifications"
         }
       ],
       "@react-native-vector-icons/ionicons"
