@@ -53,7 +53,8 @@
           "androidMode": "default",
           "androidCollapsedTitle": "AppTrabajadores Notifications"
         }
-      ]
+      ],
+      "@react-native-vector-icons/ionicons"
     ],
     "experiments": {
       "typedRoutes": true,

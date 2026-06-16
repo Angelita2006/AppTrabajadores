@@ -6,13 +6,20 @@ import {
   Trabajador,
 } from "../../../modules/trabajadores/types/trabajador";
 import { mockDb } from "../../../services/api/mockDb";
-
+/**
+ * Normaliza el estado del trabajador asegurando que devuelva un valor numérico del enumerado.
+ * Si recibe una cadena de texto, busca su equivalencia o asigna 'Activo' por defecto.
+ */
 const normalizeEstado = (estado: Estado | string): Estado =>
   typeof estado === "number"
     ? estado
     : ((Estado[estado as keyof typeof Estado] as unknown as Estado) ??
       Estado.Activo);
 
+/**
+ * Registra un nuevo trabajador en la base de datos simulada.
+ * Le asigna por defecto el rol de usuario estándar y lo vincula a la empresa con ID 1.
+ */
 export const crearTrabajador = async (
   nombre: string,
   apellidos: string,
@@ -44,6 +51,10 @@ export const crearTrabajador = async (
     empresas: [1],
   });
 
+/**
+ * Modifica los datos de un trabajador existente localizándolo mediante su ID único.
+ * Lanza un error si el identificador no coincide con ningún registro.
+ */
 export const editarTrabajador = async (
   idTrabajador: number,
   nombre: string,
@@ -76,6 +87,10 @@ export const editarTrabajador = async (
   return trabajador;
 };
 
+/**
+ * Modifica el perfil de un empleado localizándolo mediante su número de DNI.
+ * Realiza una búsqueda inicial previa en la lista global de trabajadores antes de actualizar.
+ */
 export const editarTrabajadorPorDNI = async (
   dni: string,
   nombre: string,
@@ -109,11 +124,14 @@ export const editarTrabajadorPorDNI = async (
   return actualizado;
 };
 
+/** Función preparada para futuras integraciones de borrado de registros. */
 export const eliminarTrabajador = async (): Promise<void> => undefined;
 
+/** Obtiene la lista completa de todos los trabajadores del sistema. */
 export const obtenerTrabajadores = async (): Promise<Trabajador[]> =>
   mockDb.getTrabajadores();
 
+/** Recupera la información de un trabajador específico por su ID único. */
 export const obtenerTrabajador = async (
   idTrabajador: number,
 ): Promise<Trabajador> => {
@@ -122,6 +140,10 @@ export const obtenerTrabajador = async (
   return trabajador;
 };
 
+/**
+ * Realiza la comprobación de credenciales para el inicio de sesión.
+ * Lanza un error explícito si los datos de acceso no son válidos.
+ */
 export const getTrabajadorByEmailYPassword = async (
   email: string,
   password: string,
@@ -131,12 +153,15 @@ export const getTrabajadorByEmailYPassword = async (
   return trabajador;
 };
 
+/** Alias secundario de la función de comprobación de inicio de sesión. */
 export const obtenerTrabajadorPorEmailYPassword = getTrabajadorByEmailYPassword;
 
+/** Consulta el listado de empresas asociadas al perfil de un trabajador. */
 export const obtenerEmpresasTrabajador = async (
   idTrabajador: number,
 ): Promise<Empresa[]> => mockDb.getEmpresasTrabajador(idTrabajador);
 
+/** Recupera el historial total de fichajes realizados por un empleado específico. */
 export const obtenerFichajesTorabajador = async (
   idTrabajador: number,
 ): Promise<Fichaje[]> => {
@@ -144,6 +169,7 @@ export const obtenerFichajesTorabajador = async (
   return fichajes.filter((fichaje) => fichaje.idTrabajador === idTrabajador);
 };
 
+/** Consulta los cuadrantes de horarios asignados a las jornadas de un empleado. */
 export const obtenerHorariosTrabajador = async (
   idTrabajador: number,
 ): Promise<Horario[]> => {
@@ -151,17 +177,25 @@ export const obtenerHorariosTrabajador = async (
   return horarios.filter((horario) => horario.idTrabajador === idTrabajador);
 };
 
+/** Establece un vínculo de asociación mutua en memoria entre un empleado y una empresa. */
 export const agregarEmpresaATrabajador = async (
   idTrabajador: number,
   idEmpresa: number,
 ): Promise<void> => mockDb.addEmpresaTrabajador(idTrabajador, idEmpresa);
 
+/** Función preparada para futuras integraciones de desvinculación empresarial. */
 export const eliminarEmpresaDeTrabajador = async (): Promise<void> => undefined;
 
+/** Función preparada para futuras integraciones de asignación de horarios. */
 export const agregarHorarioATrabajador = async (): Promise<void> => undefined;
 
+/** Función preparada para futuras integraciones de inserción de fichajes manuales. */
 export const agregarFichajeATrabajador = async (): Promise<void> => undefined;
 
+/**
+ * Modifica exclusivamente el estado operativo (Ej: Activo, Vacaciones, Baja) de un empleado usando su DNI.
+ * Aplica una normalización previa del dato recibido antes de persistirlo en el sistema.
+ */
 export const editarEstadoTrabajador = async (
   dni: string,
   estado: Estado,
@@ -176,6 +210,10 @@ export const editarEstadoTrabajador = async (
   return actualizado;
 };
 
+/**
+ * Obtiene el último evento de fichaje registrado por el empleado en una empresa determinada.
+ * Se utiliza habitualmente para comprobar si el usuario se encuentra actualmente dentro o fuera de su jornada.
+ */
 export const getUltimoFichajeTrabajador = async (
   idTrabajador: number,
   idEmpresa: number,
@@ -184,9 +222,10 @@ export const getUltimoFichajeTrabajador = async (
     idTrabajador,
     idEmpresa,
   );
-  return fichajes.at(-1) ?? null;
+  return fichajes.at(-1) ?? null; // Retorna el último elemento del arreglo ordenado
 };
 
+/** Obtiene el historial completo de fichajes de un empleado filtrado por una empresa específica. */
 export const obtenerFichajesEmpresaTrabajador = async (
   idTrabajador: number,
   idEmpresa: number,

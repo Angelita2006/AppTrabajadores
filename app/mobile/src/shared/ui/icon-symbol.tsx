@@ -22,6 +22,8 @@ const MAPPING = {
   schedule: "schedule",
   event: "event",
   warning: "warning",
+  "visibility-off": "visibility-off",
+  visibility: "visibility",
 } as const;
 
 type IconSymbolName = keyof typeof MAPPING;
