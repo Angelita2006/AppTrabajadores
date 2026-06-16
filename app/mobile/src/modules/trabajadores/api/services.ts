@@ -82,7 +82,7 @@ export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
 /**
  * Recupera el historial total de fichajes realizados por un empleado específico.
  */
-export const obtenerFichajesTorabajador = async (idTrabajador: number) => {
+export const obtenerFichajesTrabajador = async (idTrabajador: number) => {
   const respuesta = await api.get(`api/fichajes?idTrabajador=${idTrabajador}`);
   return respuesta.data;
 };
