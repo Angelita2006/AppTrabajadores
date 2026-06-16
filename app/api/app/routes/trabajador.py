@@ -1,16 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
 from core.database import get_db, next_id
-from app.models.trabajador import Trabajador
-from app.models.empresa import Empresa
-from app.schemas.trabajador import TrabajadorCreate, TrabajadorResponse, LoginRequest
-from app.schemas.empresa import EmpresaResponse
+from models.trabajador import Trabajador
+from schemas.trabajador import TrabajadorCreate, TrabajadorResponse, LoginRequest
+from schemas.empresa import EmpresaResponse
 
 # Inicialización del enrutador modular para el personal y autenticación
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
-
 
 @router.post("", response_model=TrabajadorResponse, status_code=status.HTTP_201_CREATED)
 def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)):

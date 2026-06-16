@@ -1,11 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
 from typing import List
-from core.database import Base, get_db, next_id
-from app.models.empresa import Empresa
-from app.models.trabajador import Trabajador
+from core.database import get_db, next_id
+from models.empresa import Empresa
 from schemas.empresa import EmpresaCreate, EmpresaResponse
 from schemas.trabajador import TrabajadorResponse
 

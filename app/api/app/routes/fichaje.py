@@ -2,16 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
-
 from core.database import get_db, next_id
-from app.models.empresa import Empresa
-from app.models.fichaje import Fichaje
-from app.models.trabajador import Trabajador
+from models.empresa import Empresa
+from models.fichaje import Fichaje
+from models.trabajador import Trabajador
 from schemas.fichaje import FichajeCreate, FichajeResponse
 
 # Inicialización del enrutador modular para el control horario
 router = APIRouter(prefix="/api/fichajes", tags=["Fichajes"])
-
 
 @router.post("", response_model=FichajeResponse, status_code=status.HTTP_201_CREATED)
 def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):

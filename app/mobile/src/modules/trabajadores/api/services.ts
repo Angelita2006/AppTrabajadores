@@ -7,7 +7,10 @@ export const getTrabajadorByEmailYPassword = async (
   email: string,
   password: string,
 ) => {
-  const respuesta = await api.post("/trabajadores/login", { email, password });
+  const respuesta = await api.post("api/trabajadores/login", {
+    email,
+    password,
+  });
   return respuesta.data;
 };
 
@@ -20,7 +23,7 @@ export const obtenerTrabajadorPorEmailYPassword = getTrabajadorByEmailYPassword;
  * Obtiene el directorio completo con la plantilla de empleados del sistema.
  */
 export const obtenerTrabajadores = async () => {
-  const respuesta = await api.get("/trabajadores");
+  const respuesta = await api.get("api/trabajadores");
   return respuesta.data;
 };
 
@@ -28,7 +31,7 @@ export const obtenerTrabajadores = async () => {
  * Recupera la información detallada de un trabajador específico por su ID único.
  */
 export const obtenerTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/trabajadores/${idTrabajador}`);
+  const respuesta = await api.get(`api/trabajadores/${idTrabajador}`);
   return respuesta.data;
 };
 
@@ -48,7 +51,7 @@ export const crearTrabajador = async (data: {
   email: string;
   password: string;
 }) => {
-  const respuesta = await api.post("/trabajadores", data);
+  const respuesta = await api.post("api/trabajadores", data);
   return respuesta.data;
 };
 
@@ -56,7 +59,7 @@ export const crearTrabajador = async (data: {
  * Modifica los datos de un trabajador existente localizándolo por su ID único.
  */
 export const editarTrabajador = async (idTrabajador: number, data: any) => {
-  const respuesta = await api.put(`/trabajadores/${idTrabajador}`, data);
+  const respuesta = await api.put(`api/trabajadores/${idTrabajador}`, data);
   return respuesta.data;
 };
 
@@ -64,7 +67,7 @@ export const editarTrabajador = async (idTrabajador: number, data: any) => {
  * Modifica el perfil de un empleado localizándolo mediante su número de DNI.
  */
 export const editarTrabajadorPorDNI = async (dni: string, data: any) => {
-  const respuesta = await api.put(`/trabajadores/dni/${dni}`, data);
+  const respuesta = await api.put(`api/trabajadores/dni/${dni}`, data);
   return respuesta.data;
 };
 
@@ -72,7 +75,7 @@ export const editarTrabajadorPorDNI = async (dni: string, data: any) => {
  * Consulta el listado de empresas asociadas al perfil de un trabajador a través de su ID.
  */
 export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/trabajadores/${idTrabajador}/empresas`);
+  const respuesta = await api.get(`api/trabajadores/${idTrabajador}/empresas`);
   return respuesta.data;
 };
 
@@ -80,7 +83,7 @@ export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
  * Recupera el historial total de fichajes realizados por un empleado específico.
  */
 export const obtenerFichajesTorabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/fichajes?idTrabajador=${idTrabajador}`);
+  const respuesta = await api.get(`api/fichajes?idTrabajador=${idTrabajador}`);
   return respuesta.data;
 };
 
@@ -88,7 +91,7 @@ export const obtenerFichajesTorabajador = async (idTrabajador: number) => {
  * Consulta los cuadrantes de horarios asignados a las jornadas de un empleado.
  */
 export const obtenerHorariosTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/horarios?idTrabajador=${idTrabajador}`);
+  const respuesta = await api.get(`api/horarios?idTrabajador=${idTrabajador}`);
   return respuesta.data;
 };
 
@@ -100,7 +103,7 @@ export const agregarEmpresaATrabajador = async (
   idEmpresa: number,
 ) => {
   const respuesta = await api.post(
-    `/trabajadores/${idTrabajador}/empresas/${idEmpresa}`,
+    `api/trabajadores/${idTrabajador}/empresas/${idEmpresa}`,
   );
   return respuesta.data;
 };
@@ -109,7 +112,7 @@ export const agregarEmpresaATrabajador = async (
  * Modifica exclusivamente el estado operativo de un empleado usando su DNI.
  */
 export const editarEstadoTrabajador = async (dni: string, estado: string) => {
-  const respuesta = await api.put(`/trabajadores/dni/${dni}/estado`, {
+  const respuesta = await api.put(`api/trabajadores/dni/${dni}/estado`, {
     estado,
   });
   return respuesta.data;
@@ -123,7 +126,7 @@ export const getUltimoFichajeTrabajador = async (
   idEmpresa: number,
 ) => {
   const respuesta = await api.get(
-    `/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}/ultimo`,
+    `api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}/ultimo`,
   );
   return respuesta.data;
 };
@@ -136,7 +139,7 @@ export const obtenerFichajesEmpresaTrabajador = async (
   idEmpresa: number,
 ) => {
   const respuesta = await api.get(
-    `/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
+    `api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
   );
   return respuesta.data;
 };

@@ -4,7 +4,7 @@ import api from "../../../services/api/api";
  * Obtiene el registro histórico global de todas las solicitudes de vacaciones del sistema.
  */
 export const obtenerVacaciones = async () => {
-  const respuesta = await api.get("/vacaciones");
+  const respuesta = await api.get("api/vacaciones");
   return respuesta.data;
 };
 
@@ -12,7 +12,7 @@ export const obtenerVacaciones = async () => {
  * Recupera el historial exclusivo de periodos solicitados por un empleado concreto.
  */
 export const obtenerVacacionesTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/vacaciones/trabajador/${idTrabajador}`);
+  const respuesta = await api.get(`api/vacaciones/trabajador/${idTrabajador}`);
   return respuesta.data;
 };
 
@@ -26,7 +26,7 @@ export const createVacacion = async (data: {
   fechaFin: string;
   motivo: string;
 }) => {
-  const respuesta = await api.post("/vacaciones", data);
+  const respuesta = await api.post("api/vacaciones", data);
   return respuesta.data;
 };
 
@@ -43,7 +43,7 @@ export const responderSolicitudVacacion = async (
   nuevoEstado: "aprobada" | "rechazada",
 ) => {
   const respuesta = await api.put(
-    `/vacaciones/${idVacacion}/responder?nuevo_estado=${nuevoEstado}`,
+    `api/vacaciones/${idVacacion}/responder?nuevo_estado=${nuevoEstado}`,
   );
   return respuesta.data;
 };

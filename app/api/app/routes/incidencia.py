@@ -1,16 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
 from core.database import get_db, next_id
-from app.models.empresa import Empresa
-from app.models.incidencia import Incidencia
-from app.models.trabajador import Trabajador
-from app.schemas.incidencia import IncidenciaCreate, IncidenciaResponse
+from models.empresa import Empresa
+from models.incidencia import Incidencia
+from models.trabajador import Trabajador
+from schemas.incidencia import IncidenciaCreate, IncidenciaResponse
 
 # Inicialización del enrutador modular para el reporte de incidencias
 router = APIRouter(prefix="/api/incidencias", tags=["Incidencias"])
-
 
 @router.post("", response_model=IncidenciaResponse, status_code=status.HTTP_201_CREATED)
 def crear_incidencia(obj_in: IncidenciaCreate, db: Session = Depends(get_db)):

@@ -1,16 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-
 from core.database import get_db, next_id
-from app.models.empresa import Empresa
-from app.models.vacacion import Vacacion
-from app.models.trabajador import Trabajador
-from app.schemas.vacacion import VacacionCreate, VacacionResponse
+from models.empresa import Empresa
+from models.vacacion import Vacacion
+from models.trabajador import Trabajador
+from schemas.vacacion import VacacionCreate, VacacionResponse
 
 # Inicialización del enrutador modular para el control de vacaciones
 router = APIRouter(prefix="/api/vacaciones", tags=["Vacaciones"])
-
 
 @router.post("", response_model=VacacionResponse, status_code=status.HTTP_201_CREATED)
 def crear_solicitud_vacacion(obj_in: VacacionCreate, db: Session = Depends(get_db)):

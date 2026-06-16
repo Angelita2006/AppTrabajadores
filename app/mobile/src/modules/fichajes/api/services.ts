@@ -6,7 +6,7 @@ export const crearFichaje = async (
   idEmpresa: number,
   tipo: string,
 ) => {
-  const respuesta = await api.post("/fichajes", {
+  const respuesta = await api.post("api/fichajes", {
     idTrabajador,
     idEmpresa,
     tipo,
@@ -16,7 +16,7 @@ export const crearFichaje = async (
 
 /** Obtiene el historial absoluto de fichajes registrados de la plataforma. */
 export const obtenerFichajes = async () => {
-  const respuesta = await api.get("/fichajes");
+  const respuesta = await api.get("api/fichajes");
   return respuesta.data;
 };
 
@@ -26,7 +26,7 @@ export const obtenerFichajesEmpresaTrabajador = async (
   idEmpresa: number,
 ) => {
   const respuesta = await api.get(
-    `/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
+    `api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
   );
   return respuesta.data;
 };

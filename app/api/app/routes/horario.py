@@ -2,16 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
-
 from core.database import get_db, next_id
-from app.models.empresa import Empresa
-from app.models.horario import Horario
-from app.models.trabajador import Trabajador
-from app.schemas.horario import HorarioCreate, HorarioResponse
+from models.empresa import Empresa
+from models.horario import Horario
+from models.trabajador import Trabajador
+from schemas.horario import HorarioCreate, HorarioResponse
 
 # Inicialización del enrutador modular para la planificación horaria
 router = APIRouter(prefix="/api/horarios", tags=["Horarios"])
-
 
 @router.post("", response_model=HorarioResponse, status_code=status.HTTP_201_CREATED)
 def crear_horario(obj_in: HorarioCreate, db: Session = Depends(get_db)):

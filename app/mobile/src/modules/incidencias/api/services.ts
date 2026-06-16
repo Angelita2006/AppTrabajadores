@@ -4,7 +4,7 @@ import api from "../../../services/api/api";
  * Obtiene el historial absoluto de todas las incidencias guardadas en el sistema.
  */
 export const obtenerIncidencias = async () => {
-  const respuesta = await api.get("/incidencias");
+  const respuesta = await api.get("api/incidencias");
   return respuesta.data;
 };
 
@@ -12,7 +12,7 @@ export const obtenerIncidencias = async () => {
  * Recupera todas las incidencias reportadas por un empleado concreto.
  */
 export const obtenerIncidenciasTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`/incidencias/trabajador/${idTrabajador}`);
+  const respuesta = await api.get(`api/incidencias/trabajador/${idTrabajador}`);
   return respuesta.data;
 };
 
@@ -26,7 +26,7 @@ export const createIncidencia = async (data: {
   fecha: string;
   descripcion: string;
 }) => {
-  const respuesta = await api.post("/incidencias", data);
+  const respuesta = await api.post("api/incidencias", data);
   return respuesta.data;
 };
 
@@ -39,6 +39,6 @@ export const crearIncidencia = createIncidencia;
  * Modifica el estado de una incidencia abierta para marcarla como 'resuelta'.
  */
 export const resolverIncidencia = async (idIncidencia: number) => {
-  const respuesta = await api.put(`/incidencias/${idIncidencia}/resolver`);
+  const respuesta = await api.put(`api/incidencias/${idIncidencia}/resolver`);
   return respuesta.data;
 };

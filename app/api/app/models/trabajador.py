@@ -1,7 +1,14 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Table
 from sqlalchemy.orm import relationship 
 from core.database import Base
-from models.trabajador import trabajador_empresa 
+
+# Definición de las tablas Trabajador y Empresa con relación manytomany(muchos a muchos)
+trabajador_empresa = Table(
+    "trabajador_empresa",
+    Base.metadata,
+    Column("trabajador_id", Integer, ForeignKey("trabajadores.id")),
+    Column("empresa_id", Integer, ForeignKey("empresas.id"))
+)
 
 class Trabajador(Base):
     __tablename__ = "trabajadores"
@@ -29,10 +36,3 @@ class Trabajador(Base):
     # def get_trabajador(cls, id_trabajador: int):
     #     return cls.query.filter_by(id=id_trabajador).first()
 
-# Definición de las tablas Trabajador y Empresa con relación manytomany(muchos a muchos)
-trabajador_empresa = Table(
-    "trabajador_empresa",
-    Base.metadata,
-    Column("trabajador_id", Integer, ForeignKey("trabajadores.id")),
-    Column("empresa_id", Integer, ForeignKey("empresas.id"))
-)

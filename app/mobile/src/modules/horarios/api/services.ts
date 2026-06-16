@@ -4,7 +4,7 @@ import api from "../../../services/api/api.js";
  * Consulta y extrae la planificación semanal global absoluta de todo el sistema.
  */
 export const obtenerHorarios = async () => {
-  const respuesta = await api.get("/horarios");
+  const respuesta = await api.get("api/horarios");
   return respuesta.data;
 };
 
@@ -12,7 +12,7 @@ export const obtenerHorarios = async () => {
  * Recupera un cuadrante de horario específico utilizando su identificador único.
  */
 export const obtenerHorario = async (idHorario: number) => {
-  const respuesta = await api.get(`/horarios/${idHorario}`);
+  const respuesta = await api.get(`api/horarios/${idHorario}`);
   return respuesta.data;
 };
 
@@ -24,7 +24,7 @@ export const obtenerHorarioTrabajadorEmpresa = async (
   idEmpresa: number,
 ) => {
   const respuesta = await api.get(
-    `/horarios/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
+    `api/horarios/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
   );
   return respuesta.data;
 };
@@ -43,7 +43,7 @@ export const crearHorario = async (data: {
   hora_entrada2?: string;
   hora_salida2?: string;
 }) => {
-  const respuesta = await api.post("/horarios", data);
+  const respuesta = await api.post("api/horarios", data);
   return respuesta.data;
 };
 
@@ -51,6 +51,6 @@ export const crearHorario = async (data: {
  * Elimina un cuadrante de horario específico del sistema mediante su ID único.
  */
 export const eliminarHorario = async (idHorario: number) => {
-  const respuesta = await api.delete(`/horarios/${idHorario}`);
+  const respuesta = await api.delete(`api/horarios/${idHorario}`);
   return respuesta.data;
 };

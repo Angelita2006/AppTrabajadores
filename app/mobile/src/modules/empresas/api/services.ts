@@ -4,7 +4,7 @@ import api from "../../../services/api/api";
  * Obtiene el catálogo global de todas las empresas dadas de alta en la plataforma.
  */
 export const obtenerEmpresas = async () => {
-  const respuesta = await api.get("/empresas");
+  const respuesta = await api.get("api/empresas");
   return respuesta.data;
 };
 
@@ -12,7 +12,7 @@ export const obtenerEmpresas = async () => {
  * Recupera la información detallada de una empresa específica mediante su ID único.
  */
 export const obtenerEmpresa = async (idEmpresa: number) => {
-  const respuesta = await api.get(`/empresas/${idEmpresa}`);
+  const respuesta = await api.get(`api/empresas/${idEmpresa}`);
   return respuesta.data;
 };
 
@@ -27,7 +27,7 @@ export const crearEmpresa = async (data: {
   poblacion: string;
   provincia: string;
 }) => {
-  const respuesta = await api.post("/empresas", data);
+  const respuesta = await api.post("api/empresas", data);
   return respuesta.data;
 };
 
@@ -35,6 +35,6 @@ export const crearEmpresa = async (data: {
  * Recupera el listado completo de empleados vinculados a un centro de trabajo específico.
  */
 export const obtenerTrabajadoresEmpresa = async (idEmpresa: number) => {
-  const respuesta = await api.get(`/empresas/${idEmpresa}/trabajadores`);
+  const respuesta = await api.get(`api/empresas/${idEmpresa}/trabajadores`);
   return respuesta.data;
 };

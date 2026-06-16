@@ -152,7 +152,6 @@ function TabsNavigation() {
 
       <Tabs.Screen name="(protected)/fichajes" options={{ href: null }} />
       <Tabs.Screen name="(protected)/perfil" options={{ href: null }} />
-      <Tabs.Screen name="(protected)/_layout" options={{ href: null }} />
       <Tabs.Screen name="(public)/login" options={{ href: null }} />
       <Tabs.Screen name="(public)/registro" options={{ href: null }} />
       <Tabs.Screen
