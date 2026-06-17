@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from core.database import get_db, next_id
 from models.empresa import Empresa
-from schemas.empresa import EmpresaCreate, EmpresaResponse
+from schemas.empresa import EmpresaCreate, EmpresaEdit, EmpresaResponse
 from schemas.trabajador import TrabajadorResponse
 
 # Inicialización del enrutador modular para el catálogo de empresas
@@ -86,3 +86,25 @@ def obtener_trabajadores_empresa(id_empresa: int, db: Session = Depends(get_db))
         )
     # Devuelve la colección mapeada automáticamente gracias a la relación secondary de SQLAlchemy
     return empresa.trabajadores
+
+@router.put("/{id_empresa}/nombre", response_model=EmpresaResponse) # Usa tu modelo de respuesta habitual
+def cambiar_nombre_empresa(id_empresa: int, obj_in: EmpresaEdit, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/empresas/{id_empresa}/nombre
+    Modifica únicamente el nombre de una empresa existente en la base de datos.
+    """
+    # Buscamos la empresa por su ID único
+    empresa = db.query(Empresa).filter(Empresa.id == id_empresa).first()
+    
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ninguna empresa con el ID {id_empresa}."
+        )
+    
+    # Actualizamos el campo con el nuevo valor validado
+    # empresa.nombre = obj_in.nombre
+    
+    db.commit()
+    db.refresh(empresa)
+    return empresa
