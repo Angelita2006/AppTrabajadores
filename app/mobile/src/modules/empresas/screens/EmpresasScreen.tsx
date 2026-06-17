@@ -28,6 +28,8 @@ export default function EmpresasScreen() {
    * Utiliza useCallback para fijar la función en memoria e impedir renderizados infinitos.
    */
   const cargar = useCallback(async () => {
+    if (!trabajadorActual) return;
+
     const data = await obtenerEmpresas();
 
     // Si el usuario es administrador ve todo; si es empleado común solo ve donde está vinculado

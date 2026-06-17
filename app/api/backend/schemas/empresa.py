@@ -35,6 +35,9 @@ class EmpresaResponse(EmpresaBase):
         # Activa el modo ORM para que Pydantic pueda leer directamente los objetos de SQLAlchemy
         # (Permite mapear propiedades complejas de base de datos a formato JSON de forma automatica)
         from_attributes = True 
+    
+class EmpresaEdit(BaseModel):
+    nombre: str    
 
 # ejemplo: 
 # {

@@ -7,11 +7,12 @@
     "icon": "./assets/icons/icon.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
-    // "usesCleartextTraffic": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.tuusuario.fichapp",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/foreground-app-android.png",

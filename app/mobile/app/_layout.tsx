@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Alert, Pressable } from "react-native";
+import { Alert, Platform, Pressable } from "react-native";
 import {
   ProveedorTrabajador,
   useTrabajador,
@@ -70,7 +70,7 @@ function TabsNavigation() {
     >
       <Tabs.Screen
         name="(protected)/home"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Fichar",
           tabBarIcon: ({ color }) => (
@@ -82,7 +82,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/trabajadores"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Trabajadores",
           tabBarIcon: ({ color }) => (
@@ -104,7 +104,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/empresas"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Empresas",
           tabBarIcon: ({ color }) => (
@@ -116,7 +116,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/horarios"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Horarios",
           tabBarIcon: ({ color }) => (
@@ -128,7 +128,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/vacaciones"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Vacaciones",
           tabBarIcon: ({ color }) => (
@@ -140,7 +140,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/incidencias"
-        redirect={!tieneSesion}
+        redirect={Platform.OS === "web" ? false : !tieneSesion} // <-- En la web se salta el bloqueo inicial
         options={{
           title: "Incidencias",
           tabBarIcon: ({ color }) => (

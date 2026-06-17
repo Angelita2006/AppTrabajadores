@@ -159,8 +159,8 @@ export default function PerfilScreen() {
         </View>
 
         <ThemedText style={styles.help}>
-          Credenciales demo: admin@app.test / admin123 · carlos@app.test /
-          demo123
+          Credenciales demo: admin@example.com / admin123 · angelita@example.com
+          / password123
         </ThemedText>
       </Card>
 

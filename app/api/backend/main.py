@@ -7,6 +7,8 @@ app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, horarios, trabajadores y empresas de FICHAPP.",
     version="1.0.0",
+    docs_url=None,
+    redoc_url=None
 )
 
 # Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
