@@ -1,40 +1,47 @@
-from datetime import datetime
-from pydantic import BaseModel, Field
-from typing import Literal
+import datetime
+from pydantic import BaseModel, Field, IPvAnyAddress
+from typing import Optional
+from uuid import UUID
+from enums import AccionAuditoriaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
 
-class AuditoriaAccesosBase(BaseModel):
+class AuditoriaAccesoBase(BaseModel):
     """
-    Propiedades comunes compartidas para la validación de una auditoria de accesos.
+    Propiedades comunes compartidas para el registro legal de accesos y consultas,
+    basado en el modelo relacional inmutable mapeado por sqlacodegen.
     """
-    # idTrabajador: int = Field(..., description="ID del trabajador que realiza el marcaje")
-    # idEmpresa: int = Field(..., description="ID de la empresa donde se registra la jornada")
-    # # Restringe los textos válidos de forma estricta para que coincidan con tu EstadoFichaje de React Native
-    # tipo: Literal["entrada", "salida", "descanso", "fin_descanso"] = Field(
-    #     ..., description="Tipo de evento horario registrado"
-    # )
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente analizada (tenant)")
+    accion: AccionAuditoriaEnum = Field(..., description="Tipo de acción efectuada (consulta, exportacion, descarga, etc.)")
 
 
-class AuditoriaAccesosCreate(AuditoriaAccesosBase):
+class AuditoriaAccesoCreate(AuditoriaAccesoBase):
     """
-    Esquema utilizado para recibir los datos desde la app móvil al auditar un acceso.
-    No requiere campos de fecha u hora ya que el backend los calcula de forma automática.
+    Esquema utilizado de forma interna por el backend para registrar un evento
+    cada vez que alguien consulta, exporta o descarga registros de la jornada.
     """
-    pass  # Hereda los campos obligatorios de AuditoriaAccesosBase sin añadir nuevos
+    usuario_id: Optional[UUID] = Field(None, description="ID UUID del usuario que realiza la consulta")
+    trabajador_id: Optional[UUID] = Field(None, description="ID UUID del trabajador cuyo historial ha sido consultado")
+    detalle: Optional[dict] = Field(default_factory=dict, description="Bloque JSONB con metadatos técnicos adicionales de la acción")
+    ip_address: Optional[IPvAnyAddress] = Field(None, description="Dirección IP de red desde donde se efectúa el acceso")
 
 
-class AuditoriaAccesosResponse(AuditoriaAccesosBase):
+class AuditoriaAccesoResponse(AuditoriaAccesoBase):
     """
-    Esquema utilizado para moldear las respuestas JSON que el servidor envía a la app.
-    Incluye las marcas de tiempo temporales generadas por la base de datos.
+    Esquema utilizado para estructurar las respuestas JSON destinadas a los informes de auditoría,
+    representantes legales o Inspectores de Trabajo.
     """
-    # id: int = Field(..., description="Identificador único secuencial del registro")
-    # fecha: int = Field(..., description="Marca de tiempo numérica en milisegundos o segundos (timestamp)")
-    # fecha_hora: datetime = Field(..., description="Objeto de fecha y hora nativo del sistema")
+    id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
+    fecha_hora: datetime.datetime = Field(..., description="Marca de tiempo real e inmutable del acceso (now)")
+    
+    # Propiedades complementarias de trazabilidad relacional
+    usuario_id: Optional[UUID] = Field(None)
+    trabajador_id: Optional[UUID] = Field(None)
+    detalle: Optional[dict] = Field(None)
+    ip_address: Optional[IPvAnyAddress] = Field(None)
 
     class Config:
-        # Permite que Pydantic lea directamente las propiedades del objeto AuditoriaAccesos de SQLAlchemy
+        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

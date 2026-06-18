@@ -1,6 +1,7 @@
-from datetime import datetime
-from pydantic import BaseModel, Field
-from typing import Literal
+import datetime
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional
+from uuid import UUID
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
@@ -8,33 +9,42 @@ from typing import Literal
 
 class AsignacionTurnoBase(BaseModel):
     """
-    Propiedades comunes compartidas para la validación de una asignación de turno.
+    Propiedades comunes compartidas para la validación de una asignación de turno
+    basada en el modelo relacional mapeado por sqlacodegen.
     """
-    # idTrabajador: int = Field(..., description="ID del trabajador que realiza el marcaje")
-    # idEmpresa: int = Field(..., description="ID de la empresa donde se registra la jornada")
-    # # Restringe los textos válidos de forma estricta para que coincidan con tu EstadoFichaje de React Native
-    # tipo: Literal["entrada", "salida", "descanso", "fin_descanso"] = Field(
-    #     ..., description="Tipo de evento horario registrado"
-    # )
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador al que se le asigna el turno")
+    turno_id: UUID = Field(..., description="ID único UUID del turno laboral teórico asignado")
+    fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la vigencia del turno en formato AAAA-MM-DD")
 
 
 class AsignacionTurnoCreate(AsignacionTurnoBase):
     """
-    Esquema utilizado para recibir los datos desde la app móvil al asignar un turno.
-    No requiere campos de fecha u hora ya que el backend los calcula de forma automática.
+    Esquema utilizado para recibir los datos desde el cliente al asignar un cuadrante
+    o turno fijo a un empleado.
     """
-    pass  # Hereda los campos obligatorios de AsignacionTurnoBase sin añadir nuevos
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización de la vigencia del turno si aplica")
+
+    @model_validator(mode='after')
+    def validar_rango_fechas(self) -> 'AsignacionTurnoCreate':
+        """
+        Valida que la fecha de finalización sea igual o posterior a la fecha de inicio,
+        emulando la restricción CheckConstraint de la base de datos.
+        """
+        if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError("La fecha de finalización de la asignación no puede ser anterior a la fecha de inicio.")
+        return self
 
 
 class AsignacionTurnoResponse(AsignacionTurnoBase):
     """
-    Esquema utilizado para moldear las respuestas JSON que el servidor envía a la app.
-    Incluye las marcas de tiempo temporales generadas por la base de datos.
+    Esquema utilizado para estructurar las respuestas JSON que el servidor devuelve a la app
+    para pintar el calendario o la jornada teórica del operario.
     """
-    # id: int = Field(..., description="Identificador único secuencial del registro")
-    # fecha: int = Field(..., description="Marca de tiempo numérica en milisegundos o segundos (timestamp)")
-    # fecha_hora: datetime = Field(..., description="Objeto de fecha y hora nativo del sistema")
+    id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
+    
+    # Propiedades complementarias opcionales expuestas en el JSON
+    fecha_fin: Optional[datetime.date] = Field(None)
 
     class Config:
-        # Permite que Pydantic lea directamente las propiedades del objeto AsignacionTurno de SQLAlchemy
+        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

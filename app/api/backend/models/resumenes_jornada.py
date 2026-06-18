@@ -36,3 +36,5 @@ class ResumenesJornada(Base):
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='resumenes_jornada')
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='resumenes_jornada')
+
+    

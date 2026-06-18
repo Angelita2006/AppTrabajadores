@@ -1,40 +1,40 @@
-from datetime import datetime
+import datetime
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Optional
+from uuid import UUID
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
 
-class CalendariosLaboralesBase(BaseModel):
+class CalendarioLaboralBase(BaseModel):
     """
-    Propiedades comunes compartidas para la validación de un calendario laboral.
+    Propiedades comunes compartidas para la validación de un calendario laboral
+    basado en el modelo relacional mapeado por sqlacodegen.
     """
-    # idTrabajador: int = Field(..., description="ID del trabajador que realiza el marcaje")
-    # idEmpresa: int = Field(..., description="ID de la empresa donde se registra la jornada")
-    # # Restringe los textos válidos de forma estricta para que coincidan con tu EstadoFichaje de React Native
-    # tipo: Literal["entrada", "salida", "descanso", "fin_descanso"] = Field(
-    #     ..., description="Tipo de evento horario registrado"
-    # )
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+    anio: int = Field(..., ge=2000, le=2100, description="Año numérico correspondiente al calendario (SmallInteger)")
+    nombre: str = Field(..., max_length=150, description="Nombre descriptivo del calendario (Ej: 'Calendario de Oficinas 2026')")
 
 
-class CalendariosLaboralesCreate(CalendariosLaboralesBase):
+class CalendarioLaboralCreate(CalendarioLaboralBase):
     """
-    Esquema utilizado para recibir los datos desde la app móvil crearse un calendario laboral.
-    No requiere campos de fecha u hora ya que el backend los calcula de forma automática.
+    Esquema utilizado para recibir los datos desde el cliente al dar de alta un calendario.
+    Permite acotar el calendario a un centro de trabajo específico si fuera necesario.
     """
-    pass  # Hereda los campos obligatorios de CalendariosLaboralesBase sin añadir nuevos
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo si es un calendario específico")
 
 
-class CalendariosLaboralesResponse(CalendariosLaboralesBase):
+class CalendarioLaboralResponse(CalendarioLaboralBase):
     """
-    Esquema utilizado para moldear las respuestas JSON que el servidor envía a la app.
-    Incluye las marcas de tiempo temporales generadas por la base de datos.
+    Esquema utilizado para estructurar las respuestas JSON hacia la interfaz móvil o web.
     """
-    # id: int = Field(..., description="Identificador único secuencial del registro")
-    # fecha: int = Field(..., description="Marca de tiempo numérica en milisegundos o segundos (timestamp)")
-    # fecha_hora: datetime = Field(..., description="Objeto de fecha y hora nativo del sistema")
+    id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
+    created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
+    
+    # Propiedades complementarias opcionales expuestas en el JSON
+    centro_trabajo_id: Optional[UUID] = Field(None)
 
     class Config:
-        # Permite que Pydantic lea directamente las propiedades del objeto CalendariosLaborales de SQLAlchemy
+        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import JSON, Boolean, Column, Date, ForeignKey, Integer, PrimaryKeyConstraint, String, DateTime, Table, Text, UniqueConstraint, Uuid, text
+from sqlalchemy import JSON, Boolean, Date, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from auditoria_accesos import AuditoriaAccesos

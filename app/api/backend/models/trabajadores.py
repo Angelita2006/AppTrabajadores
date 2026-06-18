@@ -13,14 +13,6 @@ from fichajes import Fichajes
 from usuarios import Usuarios
 from resumenes_jornada import ResumenesJornada
 
-# Definición de las tablas Trabajador y Empresa con relación manytomany(muchos a muchos)
-# trabajador_empresa = Table(
-#     "trabajador_empresa",
-#     Base.metadata,
-#     Column("trabajador_id", Integer, ForeignKey("trabajadores.id")),
-#     Column("empresa_id", Integer, ForeignKey("empresas.id"))
-# )
-
 class Trabajadores(Base):
     __tablename__ = 'trabajadores'
     __table_args__ = (

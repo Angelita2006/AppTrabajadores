@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 # from core.database import Base, engine
-from routes import empresa, fichaje, horario, trabajador, vacacion, incidencia
+from routes import empresas, fichajes, trabajadores
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
@@ -24,12 +24,9 @@ app.add_middleware(
 )
 
 # Registro de las URIs y enrutadores modulares en el núcleo de la aplicación FastAPI
-app.include_router(empresa.router)
-app.include_router(fichaje.router)
-app.include_router(horario.router) 
-app.include_router(trabajador.router)
-app.include_router(vacacion.router)
-app.include_router(incidencia.router)
+app.include_router(empresas.router)
+app.include_router(fichajes.router)
+app.include_router(trabajadores.router)
 
 @app.get("/")
 def read_root():
