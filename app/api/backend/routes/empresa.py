@@ -2,9 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from core.database import get_db, next_id
-from models.empresa import Empresa
 from schemas.empresa import EmpresaCreate, EmpresaEdit, EmpresaResponse
 from schemas.trabajador import TrabajadorResponse
+
+import sys
+import os
+directorio_actual = os.path.dirname(os.path.abspath(__file__))
+directorio_hermano = os.path.join(directorio_actual, '..', 'models')
+sys.path.append(directorio_hermano)
+from empresas import Empresas
 
 # Inicialización del enrutador modular para el catálogo de empresas
 router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
@@ -17,7 +23,7 @@ def crear_empresa(obj_in: EmpresaCreate, db: Session = Depends(get_db)):
     """
     try:
         # Verifica si el CIF ya existe previamente en el sistema para evitar duplicados
-        empresa_existente = db.query(Empresa).filter(Empresa.cif == obj_in.cif).first()
+        empresa_existente = db.query(Empresas).filter(Empresas.cif == obj_in.cif).first()
         if empresa_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -25,8 +31,8 @@ def crear_empresa(obj_in: EmpresaCreate, db: Session = Depends(get_db)):
             )
 
         # Mapea los datos del esquema directamente al modelo físico de SQLAlchemy
-        nueva_empresa = Empresa(
-            id=next_id(Empresa), 
+        nueva_empresa = Empresas(
+            id=next_id(Empresas), 
             nombre=obj_in.nombre,
             cif=obj_in.cif,
             direccion=obj_in.direccion,
@@ -54,7 +60,7 @@ def obtener_empresas(db: Session = Depends(get_db)):
     URI: GET /api/empresas
     Devuelve el catálogo completo de todas las organizaciones registradas.
     """
-    return db.query(Empresa).all()
+    return db.query(Empresas).all()
 
 
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
@@ -63,7 +69,7 @@ def obtener_empresa(id_empresa: int, db: Session = Depends(get_db)):
     URI: GET /api/empresas/{id_empresa}
     Busca una organización específica mediante su identificador único.
     """
-    empresa = db.query(Empresa).filter(Empresa.id == id_empresa).first()
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -78,7 +84,7 @@ def obtener_trabajadores_empresa(id_empresa: int, db: Session = Depends(get_db))
     URI: GET /api/empresas/{id_empresa}/trabajadores
     Recupera el listado de empleados vinculados a través de la tabla intermedia muchos a muchos.
     """
-    empresa = db.query(Empresa).filter(Empresa.id == id_empresa).first()
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -94,7 +100,7 @@ def cambiar_nombre_empresa(id_empresa: int, obj_in: EmpresaEdit, db: Session = D
     Modifica únicamente el nombre de una empresa existente en la base de datos.
     """
     # Buscamos la empresa por su ID único
-    empresa = db.query(Empresa).filter(Empresa.id == id_empresa).first()
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     
     if not empresa:
         raise HTTPException(
