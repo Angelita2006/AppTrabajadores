@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
 from core.database import get_db, next_id
-from models.empresa import Empresa
-from models.fichaje import Fichaje
-from models.trabajador import Trabajador
+from empresas import Empresas
+from fichajes import Fichajes
+from trabajadores import Trabajadores
 from schemas.fichaje import FichajeCreate, FichajeResponse
 
 # Inicialización del enrutador modular para el control horario
@@ -18,7 +18,7 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
     Registra un evento de jornada (entrada, salida o descanso) calculando el tiempo en el servidor.
     """
     # 1. Validaciones de seguridad: Verifica que el trabajador exista
-    trabajador = db.query(Trabajador).filter(Trabajador.id == obj_in.idTrabajador).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.idTrabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -26,7 +26,7 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
         )
     
     # 2. Validaciones de seguridad: Verifica que la empresa exista
-    empresa = db.query(Empresa).filter(Empresa.id == obj_in.idEmpresa).first()
+    empresa = db.query(Empresas).filter(Empresas.id == obj_in.idEmpresa).first()
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -36,8 +36,8 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
     ahora = datetime.now()
 
     # 3. Mapeo y guardado en la base de datos
-    nuevo_fichaje = Fichaje(
-        id=next_id(Fichaje), 
+    nuevo_fichaje = Fichajes(
+        id=next_id(Fichajes), 
         idTrabajador=obj_in.idTrabajador,
         idEmpresa=obj_in.idEmpresa,
         tipo=obj_in.tipo,
@@ -52,15 +52,13 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
     db.refresh(nuevo_fichaje)
     return nuevo_fichaje
 
-
 @router.get("", response_model=List[FichajeResponse])
 def obtener_fichajes(db: Session = Depends(get_db)):
     """
     URI: GET /api/fichajes
     Devuelve el historial global absoluto de todos los fichajes de la plataforma.
     """
-    return db.query(Fichaje).all()
-
+    return db.query(Fichajes).all()
 
 @router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}", response_model=List[FichajeResponse])
 def obtener_fichajes_trabajador_empresa(id_trabajador: int, id_empresa: int, db: Session = Depends(get_db)):
@@ -69,14 +67,14 @@ def obtener_fichajes_trabajador_empresa(id_trabajador: int, id_empresa: int, db:
     Recupera el historial cronológico de marcajes del día de hoy para un usuario y organización particulares.
     """
     # Verifica la existencia de las entidades antes de realizar el volcado de datos
-    trabajador = db.query(Trabajador).filter(Trabajador.id == id_trabajador).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador ({id_trabajador}) no encontrado."
         )
     
-    empresa = db.query(Empresa).filter(Empresa.id == id_empresa).first()
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -84,11 +82,10 @@ def obtener_fichajes_trabajador_empresa(id_trabajador: int, id_empresa: int, db:
         )
 
     # Realiza la consulta filtrando por ambas llaves foráneas
-    return db.query(Fichaje).filter(
-        Fichaje.idTrabajador == id_trabajador,
-        Fichaje.idEmpresa == id_empresa
+    return db.query(Fichajes).filter(
+        Fichajes.idTrabajador == id_trabajador,
+        Fichajes.idEmpresa == id_empresa
     ).all()
-
 
 @router.get("/{id_fichaje}", response_model=FichajeResponse)
 def obtener_fichaje(id_fichaje: int, db: Session = Depends(get_db)):
@@ -96,7 +93,7 @@ def obtener_fichaje(id_fichaje: int, db: Session = Depends(get_db)):
     URI: GET /api/fichajes/{id_fichaje}
     Busca un evento de fichaje específico mediante su identificador único.
     """
-    fichaje = db.query(Fichaje).filter(Fichaje.id == id_fichaje).first()
+    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
     if not fichaje:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -104,14 +101,13 @@ def obtener_fichaje(id_fichaje: int, db: Session = Depends(get_db)):
         )
     return fichaje
 
-
 @router.delete("/{id_fichaje}", status_code=status.HTTP_200_OK)
 def eliminar_fichaje(id_fichaje: int, db: Session = Depends(get_db)):
     """
     URI: DELETE /api/fichajes/{id_fichaje}
     Elimina permanentemente un fichaje del registro de la base de datos utilizando su ID.
     """
-    fichaje = db.query(Fichaje).filter(Fichaje.id == id_fichaje).first()
+    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
     if not fichaje:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

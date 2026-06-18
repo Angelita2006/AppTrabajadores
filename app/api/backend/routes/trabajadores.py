@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from core.database import get_db, next_id
-from models.trabajador import Trabajador
+from trabajadores import Trabajadores
 from schemas.trabajador import TrabajadorCreate, TrabajadorResponse, LoginRequest
 from schemas.empresa import EmpresaResponse
 
@@ -16,7 +16,7 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
     Registra un nuevo empleado en la base de datos comprobando que el email y DNI sean únicos.
     """
     # 1. Comprobación de seguridad: Verifica que el email no esté registrado
-    email_existente = db.query(Trabajador).filter(Trabajador.email == obj_in.email).first()
+    email_existente = db.query(Trabajadores).filter(Trabajadores.email == obj_in.email).first()
     if email_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -24,7 +24,7 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
         )
 
     # 2. Comprobación de seguridad: Verifica que el DNI no esté duplicado
-    dni_existente = db.query(Trabajador).filter(Trabajador.dni == obj_in.dni).first()
+    dni_existente = db.query(Trabajadores).filter(Trabajadores.dni == obj_in.dni).first()
     if dni_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -32,8 +32,8 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
         )
 
     # 3. Mapeo de Pydantic al modelo de SQLAlchemy
-    nuevo_trabajador = Trabajador(
-        id=next_id(Trabajador),
+    nuevo_trabajador = Trabajadores(
+        id=next_id(Trabajadores),
         role=obj_in.role if obj_in.role else "user",
         estado=obj_in.estado if obj_in.estado else "Activo",
         nombre=obj_in.nombre,
@@ -54,7 +54,6 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
     db.refresh(nuevo_trabajador)
     return nuevo_trabajador
 
-
 @router.post("/login", response_model=TrabajadorResponse)
 def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
     """
@@ -62,8 +61,8 @@ def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
     Valida el correo y la contraseña contra los registros de la base de datos real.
     """
     # Busca el usuario por el correo (normalizando a minúsculas)
-    trabajador = db.query(Trabajador).filter(
-        Trabajador.email == credenciales.email
+    trabajador = db.query(Trabajadores).filter(
+        Trabajadores.email == credenciales.email
     ).first()
 
     # Validación de seguridad cruzada: si no existe o la clave no coincide, lanza error 401
@@ -75,15 +74,13 @@ def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
 
     return trabajador
 
-
 @router.get("", response_model=List[TrabajadorResponse])
 def obtener_trabajadores(db: Session = Depends(get_db)):
     """
     URI: GET /api/trabajadores
     Devuelve la plantilla completa de todos los empleados del sistema.
     """
-    return db.query(Trabajador).all()
-
+    return db.query(Trabajadores).all()
 
 @router.get("/{id_trabajador}", response_model=TrabajadorResponse)
 def obtener_trabajador(id_trabajador: int, db: Session = Depends(get_db)):
@@ -91,7 +88,7 @@ def obtener_trabajador(id_trabajador: int, db: Session = Depends(get_db)):
     URI: GET /api/trabajadores/{id_trabajador}
     Busca los detalles de un empleado por su identificador único.
     """
-    trabajador = db.query(Trabajador).filter(Trabajador.id == id_trabajador).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -99,14 +96,13 @@ def obtener_trabajador(id_trabajador: int, db: Session = Depends(get_db)):
         )
     return trabajador
 
-
 @router.get("/{id_trabajador}/empresas", response_model=List[EmpresaResponse])
 def obtener_empresas_trabajador(id_trabajador: int, db: Session = Depends(get_db)):
     """
     URI: GET /api/trabajadores/{id_trabajador}/empresas
     Recupera la lista de organizaciones vinculadas al empleado a través de la relación de muchos a muchos.
     """
-    trabajador = db.query(Trabajador).filter(Trabajador.id == id_trabajador).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

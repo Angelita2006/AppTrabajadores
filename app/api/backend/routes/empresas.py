@@ -4,12 +4,6 @@ from typing import List
 from core.database import get_db, next_id
 from schemas.empresa import EmpresaCreate, EmpresaEdit, EmpresaResponse
 from schemas.trabajador import TrabajadorResponse
-
-import sys
-import os
-directorio_actual = os.path.dirname(os.path.abspath(__file__))
-directorio_hermano = os.path.join(directorio_actual, '..', 'models')
-sys.path.append(directorio_hermano)
 from empresas import Empresas
 
 # Inicialización del enrutador modular para el catálogo de empresas
@@ -53,7 +47,6 @@ def crear_empresa(obj_in: EmpresaCreate, db: Session = Depends(get_db)):
             detail=f"Ha ocurrido un error al crear la empresa: {str(error)}"
         )
 
-
 @router.get("", response_model=List[EmpresaResponse])
 def obtener_empresas(db: Session = Depends(get_db)):
     """
@@ -61,7 +54,6 @@ def obtener_empresas(db: Session = Depends(get_db)):
     Devuelve el catálogo completo de todas las organizaciones registradas.
     """
     return db.query(Empresas).all()
-
 
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
 def obtener_empresa(id_empresa: int, db: Session = Depends(get_db)):
@@ -76,7 +68,6 @@ def obtener_empresa(id_empresa: int, db: Session = Depends(get_db)):
             detail=f"Empresa con ID {id_empresa} no encontrada."
         )
     return empresa
-
 
 @router.get("/{id_empresa}/trabajadores", response_model=List[TrabajadorResponse])
 def obtener_trabajadores_empresa(id_empresa: int, db: Session = Depends(get_db)):
