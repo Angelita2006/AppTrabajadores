@@ -5,12 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyCo
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
-
-from empresas import Empresas
 from enums import EstadoCorreccionEnum, TipoCorreccionEnum
-from fichajes import Fichajes
-from trabajadores import Trabajadores
-from usuarios import Usuarios
 
 class CorreccionesFichaje(Base):
     __tablename__ = 'correcciones_fichaje'
@@ -42,8 +37,8 @@ class CorreccionesFichaje(Base):
     aprobado_por_usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     fecha_resolucion: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
 
-    aprobado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[aprobado_por_usuario_id], back_populates='correcciones_fichaje_aprobado_por_usuario')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='correcciones_fichaje')
-    fichaje_afectado: Mapped[Optional['Fichajes']] = relationship('Fichajes', back_populates='correcciones_fichaje')
-    solicitado_por_usuario: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[solicitado_por_usuario_id], back_populates='correcciones_fichaje_solicitado_por_usuario')
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='correcciones_fichaje')
+    aprobado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[aprobado_por_usuario_id], back_populates='correcciones_fichaje_aprobado_por_usuario') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='correcciones_fichaje') # type: ignore
+    fichaje_afectado: Mapped[Optional['Fichajes']] = relationship('Fichajes', back_populates='correcciones_fichaje') # type: ignore
+    solicitado_por_usuario: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[solicitado_por_usuario_id], back_populates='correcciones_fichaje_solicitado_por_usuario') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='correcciones_fichaje') # type: ignore

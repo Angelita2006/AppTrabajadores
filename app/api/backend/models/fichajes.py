@@ -4,15 +4,8 @@ from typing import Any, Optional
 import uuid
 from sqlalchemy import INT, CheckConstraint, DateTime, Enum, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from centros_trabajo import CentrosTrabajo
 from core.database import Base
-from correcciones_fichaje import CorreccionesFichaje
-from dispositivos_fichaje import DispositivosFichaje
-from empresas import Empresas
 from enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
-from motivos_pausa import MotivosPausa
-from tipos_evento_fichaje import TiposEventoFichaje
-from trabajadores import Trabajadores
 
 class Fichajes(Base):
     __tablename__ = 'fichajes'
@@ -57,12 +50,12 @@ class Fichajes(Base):
     fichaje_sustituido_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     observaciones: Mapped[Optional[str]] = mapped_column(Text)
 
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='fichajes')
-    dispositivo: Mapped[Optional['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='fichajes')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='fichajes')
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='fichajes') # type: ignore
+    dispositivo: Mapped[Optional['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='fichajes') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='fichajes') # type: ignore
     fichaje_sustituido: Mapped[Optional['Fichajes']] = relationship('Fichajes', remote_side=[id], back_populates='fichaje_sustituido_reverse')
     fichaje_sustituido_reverse: Mapped[list['Fichajes']] = relationship('Fichajes', remote_side=[fichaje_sustituido_id], back_populates='fichaje_sustituido')
-    motivo_pausa: Mapped[Optional['MotivosPausa']] = relationship('MotivosPausa', back_populates='fichajes')
-    tipo_evento: Mapped['TiposEventoFichaje'] = relationship('TiposEventoFichaje', back_populates='fichajes')
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='fichajes')
-    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='fichaje_afectado')
+    motivo_pausa: Mapped[Optional['MotivosPausa']] = relationship('MotivosPausa', back_populates='fichajes') # type: ignore
+    tipo_evento: Mapped['TiposEventoFichaje'] = relationship('TiposEventoFichaje', back_populates='fichajes') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='fichajes') # type: ignore
+    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='fichaje_afectado') # type: ignore

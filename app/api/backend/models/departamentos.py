@@ -3,10 +3,7 @@ from typing import Optional
 import uuid
 from sqlalchemy import DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from centros_trabajo import CentrosTrabajo
-from contratos import Contratos
 from core.database import Base
-from empresas import Empresas
 
 class Departamentos(Base):
     __tablename__ = 'departamentos'
@@ -23,6 +20,6 @@ class Departamentos(Base):
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     centro_trabajo_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
 
-    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='departamentos')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='departamentos')
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='departamento')
+    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='departamentos') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='departamentos') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='departamento') # type: ignore

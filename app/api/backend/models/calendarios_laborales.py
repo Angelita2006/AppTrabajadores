@@ -3,10 +3,7 @@ from typing import Optional
 import uuid
 from sqlalchemy import DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from centros_trabajo import CentrosTrabajo
 from core.database import Base
-from empresas import Empresas
-from festivos import Festivos
 
 class CalendariosLaborales(Base):
     __tablename__ = 'calendarios_laborales'
@@ -23,6 +20,6 @@ class CalendariosLaborales(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     centro_trabajo_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
 
-    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='calendarios_laborales')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='calendarios_laborales')
-    festivos: Mapped[list['Festivos']] = relationship('Festivos', back_populates='calendario')
+    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='calendarios_laborales') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='calendarios_laborales') # type: ignore
+    festivos: Mapped[list['Festivos']] = relationship('Festivos', back_populates='calendario') # type: ignore

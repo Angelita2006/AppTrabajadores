@@ -4,7 +4,6 @@ from sqlalchemy import ARRAY, CheckConstraint, ForeignKeyConstraint, PrimaryKeyC
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from asignaciones_turno import AsignacionesTurno
 from core.database import Base
-from empresas import Empresas
 
 class Turnos(Base):
     __tablename__ = 'turnos'
@@ -24,5 +23,5 @@ class Turnos(Base):
     dias_semana: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger()), nullable=False, comment='Días de la semana en que aplica el turno: 1=lunes ... 7=domingo.')
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='turnos')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='turnos') # type: ignore
     asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='turno')

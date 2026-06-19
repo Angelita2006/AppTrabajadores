@@ -4,8 +4,6 @@ import uuid
 from sqlalchemy import Boolean, Date, DateTime, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from empresas import Empresas
-from trabajadores import Trabajadores
 
 class ResumenesJornada(Base):
     __tablename__ = 'resumenes_jornada'
@@ -34,7 +32,7 @@ class ResumenesJornada(Base):
     hora_entrada: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     hora_salida: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='resumenes_jornada')
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='resumenes_jornada')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='resumenes_jornada') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='resumenes_jornada') # type: ignore
 
     

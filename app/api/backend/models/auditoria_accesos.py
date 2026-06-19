@@ -5,10 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyCo
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from empresas import Empresas
 from enums import AccionAuditoriaEnum
-from trabajadores import Trabajadores
-from usuarios import Usuarios
 
 class AuditoriaAccesos(Base):
     __tablename__ = 'auditoria_accesos'
@@ -35,6 +32,6 @@ class AuditoriaAccesos(Base):
     detalle: Mapped[Optional[dict]] = mapped_column(JSONB)
     ip_address: Mapped[Optional[Any]] = mapped_column(INET)
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='auditoria_accesos')
-    trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', back_populates='auditoria_accesos')
-    usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='auditoria_accesos')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='auditoria_accesos') # type: ignore
+    trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', back_populates='auditoria_accesos') # type: ignore
+    usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='auditoria_accesos') # type: ignore

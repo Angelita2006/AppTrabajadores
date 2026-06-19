@@ -2,15 +2,9 @@ import datetime
 from typing import Optional
 import uuid
 from sqlalchemy import Boolean, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, Text, UniqueConstraint, Uuid, text
-from calendarios_laborales import CalendariosLaborales
-from contratos import Contratos
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from departamentos import Departamentos
-from dispositivos_fichaje import DispositivosFichaje
-from empresas import Empresas
-from fichajes import Fichajes
 
 class CentrosTrabajo(Base):
     __tablename__ = 'centros_trabajo'
@@ -29,10 +23,10 @@ class CentrosTrabajo(Base):
     codigo_ccc: Mapped[Optional[str]] = mapped_column(String(20), comment='Código de Cuenta de Cotización a la Seguridad Social del centro, si aplica.')
     direccion: Mapped[Optional[str]] = mapped_column(Text)
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='centros_trabajo')
-    calendarios_laborales: Mapped[list['CalendariosLaborales']] = relationship('CalendariosLaborales', back_populates='centro_trabajo')
-    departamentos: Mapped[list['Departamentos']] = relationship('Departamentos', back_populates='centro_trabajo')
-    dispositivos_fichaje: Mapped[list['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='centro_trabajo')
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='centro_trabajo')
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='centro_trabajo')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='centros_trabajo') # type: ignore
+    calendarios_laborales: Mapped[list['CalendariosLaborales']] = relationship('CalendariosLaborales', back_populates='centro_trabajo') # type: ignore
+    departamentos: Mapped[list['Departamentos']] = relationship('Departamentos', back_populates='centro_trabajo') # type: ignore
+    dispositivos_fichaje: Mapped[list['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='centro_trabajo') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='centro_trabajo') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='centro_trabajo') # type: ignore
 

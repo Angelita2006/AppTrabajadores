@@ -2,7 +2,6 @@ from sqlalchemy import Boolean, PrimaryKeyConstraint, SmallInteger, String, Uniq
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from fichajes import Fichajes
 
 class TiposEventoFichaje(Base):
     __tablename__ = 'tipos_evento_fichaje'
@@ -17,4 +16,4 @@ class TiposEventoFichaje(Base):
     descripcion: Mapped[str] = mapped_column(String(150), nullable=False)
     computa_como_trabajo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
 
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='tipo_evento')
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='tipo_evento') # type: ignore

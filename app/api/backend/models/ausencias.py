@@ -6,9 +6,6 @@ from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKeyConstrai
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from backend.models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
-from empresas import Empresas
-from trabajadores import Trabajadores
-from usuarios import Usuarios
 
 class Ausencias(Base):
     __tablename__ = 'ausencias'
@@ -44,6 +41,6 @@ class Ausencias(Base):
     observaciones_admin: Mapped[Optional[str]] = mapped_column(Text, comment='Notas añadidas por el validador al aprobar/rechazar.')
 
     # Relaciones del ORM
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='ausencias')
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='ausencias')
-    validado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='ausencias') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='ausencias') # type: ignore
+    validado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas') # type: ignore

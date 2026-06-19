@@ -4,8 +4,6 @@ import uuid
 from sqlalchemy import CheckConstraint, Date, ForeignKeyConstraint, PrimaryKeyConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from trabajadores import Trabajadores
-from turnos import Turnos
 
 class AsignacionesTurno(Base):
     __tablename__ = 'asignaciones_turno'
@@ -22,5 +20,5 @@ class AsignacionesTurno(Base):
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date)
 
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='asignaciones_turno')
-    turno: Mapped['Turnos'] = relationship('Turnos', back_populates='asignaciones_turno')
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='asignaciones_turno') # type: ignore
+    turno: Mapped['Turnos'] = relationship('Turnos', back_populates='asignaciones_turno') # type: ignore

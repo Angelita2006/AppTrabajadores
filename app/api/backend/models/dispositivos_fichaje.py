@@ -3,11 +3,8 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from centros_trabajo import CentrosTrabajo
 from core.database import Base
-from empresas import Empresas
 from enums import MetodoFichajeEnum
-from fichajes import Fichajes
 
 class DispositivosFichaje(Base):
     __tablename__ = 'dispositivos_fichaje'
@@ -32,6 +29,6 @@ class DispositivosFichaje(Base):
     centro_trabajo_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     ubicacion: Mapped[Optional[str]] = mapped_column(String(255))
 
-    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='dispositivos_fichaje')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='dispositivos_fichaje')
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='dispositivo')
+    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='dispositivos_fichaje') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='dispositivos_fichaje') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='dispositivo') # type: ignore

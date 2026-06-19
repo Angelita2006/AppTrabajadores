@@ -3,9 +3,6 @@ import uuid
 from sqlalchemy import ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from empresas import Empresas
-from roles import Roles
-from usuarios import Usuarios
 
 class UsuariosRoles(Base):
     __tablename__ = 'usuarios_roles'
@@ -22,6 +19,6 @@ class UsuariosRoles(Base):
     role_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, comment='Ámbito del rol. NULL = aplica a todas las empresas que gestiona el usuario (típico de personal de gestoría).')
 
-    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios_roles')
-    role: Mapped['Roles'] = relationship('Roles', back_populates='usuarios_roles')
-    usuario: Mapped['Usuarios'] = relationship('Usuarios', back_populates='usuarios_roles')
+    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios_roles') # type: ignore
+    role: Mapped['Roles'] = relationship('Roles', back_populates='usuarios_roles') # type: ignore
+    usuario: Mapped['Usuarios'] = relationship('Usuarios', back_populates='usuarios_roles') # type: ignore

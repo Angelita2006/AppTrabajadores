@@ -3,15 +3,7 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, DateTime, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from asignaciones_turno import AsignacionesTurno
-from auditoria_accesos import AuditoriaAccesos
-from contratos import Contratos
 from core.database import Base
-from correcciones_fichaje import CorreccionesFichaje
-from empresas import Empresas
-from fichajes import Fichajes
-from resumenes_jornada import ResumenesJornada
-from usuarios import Usuarios
 
 class Trabajadores(Base):
     __tablename__ = 'trabajadores'
@@ -40,11 +32,11 @@ class Trabajadores(Base):
     fecha_nacimiento: Mapped[Optional[datetime.date]] = mapped_column(Date)
     fecha_baja_empresa: Mapped[Optional[datetime.date]] = mapped_column(Date)
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores')
-    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador')
-    resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='trabajador')
-    usuarios: Mapped[Optional['Usuarios']] = relationship('Usuarios', uselist=False, back_populates='trabajador')
-    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='trabajador')
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='trabajador')
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='trabajador')
-    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='trabajador')
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores') # type: ignore
+    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador') # type: ignore
+    resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='trabajador') # type: ignore
+    usuarios: Mapped[Optional['Usuarios']] = relationship('Usuarios', uselist=False, back_populates='trabajador') # type: ignore
+    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='trabajador') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='trabajador') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='trabajador') # type: ignore
+    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='trabajador') # type: ignore

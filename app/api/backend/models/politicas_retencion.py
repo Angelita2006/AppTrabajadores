@@ -4,7 +4,6 @@ from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from empresas import Empresas
 from enums import AccionRetencionEnum
 
 class PoliticasRetencion(Base):
@@ -24,4 +23,4 @@ class PoliticasRetencion(Base):
     accion_tras_periodo: Mapped[AccionRetencionEnum] = mapped_column(Enum(AccionRetencionEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_retencion_enum'), nullable=False, server_default=text("'archivar'::accion_retencion_enum"))
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
 
-    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='politicas_retencion')
+    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='politicas_retencion') # type: ignore

@@ -3,7 +3,6 @@ from typing import Optional
 import uuid
 from sqlalchemy import Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from calendarios_laborales import CalendariosLaborales
 from core.database import Base
 
 class Festivos(Base):
@@ -20,4 +19,4 @@ class Festivos(Base):
     tipo: Mapped[str] = mapped_column(String(30), nullable=False, server_default=text("'nacional'::character varying"))
     descripcion: Mapped[Optional[str]] = mapped_column(String(255))
 
-    calendario: Mapped['CalendariosLaborales'] = relationship('CalendariosLaborales', back_populates='festivos')
+    calendario: Mapped['CalendariosLaborales'] = relationship('CalendariosLaborales', back_populates='festivos') # type: ignore

@@ -4,12 +4,8 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, Numeric, PrimaryKeyConstraint, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from centros_trabajo import CentrosTrabajo
 from core.database import Base
-from departamentos import Departamentos
-from empresas import Empresas
 from enums import TipoContratoEnum, TipoJornadaEnum
-from trabajadores import Trabajadores
 
 class Contratos(Base):
     __tablename__ = 'contratos'
@@ -39,7 +35,7 @@ class Contratos(Base):
     categoria_profesional: Mapped[Optional[str]] = mapped_column(String(150))
     fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date)
 
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='contratos')
-    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos')
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos')
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos')
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='contratos') # type: ignore
+    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos') # type: ignore
