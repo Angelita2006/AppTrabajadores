@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from core.database import get_db
-from permisos import Permisos
+from models.permisos import Permisos
 from schemas.permisos import PermisoCreate, PermisoResponse
 
 router = APIRouter(prefix="/api/permisos", tags=["Permisos del Sistema"])

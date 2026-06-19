@@ -4,13 +4,13 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from enums import EstadoCorreccionEnum
 from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFichajeResponse
-from trabajadores import Trabajadores
-from usuarios import Usuarios
-from fichajes import Fichajes
-from correcciones_fichaje import CorreccionesFichaje
+from models.trabajadores import Trabajadores
+from models.usuarios import Usuarios
+from models.fichajes import Fichajes
+from models.correcciones_fichaje import CorreccionesFichaje
 
 router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
 

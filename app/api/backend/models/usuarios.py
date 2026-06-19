@@ -3,7 +3,6 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from auditoria_accesos import AuditoriaAccesos
 from core.database import Base
 from enums import TipoUsuarioEnum
 
@@ -32,7 +31,7 @@ class Usuarios(Base):
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios') # type: ignore
     trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', back_populates='usuarios') # type: ignore
-    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='usuario')
+    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='usuario') # type: ignore
     usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='usuario') # type: ignore
     correcciones_fichaje_aprobado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.aprobado_por_usuario_id]', back_populates='aprobado_por_usuario') # type: ignore
     correcciones_fichaje_solicitado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.solicitado_por_usuario_id]', back_populates='solicitado_por_usuario') # type: ignore

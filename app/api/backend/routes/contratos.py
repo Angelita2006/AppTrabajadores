@@ -4,12 +4,12 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from schemas.contratos import ContratoCreate, ContratoResponse
-from trabajadores import Trabajadores
-from centros_trabajo import CentrosTrabajo
-from departamentos import Departamentos
-from contratos import Contratos
+from models.trabajadores import Trabajadores
+from models.centros_trabajo import CentrosTrabajo
+from models.departamentos import Departamentos
+from models.contratos import Contratos
 
 router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
 

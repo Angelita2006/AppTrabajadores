@@ -4,10 +4,10 @@ from datetime import datetime, date
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from schemas.resumenes_jornada import ResumenJornadaCreate, ResumenJornadaResponse
-from trabajadores import Trabajadores
-from resumenes_jornada import ResumenesJornada
+from models.trabajadores import Trabajadores
+from models.resumenes_jornada import ResumenesJornada
 
 router = APIRouter(prefix="/api/resumenes-jornada", tags=["Resúmenes de Jornada"])
 

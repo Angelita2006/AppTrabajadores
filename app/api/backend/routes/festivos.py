@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from calendarios_laborales import CalendariosLaborales
-from festivos import Festivos
+from models.calendarios_laborales import CalendariosLaborales
+from models.festivos import Festivos
 from schemas.festivos import FestivoCreate, FestivoResponse
 
 router = APIRouter(prefix="/api/festivos", tags=["Festivos"])

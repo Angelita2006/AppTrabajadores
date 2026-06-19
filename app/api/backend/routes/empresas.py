@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from schemas.empresas import EmpresaCreate, EmpresaResponse
 from schemas.trabajadores import TrabajadorResponse
 

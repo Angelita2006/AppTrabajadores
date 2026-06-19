@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from schemas.auditoria_accesos import AuditoriaAccesoCreate, AuditoriaAccesoResponse
-from trabajadores import Trabajadores
-from usuarios import Usuarios
-from auditoria_accesos import AuditoriaAccesos
+from models.trabajadores import Trabajadores
+from models.usuarios import Usuarios
+from models.auditoria_accesos import AuditoriaAccesos
 
 router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos"])
 

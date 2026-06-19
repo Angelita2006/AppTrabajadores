@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from uuid import UUID
-from enums import TipoUsuarioEnum
+from models.enums import TipoUsuarioEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

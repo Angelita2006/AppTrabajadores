@@ -2,7 +2,6 @@ import datetime
 import uuid
 from sqlalchemy import ARRAY, CheckConstraint, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, DateTime, Time, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from asignaciones_turno import AsignacionesTurno
 from core.database import Base
 
 class Turnos(Base):
@@ -24,4 +23,4 @@ class Turnos(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='turnos') # type: ignore
-    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='turno')
+    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='turno') # type: ignore

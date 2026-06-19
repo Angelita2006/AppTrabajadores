@@ -1,17 +1,8 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
-from core.database import get_db
-from empresas import Empresas
-from turnos import Turnos
-
-# Inicialización del enrutador modular para el catálogo de turnos teóricos
-router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
-
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
@@ -31,7 +22,6 @@ class TurnoBase(BaseModel):
         ..., 
         description="Días laborables del turno. Formato: 1=lunes, 2=martes ... 7=domingo"
     )
-
 
 class TurnoCreate(TurnoBase):
     """
@@ -53,7 +43,6 @@ class TurnoCreate(TurnoBase):
                 raise ValueError(f"El valor de día '{dia}' no es válido. Debe estar comprendido entre 1 (lunes) y 7 (domingo).")
                 
         return sorted(list(set(valores)))
-
 
 class TurnoResponse(TurnoBase):
     """

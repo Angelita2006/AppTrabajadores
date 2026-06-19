@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
+from models.empresas import Empresas
 from schemas.turnos import TurnoCreate, TurnoResponse
-from turnos import Turnos
+from models.turnos import Turnos
 
 router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
 

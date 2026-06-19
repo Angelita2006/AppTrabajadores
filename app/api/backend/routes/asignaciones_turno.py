@@ -5,9 +5,9 @@ from typing import List
 from uuid import UUID
 from core.database import get_db
 from schemas.asignaciones_turno import AsignacionTurnoCreate, AsignacionTurnoResponse
-from trabajadores import Trabajadores
-from turnos import Turnos
-from asignaciones_turno import AsignacionesTurno
+from models.trabajadores import Trabajadores
+from models.turnos import Turnos
+from models.asignaciones_turno import AsignacionesTurno
 
 router = APIRouter(prefix="/api/asignaciones-turno", tags=["Asignaciones de Turno"])
 

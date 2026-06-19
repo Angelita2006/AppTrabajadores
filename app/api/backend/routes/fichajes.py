@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
-from fichajes import Fichajes
+from models.empresas import Empresas
+from models.fichajes import Fichajes
 from schemas.fichajes import FichajeCreate, FichajeResponse
-from trabajadores import Trabajadores
+from models.trabajadores import Trabajadores
 
 router = APIRouter(prefix="/api/fichajes", tags=["Fichajes"])
 

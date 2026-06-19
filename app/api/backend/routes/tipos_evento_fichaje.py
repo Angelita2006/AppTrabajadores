@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from core.database import get_db
 from schemas.tipos_evento_fichaje import TipoEventoFichajeCreate, TipoEventoFichajeResponse
-from tipos_evento_fichaje import TiposEventoFichaje
+from models.tipos_evento_fichaje import TiposEventoFichaje
 
 router = APIRouter(prefix="/api/tipos-evento-fichaje", tags=["Tipos de Evento de Fichaje"])
 

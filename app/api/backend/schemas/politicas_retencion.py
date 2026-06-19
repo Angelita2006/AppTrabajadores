@@ -1,8 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
-
-from enums import AccionRetencionEnum
+from models.enums import AccionRetencionEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

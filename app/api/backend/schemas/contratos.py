@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from uuid import UUID
-from enums import TipoContratoEnum, TipoJornadaEnum
+from models.enums import TipoContratoEnum, TipoJornadaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

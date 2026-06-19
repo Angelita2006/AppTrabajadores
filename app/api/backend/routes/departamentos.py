@@ -3,11 +3,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
 from uuid import UUID
-
 from core.database import get_db
-from empresas import Empresas
-from centros_trabajo import CentrosTrabajo
-from departamentos import Departamentos
+from models.empresas import Empresas
+from models.centros_trabajo import CentrosTrabajo
+from models.departamentos import Departamentos
 from schemas.departamentos import DepartamentoCreate, DepartamentoResponse
 
 router = APIRouter(prefix="/api/departamentos", tags=["Departamentos"])

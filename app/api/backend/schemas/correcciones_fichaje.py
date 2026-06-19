@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
-from enums import TipoCorreccionEnum, EstadoCorreccionEnum
+from models.enums import TipoCorreccionEnum, EstadoCorreccionEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

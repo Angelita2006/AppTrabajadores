@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
-from politicas_retencion import PoliticasRetencion
+from models.empresas import Empresas
+from models.politicas_retencion import PoliticasRetencion
 from schemas.politicas_retencion import PoliticaRetencionCreate, PoliticaRetencionResponse
 
 router = APIRouter(prefix="/api/politicas-retencion", tags=["Políticas de Retención"])

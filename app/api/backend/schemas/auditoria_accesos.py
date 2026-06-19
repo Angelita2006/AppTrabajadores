@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, IPvAnyAddress
 from typing import Optional
 from uuid import UUID
-from enums import AccionAuditoriaEnum
+from models.enums import AccionAuditoriaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

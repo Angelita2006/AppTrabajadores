@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, IPvAnyAddress
 from typing import Optional
 from uuid import UUID
-from enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
+from models.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)

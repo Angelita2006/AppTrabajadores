@@ -4,9 +4,9 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
-from centros_trabajo import CentrosTrabajo
-from dispositivos_fichaje import DispositivosFichaje
+from models.empresas import Empresas
+from models.centros_trabajo import CentrosTrabajo
+from models.dispositivos_fichaje import DispositivosFichaje
 from schemas.dispositivos_fichaje import DispositivoFichajeCreate, DispositivoFichajeResponse
 
 router = APIRouter(prefix="/api/dispositivos", tags=["Dispositivos de Fichaje"])

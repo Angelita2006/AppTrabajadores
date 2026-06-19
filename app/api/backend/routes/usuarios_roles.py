@@ -1,15 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 from uuid import UUID
-
 from core.database import get_db
-from empresas import Empresas
-from roles import Roles
+from models.empresas import Empresas
+from models.roles import Roles
 from schemas.usuarios_roles import UsuarioRolCreate, UsuarioRolResponse
-from usuarios import Usuarios
-from usuarios_roles import UsuariosRoles
+from models.usuarios import Usuarios
+from models.usuarios_roles import UsuariosRoles
 
 router = APIRouter(prefix="/api/usuarios-roles", tags=["Roles de Usuarios"])
 

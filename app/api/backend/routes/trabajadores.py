@@ -6,8 +6,8 @@ from core.database import get_db
 from schemas.empresas import EmpresaResponse
 from schemas.trabajadores import TrabajadorCreate, TrabajadorResponse
 from schemas.usuarios import LoginRequest
-from trabajadores import Trabajadores
-from usuarios import Usuarios
+from models.trabajadores import Trabajadores
+from models.usuarios import Usuarios
 
 # Inicialización del enrutador modular para el personal y autenticación
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])

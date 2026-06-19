@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.database import Base, engine
-from routes import empresas, fichajes, trabajadores
+from routes import asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
@@ -24,9 +24,28 @@ app.add_middleware(
 )
 
 # Registro de las URIs y enrutadores modulares en el núcleo de la aplicación FastAPI
+app.include_router(asignaciones_turno.router)
+app.include_router(auditoria_accesos.router)
+app.include_router(ausencias.router)
+app.include_router(calendarios_laborales.router)
+app.include_router(centros_trabajo.router)
+app.include_router(contratos.router)
+app.include_router(correcciones_fichaje.router)
+app.include_router(departamentos.router)
+app.include_router(dispositivos_fichaje.router)
 app.include_router(empresas.router)
+app.include_router(festivos.router)
 app.include_router(fichajes.router)
+app.include_router(motivos_pausa.router)
+app.include_router(permisos.router)
+app.include_router(politicas_retencion.router)
+app.include_router(resumenes_jornada.router)
+app.include_router(roles.router)
+app.include_router(tipos_evento_fichaje.router)
 app.include_router(trabajadores.router)
+app.include_router(turnos.router)
+app.include_router(usuarios_roles.router)
+app.include_router(usuarios.router)
 
 @app.get("/")
 def read_root():

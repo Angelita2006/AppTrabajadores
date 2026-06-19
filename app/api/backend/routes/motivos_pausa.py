@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from empresas import Empresas
-from motivos_pausa import MotivosPausa
+from models.empresas import Empresas
+from models.motivos_pausa import MotivosPausa
 from schemas.motivos_pausa import MotivoPausaCreate, MotivoPausaResponse
 
 router = APIRouter(prefix="/api/motivos-pausa", tags=["Motivos de Pausa"])

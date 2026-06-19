@@ -2,8 +2,21 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-from backend.core.database import Base 
+from core.database import Base 
 from backend.models import asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, empresas, enums, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios, vistas
+
+# Forzamos a SQLAlchemy a mapear físicamente tus tablas en memoria antes de comparar
+# Accedemos a los diccionarios de metadatos de cada archivo para asegurar su inicialización
+_modelos = [
+    empresas, trabajadores, turnos, asignaciones_turno, ausencias,
+    fichajes, auditoria_accesos, enums, vistas, calendarios_laborales, centros_trabajo,
+    contratos, correcciones_fichaje, departamentos, dispositivos_fichaje,
+    festivos, motivos_pausa, permisos, politicas_retencion,
+    resumenes_jornada, roles, tipos_evento_fichaje, usuarios_roles, usuarios
+]
+
+for modelo in _modelos:
+    getattr(modelo, "__doc__", None)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
