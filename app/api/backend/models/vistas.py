@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, Enum, ForeignKeyConstraint, Numeric, PrimaryKeyConstraint, SmallInteger, String, Table, Text, Uuid
 from core.database import Base
-from enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
+from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 from sqlalchemy.dialects.postgresql import INET
 
 t_v_fichajes_vigentes = Table(

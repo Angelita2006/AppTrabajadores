@@ -4,7 +4,7 @@ from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from enums import AccionRetencionEnum
+from models.enums import AccionRetencionEnum
 
 class PoliticasRetencion(Base):
     __tablename__ = 'politicas_retencion'

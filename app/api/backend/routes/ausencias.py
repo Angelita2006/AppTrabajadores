@@ -6,7 +6,7 @@ from uuid import UUID
 from models.ausencias import Ausencias
 from core.database import get_db
 from models.empresas import Empresas
-from enums import EstadoAusenciaEnum
+from models.enums import EstadoAusenciaEnum
 from schemas.ausencias import AusenciaCreate, AusenciaResponse
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios

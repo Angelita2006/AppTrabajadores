@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from enums import TipoUsuarioEnum
+from models.enums import TipoUsuarioEnum
 
 class Usuarios(Base):
     __tablename__ = 'usuarios'

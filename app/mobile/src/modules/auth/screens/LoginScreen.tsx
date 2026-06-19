@@ -44,9 +44,10 @@ export default function LoginScreen() {
 
   useEffect(() => {
     // Si el usuario ya tiene una sesión iniciada, salta directo al Home
-    if (trabajadorActual) {
-      router.replace("/(protected)/home");
-    }
+    // if (trabajadorActual) {
+    //   router.replace("/(protected)/home");
+    // }
+    setTrabajadorActual(null);
 
     // Animación infinita para el movimiento del fondo dinámico
     granAnimacionFondo.value = withRepeat(

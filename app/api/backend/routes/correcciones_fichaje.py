@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 from core.database import get_db
 from models.empresas import Empresas
-from enums import EstadoCorreccionEnum
+from models.enums import EstadoCorreccionEnum
 from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFichajeResponse
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios

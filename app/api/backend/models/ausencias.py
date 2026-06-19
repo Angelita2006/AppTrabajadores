@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from backend.models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
+from models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
 
 class Ausencias(Base):
     __tablename__ = 'ausencias'

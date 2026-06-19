@@ -1,145 +1,145 @@
 import api from "../../../services/api/api";
 
+// ====================================================================
+// 1. ENDPOINTS DE AUTENTICACIÓN Y EXPENDIENTE (TABLA TRABAJADORES)
+// ====================================================================
+
 /**
- * Valida el correo y la contraseña contra la base de datos SQLite real del backend.
+ * Valida el correo y la contraseña contra la base de datos de producción.
+ * @param email Correo electrónico
+ * @param password Contraseña en texto plano
  */
 export const getTrabajadorByEmailYPassword = async (
   email: string,
   password: string,
 ) => {
-  const respuesta = await api.post("api/trabajadores/login", {
+  // Conectado al nuevo router de Usuarios / Trabajadores unificado
+  const respuesta = await api.post("/api/trabajadores/login", {
     email,
     password,
   });
   return respuesta.data;
 };
 
-/**
- * Alias de compatibilidad para la función de validación de credenciales.
- */
+/** Alias de compatibilidad para la función de inicio de sesión */
 export const obtenerTrabajadorPorEmailYPassword = getTrabajadorByEmailYPassword;
 
 /**
- * Obtiene el directorio completo con la plantilla de empleados del sistema.
+ * Obtiene la plantilla completa de empleados registrados en el sistema Saas.
  */
 export const obtenerTrabajadores = async () => {
-  const respuesta = await api.get("api/trabajadores");
+  const respuesta = await api.get("/api/trabajadores");
   return respuesta.data;
 };
 
 /**
- * Recupera la información detallada de un trabajador específico por su ID único.
+ * Recupera la información detallada de un trabajador específico mediante su UUID.
+ * @param idTrabajador Identificador único de tipo UUID (string)
  */
-export const obtenerTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`api/trabajadores/${idTrabajador}`);
+export const obtenerTrabajador = async (idTrabajador: string) => {
+  const respuesta = await api.get(`/api/trabajadores/${idTrabajador}`);
   return respuesta.data;
 };
 
 /**
- * Registra un nuevo empleado en la base de datos del backend.
+ * Registra un nuevo empleado en el backend bajo una estructura Multiempresa.
  */
 export const crearTrabajador = async (data: {
+  empresa_id: string;
+  nif_nie: string;
   nombre: string;
   apellidos: string;
-  dni: string;
-  puesto: string;
-  direccion: string;
-  codigo_postal: string;
-  poblacion: string;
-  provincia: string;
-  cuenta_cotizacion: string;
-  email: string;
-  password: string;
+  email?: string;
+  telefono?: string;
+  numero_seguridad_social?: string;
+  fecha_nacimiento?: string; // Formato AAAA-MM-DD
 }) => {
-  const respuesta = await api.post("api/trabajadores", data);
+  const respuesta = await api.post("/api/trabajadores", data);
   return respuesta.data;
 };
 
 /**
- * Modifica los datos de un trabajador existente localizándolo por su ID único.
+ * Consulta la organización o empresa principal asignada al expediente del empleado.
+ * @param idTrabajador Identificador único de tipo UUID (string)
  */
-export const editarTrabajador = async (idTrabajador: number, data: any) => {
-  const respuesta = await api.put(`api/trabajadores/${idTrabajador}`, data);
+export const obtenerEmpresasTrabajador = async (idTrabajador: string) => {
+  const respuesta = await api.get(`/api/trabajadores/${idTrabajador}/empresas`);
+  return respuesta.data;
+};
+
+// ====================================================================
+// 2. ENDPOINTS PARA LA FUTURA UI (VISTAS, CONTRATOS Y PLANIFICACIÓN)
+// ====================================================================
+
+/**
+ * [VISTA DE CONTROL] Recupera la secuencia histórica de contratos de un empleado.
+ * Esencial para pintar el puesto, categoría y horas semanales en la UI.
+ */
+export const obtenerContratosTrabajador = async (idTrabajador: string) => {
+  const respuesta = await api.get(`/api/contratos/trabajador/${idTrabajador}`);
   return respuesta.data;
 };
 
 /**
- * Modifica el perfil de un empleado localizándolo mediante su número de DNI.
+ * [VISTA DE PLANIFICACIÓN] Recupera el cuadrante actual de turnos teóricos del operario.
+ * Necesario para dibujar los horarios asignados de lunes a domingo en la pantalla del calendario.
  */
-export const editarTrabajadorPorDNI = async (dni: string, data: any) => {
-  const respuesta = await api.put(`api/trabajadores/dni/${dni}`, data);
-  return respuesta.data;
-};
-
-/**
- * Consulta el listado de empresas asociadas al perfil de un trabajador a través de su ID.
- */
-export const obtenerEmpresasTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`api/trabajadores/${idTrabajador}/empresas`);
-  return respuesta.data;
-};
-
-/**
- * Recupera el historial total de fichajes realizados por un empleado específico.
- */
-export const obtenerFichajesTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`api/fichajes?idTrabajador=${idTrabajador}`);
-  return respuesta.data;
-};
-
-/**
- * Consulta los cuadrantes de horarios asignados a las jornadas de un empleado.
- */
-export const obtenerHorariosTrabajador = async (idTrabajador: number) => {
-  const respuesta = await api.get(`api/horarios?idTrabajador=${idTrabajador}`);
-  return respuesta.data;
-};
-
-/**
- * Establece un vínculo de asociación mutua entre un empleado y una empresa.
- */
-export const agregarEmpresaATrabajador = async (
-  idTrabajador: number,
-  idEmpresa: number,
+export const obtenerAsignacionesTurnoTrabajador = async (
+  idTrabajador: string,
 ) => {
-  const respuesta = await api.post(
-    `api/trabajadores/${idTrabajador}/empresas/${idEmpresa}`,
+  const respuesta = await api.get(
+    `/api/asignaciones-turno/trabajador/${idTrabajador}`,
   );
   return respuesta.data;
 };
 
 /**
- * Modifica exclusivamente el estado operativo de un empleado usando su DNI.
+ * [VISTA DE CONTROL HORARIO] Consulta el histórico completo de marcajes inmutables.
+ * Utilizado para rellenar las tablas de auditoría horaria en la interfaz del perfil.
  */
-export const editarEstadoTrabajador = async (dni: string, estado: string) => {
-  const respuesta = await api.put(`api/trabajadores/dni/${dni}/estado`, {
-    estado,
-  });
-  return respuesta.data;
-};
-
-/**
- * Obtiene el último evento de fichaje registrado por el empleado en una empresa determinada.
- */
-export const getUltimoFichajeTrabajador = async (
-  idTrabajador: number,
-  idEmpresa: number,
+export const obtenerFichajesTrabajadorYEmpresa = async (
+  idTrabajador: string,
+  idEmpresa: string,
 ) => {
   const respuesta = await api.get(
-    `api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}/ultimo`,
+    `/api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
   );
   return respuesta.data;
 };
 
 /**
- * Obtiene el historial completo de fichajes de un empleado filtrado por una empresa específica.
+ * [VISTA DE CUADRO DE MANDO] Recupera los resúmenes diarios acumulados del empleado.
+ * Alimenta los gráficos de la UI mostrando los minutos totales trabajados, pausas y horas extras.
  */
-export const obtenerFichajesEmpresaTrabajador = async (
-  idTrabajador: number,
-  idEmpresa: number,
+export const obtenerResumenesMensualesTrabajador = async (
+  idTrabajador: string,
 ) => {
   const respuesta = await api.get(
-    `api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
+    `/api/resumenes-jornada/trabajador/${idTrabajador}`,
+  );
+  return respuesta.data;
+};
+
+/**
+ * [VISTA DE AUSENCIAS] Recupera el histórico de solicitudes de vacaciones, bajas o maternidades.
+ * Alimenta las tarjetas de solicitudes de la app móvil para revisar si están aprobadas o rechazadas.
+ */
+export const obtenerAusenciasYVacacionesTrabajador = async (
+  idTrabajador: string,
+) => {
+  const respuesta = await api.get(`/api/ausencias/trabajador/${idTrabajador}`);
+  return respuesta.data;
+};
+
+/**
+ * [VISTA DE CORRECCIONES] Recupera el registro de peticiones de rectificación horaria.
+ * Permite al empleado revisar los estados de sus solicitudes de olvido de fichajes.
+ */
+export const obtenerCorreccionesSolicitadasTrabajador = async (
+  idTrabajador: string,
+) => {
+  const respuesta = await api.get(
+    `/api/correcciones/trabajador/${idTrabajador}`,
   );
   return respuesta.data;
 };

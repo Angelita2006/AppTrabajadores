@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyCo
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from enums import AccionAuditoriaEnum
+from models.enums import AccionAuditoriaEnum
 
 class AuditoriaAccesos(Base):
     __tablename__ = 'auditoria_accesos'

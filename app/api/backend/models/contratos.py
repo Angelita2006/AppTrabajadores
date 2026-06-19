@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, Numeric, PrimaryKeyConstraint, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from enums import TipoContratoEnum, TipoJornadaEnum
+from models.enums import TipoContratoEnum, TipoJornadaEnum
 
 class Contratos(Base):
     __tablename__ = 'contratos'

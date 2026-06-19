@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import INT, CheckConstraint, DateTime, Enum, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
+from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 
 class Fichajes(Base):
     __tablename__ = 'fichajes'

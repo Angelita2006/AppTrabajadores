@@ -6,8 +6,8 @@ from uuid import UUID
 from models.empresas import Empresas
 from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioResponse
 from models.usuarios import Usuarios
-from trabajadores import Trabajadores
-from ..core.database import get_db
+from models.trabajadores import Trabajadores
+from core.database import get_db
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios y Autenticación"])
 
