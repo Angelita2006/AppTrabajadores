@@ -1,4 +1,3 @@
-
 import enum
 
 class AccionAuditoriaEnum(str, enum.Enum):
@@ -60,3 +59,15 @@ class TipoUsuarioEnum(str, enum.Enum):
     REPRESENTANTE_LEGAL = 'representante_legal'
     TRABAJADOR = 'trabajador'
     AUDITOR_ITSS = 'auditor_itss'
+
+class TipoAusenciaEnum(str, enum.Enum):
+    vacaciones = "vacaciones"
+    baja_temporal = "baja_temporal"
+    maternidad_paternidad = "maternidad_paternidad"
+    permiso_retribuido = "permiso_retribuido"
+    ausencia_injustificada = "ausencia_injustificada"
+
+class EstadoAusenciaEnum(str, enum.Enum):
+    pendiente = "pendiente"
+    aprobada = "aprobada"
+    rechazada = "rechazada"

@@ -3,11 +3,11 @@ from typing import Optional
 import uuid
 from sqlalchemy import JSON, Boolean, Date, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
 from auditoria_accesos import AuditoriaAccesos
 from calendarios_laborales import CalendariosLaborales
 from centros_trabajo import CentrosTrabajo
 from contratos import Contratos
+from core.database import Base
 from correcciones_fichaje import CorreccionesFichaje
 from departamentos import Departamentos
 from dispositivos_fichaje import DispositivosFichaje

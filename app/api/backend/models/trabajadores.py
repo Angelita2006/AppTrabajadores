@@ -3,15 +3,15 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, DateTime, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
 from asignaciones_turno import AsignacionesTurno
-from empresas import Empresas
 from auditoria_accesos import AuditoriaAccesos
 from contratos import Contratos
+from core.database import Base
 from correcciones_fichaje import CorreccionesFichaje
+from empresas import Empresas
 from fichajes import Fichajes
-from usuarios import Usuarios
 from resumenes_jornada import ResumenesJornada
+from usuarios import Usuarios
 
 class Trabajadores(Base):
     __tablename__ = 'trabajadores'

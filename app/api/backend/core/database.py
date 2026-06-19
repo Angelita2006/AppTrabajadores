@@ -6,7 +6,8 @@ from sqlalchemy.orm import sessionmaker
 # from sqlalchemy.orm import Session
 
 # DATABASE_URL = "sqlite:///./database/test.db"
-DATABASE_URL = "postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/registrohorariosimple"
+# DATABASE_URL = "postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/registrohorariosimple"
+DATABASE_URL = "postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/registrohorariosimpledev"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

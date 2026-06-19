@@ -3,8 +3,8 @@ from typing import Optional
 import uuid
 from sqlalchemy import Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
 from calendarios_laborales import CalendariosLaborales
+from core.database import Base
 
 class Festivos(Base):
     __tablename__ = 'festivos'

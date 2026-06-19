@@ -4,8 +4,8 @@ from typing import Any, Optional
 import uuid
 from sqlalchemy import INT, CheckConstraint, DateTime, Enum, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
 from centros_trabajo import CentrosTrabajo
+from core.database import Base
 from correcciones_fichaje import CorreccionesFichaje
 from dispositivos_fichaje import DispositivosFichaje
 from empresas import Empresas

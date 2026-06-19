@@ -1,12 +1,9 @@
 from logging.config import fileConfig
-
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
-
-from backend.database import Base 
-from backend.main import Empresa, Trabajador, Horario, Fichaje 
+from backend.core.database import Base 
+from backend.models import asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, empresas, enums, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios, vistas
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# from core.database import Base, engine
+from core.database import Base, engine
 from routes import empresas, fichajes, trabajadores
 
 app = FastAPI(
@@ -12,7 +12,7 @@ app = FastAPI(
 )
 
 # Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
-# Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 # Configuración del Middleware CORS para habilitar la comunicación con dispositivos móviles
 app.add_middleware(

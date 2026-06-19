@@ -3,8 +3,8 @@ from typing import Optional
 import uuid
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
 from auditoria_accesos import AuditoriaAccesos
+from core.database import Base
 from correcciones_fichaje import CorreccionesFichaje
 from empresas import Empresas
 from enums import TipoUsuarioEnum

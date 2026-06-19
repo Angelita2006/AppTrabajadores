@@ -24,7 +24,6 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid(), digest() para hash de integridad
 
-
 -- ============================================================================
 -- 1. TIPOS ENUMERADOS
 -- ============================================================================
@@ -77,7 +76,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 -- ============================================================================
 -- 3. ESTRUCTURA EMPRESARIAL (raíz multiempresa)
 -- ============================================================================
@@ -107,7 +105,6 @@ COMMENT ON TABLE empresas IS 'Empresas cliente de la gestoría. Raíz de aislami
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON empresas
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
 
-
 CREATE TABLE centros_trabajo (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     empresa_id      UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
@@ -124,7 +121,6 @@ COMMENT ON COLUMN centros_trabajo.codigo_ccc IS 'Código de Cuenta de Cotizació
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON centros_trabajo
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
 
-
 CREATE TABLE departamentos (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     empresa_id          UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
@@ -136,7 +132,6 @@ CREATE TABLE departamentos (
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON departamentos
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
-
 
 -- ============================================================================
 -- 4. PERSONAL Y CONTRATOS
@@ -164,7 +159,6 @@ COMMENT ON TABLE trabajadores IS 'Trabajadores de cada empresa cliente. El derec
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON trabajadores
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
 
-
 CREATE TABLE contratos (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     trabajador_id           UUID NOT NULL REFERENCES trabajadores(id) ON DELETE RESTRICT,
@@ -186,7 +180,6 @@ CREATE TABLE contratos (
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON contratos
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
-
 
 -- ============================================================================
 -- 5. CALENDARIO Y TURNOS (jornada teórica, para contrastar con lo fichado)
@@ -232,7 +225,6 @@ CREATE TABLE asignaciones_turno (
     CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
 );
 
-
 -- ============================================================================
 -- 6. SEGURIDAD: USUARIOS Y CONTROL DE ACCESO (RBAC)
 -- ============================================================================
@@ -258,7 +250,6 @@ COMMENT ON COLUMN usuarios.empresa_id IS 'NULL para usuarios de la gestoría con
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON usuarios
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
-
 
 CREATE TABLE roles (
     id          SMALLSERIAL PRIMARY KEY,
@@ -287,7 +278,6 @@ CREATE TABLE usuarios_roles (
 );
 COMMENT ON COLUMN usuarios_roles.empresa_id IS 'Ámbito del rol. NULL = aplica a todas las empresas que gestiona el usuario (típico de personal de gestoría).';
 
-
 -- ============================================================================
 -- 7. FICHAJE (núcleo del sistema)
 -- ============================================================================
@@ -310,7 +300,6 @@ COMMENT ON TABLE dispositivos_fichaje IS 'Terminales/medios de fichaje permitido
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON dispositivos_fichaje
     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
 
-
 CREATE TABLE tipos_evento_fichaje (
     id                      SMALLSERIAL PRIMARY KEY,
     codigo                  VARCHAR(30) NOT NULL UNIQUE,
@@ -328,7 +317,6 @@ CREATE TABLE motivos_pausa (
     duracion_max_minutos    SMALLINT
 );
 COMMENT ON COLUMN motivos_pausa.empresa_id IS 'NULL = motivo del catálogo global (ej. comida, descanso legal); con valor = motivo propio de una empresa.';
-
 
 CREATE TABLE fichajes (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -362,7 +350,6 @@ CREATE INDEX idx_fichajes_empresa_fecha ON fichajes (empresa_id, fecha_hora DESC
 CREATE INDEX idx_fichajes_centro_fecha ON fichajes (centro_trabajo_id, fecha_hora DESC);
 CREATE INDEX idx_fichajes_sustituido ON fichajes (fichaje_sustituido_id) WHERE fichaje_sustituido_id IS NOT NULL;
 
-
 CREATE TABLE correcciones_fichaje (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     empresa_id                  UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
@@ -383,7 +370,6 @@ COMMENT ON TABLE correcciones_fichaje IS 'Flujo auditable de altas manuales, mod
 CREATE INDEX idx_correcciones_fichaje_afectado ON correcciones_fichaje (fichaje_afectado_id);
 CREATE INDEX idx_correcciones_empresa_estado ON correcciones_fichaje (empresa_id, estado);
 
-
 -- ============================================================================
 -- 8. AUDITORÍA Y RETENCIÓN
 -- ============================================================================
@@ -402,7 +388,6 @@ COMMENT ON TABLE auditoria_accesos IS 'Registra cada consulta, exportación o de
 
 CREATE INDEX idx_auditoria_empresa_fecha ON auditoria_accesos (empresa_id, fecha_hora DESC);
 CREATE INDEX idx_auditoria_trabajador ON auditoria_accesos (trabajador_id) WHERE trabajador_id IS NOT NULL;
-
 
 CREATE TABLE resumenes_jornada (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -423,7 +408,6 @@ COMMENT ON TABLE resumenes_jornada IS 'Tabla de agregados diarios, recalculada p
 
 CREATE INDEX idx_resumenes_empresa_fecha ON resumenes_jornada (empresa_id, fecha DESC);
 
-
 CREATE TABLE politicas_retencion (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     empresa_id              UUID REFERENCES empresas(id) ON DELETE RESTRICT,
@@ -435,7 +419,6 @@ COMMENT ON TABLE politicas_retencion IS 'Política de conservación legal (míni
 
 INSERT INTO politicas_retencion (empresa_id, anios_conservacion, accion_tras_periodo)
 VALUES (NULL, 4, 'archivar');
-
 
 -- ============================================================================
 -- 9. INMUTABILIDAD DE FICHAJES (defensa en profundidad a nivel de BD)
@@ -452,7 +435,6 @@ CREATE TRIGGER bloquear_update_fichaje BEFORE UPDATE ON fichajes
 
 CREATE TRIGGER bloquear_delete_fichaje BEFORE DELETE ON fichajes
     FOR EACH ROW EXECUTE FUNCTION trg_bloquear_modificacion_fichaje();
-
 
 -- ============================================================================
 -- 10. HASH DE INTEGRIDAD AUTOMÁTICO
@@ -483,7 +465,6 @@ CREATE TRIGGER calcular_hash_fichaje BEFORE INSERT ON fichajes
 -- directos a la BD, puede encadenarse con el hash de la fila anterior
 -- (estilo blockchain) o firmarse externamente; se deja como mejora futura.
 
-
 -- ============================================================================
 -- 11. VISTA DE FICHAJES VIGENTES
 -- ============================================================================
@@ -501,7 +482,6 @@ AND NOT EXISTS (
       AND c.estado = 'aprobada'
 );
 COMMENT ON VIEW v_fichajes_vigentes IS 'Fichajes con efecto legal actual: excluye los anulados (vía correcciones_fichaje aprobadas) y los ya sustituidos por una fila más reciente. Es la vista que deben usar nómina, informes e inspección; nunca se borra ni edita la fila original.';
-
 
 -- ============================================================================
 -- 12. SEGURIDAD A NIVEL DE FILA (RLS) PARA AISLAMIENTO MULTIEMPRESA
@@ -542,7 +522,6 @@ END $$;
 ALTER TABLE empresas ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON empresas
     USING (is_gestoria_admin() OR id = current_empresa_id());
-
 
 -- ============================================================================
 -- 13. DATOS SEMILLA (catálogos globales)
