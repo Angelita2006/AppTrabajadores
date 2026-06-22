@@ -9,12 +9,12 @@ import api from "../../../services/api/api";
  * @param email Correo electrónico
  * @param password Contraseña en texto plano
  */
-export const getTrabajadorByEmailYPassword = async (
+export const getUsuarioByEmailYPassword = async (
   email: string,
   password: string,
 ) => {
   // Conectado al nuevo router de Usuarios / Trabajadores unificado
-  const respuesta = await api.post("/api/trabajadores/login", {
+  const respuesta = await api.post("/api/usuarios/login", {
     email,
     password,
   });
@@ -22,7 +22,15 @@ export const getTrabajadorByEmailYPassword = async (
 };
 
 /** Alias de compatibilidad para la función de inicio de sesión */
-export const obtenerTrabajadorPorEmailYPassword = getTrabajadorByEmailYPassword;
+export const obtenerUsuarioPorEmailYPassword = getUsuarioByEmailYPassword;
+
+/**
+ * Obtiene la plantilla completa de usuarios registrados en el sistema Saas.
+ */
+export const obtenerUsuarios = async () => {
+  const respuesta = await api.get("/api/trabajadores");
+  return respuesta.data;
+};
 
 /**
  * Obtiene la plantilla completa de empleados registrados en el sistema Saas.

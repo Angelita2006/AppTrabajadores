@@ -1,8 +1,15 @@
-from sqlalchemy import PrimaryKeyConstraint, SmallInteger, String, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, PrimaryKeyConstraint, SmallInteger, String, Table, UniqueConstraint
 from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
+
+roles_permisos = Table(
+    "roles_permisos",
+    Base.metadata,
+    Column("role_id", SmallInteger, ForeignKey("roles.id", ondelete="CASCADE")),
+    Column("permiso_id", SmallInteger, ForeignKey("permisos.id", ondelete="CASCADE"))
+)
 
 class Roles(Base):
     __tablename__ = 'roles'

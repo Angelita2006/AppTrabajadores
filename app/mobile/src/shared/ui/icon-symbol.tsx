@@ -24,6 +24,8 @@ const MAPPING = {
   warning: "warning",
   "visibility-off": "visibility-off",
   visibility: "visibility",
+  mail: "mail",
+  lock: "lock",
 } as const;
 
 type IconSymbolName = keyof typeof MAPPING;

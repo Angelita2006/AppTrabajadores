@@ -40,3 +40,4 @@ class Trabajadores(Base):
     contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='trabajador') # type: ignore
     fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='trabajador') # type: ignore
     correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='trabajador') # type: ignore
+    ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='trabajador') # type: ignore

@@ -35,3 +35,4 @@ class Usuarios(Base):
     usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='usuario') # type: ignore
     correcciones_fichaje_aprobado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.aprobado_por_usuario_id]', back_populates='aprobado_por_usuario') # type: ignore
     correcciones_fichaje_solicitado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.solicitado_por_usuario_id]', back_populates='solicitado_por_usuario') # type: ignore
+    ausencias_validadas: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='validado_por_usuario') # type: ignore

@@ -1,157 +1,349 @@
-import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
-// import { obtenerTrabajadores } from "../../../modules/trabajadores/api/trabajadoresService";
-import { obtenerTrabajadores } from "../../../modules/trabajadores/api/services";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Estado,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import { obtenerTrabajadores } from "../../../modules/trabajadores/api/services";
+import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import {
+  TipoUsuario,
   Trabajador,
 } from "../../../modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../../shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 
-/**
- * Traduce el enumerado de estado a una cadena de texto legible para el usuario.
- * Si el estado no está definido, devuelve un mensaje por defecto.
- *
- * @param estado - Código del estado actual extraído del objeto Trabajador.
- * @returns Cadena de texto correspondiente al nombre del estado.
- */
-const estadoLabel = (estado?: Estado) =>
-  estado === undefined ? "Sin estado" : Estado[estado];
+export default function AdministracionTrabajadoresScreen() {
+  const { usuarioActual } = useTrabajador();
 
-/**
- * Pantalla principal que muestra el directorio completo de los empleados del sistema.
- * Permite visualizar métricas rápidas de los estados y la lista detallada de personal.
- */
-export default function TrabajadoresScreen() {
-  // Estado local para almacenar el listado de trabajadores recuperados
-  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
-
-  // Carga automática de la lista al renderizar la pantalla por primera vez
-  useEffect(() => {
-    obtenerTrabajadores().then(setTrabajadores);
-  }, []);
-
-  // Filtra de forma dinámica a los empleados excluyendo a los que estén dados de baja u ocultos
-  const activos = trabajadores.filter(
-    (item) => item.estado !== Estado.Inactivo,
+  const [plantillaCompleta, setPlantillaCompleta] = useState<Trabajador[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "altas" | "bajas">(
+    "todos",
   );
 
+  const esGestoria =
+    usuarioActual?.tipo_usuario === ("admin_gestoria" as TipoUsuario);
+  const esAdminEmpresa =
+    usuarioActual?.tipo_usuario === ("admin_empresa" as TipoUsuario);
+  const esAdministrador = esGestoria || esAdminEmpresa;
+
+  useEffect(() => {
+    if (esAdministrador) {
+      cargarDatosPlantilla();
+    }
+  }, [esAdministrador]);
+
+  const cargarDatosPlantilla = async () => {
+    try {
+      setCargando(true);
+      const datos = await obtenerTrabajadores();
+      setPlantillaCompleta(datos);
+    } catch (error) {
+      Alert.alert(
+        "Error de auditoría",
+        "No se ha podido descargar el registro legal de empleados. " + error,
+      );
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const plantillaFiltrada = useMemo(() => {
+    return plantillaCompleta.filter((trabajador) => {
+      const coincideEmpresa = esGestoria
+        ? true
+        : trabajador.empresa_id === usuarioActual?.empresa_id;
+
+      const coincideEstado =
+        filtroEstado === "todos" ||
+        (filtroEstado === "altas" && trabajador.activo) ||
+        (filtroEstado === "bajas" && !trabajador.activo);
+
+      return coincideEmpresa && coincideEstado;
+    });
+  }, [plantillaCompleta, filtroEstado, usuarioActual, esGestoria]);
+
+  if (!esAdministrador) {
+    return (
+      <AppScreen
+        title="Acceso Restringido"
+        subtitle="Control de Privacidad Saas"
+      >
+        <View style={styles.contenedorAlerta}>
+          <Card>
+            <ThemedText style={styles.titleAlerta}>
+              Área Restringida por Ley
+            </ThemedText>
+            <ThemedText style={styles.textAlerta}>
+              De acuerdo con la legislación vigente de protección de datos
+              (RGPD), este panel de auditoría está reservado exclusivamente para
+              Inspectores de Trabajo, Representantes Legales o Administradores.
+            </ThemedText>
+          </Card>
+        </View>
+      </AppScreen>
+    );
+  }
+
   return (
-    // Contenedor general que integra el fondo animado del degradado por detrás
     <AppScreen
-      title="Trabajadores"
-      subtitle="Directorio operativo para controlar jornada, empresa y estado."
+      title="Control de Plantilla"
+      subtitle="Registro oficial de empleados y expedientes de la organización."
     >
-      {/* SECCIÓN: Fila superior con tarjetas estadísticas rápidas */}
       <Row>
-        <StatCard label="Total" value={String(trabajadores.length)} />
         <StatCard
-          label="Activos"
-          value={String(activos.length)}
-          tone="success" // Aplica un fondo verde para destacar al personal activo
+          label="Filtrados"
+          value={plantillaFiltrada.length.toString()}
         />
         <StatCard
-          label="Administradores"
-          value={String(
-            trabajadores.filter((item) => item.role === "admin").length,
-          )}
+          label="Altas Activas"
+          value={plantillaFiltrada.filter((t) => t.activo).length.toString()}
+          tone="success"
+        />
+        <StatCard
+          label="Ámbito Saas"
+          value={esGestoria ? "Global Gestor" : "Aislamiento Empresa"}
         />
       </Row>
 
-      {/* SECCIÓN: Mapeo y generación de fichas individuales por empleado */}
-      {trabajadores.map((trabajador) => (
-        <Card key={trabajador.id}>
-          <View style={styles.row}>
-            {/* Elemento visual del avatar con las iniciales del nombre y apellido */}
-            <View style={styles.avatar}>
-              <ThemedText style={styles.avatarText}>
-                {trabajador.nombre[0]}
-                {trabajador.apellidos[0]}
-              </ThemedText>
-            </View>
-
-            {/* Bloque central con el nombre completo y los datos básicos de contacto */}
-            <View style={styles.info}>
-              <ThemedText style={styles.name}>
-                {trabajador.nombre} {trabajador.apellidos}
-              </ThemedText>
-              <ThemedText style={styles.meta}>
-                {trabajador.puesto} · {trabajador.email}
-              </ThemedText>
-            </View>
-
-            {/* Etiqueta lateral derecha que muestra el estado actual traducido */}
-            <View style={styles.badge}>
-              <ThemedText style={styles.badgeText}>
-                {estadoLabel(trabajador.estado)}
-              </ThemedText>
-            </View>
-          </View>
-
-          {/* Fila de detalles geográficos y cantidad de corporaciones asignadas */}
-          <ThemedText style={styles.body}>
-            {trabajador.poblacion}, {trabajador.provincia} ·{" "}
-            {trabajador.empresas?.length ?? 0} empresas
+      <View style={styles.contenedorFiltros}>
+        <Pressable
+          style={[
+            styles.botonFiltro,
+            filtroEstado === "todos" && styles.botonFiltroActivo,
+          ]}
+          onPress={() => setFiltroEstado("todos")}
+        >
+          <ThemedText
+            style={[
+              styles.textoBoton,
+              filtroEstado === "todos" && styles.textoBotonActivo,
+            ]}
+          >
+            Todos
           </ThemedText>
-        </Card>
-      ))}
+        </Pressable>
+        <Pressable
+          style={[
+            styles.botonFiltro,
+            filtroEstado === "altas" && styles.botonFiltroActivo,
+          ]}
+          onPress={() => setFiltroEstado("altas")}
+        >
+          <ThemedText
+            style={[
+              styles.textoBoton,
+              filtroEstado === "altas" && styles.textoBotonActivo,
+            ]}
+          >
+            Altas
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.botonFiltro,
+            filtroEstado === "bajas" && styles.botonFiltroActivo,
+          ]}
+          onPress={() => setFiltroEstado("bajas")}
+        >
+          <ThemedText
+            style={[
+              styles.textoBoton,
+              filtroEstado === "bajas" && styles.textoBotonActivo,
+            ]}
+          >
+            Bajas
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      <ThemedText style={styles.sectionTitle}>
+        Directorio de Expedientes
+      </ThemedText>
+
+      {cargando ? (
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+          style={{ marginTop: 40 }}
+        />
+      ) : (
+        <FlatList
+          data={plantillaFiltrada}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <Card>
+              <View style={styles.cardHeader}>
+                <ThemedText style={styles.nombreEmpleado}>
+                  {item.nombre} {item.apellidos}
+                </ThemedText>
+                <View
+                  style={[
+                    styles.badge,
+                    item.activo ? styles.badgeActivo : styles.badgeInactivo,
+                  ]}
+                >
+                  <ThemedText style={styles.badgeText}>
+                    {item.activo ? "Alta" : "Baja"}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View style={styles.gridInfo}>
+                <View style={styles.infoRow}>
+                  <ThemedText style={styles.infoLabel}>
+                    Identificación:
+                  </ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {item.nif_nie}
+                  </ThemedText>
+                </View>
+                <View style={styles.infoRow}>
+                  <ThemedText style={styles.infoLabel}>Fecha Alta:</ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {item.fecha_alta_empresa}
+                  </ThemedText>
+                </View>
+                <View style={styles.infoRow}>
+                  <ThemedText style={styles.infoLabel}>Email:</ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {item.email ?? "No asignado"}
+                  </ThemedText>
+                </View>
+                {item.telefono && (
+                  <View style={styles.infoRow}>
+                    <ThemedText style={styles.infoLabel}>Teléfono:</ThemedText>
+                    <ThemedText style={styles.infoValue}>
+                      {item.telefono}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            </Card>
+          )}
+          ListEmptyComponent={
+            <ThemedText style={styles.emptyText}>
+              No se encontraron trabajadores en este registro.
+            </ThemedText>
+          }
+        />
+      )}
     </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  // fila del contenedor, alinea elementos en horizontal, los centra verticalmente y salta de línea si no caben
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+  contenedorAlerta: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+    borderRadius: 16,
+    padding: 4,
+    marginTop: 20,
   },
-  // recuadro del avatar, fondo azul claro, centrado absoluto y dimensiones fijas de 44 px
-  avatar: {
-    alignItems: "center",
-    backgroundColor: "#E0F2FE",
-    borderRadius: 8,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  // iniciales dentro del avatar, color azul oscuro y grosor de letra al máximo
-  avatarText: {
-    color: "#0369A1",
+  titleAlerta: {
+    color: "#991B1B",
+    fontSize: 16,
     fontWeight: "900",
+    marginBottom: 8,
   },
-  // bloque central de información, se expande para ocupar el espacio libre y define un ancho mínimo de 220 px
-  info: {
+  textAlerta: {
+    color: "#7F1D1D",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  contenedorFiltros: {
+    flexDirection: "row",
+    backgroundColor: "#F1F5F9",
+    padding: 4,
+    borderRadius: 12,
+    marginVertical: 8,
+    gap: 4,
+  },
+  botonFiltro: {
     flex: 1,
-    minWidth: 220,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
   },
-  // texto del nombre completo, color azul oscuro casi negro, tamaño 17 y negrita fuerte
-  name: {
-    color: "#0F172A",
-    fontSize: 17,
-    fontWeight: "800",
+  botonFiltroActivo: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  // texto secundario con los datos de contacto, color gris intermedio
-  meta: {
+  textoBoton: {
+    fontSize: 14,
+    fontWeight: "600",
     color: "#64748B",
   },
-  // etiqueta contenedora del estado, fondo azul violáceo claro y bordes totalmente redondeados tipo píldora
-  badge: {
-    backgroundColor: "#EEF2FF",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  textoBotonActivo: {
+    color: "#1E293B",
+    fontWeight: "700",
   },
-  // texto dentro de la etiqueta de estado, color azul violáceo oscuro, tamaño compacto de 12 y negrita fuerte
-  badgeText: {
-    color: "#3730A3",
-    fontSize: 12,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: "800",
+    color: "#1E293B",
+    marginVertical: 12,
   },
-  // texto de la descripción inferior o ubicación, color azul grisáceo suave
-  body: {
-    color: "#475569",
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingBottom: 8,
+  },
+  nombreEmpleado: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  badgeActivo: {
+    backgroundColor: "#DCFCE7",
+  },
+  badgeInactivo: {
+    backgroundColor: "#FEE2E2",
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#15803D",
+  },
+  gridInfo: {
+    gap: 6,
+  },
+  infoRow: {
+    flexDirection: "row",
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: "#64748B",
+    width: 110,
+    fontWeight: "600",
+  },
+  infoValue: {
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: "500",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#64748B",
+    marginTop: 20,
   },
 });

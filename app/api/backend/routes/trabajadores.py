@@ -12,7 +12,6 @@ from models.usuarios import Usuarios
 # Inicialización del enrutador modular para el personal y autenticación
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
 
-
 @router.post("", response_model=TrabajadorResponse, status_code=status.HTTP_201_CREATED)
 def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)):
     """
@@ -57,7 +56,6 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
     db.refresh(nuevo_trabajador)
     return nuevo_trabajador
 
-
 @router.post("/login", response_model=TrabajadorResponse)
 def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
     """
@@ -90,7 +88,6 @@ def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
     # Devuelve el objeto del trabajador asociado para cargar el perfil en React Native
     return usuario_cuenta.trabajador
 
-
 @router.get("", response_model=List[TrabajadorResponse])
 def obtener_trabajadores(db: Session = Depends(get_db)):
     """
@@ -98,7 +95,6 @@ def obtener_trabajadores(db: Session = Depends(get_db)):
     Devuelve la plantilla completa de todos los empleados del sistema.
     """
     return db.query(Trabajadores).all()
-
 
 @router.get("/{id_trabajador}", response_model=TrabajadorResponse)
 def obtener_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
@@ -113,7 +109,6 @@ def obtener_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
             detail=f"Trabajador con ID {id_trabajador} no encontrado."
         )
     return trabajador
-
 
 @router.get("/{id_trabajador}/empresas", response_model=List[EmpresaResponse])
 def obtener_empresas_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):

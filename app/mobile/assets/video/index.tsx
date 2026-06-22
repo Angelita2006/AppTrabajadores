@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,17 +22,17 @@ import Animated, {
 import {
   getUsuarioByEmailYPassword,
   obtenerEmpresasTrabajador,
-} from "../../../modules/trabajadores/api/services";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
-import { ThemedText } from "../../../shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
-import VideoBackground from "../../../shared/ui/VideoBackground";
-import { IconSymbol } from "../../../shared/ui/icon-symbol";
+} from "../src/modules/trabajadores/api/services";
+import { useTrabajador } from "../src/modules/trabajadores/store/TrabajadorContext";
+import { ThemedText } from "../src/shared/components/themed-text";
+import VideoBackground from "../src/shared/ui/VideoBackground";
+import { IconSymbol } from "../src/shared/ui/icon-symbol";
+import { AppScreen, Card, Row, StatCard } from "../src/shared/ui/AppSurface";
 
 const { width, height } = Dimensions.get("window");
 
 export default function LoginScreen() {
-  // const router = useRouter();
+  const router = useRouter();
   const {
     usuarioActual,
     setUsuarioActual,
@@ -73,7 +74,7 @@ export default function LoginScreen() {
     // Animación de entrada para la tarjeta del formulario
     opacidadTarjeta.value = 0;
     opacidadTarjeta.value = withTiming(1, { duration: 600 });
-  }, [granAnimacionFondo, opacidadTarjeta, setUsuarioActual, usuarioActual]);
+  }, [usuarioActual]);
 
   // Validaciones de formato antes de realizar la petición HTTP
   const validarFormulario = () => {
@@ -137,7 +138,7 @@ export default function LoginScreen() {
   });
 
   // ====================================================================
-  // VISTA A: USUARIO AUTENTICADO, DETECTA LA SESIÓN Y MUESTRA TU PERFIL
+  // VISTA A: USUARIO AUTENTICADO ➡️ DETECTA LA SESIÓN Y MUESTRA TU PERFIL
   // ====================================================================
   if (usuarioActual && trabajadorActual) {
     return (
@@ -146,54 +147,26 @@ export default function LoginScreen() {
         subtitle="Consulta la ficha técnica de tu expediente laboral operativo."
       >
         <Row>
-          <StatCard
-            label="Usuario"
-            value={usuarioActual.nombre}
-            tone="success"
-          />
+          <StatCard label="Usuario" value={usuarioActual.nombre} tone="success" />
           <StatCard label="Rol Sistema" value={usuarioActual.tipo_usuario} />
-          <StatCard
-            label="Empresa Activa"
-            value={empresaSeleccionada?.nombre ?? "Ninguna"}
-          />
+          <StatCard label="Empresa Activa" value={empresaSeleccionada?.nombre ?? "Ninguna"} />
         </Row>
 
         <Animated.View style={estiloTarjetaAnimada}>
           <Card>
-            <ThemedText style={styles.perfilTitle}>
-              Ficha del Trabajador
-            </ThemedText>
-
+            <ThemedText style={styles.perfilTitle}>Ficha del Trabajador</ThemedText>
+            
             <View style={styles.detailGrid}>
-              <Detail
-                label="Nombre Completo"
-                value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`}
-              />
-              <Detail
-                label="Identificación (NIF/NIE)"
-                value={trabajadorActual.nif_nie}
-              />
-              <Detail
-                label="Fecha Alta Empresa"
-                value={trabajadorActual.fecha_alta_empresa}
-              />
-              <Detail
-                label="Número Seg. Social"
-                value={
-                  trabajadorActual.numero_seguridad_social ?? "No registrado"
-                }
-              />
-              <Detail
-                label="Teléfono de Contacto"
-                value={trabajadorActual.telefono ?? "No registrado"}
-              />
+              <Detail label="Nombre Completo" value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`} />
+              <Detail label="Identificación (NIF/NIE)" value={trabajadorActual.nif_nie} />
+              <Detail label="Fecha Alta Empresa" value={trabajadorActual.fecha_alta_empresa} />
+              <Detail label="Número Seg. Social" value={trabajadorActual.numero_seguridad_social ?? "No registrado"} />
+              <Detail label="Teléfono de Contacto" value={trabajadorActual.telefono ?? "No registrado"} />
               <Detail label="Email de Acceso" value={usuarioActual.email} />
             </View>
 
             <Pressable style={styles.logoutButton} onPress={cerrarSesion}>
-              <ThemedText style={styles.logoutButtonText}>
-                Cerrar Sesión Activa
-              </ThemedText>
+              <ThemedText style={styles.logoutButtonText}>Cerrar Sesión Activa</ThemedText>
             </Pressable>
           </Card>
         </Animated.View>
@@ -202,7 +175,7 @@ export default function LoginScreen() {
   }
 
   // ====================================================================
-  // VISTA B: SIN AUTENTICAR, FORMULARIO DE ACCESO PROFESIONAL CON VIDEO
+  // VISTA B: SIN AUTENTICAR ➡️ FORMULARIO DE ACCESO PROFESIONAL CON VIDEO
   // ====================================================================
   return (
     <KeyboardAvoidingView

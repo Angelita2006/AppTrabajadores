@@ -44,3 +44,4 @@ class Empresas(Base):
     fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='empresa') # type: ignore
     usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='empresa') # type: ignore
     correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='empresa') # type: ignore
+    ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='empresa') # type: ignore

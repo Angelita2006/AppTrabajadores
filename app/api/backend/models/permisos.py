@@ -1,5 +1,5 @@
 
-from sqlalchemy import PrimaryKeyConstraint, SmallInteger, String, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, PrimaryKeyConstraint, SmallInteger, String, Table, UniqueConstraint
 from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
