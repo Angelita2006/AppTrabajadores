@@ -55,7 +55,7 @@ def obtener_todos_los_turnos(db: Session = Depends(get_db)):
     URI: GET /api/turnos
     Devuelve el catálogo de todos los turnos teóricos de la plataforma Saas para la gestoría.
     """
-    return db.query(Turnos).all()
+    return db.query(Turnos).join(Turnos.empresa).order_by(Empresas.nombre_comercial.asc()).all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[TurnoResponse])

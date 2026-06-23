@@ -58,7 +58,7 @@ def obtener_empresas(db: Session = Depends(get_db)):
     URI: GET /api/empresas
     Devuelve el catálogo completo de todas las organizaciones dadas de alta en el sistema.
     """
-    return db.query(Empresas).all()
+    return db.query(Empresas).order_by(Empresas.nombre_comercial.asc()).all()
 
 
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
@@ -88,8 +88,8 @@ def obtener_trabajadores_empresa(id_empresa: UUID, db: Session = Depends(get_db)
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Empresa con ID {id_empresa} no encontrada."
         )
-    # Devuelve la colección mapeada gracias a la relación uno a muchos de tu modelo actualizado
-    return empresa.trabajadores
+    # Devuelve la colección mapeada y ordenada por nombre
+    return sorted(empresa.trabajadores, key=lambda t: t.nombre)
 
 
 @router.put("/{id_empresa}/razon-social", response_model=EmpresaResponse)

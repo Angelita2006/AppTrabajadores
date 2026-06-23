@@ -54,7 +54,7 @@ def obtener_todos_los_motivos(db: Session = Depends(get_db)):
     URI: GET /api/motivos-pausa
     Devuelve el catálogo absoluto (globales + privados) de motivos de pausa registrados en el Saas.
     """
-    return db.query(MotivosPausa).all()
+    return db.query(MotivosPausa).order_by(MotivosPausa.nombre.asc()).all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[MotivoPausaResponse])

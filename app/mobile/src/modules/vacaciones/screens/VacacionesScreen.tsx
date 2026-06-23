@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 // import { mockDb, Vacacion } from "../../../services/api/mockDb";
 import { crearVacacion, obtenerVacaciones } from "../api/services";
 import { Vacacion } from "../types/vacacion";

@@ -49,7 +49,7 @@ def obtener_todos_los_roles(db: Session = Depends(get_db)):
     URI: GET /api/roles
     Devuelve el catálogo completo de roles de seguridad definidos en el sistema.
     """
-    return db.query(Roles).all()
+    return db.query(Roles).order_by(Roles.id.asc()).all()
 
 
 @router.get("/{id_rol}", response_model=RolResponse)

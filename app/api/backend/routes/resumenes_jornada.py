@@ -83,7 +83,8 @@ def obtener_todos_los_resumenes(db: Session = Depends(get_db)):
     URI: GET /api/resumenes-jornada
     Lista el histórico total de cálculos diarios consolidados en la plataforma Saas.
     """
-    return db.query(ResumenesJornada).all()
+    return db.query(ResumenesJornada).join(ResumenesJornada.trabajador).order_by(Trabajadores.nombre.asc()).all()
+    return db.query(ResumenesJornada).join(ResumenesJornada.empresa).order_by(Empresas.nombre_comercial.asc()).all()
 
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[ResumenJornadaResponse])

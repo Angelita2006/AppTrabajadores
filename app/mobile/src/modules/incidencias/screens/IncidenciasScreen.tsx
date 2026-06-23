@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 // import { Incidencia, mockDb } from "../../../services/api/mockDb";
 import {
-  crearIncidencia,
-  obtenerIncidencias,
+    crearIncidencia,
+    obtenerIncidencias,
 } from "../../../modules/incidencias/api/services";
 import { Incidencia } from "../../../modules/incidencias/types/incidencia";
 import { ThemedText } from "../../../shared/components/themed-text";

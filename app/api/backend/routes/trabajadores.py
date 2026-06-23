@@ -94,7 +94,7 @@ def obtener_trabajadores(db: Session = Depends(get_db)):
     URI: GET /api/trabajadores
     Devuelve la plantilla completa de todos los empleados del sistema.
     """
-    return db.query(Trabajadores).all()
+    return db.query(Trabajadores).order_by(Trabajadores.nombre.asc()).all()
 
 @router.get("/{id_trabajador}", response_model=TrabajadorResponse)
 def obtener_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
@@ -127,3 +127,20 @@ def obtener_empresas_trabajador(id_trabajador: UUID, db: Session = Depends(get_d
     if trabajador.empresa:
         return [trabajador.empresa]
     return []
+
+@router.delete("/{id_trabajador}", status_code=status.HTTP_200_OK)
+def eliminar_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
+    """
+    URI: DELETE /api/trabajadores/{id_trabajador}
+    Elimina físicamente un trabajador. Si se borra, las asignaciones ligadas se eliminan automáticamente (CASCADE).
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador con ID {id_trabajador} no localizado."
+        )
+    
+    db.delete(trabajador)
+    db.commit()
+    return {"detail": f"Trabajador ({id_trabajador}) eliminado correctamente junto con su planificación en cascada."}

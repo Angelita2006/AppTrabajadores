@@ -6,8 +6,8 @@ import { Fichaje } from "../../../modules/fichajes/types/fichaje";
 // import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/horariosService";
 import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/services";
 import { Horario } from "../../../modules/horarios/types/horario";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 
 /**
  * Propiedades para el componente CalendarTrabajador.

@@ -102,7 +102,7 @@ def obtener_todos_los_usuarios(db: Session = Depends(get_db)):
     URI: GET /api/usuarios
     Devuelve el listado completo de cuentas de usuario dadas de alta en el Saas.
     """
-    return db.query(Usuarios).all()
+    return db.query(Usuarios).order_by(Usuarios.nombre.asc()).all()
 
 
 @router.get("/{id_usuario}", response_model=UsuarioResponse)

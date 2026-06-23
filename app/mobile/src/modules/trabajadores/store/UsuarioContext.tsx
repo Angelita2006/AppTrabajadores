@@ -1,10 +1,7 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react";
-import { Empresa } from "../../../modules/empresas/types/empresa";
+import { Empresa } from "../../empresas/types/empresa";
 // Importamos el nuevo tipo compuesto que creamos en el paso anterior
-import {
-  Trabajador,
-  UsuarioSesion,
-} from "../../../modules/trabajadores/types/trabajador";
+import { Trabajador, UsuarioSesion } from "../types/trabajador";
 
 /**
  * Interfaz que define el molde de datos del contexto de sesión unificado.
@@ -16,7 +13,6 @@ interface TrabajadorContextValue {
   setUsuarioActual: (usuario: UsuarioSesion | null) => void;
   // Atributo calculado directo: extrae el expediente del trabajador anidado en la sesión
   trabajadorActual: Trabajador | null;
-
   // Objeto con los datos de la empresa con la que se está operando activamente en la sesión
   empresaSeleccionada: Empresa | null;
   // Función básica para actualizar o cambiar directamente la empresa activa en memoria

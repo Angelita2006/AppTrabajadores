@@ -1,33 +1,100 @@
-DOCUMENTACIÓN COMPLETA DE AppTrabajadores
+DOCUMENTACIÓN COMPLETA DEL PROYECTO AppTrabajadores PARA LA APP "FICHAPP"
 
 1. PROPÓSITO GENERAL
 -------------------
-AppTrabajadores es una aplicación construida con Expo y React Native que gestiona el fichaje de trabajadores en empresas.
-Permite iniciar sesión, registrar usuarios, seleccionar empresas, fichar entradas, salidas, descansos y horas extra.
-Adicionalmente ofrece soporte de roles: "user" para trabajadores normales y "admin" para un perfil con visibilidad 
-ampliada sobre empresas, sus trabajadores con sus horarios y sus fichajes en las empresas.
+FICHAPP es una aplicación construida con Expo y React Native pensada para una gestoría y que gestiona 
+el sistema de registro de la jornada laboral de trabajadores de varias empresas cliente
+(modelo SaaS multiempresa).
+Permite iniciar sesión, seleccionar empresas, fichar entradas, salidas, descansos y horas extra.,
+ver el horario propio, solicitar vacaciones y reportar incidencias (olvidos de fichaje, etc). 
+Adicionalmente ofrece soporte de roles: "user" para trabajadores normales y "admin" para un perfil de
+administrador que puede ver el listado de empresas y sus trabajadores con sus horarios y sus fichajes 
+en las empresas.
 
 2. ARQUITECTURA DEL PROYECTO
 ----------------------------
-- app/: Contiene las pantallas de la aplicación y la navegación basada en archivos.
-- app/(protected)/: Pantallas de área protegida que se muestran después de iniciar sesión.
-- components/: Componentes reutilizables para UI y temas.
-- constants/: Temas y colores globales.
-- context/: Contexto global para trabajador y empresa seleccionada.
-- src/models/: Definiciones de tipos y estructuras de datos.
-- src/services/: Lógica de negocio local usando datos mock.
-- src/mock/: Datos de ejemplo para trabajadores, empresas, horarios y fichajes.
-- hooks/: Hooks personalizados para el tema de colores y esquema de color.
-- README.md: documento inicial generado por Expo.
+app/
+├── README.md (documento inicial generado por Expo, descripción de la app)
+├── mobile/   → App Expo/React Native (cliente)
+|   - app.json (configuración central del proyecto de react native)
+|   - metro.config.js (configuración de metro y empaquetador de javascript para react native)
+|   - package.json (configuración del proyecto y librerías)
+|   - tsconfig.json (configuración del compilador de typescript para react native)
+|   - docs
+|     - Análisis.docx (introducción de requisitos de la app)
+|     - DOCUMENTACION_APP.txt (memoria de la app)
+|     - DOCUMENTACION_APP.txt (memoria de la app)
+|   - app
+|     - (protected)
+|       - empresas (redirige a la pantalla de empresas)
+|       - fichajes (redirige a la pantalla de home, para fichajes)
+|       - home (redirige a la pantalla de home, para fichajes)
+|       - horarios (redirige a la pantalla de horarios)
+|       - incidencias (redirige a la pantalla de incidencias)
+|       - perfil (redirige a la pantalla del perfil/login)
+|       - trabajadores (redirige a la pantalla de trabajadores)
+|       - vacaciones (redirige a la pantalla de vacaciones)
+|     - (public)
+|       - login (redirige a la pantalla de login)
+|       - registro (redirige a la pantalla de registro)
+|       - recuperar-password (redirige a la pantalla de recuperar la contraseña)
+|     - _layout (estructura de la aplicacion con la barra inferior (tabs))
+|     - index (redirige a la pantalla de login)
+|   - assets
+|     - icons (imagenes para el icono de la app)
+|     - images (imagenes para fondos)
+|     - video (videos para fondos)
+|   - src
+|     - constants (tema de la app)
+|     - hooks (hooks para el cambiar el tema de la app)
+|     - modules
+|       - auth (login)
+|       - empresas (empresas: api services, component selector, screen, interface)
+|       - fichajes (fichajes: api services, main action button, screen, interface)
+|       - horarios (horarios: api services, calendar, screen, interface)
+|       - incidencias (incidencias: api services, screen, interface)
+|       - trabajadores (trabajadores: api services, context, screen, interface)
+|       - vacaciones (vacaciones: api services, screen, interface)
+|     - services
+|       - api.js (cliente de axios para hacer llamadas a la api)
+|       - mockDb.ts (database mock para hacer pruebas de ui con datos en memoria)
+|     - shared
+|       - components (componentes para pantallas como: links, saludo, botones, texto, vista)
+|       - layouts (componente para crear una vista scrolleable para las pantallas)
+|       - navigation (componente para la navegación en la barra inferior (tabs))
+|       - ui (componentes de ui como: fondo animado/video, superficie de la app, colapsable, símbolos)
+└── api/      → Backend FastAPI + PostgreSQL (servidor)
+    - main.py ( creación de la api, construcción automática de las tablas en la base de datos, )
+                 ( configuración del cors y registro de las uris y enrutadores de tablas )
+    - alembic (control de versiones/migraciones de la base de datos)
+    - backend
+      - core 
+        - database (creación de la base de datos (conexión string))
+        - crud (métodos de base de datos básicos listos para usar en las rutas de api)
+      - database (base de datos antigua de sqlite) **eliminar
+      - models (clases modelo python (sqlalchemy))
+      - routes (rutas api)
+      - schemas (esquemas de validación (PYDANTIC))
+      - views (rutas api necesarias para pantallas (UI)) **implementar
 
 3. NAVEGACIÓN Y RUTAS
 ---------------------
 La aplicación usa Expo Router con enrutamiento basado en archivos.
-- app/index.tsx: pantalla principal de login, registro, perfil y edición de perfil.
-- app/(protected)/home.tsx: pantalla de fichaje y resumen del trabajador.
-- app/(protected)/empresas.tsx: pantalla de selección y gestión de empresas.
+- app/(protected)/empresas (pantalla de empresas)
+- app/(protected)/fichajes (pantalla de home, para fichajes)
+- app/(protected)/home (pantalla de home, para fichajes)
+- app/(protected)/horarios (pantalla de horarios)
+- app/(protected)/incidencias (pantalla de incidencias)
+- app/(protected)/perfil (pantalla del perfil/login)
+- app/(protected)/trabajadores (pantalla de trabajadores)
+- app/(protected)/vacaciones (pantalla de vacaciones)
+- app/(public)/login (pantalla de login)
+- app/(public)/registro (pantalla de registro)
+- app/(public)/recuperar-password (pantalla de recuperar la contraseña)
+- app/_layout (aplicacion con la barra inferior (tabs))
+- app/index (empieza en la pantalla de login)
 
-4. CONTEXTO GLOBAL: TrabajadorContext.tsx
+4. CONTEXTO DE USUARIOS: TrabajadorContext.tsx
 -----------------------------------------
 Este archivo define el contexto compartido entre las pantallas:
 - trabajadorActual: datos del trabajador logueado.
@@ -166,14 +233,14 @@ Las pantallas usan componentes con:
 
 10. ROLES Y PERMISOS
 --------------------
-- `role: "user"`: trabajador normal. Puede ver solo sus propias empresas, su horario y fichar.
-- `role: "admin"`: usuario administrador. Puede ver todas las empresas y, al seleccionar una empresa, ver la lista de trabajadores y sus horarios.
-- El rol se define en `src/mock/trabajadoresMock.tsx` para los datos de ejemplo.
+- `role: "user"`: trabajador normal. Puede ver solo sus propias empresas, su jornada y fichar.
+- `role: "admin"`: usuario administrador. Puede ver todas las empresas y su lista de trabajadores y sus jornadas.
+- El rol se define al crear el usuario
 
 11. FLUJO DE USUARIO
 --------------------
 1. El usuario abre la app en `app/index.tsx`.
-2. Inicia sesión o se registra.
+2. Inicia sesión (**o se registra).
 3. Tras el login, el perfil puede verse y editarse.
 4. El usuario navega a `app/(protected)/empresas.tsx` para seleccionar o añadir una empresa.
 5. Una vez seleccionada la empresa, accede a `app/(protected)/home.tsx` para fichar.
@@ -207,8 +274,29 @@ Es adecuado para:
 - demostrar roles de administrador y trabajador.
 - usar como base para integrar un backend real más adelante.
 
+15. LÓGICA DE NEGOCIO 
+---------------------
+- Empresas, centro de trabajo (de empresa), departamento (de centro de trabajo), 
+calendario laboral (de una centro de trabajo) y festivos (de calendario)
+
+- Fichajes (de trabajador, en centro de trabajo y dispositivo), dispositivos 
+(para fichar, de centro de trabajo), tipos fichaje, motivos pausa (de empresa), 
+permisos y politicas retencion (de empresa)
+
+- Trabajadores (de empresa), usuarios (de trabajador y empresa), usuarios roles 
+(id rol, de usuario y empresa), roles, turnos (de empresa) y resumen jornada 
+(de trabajador, empresa)
+
+Se crean las empresas, los centros de trabajo de cada una, los departamentos de 
+cada una, la auditoria accesos (de empresa, usuario, trabajador), el calendario 
+laboral de cada una y sus festivos en el calendario
+Se crean los trabajadores ligados a cada empresa, un usuario por cada trabajador,
+los tipos de roles y los roles asignados a cada usuario, las asignaciones de turnos
+(de trabajador y turno), los turnos en las empresas, los tipos de fichaje, los 
+motivos de pausa en la empresa, los permisos, la politica retencion y dispositivos
+
 Comando para ejecutar la api del backend: 
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 Comando para ejecutar la aplicación web:
 npx expo start --web
 Ejecutar la aplicación android:

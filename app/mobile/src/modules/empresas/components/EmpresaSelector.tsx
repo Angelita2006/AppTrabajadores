@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import {
-  FlatList,
-  Modal,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  View,
+    FlatList,
+    Modal,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    View,
 } from "react-native";
 import { Empresa } from "../../../modules/empresas/types/empresa";
 import { useFichajeStore } from "../../../modules/fichajes/store/useFichajeStore";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 
 /**
  * Componente interactivo que despliega una ventana modal con el listado de empresas.

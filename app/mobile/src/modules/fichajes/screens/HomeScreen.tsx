@@ -6,16 +6,16 @@ import { EmpresaSelector } from "../../../modules/empresas/components/EmpresaSel
 //   obtenerFichajesEmpresaTrabajador,
 // } from "../../../modules/fichajes/api/fichajesService";
 import {
-  crearFichaje,
-  obtenerFichajesEmpresaTrabajador,
+    crearFichaje,
+    obtenerFichajesEmpresaTrabajador,
 } from "../../../modules/fichajes/api/services";
 import { Fichaje } from "../../../modules/fichajes/types/fichaje";
 // import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/horariosService";
 import { obtenerHorarioTrabajadorEmpresa } from "../../../modules/horarios/api/services";
 import { Horario } from "../../../modules/horarios/types/horario";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 /**
  * Convierte un objeto de fecha o marca de tiempo numérica en formato de texto de horas y minutos.
  * Devuelve un indicador de guiones si el valor recibido no existe.

@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 import { Alert, Platform, Pressable } from "react-native";
 import {
-  ProveedorTrabajador,
-  useTrabajador,
-} from "../src/modules/trabajadores/store/TrabajadorContext";
+    ProveedorTrabajador,
+    useTrabajador,
+} from "../src/modules/trabajadores/store/UsuarioContext";
 import { TipoUsuario } from "../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";

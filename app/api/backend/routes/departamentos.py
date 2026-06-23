@@ -63,7 +63,7 @@ def obtener_todos_los_departamentos(db: Session = Depends(get_db)):
     URI: GET /api/departamentos
     Devuelve la estructura de departamentos global absoluta del sistema Saas.
     """
-    return db.query(Departamentos).all()
+    return db.query(Departamentos).join(Departamentos.empresa).order_by(Empresas.nombre_comercial.asc()).order_by(Departamentos.nombre.asc()).all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[DepartamentoResponse])

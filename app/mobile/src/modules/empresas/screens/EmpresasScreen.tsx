@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 // import { obtenerEmpresas } from "../../../modules/empresas/api/empresasService";
 import { obtenerEmpresas } from "../../../modules/empresas/api/services";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 import { Empresa } from "../types/empresa";
 
 /**

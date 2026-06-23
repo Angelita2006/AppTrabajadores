@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import String
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -62,7 +63,7 @@ def obtener_todos_los_festivos(db: Session = Depends(get_db)):
     URI: GET /api/festivos
     Devuelve la lista global absoluta de todos los días festivos cargados en la plataforma.
     """
-    return db.query(Festivos).all()
+    return db.query(Festivos).order_by(Festivos.fecha.asc()).all()
 
 
 @router.get("/calendario/{id_calendario}", response_model=List[FestivoResponse])
@@ -73,6 +74,31 @@ def obtener_festivos_por_calendario(id_calendario: UUID, db: Session = Depends(g
     """
     return db.query(Festivos).filter(Festivos.calendario_id == id_calendario).order_by(Festivos.fecha.asc()).all()
 
+@router.put("/{id_festivo}/editar", response_model=FestivoResponse)
+def editar_festivo(id_festivo: UUID, nueva_fecha = None, nuevo_tipo = None, nueva_descripcion = None, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/usuarios-roles/{id_festivo}/editar
+    Modifica la fecha, el tipo o la descripción del festivo.
+    """
+    festivo = db.query(Festivos).filter(Festivos.id == id_festivo).first()
+    
+    if not festivo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ningún festivo con el ID {id_festivo}."
+        )
+    
+    if nueva_fecha is not None:
+        setattr(festivo, "fecha", nueva_fecha)
+    if nuevo_tipo is not None:
+        setattr(festivo, "tipo", nuevo_tipo)
+    if nueva_descripcion is not None:
+        setattr(festivo, "descripcion", nueva_descripcion)
+    # setattr(festivo, "updated_at", datetime.now())
+    
+    db.commit()
+    db.refresh(festivo)
+    return festivo
 
 @router.delete("/{id_festivo}", status_code=status.HTTP_200_OK)
 def eliminar_festivo_manual(id_festivo: UUID, db: Session = Depends(get_db)):

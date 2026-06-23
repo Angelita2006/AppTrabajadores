@@ -71,7 +71,7 @@ def obtener_todas_las_asignaciones_de_roles(db: Session = Depends(get_db)):
     URI: GET /api/usuarios-roles
     Devuelve la matriz global de asignaciones de roles y alcances del sistema Saas.
     """
-    return db.query(UsuariosRoles).all()
+    return db.query(UsuariosRoles).join(UsuariosRoles.usuario).order_by(Usuarios.nombre.asc()).all()
 
 
 @router.get("/usuario/{id_usuario}", response_model=List[UsuarioRolResponse])
@@ -82,6 +82,26 @@ def obtener_roles_por_usuario(id_usuario: UUID, db: Session = Depends(get_db)):
     """
     return db.query(UsuariosRoles).filter(UsuariosRoles.usuario_id == id_usuario).all()
 
+@router.put("/{id_usuario}/rol", response_model=UsuarioRolResponse)
+def cambiar_rol_asignado_usuario(id_usuario: UUID, nuevo_rol: int, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/usuarios-roles/{id_usuario}/rol
+    Modifica el rol asignado a un usuario existente.
+    """
+    usuariorol = db.query(UsuariosRoles).filter(UsuariosRoles.usuario_id == id_usuario).first()
+    
+    if not usuariorol:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ninguna asignación de rol con el ID de usuario {id_usuario}."
+        )
+    
+    setattr(usuariorol, "role_id", nuevo_rol)
+    # setattr(usuariorol, "updated_at", datetime.now())
+    
+    db.commit()
+    db.refresh(usuariorol)
+    return usuariorol
 
 @router.delete("/{id_asignacion}", status_code=status.HTTP_200_OK)
 def revocar_rol_usuario(id_asignacion: UUID, db: Session = Depends(get_db)):

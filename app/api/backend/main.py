@@ -5,7 +5,7 @@ from routes import asignaciones_turno, auditoria_accesos, ausencias, calendarios
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
-    description="API centralizada para gestionar fichajes, horarios, trabajadores y empresas de FICHAPP.",
+    description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
     version="1.0.0",
     # docs_url=None,
     # redoc_url=None

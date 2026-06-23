@@ -3,11 +3,11 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 // import { crearFichaje } from "../../../modules/fichajes/api/fichajesService";
 import { crearFichaje } from "../../../modules/fichajes/api/services";
 import {
-  EstadoFichaje,
-  useFichajeStore,
+    EstadoFichaje,
+    useFichajeStore,
 } from "../../../modules/fichajes/store/useFichajeStore";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 /**
  * Diccionario de configuración estática para adaptar el botón principal según la situación del empleado.
  * Define las etiquetas, el tipo de evento técnico y los colores para cada estado de la jornada.

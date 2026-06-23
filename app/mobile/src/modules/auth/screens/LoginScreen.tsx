@@ -1,32 +1,32 @@
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming,
 } from "react-native-reanimated";
 import {
-  getUsuarioByEmailYPassword,
-  obtenerEmpresasTrabajador,
+    getUsuarioByEmailYPassword,
+    obtenerEmpresasTrabajador,
 } from "../../../modules/trabajadores/api/services";
-import { useTrabajador } from "../../../modules/trabajadores/store/TrabajadorContext";
 import { ThemedText } from "../../../shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../../shared/ui/AppSurface";
 import VideoBackground from "../../../shared/ui/VideoBackground";
 import { IconSymbol } from "../../../shared/ui/icon-symbol";
+import { useTrabajador } from "../../trabajadores/store/UsuarioContext";
 
 const { width, height } = Dimensions.get("window");
 
