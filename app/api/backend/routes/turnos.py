@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 from typing import List
 from uuid import UUID
 from core.database import get_db
@@ -55,7 +55,7 @@ def obtener_todos_los_turnos(db: Session = Depends(get_db)):
     URI: GET /api/turnos
     Devuelve el catálogo de todos los turnos teóricos de la plataforma Saas para la gestoría.
     """
-    return db.query(Turnos).join(Turnos.empresa).order_by(Empresas.nombre_comercial.asc()).all()
+    return db.query(Turnos).join(Turnos.empresa).order_by(Empresas.nombre_comercial.asc(), Turnos.nombre.asc()).all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[TurnoResponse])
@@ -64,7 +64,7 @@ def obtener_turnos_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
     URI: GET /api/turnos/empresa/{id_empresa}
     Recupera los cuadrantes horarios dados de alta de forma aislada por una organización (tenant).
     """
-    return db.query(Turnos).filter(Turnos.empresa_id == id_empresa).all()
+    return db.query(Turnos).filter(Turnos.empresa_id == id_empresa).order_by(Turnos.nombre.asc()).all()
 
 
 @router.get("/{id_turno}", response_model=TurnoResponse)
@@ -81,6 +81,35 @@ def obtener_turno_laboral(id_turno: UUID, db: Session = Depends(get_db)):
         )
     return turno
 
+@router.put("/{id_turno}/editar", response_model=TurnoResponse)
+def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_hora_inicio = None, nueva_hora_fin = None, nueva_duracion_pausa_min = None, nuevos_dias_semana = None, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/turnos/{id_turno}/editar
+    Modifica los datos de un turno como el nombre, la hora de inicio, la hora de fin, la duración de pausa en minutos y los días de la semana.
+    """
+    turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
+    
+    if not turno:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ningún turno con el ID {id_turno}."
+        )
+    
+    if nuevo_nombre is not None:
+        setattr(turno, "nombre", nuevo_nombre)
+    if nueva_hora_inicio is not None:
+        setattr(turno, "hora_inicio", nueva_hora_inicio)
+    if nueva_hora_fin is not None:
+        setattr(turno, "hora_fin", nueva_hora_fin)
+    if nueva_duracion_pausa_min is not None:
+        setattr(turno, "duracion_pausa_minutos", nueva_duracion_pausa_min)
+    if nuevos_dias_semana is not None:
+        setattr(turno, "dias_semana", nuevos_dias_semana)
+    # setattr(empresa, "updated_at", datetime.now())
+    
+    db.commit()
+    db.refresh(turno)
+    return turno
 
 @router.delete("/{id_turno}", status_code=status.HTTP_200_OK)
 def eliminar_turno_maestro(id_turno: UUID, db: Session = Depends(get_db)):
