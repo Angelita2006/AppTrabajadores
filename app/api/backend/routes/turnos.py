@@ -82,10 +82,10 @@ def obtener_turno_laboral(id_turno: UUID, db: Session = Depends(get_db)):
     return turno
 
 @router.put("/{id_turno}/editar", response_model=TurnoResponse)
-def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_hora_inicio = None, nueva_hora_fin = None, nueva_duracion_pausa_min = None, nuevos_dias_semana = None, db: Session = Depends(get_db)):
+def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_duracion_pausa_min = None, db: Session = Depends(get_db)):
     """
     URI: PUT /api/turnos/{id_turno}/editar
-    Modifica los datos de un turno como el nombre, la hora de inicio, la hora de fin, la duración de pausa en minutos y los días de la semana.
+    Modifica los datos de un turno como el nombre, la duración de pausa en minutos y los días de la semana.
     """
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     
@@ -97,14 +97,8 @@ def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_hora_inicio = None, 
     
     if nuevo_nombre is not None:
         setattr(turno, "nombre", nuevo_nombre)
-    if nueva_hora_inicio is not None:
-        setattr(turno, "hora_inicio", nueva_hora_inicio)
-    if nueva_hora_fin is not None:
-        setattr(turno, "hora_fin", nueva_hora_fin)
     if nueva_duracion_pausa_min is not None:
         setattr(turno, "duracion_pausa_minutos", nueva_duracion_pausa_min)
-    if nuevos_dias_semana is not None:
-        setattr(turno, "dias_semana", nuevos_dias_semana)
     # setattr(empresa, "updated_at", datetime.now())
     
     db.commit()
