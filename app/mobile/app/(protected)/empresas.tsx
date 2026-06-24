@@ -1,12 +1,12 @@
-// app/mobile/app/(protected)/empresas.tsx
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  View,
 } from "react-native";
+// import { obtenerEmpresas } from "../../src/modules/empresas/api/services";
 import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
@@ -43,20 +43,9 @@ export default function EmpresasScreen() {
     try {
       setCargando(true);
       // Simulación de GET /api/empresas (Si es admin_empresa, el backend filtra por su tenant)
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // await obtenerEmpresas();
 
-      setEmpresas([
-        {
-          id: "e9f8d7c6-b5a4-4321-9876-1234567890ab",
-          razon_social: "Tecnologías Fichapp S.L.",
-          nombre_comercial: "Fichapp Devs",
-          cif: "B12345678",
-          zona_horaria: "Europe/Madrid",
-          codigo_cnae: "6201 - Actividades de programación informática",
-          convenio_colectivo: "Convenio Estatal de Oficinas y Despachos",
-          direccion_fiscal: "Calle Calasparra, 14, Murcia, España",
-        },
-      ]);
+      setEmpresas([obtenerEmpresas()]);
     } catch {
       Alert.alert(
         "Error Saas",
@@ -239,3 +228,6 @@ const styles = StyleSheet.create({
   },
   detalleValue: { fontSize: 13, color: "#334155", fontWeight: "500", flex: 1 },
 });
+function obtenerEmpresas(): ItemEmpresa {
+  throw new Error("Function not implemented.");
+}

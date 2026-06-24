@@ -91,10 +91,13 @@ export const obtenerContratosTrabajador = async (idTrabajador: string) => {
 /**
  * [VISTA DE PLANIFICACIÓN] Recupera el cuadrante actual de turnos teóricos del operario.
  * Necesario para dibujar los horarios asignados de lunes a domingo en la pantalla del calendario.
+ * @param idTrabajador Identificador UUID del expediente del empleado
  */
 export const obtenerAsignacionesTurnoTrabajador = async (
-  idTrabajador: string,
+  idTrabajador: string | null,
 ) => {
+  if (!idTrabajador || idTrabajador === "1" || idTrabajador.length < 10)
+    return [];
   const respuesta = await api.get(
     `/api/asignaciones-turno/trabajador/${idTrabajador}`,
   );

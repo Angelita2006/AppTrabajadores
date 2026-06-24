@@ -1,5 +1,6 @@
+// app/mobile/app/_layout.tsx
 import { Tabs } from "expo-router";
-import { Alert, Platform, Pressable } from "react-native";
+import { Alert, LogBox, Platform, Pressable } from "react-native"; // 🚀 CORRECCIÓN: Se añadió LogBox en los elementos importados
 import {
   ProveedorSesion,
   useSesion,
@@ -7,6 +8,12 @@ import {
 import { TipoUsuario } from "../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
+
+// Desactivamos las alertas visuales solo si la aplicación se ejecuta en navegadores.
+// Esto evita que el bug interno del LogContext de Expo rompa el árbol de renderizado de la web.
+if (Platform.OS === "web") {
+  LogBox.ignoreAllLogs(true);
+}
 
 function TabsNavigation() {
   const { usuarioActual } = useSesion();

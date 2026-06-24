@@ -21,7 +21,7 @@ import {
   getUsuarioByEmailYPassword,
   obtenerEmpresasTrabajador,
 } from "../src/modules/trabajadores/api/services";
-import { useTrabajador } from "../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../src/shared/ui/AppSurface";
 import VideoBackground from "../src/shared/ui/VideoBackground";
@@ -37,7 +37,7 @@ export default function RootIndexScreen() {
     setEmpresas,
     setEmpresaSeleccionada,
     empresaSeleccionada,
-  } = useTrabajador();
+  } = useSesion();
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
   const [password, setPassword] = useState("password123");
@@ -259,20 +259,7 @@ export default function RootIndexScreen() {
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
               />
-              <Pressable
-                onPress={() => router.replace("/recuperar-password")}
-                style={{
-                  alignSelf: "flex-end",
-                  marginBottom: 16,
-                  marginTop: -8,
-                }}
-              >
-                <ThemedText
-                  style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
-                >
-                  ¿Has olvidado tu contraseña?
-                </ThemedText>
-              </Pressable>
+
               <Pressable
                 onPress={() => setIsObscured(!isObscured)}
                 style={styles.eyeButton}
@@ -285,6 +272,22 @@ export default function RootIndexScreen() {
                 />
               </Pressable>
             </View>
+            <Pressable
+              onPress={() =>
+                router.replace("/(authentication)/recuperar-password")
+              }
+              style={{
+                alignSelf: "center",
+                marginBottom: 16,
+                marginTop: 16,
+              }}
+            >
+              <ThemedText
+                style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
+              >
+                ¿Has olvidado tu contraseña?
+              </ThemedText>
+            </Pressable>
             {errorPassword && (
               <ThemedText style={styles.errorText}>
                 La contraseña requiere al menos 6 caracteres.
@@ -306,9 +309,9 @@ export default function RootIndexScreen() {
               <ThemedText style={styles.buttonText}>Iniciar Sesión</ThemedText>
             )}
           </Pressable>
-          <ThemedText style={styles.helpText}>
+          {/* <ThemedText style={styles.helpText}>
             Conexión encriptada con el servidor de la organización.
-          </ThemedText>
+          </ThemedText> */}
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -337,7 +340,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
-    elevation: 8,
+    alignItems: "center",
+
+    // Filtro inteligente para aplicar sombras seguras según la plataforma
+    ...Platform.select({
+      web: {
+        // En navegadores web usamos la directiva estándar recomendada por la advertencia
+        boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
+      },
+      default: {
+        // En dispositivos móviles (Pixel_9/iOS) mantenemos la sombra nativa estándar
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+      },
+    }),
   },
   headerContenedor: { alignItems: "center", marginBottom: 28 },
   logoBranding: {

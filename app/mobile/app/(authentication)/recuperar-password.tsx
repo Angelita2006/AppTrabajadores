@@ -2,25 +2,25 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
-    confirmarCambioPassword,
-    solicitarTokenRecuperacion,
+  confirmarCambioPassword,
+  solicitarTokenRecuperacion,
 } from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import VideoBackground from "../../src/shared/ui/VideoBackground";
@@ -38,7 +38,7 @@ export default function RecuperarPasswordScreen() {
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
 
-  const opacidadTarjeta = useSharedValue(1);
+  const opacidadTarjeta = useSharedValue(0);
 
   const handleSolicitarToken = async () => {
     if (!email.includes("@")) {
@@ -95,7 +95,7 @@ export default function RecuperarPasswordScreen() {
     } catch (error: any) {
       Alert.alert(
         "Fallo de Validación",
-        "El token de 6 dígitos introducido es incorrecto.\m" + error,
+        "El token de 6 dígitos introducido es incorrecto.\n" + error,
       );
     } finally {
       setCargando(false);

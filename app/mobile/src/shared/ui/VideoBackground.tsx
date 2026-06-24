@@ -1,38 +1,57 @@
+// app/mobile/src/shared/ui/VideoBackground.tsx
 import { useVideoPlayer, VideoView } from "expo-video";
 import React from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
-
-const { width, height } = Dimensions.get("window");
+import { Platform, StyleSheet, View } from "react-native";
 
 export default function VideoBackground() {
-  // Ruta local de tu archivo MP4 ligero
   const videoLocal = require("../../../assets/video/login-bg.mp4");
 
-  /**
-   * CONTROL DEL REPRODUCTOR NATIVO:
-   * useVideoPlayer inicializa el video de forma óptima en el sistema operativo.
-   * Configuramos las mismas propiedades que tenías en expo-av.
-   */
   const player = useVideoPlayer(videoLocal, (playerInstance) => {
-    playerInstance.loop = true; // isLooping={true} -> Bucle infinito sin saltos
-    playerInstance.muted = true; // isMuted={true} -> Silenciado por completo
-    playerInstance.playbackRate = 1.0; // rate={1.0} -> Velocidad normal
-    playerInstance.play(); // shouldPlay={true} -> Reproducción automática
+    playerInstance.muted = true; // Mute obligatorio para saltar el bloqueo de autoplay en Web
+    playerInstance.loop = true; // Bucle infinito continuo
+    playerInstance.playbackRate = 1.0; // Velocidad normal
+    playerInstance.play(); // Disparar reproducción automática
   });
 
+  player.muted = true;
+
+  // Controlamos el renderizado y aislamiento de forma condicional según la plataforma
+  if (Platform.OS === "web") {
+    return (
+      <View
+        style={StyleSheet.absoluteFill}
+        {...({
+          tabIndex: -1,
+          inert: "true",
+          dataSet: { inert: "" },
+        } as any)}
+      >
+        <VideoView
+          player={player}
+          style={styles.video}
+          nativeControls={false}
+          contentFit="cover"
+          showsTimecodes={false}
+        />
+        <View style={styles.overlay} />
+      </View>
+    );
+  }
+
+  // Vista nativa pura para Android (Pixel_9) e iOS
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* 1. COMPONENTE REPRODUCTOR DE VIDEO OPTIMIZADO (NUEVO) */}
+    <View
+      style={StyleSheet.absoluteFill}
+      accessible={false}
+      importantForAccessibility="no"
+    >
       <VideoView
         player={player}
         style={styles.video}
-        nativeControls={false} // Oculta los botones nativos de reproducción (play/pausa)
-        contentFit="cover" // resizeMode={ResizeMode.COVER} -> Cubre la pantalla sin cortes
-        showsTimecodes={false} // Oculta marcas de tiempo del sistema
+        nativeControls={false}
+        contentFit="cover"
+        showsTimecodes={false}
       />
-
-      {/* 2. CAPA SUPERIOR OSCURA (OVERLAY) */}
-      {/* Mantiene el contraste correcto y la legibilidad de las letras del formulario */}
       <View style={styles.overlay} />
     </View>
   );
@@ -40,12 +59,10 @@ export default function VideoBackground() {
 
 const styles = StyleSheet.create({
   video: {
-    width: width,
-    height: height,
-    position: "absolute",
+    ...StyleSheet.absoluteFillObject,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    backgroundColor: "rgba(15, 23, 42, 0.65)", // Filtro de legibilidad UX
   },
 });
