@@ -1,20 +1,18 @@
-// app/mobile/app/_layout.tsx
-
 import { Tabs } from "expo-router";
 import { Alert, Platform, Pressable } from "react-native";
 import {
-  ProveedorTrabajador,
-  useTrabajador,
-} from "../src/modules/trabajadores/store/UsuarioContext";
+  ProveedorSesion,
+  useSesion,
+} from "../src/modules/trabajadores/store/SesionContext";
 import { TipoUsuario } from "../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
 function TabsNavigation() {
-  const { usuarioActual } = useTrabajador();
+  const { usuarioActual } = useSesion();
   const tieneSesion = usuarioActual !== null;
 
-  // Filtro de seguridad: Evaluamos si la cuenta posee facultades corporativas o de gestoría
+  // Escudo de control horario: Evaluamos si el perfil cuenta con rango directivo
   const esAdmin =
     usuarioActual?.tipo_usuario === ("admin_empresa" as TipoUsuario) ||
     usuarioActual?.tipo_usuario === ("admin_gestoria" as TipoUsuario);
@@ -27,7 +25,7 @@ function TabsNavigation() {
           if (!tieneSesion) {
             Alert.alert(
               "Acceso Restringido",
-              "Por favor, inicia sesión en la pestaña de Acceso para desbloquear las funciones de control horario.",
+              "Por favor, introduce tus credenciales corporativas en la pestaña de Acceso para desbloquear esta sección.",
             );
           } else {
             props.onPress?.(event);
@@ -81,15 +79,14 @@ function TabsNavigation() {
       />
 
       <Tabs.Screen
-        name="(protected)/trabajadores"
+        name="(protected)/plantilla"
         redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Plantilla",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="group" color={color} />
           ),
-          // Ocultación total por Ley: Si no es administrador, la pestaña se destruye de la UI
-          href: esAdmin ? "/(protected)/trabajadores" : null,
+          tabBarButton: esAdmin ? TabButtonProtegido : () => null,
         }}
       />
 
@@ -155,7 +152,7 @@ function TabsNavigation() {
         }}
       />
 
-      {/* Controladores de desvío interno ocultos */}
+      {/* Controladores ocultos de ruteo interno */}
       <Tabs.Screen name="(protected)/fichajes" options={{ href: null }} />
       <Tabs.Screen name="(protected)/perfil" options={{ href: null }} />
       <Tabs.Screen name="(public)/login" options={{ href: null }} />
@@ -170,8 +167,8 @@ function TabsNavigation() {
 
 export default function TabLayout() {
   return (
-    <ProveedorTrabajador>
+    <ProveedorSesion>
       <TabsNavigation />
-    </ProveedorTrabajador>
+    </ProveedorSesion>
   );
 }

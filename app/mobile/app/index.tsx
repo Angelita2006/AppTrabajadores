@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -258,6 +259,20 @@ export default function RootIndexScreen() {
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
               />
+              <Pressable
+                onPress={() => router.replace("/recuperar-password")}
+                style={{
+                  alignSelf: "flex-end",
+                  marginBottom: 16,
+                  marginTop: -8,
+                }}
+              >
+                <ThemedText
+                  style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
+                >
+                  ¿Has olvidado tu contraseña?
+                </ThemedText>
+              </Pressable>
               <Pressable
                 onPress={() => setIsObscured(!isObscured)}
                 style={styles.eyeButton}
