@@ -1,7 +1,13 @@
+import LoginBG from "@/assets/images/login-bg.png";
 import React from "react";
+import { Image, View } from "react-native";
 
-const _layout = () => {
-  return <div>_layout</div>;
+const AuthLayout = () => {
+  return (
+    <View>
+      <Image source={LoginBG} />
+    </View>
+  );
 };
 
-export default _layout;
+export default AuthLayout;
