@@ -1,4 +1,4 @@
-import api from "../../../services/api/api.js";
+import api from "../../../service/api/api.js";
 
 /** Registra un nuevo evento de fichaje (entrada, salida o descanso) en el servidor de Python. */
 export const crearFichaje = async (

@@ -1,4 +1,4 @@
-import api from "../../../services/api/api";
+import api from "../../../service/api/api";
 
 /**
  * Obtiene el catálogo global de todas las empresas dadas de alta en la plataforma.

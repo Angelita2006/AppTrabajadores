@@ -246,35 +246,7 @@ Las pantallas usan componentes con:
 5. Una vez seleccionada la empresa, accede a `app/(protected)/home.tsx` para fichar.
 6. Si es admin, en `home.tsx` ve trabajadores de la empresa seleccionada.
 
-12. OTRAS OBSERVACIONES
-----------------------
-- El proyecto usa React Native y Expo Router, lo que facilita el soporte web y móvil.
-- `app/index.tsx` utiliza `Animated.ScrollView` para permitir desplazamiento en formularios largos.
-- La lógica de negocio se mantiene local con datos mock, lo que permite probar la app sin backend.
-- `src/APIservices/` existe como carpeta alternativa de servicios, pero las pantallas actuales usan `src/services/` y `src/mock/`.
-- `README.md` es el README generado por Expo y puede reemplazarse por esta documentación si se desea.
-
-13. ARCHIVOS PRINCIPALES
-------------------------
-- app/index.tsx: login, registro, perfil y edición de perfil.
-- app/(protected)/home.tsx: pantalla de fichaje y resumen.
-- app/(protected)/empresas.tsx: selección y gestión de empresas.
-- context/TrabajadorContext.tsx: contexto para trabajador/empresa.
-- src/models/: tipos y estructuras.
-- src/services/: lógica de negocio local.
-- src/mock/: datos de ejemplo.
-- components/themed-text.tsx / components/themed-view.tsx: componentes de UI con tema.
-- hooks/use-theme-color.ts: hook para elegir colores según tema.
-
-14. USO PROFESIONAL
-------------------
-Este proyecto sirve como una app de control de presencia.
-Es adecuado para:
-- validar pantallas de fichaje y selección de empresa.
-- demostrar roles de administrador y trabajador.
-- usar como base para integrar un backend real más adelante.
-
-15. LÓGICA DE NEGOCIO 
+12. LÓGICA DE NEGOCIO 
 ---------------------
 - Empresas, centro de trabajo (de empresa), departamento (de centro de trabajo), 
 calendario laboral (de una centro de trabajo) y festivos (de calendario)
@@ -289,11 +261,11 @@ permisos y politicas retencion (de empresa)
 
 Se crean las empresas, los centros de trabajo de cada una, los departamentos de 
 cada una, la auditoria accesos (de empresa, usuario, trabajador), el calendario 
-laboral de cada una y sus festivos en el calendario
-Se crean los trabajadores ligados a cada empresa, un usuario por cada trabajador,
-los tipos de roles y los roles asignados a cada usuario, las asignaciones de turnos
-(de trabajador y turno), los turnos en las empresas, los tipos de fichaje, los 
-motivos de pausa en la empresa, los permisos, la politica retencion y dispositivos
+laboral de cada una y sus festivos en el calendario, los trabajadores ligados a 
+cada empresa, un usuario por cada trabajador, los tipos de roles y los roles 
+asignados a cada usuario, las asignaciones de turnos (de trabajador y turno), 
+los turnos en las empresas, los tipos de fichaje, los motivos de pausa en la 
+empresa, los permisos, la politica retencion y dispositivos.
 
 Comando para ejecutar la api del backend: 
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8080

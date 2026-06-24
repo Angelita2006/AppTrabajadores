@@ -138,3 +138,24 @@ def cambiar_estado_usuario(id_usuario: UUID, activo: bool, db: Session = Depends
     db.commit()
     db.refresh(usuario)
     return usuario
+
+@router.put("/{id_usuario}/password", response_model=UsuarioResponse)
+def cambiar_password_usuario(id_usuario: UUID, antigua_password: str, nueva_password: str, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/usuarios/{id_usuario}/password
+    Permite cambiar la contraseña de la cuenta de usuario.
+    """
+    usuario = db.query(Usuarios).filter(Usuarios.id == id_usuario).first()
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cuenta de usuario con ID {id_usuario} no encontrada."
+        )
+
+    if usuario.password_hash.__str__()  == antigua_password:
+        setattr(usuario, "password_hash", str(nueva_password))
+    
+    setattr(usuario, "updated_at", datetime.datetime.now())
+    db.commit()
+    db.refresh(usuario)
+    return usuario

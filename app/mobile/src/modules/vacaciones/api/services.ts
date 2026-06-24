@@ -1,4 +1,4 @@
-import api from "../../../services/api/api";
+import api from "../../../service/api/api";
 
 /**
  * Obtiene el registro histórico global de todas las solicitudes de vacaciones del sistema.

@@ -1,4 +1,4 @@
-import api from "../../../services/api/api";
+import api from "../../../service/api/api";
 
 // ====================================================================
 // 1. ENDPOINTS DE AUTENTICACIÓN Y EXPENDIENTE (TABLA TRABAJADORES)
