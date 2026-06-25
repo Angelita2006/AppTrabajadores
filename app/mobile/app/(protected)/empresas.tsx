@@ -6,29 +6,17 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-// import { obtenerEmpresas } from "../../src/modules/empresas/api/services";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { obtenerEmpresas } from "../../src/modules/empresas/api/services";
+import { Empresa } from "../../src/modules/empresas/types/empresa";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
-// Definición de tipo local mapeada milimétricamente con tu modelo físico de Empresas
-interface ItemEmpresa {
-  id: string;
-  razon_social: string;
-  cif: string;
-  nombre_comercial?: string | null;
-  zona_horaria: string;
-  codigo_cnae?: string | null;
-  convenio_colectivo?: string | null;
-  direccion_fiscal?: string | null;
-}
-
 export default function EmpresasScreen() {
-  const { usuarioActual } = useTrabajador();
-  const [empresas, setEmpresas] = useState<ItemEmpresa[]>([]);
+  const { usuarioActual } = useSesion();
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargando, setCargando] = useState(true);
 
-  // Filtro estricto basado en la matriz RBAC de tu backend Saas
   const esGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
   const esAutorizado = esGestoria || esAdminEmpresa;
@@ -42,10 +30,7 @@ export default function EmpresasScreen() {
   const cargarCatalogoEmpresas = async () => {
     try {
       setCargando(true);
-      // Simulación de GET /api/empresas (Si es admin_empresa, el backend filtra por su tenant)
-      // await obtenerEmpresas();
-
-      setEmpresas([obtenerEmpresas()]);
+      setEmpresas(await obtenerEmpresas());
     } catch {
       Alert.alert(
         "Error Saas",
@@ -228,6 +213,3 @@ const styles = StyleSheet.create({
   },
   detalleValue: { fontSize: 13, color: "#334155", fontWeight: "500", flex: 1 },
 });
-function obtenerEmpresas(): ItemEmpresa {
-  throw new Error("Function not implemented.");
-}

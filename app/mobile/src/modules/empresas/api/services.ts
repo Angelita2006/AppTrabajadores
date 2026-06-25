@@ -17,6 +17,14 @@ export const obtenerEmpresa = async (idEmpresa: number) => {
 };
 
 /**
+ * Recupera la información detallada de una empresa específica mediante su ID único.
+ */
+export const obtenerEmpresaPorCif = async (cifEmpresa: number) => {
+  const respuesta = await api.get(`api/empresas/cif/${cifEmpresa}`);
+  return respuesta.data;
+};
+
+/**
  * Crea una nueva estructura de datos de empresa en la base de datos real del backend.
  */
 export const crearEmpresa = async (data: {

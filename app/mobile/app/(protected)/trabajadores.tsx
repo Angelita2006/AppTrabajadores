@@ -1,24 +1,24 @@
 // app/mobile/app/(protected)/trabajadores.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
 import { obtenerTrabajadores } from "../../src/modules/trabajadores/api/services";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import {
-    TipoUsuario,
-    Trabajador,
+  TipoUsuario,
+  Trabajador,
 } from "../../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
 export default function AdministracionTrabajadoresScreen() {
-  const { usuarioActual } = useTrabajador();
+  const { usuarioActual } = useSesion();
   const [plantilla, setPlantilla] = useState<Trabajador[]>([]);
   const [cargando, setCargando] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "altas" | "bajas">(
@@ -250,10 +250,7 @@ const styles = StyleSheet.create({
   },
   botonFiltroActivo: {
     backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px 0px rgba(0, 0, 0, 0.05)",
     elevation: 2,
   },
   textoBoton: { fontSize: 14, fontWeight: "600", color: "#64748B" },

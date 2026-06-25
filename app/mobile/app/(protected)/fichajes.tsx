@@ -1,7 +1,7 @@
 // app/mobile/app/(protected)/fichajes.tsx
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -14,7 +14,7 @@ interface ItemFichaje {
 }
 
 export default function FichajesHistorialScreen() {
-  const { trabajadorActual } = useTrabajador();
+  const { trabajadorActual } = useSesion();
   const [historial, setHistorial] = useState<ItemFichaje[]>([]);
   const [cargando, setCargando] = useState(true);
 

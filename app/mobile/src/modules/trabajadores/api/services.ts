@@ -1,4 +1,6 @@
 import api from "../../../service/api/api";
+import { Empresa } from "../../empresas/types/empresa";
+import { UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
 // 1. ENDPOINTS DE AUTENTICACIÓN Y EXPENDIENTE (TABLA TRABAJADORES)
@@ -12,7 +14,7 @@ import api from "../../../service/api/api";
 export const getUsuarioByEmailYPassword = async (
   email: string,
   password: string,
-) => {
+): Promise<UsuarioSesion> => {
   // Conectado al nuevo router de Usuarios / Trabajadores unificado
   const respuesta = await api.post("/api/usuarios/login", {
     email,
@@ -70,8 +72,12 @@ export const crearTrabajador = async (data: {
  * Consulta la organización o empresa principal asignada al expediente del empleado.
  * @param idTrabajador Identificador único de tipo UUID (string)
  */
-export const obtenerEmpresasTrabajador = async (idTrabajador: string) => {
-  const respuesta = await api.get(`/api/trabajadores/${idTrabajador}/empresas`);
+export const obtenerEmpresasTrabajador = async (
+  idTrabajador: string,
+): Promise<Empresa[]> => {
+  const respuesta = await api.get<Empresa[]>(
+    `/api/trabajadores/${idTrabajador}/empresas`,
+  );
   return respuesta.data;
 };
 

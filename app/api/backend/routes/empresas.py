@@ -75,6 +75,19 @@ def obtener_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
         )
     return empresa
 
+@router.get("/cif/{cif_empresa}", response_model=EmpresaResponse)
+def obtener_empresa_por_cif(cif_empresa: UUID, db: Session = Depends(get_db)):
+    """
+    URI: GET /api/empresas/cif/{cif_empresa}
+    Busca una organización específica mediante su cif.
+    """
+    empresa = db.query(Empresas).filter(Empresas.cif == cif_empresa).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con CIF {cif_empresa} no encontrada."
+        )
+    return empresa
 
 @router.get("/{id_empresa}/trabajadores", response_model=List[TrabajadorResponse])
 def obtener_trabajadores_empresa(id_empresa: UUID, db: Session = Depends(get_db)):

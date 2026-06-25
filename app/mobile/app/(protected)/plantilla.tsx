@@ -1,23 +1,23 @@
 // ARCHIVO: app/mobile/app/(protected)/plantilla.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  View,
 } from "react-native";
 import { obtenerTrabajadores } from "../../src/modules/trabajadores/api/services";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import {
-    TipoUsuario,
-    Trabajador,
+  TipoUsuario,
+  Trabajador,
 } from "../../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card } from "../../src/shared/ui/AppSurface";
 
 export default function PlantillaScreen() {
-  const { usuarioActual } = useTrabajador();
+  const { usuarioActual } = useSesion();
   const [plantilla, setPlantilla] = useState<Trabajador[]>([]);
   const [cargando, setCargando] = useState(true);
   const [filtroEstado] = useState<"todos" | "altas">("todos");

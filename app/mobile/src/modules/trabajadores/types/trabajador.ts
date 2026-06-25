@@ -47,5 +47,5 @@ export interface UsuarioSesion {
   trabajador_id: string | null; // NULL si es un usuario administrador puro sin expediente
 
   // Relación uno a uno mapeada por el backend de producción
-  trabajador?: Trabajador | null;
+  // trabajador?: Trabajador | null;
 }

@@ -1,22 +1,24 @@
-// app/mobile/src/modules/trabajadores/store/SesionContext.tsx
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useMemo,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
+import { Empresa } from "../../empresas/types/empresa";
+import { obtenerTrabajador } from "../api/services";
 import { Trabajador, UsuarioSesion } from "../types/trabajador";
 
 interface SesionContextValue {
   usuarioActual: UsuarioSesion | null;
   setUsuarioActual: (usuario: UsuarioSesion | null) => void;
-  trabajadorActual: Trabajador | null; // Propiedad calculada reactiva de alta comodidad
-  empresaSeleccionada: any | null;
-  setEmpresaSeleccionada: (empresa: any | null) => void;
-  empresas: any[];
-  setEmpresas: (empresas: any[]) => void;
-  seleccionarEmpresa: (empresa: any | null) => void;
+  trabajadorActual: Trabajador | null;
+  empresaSeleccionada: Empresa | null;
+  setEmpresaSeleccionada: (empresa: Empresa | null) => void;
+  empresas: Empresa[];
+  setEmpresas: (empresas: Empresa[]) => void;
+  seleccionarEmpresa: (empresa: Empresa | null) => void;
 }
 
 const SesionContext = createContext<SesionContextValue | undefined>(undefined);
@@ -25,18 +27,38 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioSesion | null>(
     null,
   );
-  const [empresaSeleccionada, setEmpresaSeleccionada] = useState<any | null>(
+  const [empresaSeleccionada, setEmpresaSeleccionada] =
+    useState<Empresa | null>(null);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+
+  // 2. Convertimos trabajadorActual en un estado de TypeScript correcto
+  const [trabajadorActual, setTrabajadorActual] = useState<Trabajador | null>(
     null,
   );
-  const [empresas, setEmpresas] = useState<any[]>([]);
 
-  /**
-   * Extrae de forma automática el expediente laboral anidado dentro de la cuenta del usuario.
-   * Evita tener que actualizar manualmente múltiples estados a la vez en el Login.
-   */
-  const trabajadorActual = useMemo(() => {
-    return usuarioActual?.trabajador ?? null;
-  }, [usuarioActual]);
+  // 3. Usamos useEffect para resolver de forma asíncrona la petición de la API
+  useEffect(() => {
+    async function cargarExpediente() {
+      // Si el usuario cierra sesión, limpiamos el expediente del trabajador
+      if (!usuarioActual || !usuarioActual.trabajador_id) {
+        setTrabajadorActual(null);
+        return;
+      }
+
+      try {
+        // Esperamos a la API de forma segura
+        const datosTrabajador = await obtenerTrabajador(
+          usuarioActual.trabajador_id,
+        );
+        setTrabajadorActual(datosTrabajador);
+      } catch (error) {
+        console.error("Error al obtener los datos del trabajador:", error);
+        setTrabajadorActual(null);
+      }
+    }
+
+    cargarExpediente();
+  }, [usuarioActual]); // Se ejecuta automáticamente cada vez que el usuario inicia o cierra sesión
 
   const value = useMemo(
     () => ({

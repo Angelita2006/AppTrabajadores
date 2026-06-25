@@ -1,10 +1,8 @@
-// app/mobile/app/(authentication)/recuperar-password.tsx
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,10 +21,8 @@ import {
   solicitarTokenRecuperacion,
 } from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
-import VideoBackground from "../../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
-
-const { width } = Dimensions.get("window");
+import VideoBackground from "../../src/shared/ui/VideoBackground";
 
 export default function RecuperarPasswordScreen() {
   const router = useRouter();
@@ -38,7 +34,13 @@ export default function RecuperarPasswordScreen() {
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
 
+  // Inicializamos en 0 para la animación de entrada suave
   const opacidadTarjeta = useSharedValue(0);
+
+  useEffect(() => {
+    // Forzamos a Reanimated a despertar el componente al cargar la vista
+    opacidadTarjeta.value = withTiming(1, { duration: 500 });
+  }, [opacidadTarjeta]);
 
   const handleSolicitarToken = async () => {
     if (!email.includes("@")) {
@@ -55,10 +57,10 @@ export default function RecuperarPasswordScreen() {
 
       // Transición animada de la tarjeta hacia el paso 2
       opacidadTarjeta.value = withTiming(0, { duration: 200 }, () => {
+        setPaso(2);
         opacidadTarjeta.value = withTiming(1, { duration: 300 });
       });
 
-      setPaso(2);
       Alert.alert(
         "Código Despachado",
         "Usa el token '123456' que hemos impreso de forma segura en la consola de tu servidor.",
@@ -104,6 +106,13 @@ export default function RecuperarPasswordScreen() {
 
   const estiloTarjetaAnimada = useAnimatedStyle(() => ({
     opacity: opacidadTarjeta.value,
+    transform: [
+      {
+        translateY: withTiming(
+          opacidadTarjeta.value * 0 + (1 - opacidadTarjeta.value) * 40,
+        ),
+      },
+    ],
   }));
 
   return (
@@ -112,6 +121,7 @@ export default function RecuperarPasswordScreen() {
       style={styles.container}
     >
       <VideoBackground />
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
@@ -124,7 +134,7 @@ export default function RecuperarPasswordScreen() {
             <ThemedText style={styles.mainTitle}>Recuperación</ThemedText>
             <ThemedText style={styles.subtitle}>
               {paso === 1
-                ? "Restablece el acceso a tu cuenta corporativa"
+                ? "Restablece el acceso a tu cuenta"
                 : "Introduce el código de verificación"}
             </ThemedText>
           </View>
@@ -136,7 +146,7 @@ export default function RecuperarPasswordScreen() {
             <View style={styles.formularioWidth}>
               <View style={styles.field}>
                 <ThemedText style={styles.label}>
-                  Correo de la Cuenta
+                  Correo de recuperación
                 </ThemedText>
                 <View style={styles.inputWrapper}>
                   <IconSymbol
@@ -276,12 +286,28 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   loginCard: {
-    width: width * 0.9,
+    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
+    width: "90%",
+    maxWidth: 420,
+
+    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
+    alignSelf: "center",
+
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
-    elevation: 8,
     alignItems: "center",
+
+    // Filtro inteligente para aplicar sombras seguras según la plataforma
+    ...Platform.select({
+      web: {
+        boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
+      },
+      default: {
+        boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
+        elevation: 8,
+      },
+    }),
   },
   headerContenedor: { alignItems: "center", marginBottom: 24 },
   logoBranding: {

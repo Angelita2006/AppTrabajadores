@@ -1,4 +1,3 @@
-// app/mobile/app/(protected)/horarios.tsx
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -7,14 +6,12 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { AsignacionTurno } from "../../src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerAsignacionesTurnoTrabajador } from "../../src/modules/trabajadores/api/services";
 import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
-
-// Importación de las interfaces unificadas de producción
-import { AsignacionTurno } from "../../src/modules/asignaciones-turno/types/asignacion-turno";
 
 export default function HorariosScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
@@ -22,28 +19,30 @@ export default function HorariosScreen() {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    // Declaramos la función de red aquí adentro.
+    // Al ser local, encapsula sus dependencias y elimina advertencias de ESLint.
+    const cargarPlanificacionHoraria = async () => {
+      try {
+        setCargando(true);
+        // Descarga real desde tu base de datos PostgreSQL
+        const datos = await obtenerAsignacionesTurnoTrabajador(
+          usuarioActual!.trabajador_id,
+        );
+        setCuadrante(datos);
+      } catch {
+        Alert.alert(
+          "Error de Sincronización",
+          "No se ha podido descargar tu calendario de turnos oficiales.",
+        );
+      } finally {
+        setCargando(false);
+      }
+    };
+
     if (usuarioActual?.trabajador_id) {
       cargarPlanificacionHoraria();
     }
-  }, [usuarioActual]);
-
-  const cargarPlanificacionHoraria = async () => {
-    try {
-      setCargando(true);
-      // Descarga real desde tu base de datos PostgreSQL
-      const datos = await obtenerAsignacionesTurnoTrabajador(
-        usuarioActual!.trabajador_id,
-      );
-      setCuadrante(datos);
-    } catch {
-      Alert.alert(
-        "Error de Sincronización",
-        "No se ha podido descargar tu calendario de turnos oficiales.",
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
+  }, [usuarioActual]); // El array vigila únicamente la cuenta de usuario de PostgreSQL
 
   return (
     <AppScreen

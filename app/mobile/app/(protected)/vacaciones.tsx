@@ -1,15 +1,15 @@
 // app/mobile/app/(protected)/vacaciones.tsx
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -37,7 +37,7 @@ interface ItemAusencia {
 }
 
 export default function VacacionesScreen() {
-  useTrabajador();
+  useSesion();
   const [solicitudes, setSolicitudes] = useState<ItemAusencia[]>([]);
   const [cargando, setCargando] = useState(false);
 

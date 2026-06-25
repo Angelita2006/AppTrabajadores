@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,8 +25,6 @@ import { ThemedText } from "../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../src/shared/ui/AppSurface";
 import VideoBackground from "../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
-
-const { width } = Dimensions.get("window");
 
 export default function RootIndexScreen() {
   const {
@@ -68,18 +65,27 @@ export default function RootIndexScreen() {
   };
 
   const handleLogin = async () => {
-    if (!validarFormulario()) return;
+    if (!validarFormulario()) console.log("Formulario no válido.");
 
     try {
+      console.log("Cargando...");
       setCargando(true);
       const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
-      const empresas = await obtenerEmpresasTrabajador(
-        usuarioSesion.trabajador_id,
-      );
-
       setUsuarioActual(usuarioSesion);
-      setEmpresas(empresas);
-      setEmpresaSeleccionada(empresas[0] ?? null);
+      console.log("Usuario actual: " + usuarioSesion?.nombre.toString());
+      console.log("Trabajador actual: " + trabajadorActual?.nombre);
+      if (usuarioSesion.trabajador_id !== null) {
+        const empresas = await obtenerEmpresasTrabajador(
+          usuarioSesion.trabajador_id,
+        );
+        setEmpresas(empresas);
+        if (empresas.length > 0) {
+          setEmpresaSeleccionada(empresas[0]);
+          console.log("Empresa seleccionada: " + empresas[0].nombre_comercial);
+        } else {
+          console.log("Este trabajador no tiene empresas asignadas.");
+        }
+      }
     } catch (error) {
       Alert.alert(
         "Fallo de autenticación",
@@ -117,7 +123,7 @@ export default function RootIndexScreen() {
     return (
       <AppScreen
         title="Mi Perfil"
-        subtitle="Consulta la ficha técnica de tu expediente laboral operativo."
+        // subtitle="Consulta la ficha técnica de tu expediente laboral operativo."
       >
         <Row>
           <StatCard
@@ -128,7 +134,7 @@ export default function RootIndexScreen() {
           <StatCard label="Rol Sistema" value={usuarioActual.tipo_usuario} />
           <StatCard
             label="Empresa Activa"
-            value={empresaSeleccionada?.nombre ?? "Ninguna"}
+            value={empresaSeleccionada?.nombre_comercial ?? "Ninguna"}
           />
         </Row>
 
@@ -160,12 +166,12 @@ export default function RootIndexScreen() {
                 label="Teléfono de Contacto"
                 value={trabajadorActual.telefono ?? "No registrado"}
               />
-              <Detail label="Email de Acceso" value={usuarioActual.email} />
+              <Detail label="Email" value={usuarioActual.email} />
             </View>
 
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
               <ThemedText style={styles.logoutButtonText}>
-                Cerrar Sesión Activa
+                Cerrar Sesión
               </ThemedText>
             </Pressable>
           </Card>
@@ -309,9 +315,20 @@ export default function RootIndexScreen() {
               <ThemedText style={styles.buttonText}>Iniciar Sesión</ThemedText>
             )}
           </Pressable>
-          {/* <ThemedText style={styles.helpText}>
-            Conexión encriptada con el servidor de la organización.
-          </ThemedText> */}
+          <Pressable
+            onPress={() => router.replace("/(authentication)/registro")}
+            style={{
+              alignSelf: "center",
+              marginBottom: 16,
+              marginTop: 16,
+            }}
+          >
+            <ThemedText
+              style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
+            >
+              ¿No tienes una cuenta? Regístrate
+            </ThemedText>
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -336,7 +353,13 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   loginCard: {
-    width: width * 0.9,
+    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
+    width: "90%",
+    maxWidth: 420,
+
+    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
+    alignSelf: "center",
+
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
@@ -345,15 +368,10 @@ const styles = StyleSheet.create({
     // Filtro inteligente para aplicar sombras seguras según la plataforma
     ...Platform.select({
       web: {
-        // En navegadores web usamos la directiva estándar recomendada por la advertencia
         boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
       },
       default: {
-        // En dispositivos móviles (Pixel_9/iOS) mantenemos la sombra nativa estándar
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
+        boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
         elevation: 8,
       },
     }),

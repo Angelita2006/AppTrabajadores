@@ -2,24 +2,23 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
+import { obtenerEmpresaPorCif } from "../../src/modules/empresas/api/services";
+import { Empresa } from "../../src/modules/empresas/types/empresa";
 import { crearTrabajador } from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import VideoBackground from "../../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
-
-const { width } = Dimensions.get("window");
 
 export default function RegistroScreen() {
   const router = useRouter();
@@ -32,7 +31,7 @@ export default function RegistroScreen() {
   const [nifNie, setNifNie] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [empresaId, setEmpresaId] = useState(""); // Código UUID del Tenant entregado por la empresa
+  const [empresaCif, setEmpresaCif] = useState(""); // Código UUID del Tenant entregado por la empresa
 
   // Estados de Validación Visual
   const [errorEmail, setErrorEmail] = useState(false);
@@ -43,7 +42,7 @@ export default function RegistroScreen() {
     const esEmailValido = emailRegex.test(email);
     const esPasswordValido = password.length >= 6;
     const camposCompletos =
-      nombre.trim() && apellidos.trim() && nifNie.trim() && empresaId.trim();
+      nombre.trim() && apellidos.trim() && nifNie.trim() && empresaCif.trim();
 
     setErrorEmail(!esEmailValido);
     setErrorPassword(!esPasswordValido);
@@ -64,15 +63,16 @@ export default function RegistroScreen() {
 
     try {
       setCargando(true);
-
+      const empresa: Empresa = await obtenerEmpresaPorCif(
+        Number.parseInt(empresaCif),
+      );
       // Dispara la petición hacia el endpoint POST /api/trabajadores de tu FastAPI
       await crearTrabajador({
-        empresa_id: empresaId.trim(),
+        empresa_id: empresa.id.toString(),
         nif_nie: nifNie.trim().toUpperCase(),
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
         email: email.trim().toLowerCase(),
-        // fecha_alta_empresa: new Date().toISOString().split("T")[0],
       });
 
       Alert.alert(
@@ -115,9 +115,7 @@ export default function RegistroScreen() {
           <View style={styles.formulario}>
             {/* Campo: Código de Empresa (Tenant) */}
             <View style={styles.field}>
-              <ThemedText style={styles.label}>
-                ID Único de Empresa (UUID)
-              </ThemedText>
+              <ThemedText style={styles.label}>CIF Único de Empresa</ThemedText>
               <View style={styles.inputWrapper}>
                 <IconSymbol
                   name="briefcase.fill"
@@ -126,11 +124,11 @@ export default function RegistroScreen() {
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  value={empresaId}
-                  onChangeText={setEmpresaId}
+                  value={empresaCif}
+                  onChangeText={setEmpresaCif}
                   style={styles.inputContainer}
                   autoCapitalize="none"
-                  placeholder="Introduce el UUID de tu corporación"
+                  placeholder="Introduce el CIF de tu corporación"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
                 />
@@ -296,12 +294,28 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   loginCard: {
-    width: width * 0.9,
+    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
+    width: "90%",
+    maxWidth: 420,
+
+    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
+    alignSelf: "center",
+
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
-    padding: 24,
-    elevation: 8,
+    padding: 28,
     alignItems: "center",
+
+    // Filtro inteligente para aplicar sombras seguras según la plataforma
+    ...Platform.select({
+      web: {
+        boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
+      },
+      default: {
+        boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
+        elevation: 8,
+      },
+    }),
   },
   headerContenedor: { alignItems: "center", marginBottom: 20 },
   logoBranding: {

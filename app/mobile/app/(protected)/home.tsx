@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useTrabajador } from "../../src/modules/trabajadores/store/UsuarioContext";
+import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
 
 export default function HomeScreen() {
-  const { empresaSeleccionada } = useTrabajador();
+  const { empresaSeleccionada } = useSesion();
 
   // Estados para controlar el flujo horario reactivo
   const [estadoActual, setEstadoActual] = useState<Estado>(Estado.Activo);
@@ -65,7 +65,7 @@ export default function HomeScreen() {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       setEstadoActual(nuevoEstado);
-      Alert.alert(
+      console.log(
         "Control Horario",
         `Marcaje de ${tipoLabel} registrado con éxito en el servidor.`,
       );
@@ -82,7 +82,7 @@ export default function HomeScreen() {
   return (
     <AppScreen
       title="Control de Jornada"
-      subtitle={`Empresa activa: ${empresaSeleccionada?.nombre ?? "Ninguna asignada"}`}
+      subtitle={`Empresa activa: ${empresaSeleccionada?.nombre_comercial ?? "Ninguna asignada"}`}
     >
       {/* Fila de contadores rápidos y estado actual */}
       <Row>
@@ -217,10 +217,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px 0px rgba(0, 0, 0, 0.1)",
     elevation: 2,
   },
   botonEntrada: {
