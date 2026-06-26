@@ -73,7 +73,6 @@ export default function RootIndexScreen() {
       const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
       setUsuarioActual(usuarioSesion);
       console.log("Usuario actual: " + usuarioSesion?.nombre.toString());
-      console.log("Trabajador actual: " + trabajadorActual?.nombre);
       if (usuarioSesion.trabajador_id !== null) {
         const empresas = await obtenerEmpresasTrabajador(
           usuarioSesion.trabajador_id,
@@ -86,11 +85,10 @@ export default function RootIndexScreen() {
           console.log("Este trabajador no tiene empresas asignadas.");
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert(
-        "Fallo de autenticación",
-        "El correo electrónico o la contraseña introducidos son incorrectos o su cuenta está inactiva.\n" +
-          error,
+        "Error al cargar el calendario",
+        `No se han podido recuperar tus turnos programados.\nError: ${error}`,
       );
     } finally {
       setCargando(false);

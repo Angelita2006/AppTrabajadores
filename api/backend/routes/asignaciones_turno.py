@@ -64,6 +64,32 @@ def obtener_asignaciones_por_trabajador(id_trabajador: UUID, db: Session = Depen
     """
     return db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == id_trabajador).all()
 
+@router.put("/{id_asignacion}/editar", response_model=AsignacionTurnoResponse)
+def editar_asignacion_turno(id_asignacion: UUID, fecha_fin: date, fecha_inicio = None,  db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/asignaciones-turno/{id_asignacion}/editar?fecha_fin=AAAA-MM-DD
+    Edita los datos sobre un turno asignado para permitir rotaciones horarias.
+    """
+    asignacion = db.query(AsignacionesTurno).filter(AsignacionesTurno.id == id_asignacion).first()
+    if not asignacion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación de turno no encontrada.")
+
+    # Emulación en la capa de la API de la regla lógica CheckConstraint de la base de datos
+    if asignacion.fecha_inicio > fecha_fin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La fecha de finalización no puede ser previa a la fecha de inicio del turno."
+        )
+
+    # Modificación segura utilizando setattr para eludir advertencias estrictas de tipo en Pylance
+    if fecha_inicio is not None:   
+        setattr(asignacion, "fecha_inicio", fecha_inicio)
+        
+    setattr(asignacion, "fecha_fin", fecha_fin)
+    
+    db.commit()
+    db.refresh(asignacion)
+    return asignacion
 
 @router.put("/{id_asignacion}/finalizar", response_model=AsignacionTurnoResponse)
 def finalizar_vigencia_turno(id_asignacion: UUID, fecha_fin: date, db: Session = Depends(get_db)):

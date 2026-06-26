@@ -196,6 +196,9 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     marginTop: 8,
     fontVariant: ["tabular-nums"],
+    padding: 10,
+    marginBottom: 10,
+    lineHeight: 48,
   },
   loaderSpacing: {
     marginTop: 12,
