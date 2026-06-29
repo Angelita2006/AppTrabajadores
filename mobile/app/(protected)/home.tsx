@@ -69,9 +69,9 @@ export default function HomeScreen() {
 
         if (fichajesHoy.length === 0) {
           setEstadoActual(Estado.Activo);
-          setSegundosAcumuladosHoy(0);
-          setTiempoFormateado("00:00:00");
-          setTimestampBaseActual(null);
+          // setSegundosAcumuladosHoy(0);
+          // setTiempoFormateado("00:00:00");
+          // setTimestampBaseActual(null);
           return;
         }
 
