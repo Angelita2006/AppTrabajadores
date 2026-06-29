@@ -65,31 +65,51 @@ export default function RootIndexScreen() {
   };
 
   const handleLogin = async () => {
-    if (!validarFormulario()) console.log("Formulario no válido.");
+    // Si el formulario no es válido, detenemos la ejecución inmediatamente
+    if (!validarFormulario()) {
+      console.log("Formulario no válido.");
+      return;
+    }
 
     try {
       console.log("Cargando...");
       setCargando(true);
+
+      // Intentamos el login en el backend
       const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
       setUsuarioActual(usuarioSesion);
       console.log("Usuario actual: " + usuarioSesion?.nombre.toString());
+
+      // Si el login fue exitoso y tiene un trabajador asociado, cargamos sus empresas
       if (usuarioSesion.trabajador_id !== null) {
-        const empresas = await obtenerEmpresasTrabajador(
-          usuarioSesion.trabajador_id,
-        );
-        setEmpresas(empresas);
-        if (empresas.length > 0) {
-          setEmpresaSeleccionada(empresas[0]);
-          console.log("Empresa seleccionada: " + empresas[0].nombre_comercial);
-        } else {
-          console.log("Este trabajador no tiene empresas asignadas.");
+        try {
+          const empresas = await obtenerEmpresasTrabajador(
+            usuarioSesion.trabajador_id,
+          );
+          setEmpresas(empresas);
+          if (empresas.length > 0) {
+            setEmpresaSeleccionada(empresas[0]);
+            console.log(
+              "Empresa seleccionada: " + empresas[0].nombre_comercial,
+            );
+          } else {
+            console.log("Este trabajador no tiene empresas asignadas.");
+          }
+        } catch (errorEmpresa) {
+          console.log(
+            "Error secundario al cargar empresas o turnos:",
+            errorEmpresa,
+          );
+          // Aquí podrías poner una alerta secundaria si lo deseas,
+          // pero el usuario ya habrá iniciado sesión correctamente.
         }
       }
     } catch (error: any) {
-      Alert.alert(
-        "Error al cargar el calendario",
-        `No se han podido recuperar tus turnos programados.\nError: ${error}`,
-      );
+      const mensajeErrorApi =
+        error.response?.data?.detail ||
+        "No se pudo conectar con el servidor. Revisa tu conexión.";
+
+      Alert.alert("Fallo de Autenticación", mensajeErrorApi);
     } finally {
       setCargando(false);
     }

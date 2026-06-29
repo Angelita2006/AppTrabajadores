@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from core.security import verify_password
 from models.empresas import Empresas
 from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioResponse
 from models.usuarios import Usuarios
@@ -68,16 +69,26 @@ def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
             detail=f"Ha ocurrido un error de integridad al guardar el usuario: {str(error)}"
         )
 
-
 @router.post("/login", response_model=UsuarioResponse)
 def login_plataforma(credenciales: LoginRequest, db: Session = Depends(get_db)):
     """
     URI: POST /api/usuarios/login
-    Valida el correo y la contraseña, actualizando el hito de último acceso.
+    Valida el correo y la contraseña (soporta texto plano y hash seguro), 
+    actualizando el hito de último acceso.
     """
     usuario = db.query(Usuarios).filter(Usuarios.email == credenciales.email).first()
 
-    if not usuario or str(usuario.password_hash) != credenciales.password:
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El correo electrónico o la contraseña introducidos son incorrectos."
+        )
+
+    es_hash_valido = verify_password(credenciales.password, str(usuario.password_hash))
+    es_texto_plano_valido = str(usuario.password_hash) == credenciales.password
+
+    # Si no pasa ninguna de las dos verificaciones, rechazamos el acceso
+    if not (es_hash_valido or es_texto_plano_valido):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El correo electrónico o la contraseña introducidos son incorrectos."

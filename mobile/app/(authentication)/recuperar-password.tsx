@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -57,7 +58,7 @@ export default function RecuperarPasswordScreen() {
 
       // Transición animada de la tarjeta hacia el paso 2
       opacidadTarjeta.value = withTiming(0, { duration: 200 }, () => {
-        setPaso(2);
+        runOnJS(setPaso)(2);
         opacidadTarjeta.value = withTiming(1, { duration: 300 });
       });
 
@@ -104,16 +105,15 @@ export default function RecuperarPasswordScreen() {
     }
   };
 
-  const estiloTarjetaAnimada = useAnimatedStyle(() => ({
-    opacity: opacidadTarjeta.value,
-    transform: [
-      {
-        translateY: withTiming(
-          opacidadTarjeta.value * 0 + (1 - opacidadTarjeta.value) * 40,
-        ),
-      },
-    ],
-  }));
+  const estiloTarjetaAnimada = useAnimatedStyle(() => {
+    // Calculamos la traslación en base a la opacidad actual de forma lineal
+    const translateY = (1 - opacidadTarjeta.value) * 40;
+
+    return {
+      opacity: opacidadTarjeta.value,
+      transform: [{ translateY }],
+    };
+  });
 
   return (
     <KeyboardAvoidingView

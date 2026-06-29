@@ -21,23 +21,32 @@ class FichajeBase(BaseModel):
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Método utilizado para realizar el marcaje")
 
 
-class FichajeCreate(FichajeBase):
+class FichajeCreate(BaseModel):
     """
-    Esquema utilizado para recibir los datos de un fichaje enviados desde la app móvil.
-    Contiene campos opcionales calculados de forma automática o manual según la situación.
+    Esquema unificado para recibir marcajes desde clientes web o móviles.
+    Garantiza la presencia de los campos no nulos exigidos por PostgreSQL.
     """
-    # Coordenadas mapeadas como Decimal para coincidir con la precisión del modelo Numeric(9,6)
-    latitud: Optional[Decimal] = Field(None, ge=Decimal('-90'), le=Decimal('90'), description="Coordenada de latitud")
-    longitud: Optional[Decimal] = Field(None, ge=Decimal('-180'), le=Decimal('180'), description="Coordenada de longitud")
+    empresa_id: UUID = Field(..., description="ID UUID del Tenant corporativo")
+    trabajador_id: UUID = Field(..., description="ID UUID del expediente del empleado")
+    centro_trabajo_id: UUID = Field(..., description="ID UUID del centro de trabajo asignado")
     
-    # Campo IP mapeado temporalmente con un string o formato IP (se procesará a INT en el CRUD)
-    ip_address: Optional[IPvAnyAddress] = Field(None, description="Dirección IP del dispositivo")
+    # Recibe la palabra clave string ("ENTRADA", "SALIDA") y se procesa a int en la ruta
+    tipo_evento_id: str = Field(..., description="Etiqueta textual del evento horario")
+    metodo_fichaje: MetodoFichajeEnum = Field(..., description="Canal: app_movil, web, qr, etc.")
     
-    motivo_pausa_id: Optional[int] = Field(None, description="ID del motivo de la pausa si aplica")
-    dispositivo_id: Optional[UUID] = Field(None, description="ID UUID del dispositivo físico de fichaje")
-    fecha_hora_dispositivo: Optional[datetime] = Field(None, description="Fecha y hora capturada por el hardware local")
-    observaciones: Optional[str] = Field(None, description="Comentarios adicionales sobre el marcaje")
-
+    # Campos por defecto mapeados según el diseño de tu base de datos
+    origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR)
+    estado: EstadoFichajeEnum = Field(default=EstadoFichajeEnum.VALIDO)
+    
+    # Parámetros hardware y geolocalización opcionales
+    latitud: Optional[Decimal] = Field(None, ge=Decimal('-90'), le=Decimal('90'))
+    longitud: Optional[Decimal] = Field(None, ge=Decimal('-180'), le=Decimal('180'))
+    ip_address: Optional[IPvAnyAddress] = Field(None, description="IP resuelta por la red")
+    
+    motivo_pausa_id: Optional[int] = Field(None)
+    dispositivo_id: Optional[UUID] = Field(None)
+    fecha_hora_dispositivo: Optional[datetime] = Field(None)
+    observaciones: Optional[str] = Field(None)
 
 class FichajeResponse(FichajeBase):
     """

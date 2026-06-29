@@ -180,3 +180,42 @@ export const confirmarCambioPassword = async (data: {
   const respuesta = await api.post("/api/auth/confirmar-password", data);
   return respuesta.data;
 };
+
+/**
+ * Envía un marcaje horario inmutable hacia la tabla 'fichajes' de PostgreSQL.
+ * Sincronizado con los requisitos NOT NULL de base de datos.
+ */
+export const registrarFichaje = async (data: {
+  empresa_id: string;
+  trabajador_id: string;
+  centro_trabajo_id: string;
+  tipo_evento_id: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
+  metodo_fichaje: "app_movil" | "web";
+  fecha_hora_dispositivo: string;
+  observaciones?: string | null;
+}) => {
+  const respuesta = await api.post("/api/fichajes", data);
+  return respuesta.data;
+};
+
+/**
+ * Descarga todos los marcajes del día actual para reconstruir el estado y el segundero.
+ * Conecta con el endpoint que filtra por la fecha actual del servidor.
+ */
+export const obtenerFichajesHoy = async (trabajadorId: string) => {
+  const respuesta = await api.get(
+    `/api/fichajes/trabajador/${trabajadorId}/hoy`,
+  );
+  return respuesta.data;
+};
+
+/**
+ * Descarga de forma eficiente el marcaje más reciente del operario.
+ * Apunta al endpoint especializado '/ultimo' de FastAPI de forma rápida.
+ */
+export const obtenerUltimoFichaje = async (trabajadorId: string) => {
+  const respuesta = await api.get(
+    `/api/fichajes/trabajador/${trabajadorId}/ultimo`,
+  );
+  return respuesta.data;
+};

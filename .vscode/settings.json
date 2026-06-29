@@ -9,6 +9,7 @@
     "./app/api/app",
     "./app/api/backend",
     "./app/api/backend",
-    "./app/api/backend/models"
+    "./app/api/backend/models",
+    "./api/backend/models"
   ]
 }

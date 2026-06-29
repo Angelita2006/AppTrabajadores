@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, model_validator
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Any, Optional
 from uuid import UUID
 from models.enums import TipoContratoEnum, TipoJornadaEnum
 
@@ -35,15 +35,34 @@ class ContratoCreate(ContratoBase):
     categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría según convenio profesional")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
 
-    @model_validator(mode='after')
-    def validar_fechas_coherentes(self) -> 'ContratoCreate':
+    @field_validator('fecha_fin', mode='before')
+    @classmethod
+    def limpiar_fecha_vacancia(cls, v: Any) -> Optional[datetime.date]:
         """
-        Valida que la fecha de finalización sea igual o posterior a la fecha de inicio,
-        emulando la restricción CheckConstraint de la base de datos.
+        Intercepta el valor antes del parseo de Pydantic.
         """
-        if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
-            raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio del contrato.")
+        if v == "" or v is None:
+            return None
+        return v
+
+@model_validator(mode='after')
+def validar_fechas_coherentes(self) -> 'ContratoCreate':
+    """
+    Adapta dinámicamente la validez de la fecha de fin según la modalidad contractual,
+    impidiendo bloqueos de inserción y asegurando la integridad de PostgreSQL.
+    """
+    # Si el contrato es de tipo indefinido, forzamos la fecha de fin a None de forma segura
+    if self.tipo_contrato == TipoContratoEnum.INDEFINIDO:
+        self.fecha_fin = None
         return self
+
+    if self.tipo_contrato == TipoContratoEnum.TEMPORAL and not self.fecha_fin:
+        raise ValueError("Los contratos temporales requieren especificar obligatoriamente una fecha de finalización.")
+
+    if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+        raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio del contrato.")
+        
+    return self
 
 
 class ContratoResponse(ContratoBase):
@@ -55,12 +74,10 @@ class ContratoResponse(ContratoBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
     
-    # Propiedades complementarias opcionales
     departamento_id: Optional[UUID] = Field(None)
     puesto_trabajo: Optional[str] = Field(None)
     categoria_profesional: Optional[str] = Field(None)
     fecha_fin: Optional[datetime.date] = Field(None)
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

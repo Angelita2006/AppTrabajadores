@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, date 
 from typing import List
 from uuid import UUID
 from core.database import get_db
@@ -20,7 +20,7 @@ def crear_contrato(obj_in: ContratoCreate, db: Session = Depends(get_db)):
     Registra un nuevo contrato laboral en el sistema validando la coherencia estructural de las entidades.
     """
     # 1. Validaciones estructurales de existencia (Aislamiento Multiempresa/Tenant)
-    empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
+    empresa = db.query(Empresas).filter(Representativo := Empresas.id == obj_in.empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa no encontrada.")
 
@@ -38,6 +38,7 @@ def crear_contrato(obj_in: ContratoCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento no encontrado.")
 
     # 2. Mapeo y volcado directo al modelo físico de la base de datos de producción
+    # Nota: Si el esquema Pydantic interceptó un contrato indefinido, obj_in.fecha_fin es None de fábrica
     nuevo_contrato = Contratos(
         trabajador_id=obj_in.trabajador_id,
         empresa_id=obj_in.empresa_id,
@@ -49,8 +50,8 @@ def crear_contrato(obj_in: ContratoCreate, db: Session = Depends(get_db)):
         departamento_id=obj_in.departamento_id,
         puesto_trabajo=obj_in.puesto_trabajo,
         categoria_profesional=obj_in.categoria_profesional,
-        fecha_fin=obj_in.fecha_fin,
-        activo=True # Alta activa por defecto
+        fecha_fin=obj_in.fecha_fin, 
+        activo=True 
     )
 
     try:
@@ -94,10 +95,11 @@ def obtener_contratos_por_empresa(id_empresa: UUID, db: Session = Depends(get_db
 
 
 @router.put("/{id_contrato}/dar-baja", response_model=ContratoResponse)
-def rescindir_contrato(id_contrato: UUID, fecha_fin: datetime, db: Session = Depends(get_db)):
+def rescindir_contrato(id_contrato: UUID, fecha_fin: date, db: Session = Depends(get_db)):
     """
     URI: PUT /api/contratos/{id_contrato}/dar-baja?fecha_fin=AAAA-MM-DD
-    Finaliza la vigencia de un contrato laboral aplicando la baja lógica y guardando la fecha de cese de actividad.
+    Cambiado fecha_fin a 'date' para concordar con el modelo de datos 
+    de la columna física en PostgreSQL y mitigar fallas de guardado.
     """
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
     if not contrato:
@@ -109,7 +111,6 @@ def rescindir_contrato(id_contrato: UUID, fecha_fin: datetime, db: Session = Dep
             detail="La fecha de cese no puede ser anterior al inicio del contrato."
         )
 
-    # Uso seguro de setattr para eludir avisos de tipo y actualizar los hilos de auditoría
     setattr(contrato, "activo", False)
     setattr(contrato, "fecha_fin", fecha_fin)
     setattr(contrato, "updated_at", datetime.now())
