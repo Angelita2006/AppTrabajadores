@@ -76,7 +76,7 @@ export default function EmpresasScreen() {
         />
         <StatCard
           label="Rol de Gestión"
-          value={esGestoria ? "Gestoría" : "Tenant Admin"}
+          value={esGestoria ? "Gestoría" : "Admin"}
           tone="success"
         />
       </Row>

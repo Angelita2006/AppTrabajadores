@@ -1,9 +1,18 @@
-// app/mobile/app/(protected)/vacaciones.tsx
-import React, { useEffect, useState } from "react";
+import {
+  AusenciaCreateRequest,
+  AusenciaResponse,
+  EstadoAusencia,
+  ItemAusencia,
+  TipoAusencia,
+} from "@/src/modules/ausencias/types/ausencia";
+import {
+  obtenerAusenciasYVacacionesTrabajador,
+  solicitarAusenciaOVacaciones,
+} from "@/src/modules/trabajadores/api/services";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Pressable,
   StyleSheet,
   TextInput,
@@ -13,69 +22,68 @@ import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
-// Definición de tipos y enumerados idénticos a tu backend de PostgreSQL
-enum TipoAusenciaEnum {
-  vacaciones = "vacaciones",
-  baja_temporal = "baja_temporal",
-  maternidad_paternidad = "maternidad_paternidad",
-  permiso_retribuido = "permiso_retribuido",
-}
-
-enum EstadoAusenciaEnum {
-  pendiente = "pendiente",
-  aprobada = "aprobada",
-  rechazada = "rechazada",
-}
-
-interface ItemAusencia {
-  id: string;
-  tipo_ausencia: TipoAusenciaEnum;
-  estado: EstadoAusenciaEnum;
-  fecha_inicio: string;
-  fecha_fin: string;
-  motivo: string;
-}
-
 export default function VacacionesScreen() {
-  useSesion();
+  const { usuarioActual, trabajadorActual, empresaSeleccionada } = useSesion();
   const [solicitudes, setSolicitudes] = useState<ItemAusencia[]>([]);
   const [cargando, setCargando] = useState(false);
+  const [buscandoInicial, setBuscandoInicial] = useState(true);
 
-  // Estados locales para el formulario de alta manual
-  const [tipoSeleccionado, setTipoSeleccionado] = useState<TipoAusenciaEnum>(
-    TipoAusenciaEnum.vacaciones,
-  );
+  // Estados locales para el formulario
   const [fechaInicio, setFechaInicio] = useState("2026-07-01");
   const [fechaFin, setFechaFin] = useState("2026-07-15");
   const [motivo, setMotivo] = useState("");
+  const [tipoAusencia, setTipoAusencia] = useState<TipoAusencia>(
+    "vacaciones" as TipoAusencia,
+  );
+
+  // Carga histórica de ausencias
+  const cargarHistoricoAusencias = async () => {
+    if (!trabajadorActual?.id) {
+      setBuscandoInicial(false);
+      return;
+    }
+
+    try {
+      setBuscandoInicial(true);
+      const ausenciasTrabajador: ItemAusencia[] =
+        await obtenerAusenciasYVacacionesTrabajador(trabajadorActual.id);
+      setSolicitudes(ausenciasTrabajador || []);
+    } catch (error) {
+      console.error("Error cargando ausencias:", error);
+    } finally {
+      setBuscandoInicial(false);
+    }
+  };
 
   useEffect(() => {
     cargarHistoricoAusencias();
-  }, []);
+  }, [trabajadorActual?.id]);
 
-  const cargarHistoricoAusencias = async () => {
-    // Simulamos la descarga de datos desde /api/ausencias/trabajador/{id}
-    setSolicitudes([
-      {
-        id: "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
-        tipo_ausencia: TipoAusenciaEnum.vacaciones,
-        estado: EstadoAusenciaEnum.aprobada,
-        fecha_inicio: "2026-01-01",
-        fecha_fin: "2026-01-07",
-        motivo: "Periodo navideño retrasado",
-      },
-      {
-        id: "f6e5d4c3-b2a1-0f9e-8d7c-6b5a4f3e2d1c",
-        tipo_ausencia: TipoAusenciaEnum.permiso_retribuido,
-        estado: EstadoAusenciaEnum.pendiente,
-        fecha_inicio: "2026-08-10",
-        fecha_fin: "2026-08-11",
-        motivo: "Cita médica especialista",
-      },
-    ]);
-  };
+  // Cálculo dinámico del total de días reales acumulados de todas las solicitudes
+  const totalDiasSolicitados = useMemo(() => {
+    return solicitudes.reduce((acumulador, item) => {
+      const inicio = new Date(item.fecha_inicio);
+      const fin = new Date(item.fecha_fin);
+
+      // Calcular la diferencia en milisegundos y pasar a días (+1 para incluir el día de inicio)
+      const diferenciaTiempo = fin.getTime() - inicio.getTime();
+      const dias = Math.max(
+        0,
+        Math.floor(diferenciaTiempo / (1000 * 60 * 60 * 24)) + 1,
+      );
+
+      return acumulador + (isNaN(dias) ? 0 : dias);
+    }, 0);
+  }, [solicitudes]);
 
   const enviarSolicitud = async () => {
+    if (!tipoAusencia) {
+      Alert.alert(
+        "Formulario incompleto",
+        "Por favor, selecciona un tipo de ausencia.",
+      );
+      return;
+    }
     if (!motivo.trim()) {
       Alert.alert(
         "Formulario incompleto",
@@ -86,16 +94,29 @@ export default function VacacionesScreen() {
 
     try {
       setCargando(true);
-      // Simula el POST /api/ausencias hacia FastAPI
-      await new Promise((resolve) => setTimeout(resolve, 800));
 
-      const nueva: ItemAusencia = {
-        id: Math.random().toString(), // El backend generará un UUID real
-        tipo_ausencia: tipoSeleccionado,
-        estado: EstadoAusenciaEnum.pendiente,
+      if (usuarioActual!.trabajador_id == null) return;
+
+      const payload: AusenciaCreateRequest = {
+        trabajador_id: usuarioActual!.trabajador_id,
+        empresa_id: empresaSeleccionada!.id,
+        tipo_ausencia: tipoAusencia,
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
         motivo: motivo,
+        justificante_metadata: {},
+      };
+
+      const respuestaBackend: AusenciaResponse =
+        await solicitarAusenciaOVacaciones(payload);
+
+      const nueva: ItemAusencia = {
+        id: respuestaBackend.id,
+        tipo_ausencia: respuestaBackend.tipo_ausencia,
+        estado: respuestaBackend.estado,
+        fecha_inicio: respuestaBackend.fecha_inicio,
+        fecha_fin: respuestaBackend.fecha_fin,
+        motivo: respuestaBackend.motivo,
       };
 
       setSolicitudes([nueva, ...solicitudes]);
@@ -119,19 +140,19 @@ export default function VacacionesScreen() {
       <Row>
         <StatCard
           label="Días Solicitados"
-          value={solicitudes.length.toString()}
+          value={totalDiasSolicitados.toString()}
         />
         <StatCard
           label="Aprobadas"
           value={solicitudes
-            .filter((s) => s.estado === EstadoAusenciaEnum.aprobada)
+            .filter((s) => s.estado === EstadoAusencia.aprobado)
             .length.toString()}
           tone="success"
         />
         <StatCard
           label="Pendientes"
           value={solicitudes
-            .filter((s) => s.estado === EstadoAusenciaEnum.pendiente)
+            .filter((s) => s.estado === EstadoAusencia.pendiente)
             .length.toString()}
           tone="warning"
         />
@@ -142,22 +163,32 @@ export default function VacacionesScreen() {
         <View style={styles.contenedorFormulario}>
           <ThemedText style={styles.label}>Tipo de Ausencia</ThemedText>
           <View style={styles.selectorTipos}>
-            {Object.values(TipoAusenciaEnum).map((tipo) => (
+            {(
+              [
+                "vacaciones",
+                "baja_temporal",
+                "maternidad_paternidad",
+                "permiso_retribuido",
+                "ausencia_justificada",
+              ] as TipoAusencia[]
+            ).map((tipo) => (
               <Pressable
                 key={tipo}
                 style={[
                   styles.opcionTipo,
-                  tipoSeleccionado === tipo && styles.opcionTipoActiva,
+                  tipoAusencia === tipo && styles.opcionTipoActiva,
                 ]}
-                onPress={() => setTipoSeleccionado(tipo)}
+                onPress={() => {
+                  setTipoAusencia(tipo);
+                }}
               >
                 <ThemedText
                   style={[
                     styles.textoOpcion,
-                    tipoSeleccionado === tipo && styles.textoOpcionActiva,
+                    tipoAusencia === tipo && styles.textoOpcionActiva,
                   ]}
                 >
-                  {tipo.replace("_", " ")}
+                  {tipo.replace(/_/g, " ").toUpperCase()}
                 </ThemedText>
               </Pressable>
             ))}
@@ -190,64 +221,72 @@ export default function VacacionesScreen() {
             onChangeText={setMotivo}
             style={[styles.input, styles.textArea]}
             multiline
-            numberOfLines={3}
             placeholder="Detalla la causa legal de tu ausencia..."
             placeholderTextColor="#94A3B8"
           />
-
-          <Pressable
-            style={[styles.submitButton, cargando && styles.buttonDisabled]}
-            onPress={enviarSolicitud}
-            disabled={cargando}
-          >
-            {cargando ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <ThemedText style={styles.submitText}>Enviar a RRHH</ThemedText>
-            )}
-          </Pressable>
         </View>
+        <Pressable
+          style={[styles.submitButton, cargando && styles.buttonDisabled]}
+          onPress={enviarSolicitud}
+          disabled={cargando}
+        >
+          {cargando ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <ThemedText style={styles.submitText}>Enviar a RRHH</ThemedText>
+          )}
+        </Pressable>
       </Card>
 
       <ThemedText style={styles.sectionTitle}>
         Historial de Peticiones
       </ThemedText>
-      <FlatList
-        data={solicitudes}
-        scrollEnabled={false}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Card>
-            <View style={styles.solicitudItem}>
-              <View style={styles.solicitudHeader}>
-                <ThemedText style={styles.solicitudTipo}>
-                  {item.tipo_ausencia.replace("_", " ").toUpperCase()}
-                </ThemedText>
-                <View
-                  style={[
-                    styles.badge,
-                    item.estado === EstadoAusenciaEnum.aprobada
-                      ? styles.badgeAprobado
-                      : item.estado === EstadoAusenciaEnum.pendiente
-                        ? styles.badgePendiente
-                        : styles.badgeRechazado,
-                  ]}
-                >
-                  <ThemedText style={styles.badgeText}>
-                    {item.estado}
+
+      {buscandoInicial ? (
+        <ActivityIndicator
+          size="small"
+          color="#2563EB"
+          style={{ marginTop: 12 }}
+        />
+      ) : solicitudes.length === 0 ? (
+        <ThemedText style={styles.empty}>
+          No constan solicitudes previas.
+        </ThemedText>
+      ) : (
+        <View style={{ paddingBottom: 24 }}>
+          {solicitudes.map((item) => (
+            <Card key={item.id}>
+              <View style={styles.solicitudItem}>
+                <View style={styles.solicitudHeader}>
+                  <ThemedText style={styles.solicitudTipo}>
+                    {item.tipo_ausencia.replace(/_/g, " ").toUpperCase()}
                   </ThemedText>
+                  <View
+                    style={[
+                      styles.badge,
+                      item.estado === EstadoAusencia.aprobado
+                        ? styles.badgeAprobado
+                        : item.estado === EstadoAusencia.pendiente
+                          ? styles.badgePendiente
+                          : styles.badgeRechazado,
+                    ]}
+                  >
+                    <ThemedText style={styles.badgeText}>
+                      {item.estado.toUpperCase()}
+                    </ThemedText>
+                  </View>
                 </View>
+                <ThemedText style={styles.solicitudFechas}>
+                  Periodo: {item.fecha_inicio} al {item.fecha_fin}
+                </ThemedText>
+                <ThemedText style={styles.solicitudMotivo}>
+                  {item.motivo}
+                </ThemedText>
               </View>
-              <ThemedText style={styles.solicitudFechas}>
-                Periodo: {item.fecha_inicio} al {item.fecha_fin}
-              </ThemedText>
-              <ThemedText style={styles.solicitudMotivo}>
-                {item.motivo}
-              </ThemedText>
-            </View>
-          </Card>
-        )}
-      />
+            </Card>
+          ))}
+        </View>
+      )}
     </AppScreen>
   );
 }
@@ -274,6 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   opcionTipo: {
+    width: "auto",
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
@@ -282,8 +322,18 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
   opcionTipoActiva: { backgroundColor: "#DBEAFE", borderColor: "#3B82F6" },
-  textoOpcion: { fontSize: 12, color: "#64748B", fontWeight: "600" },
-  textoOpcionActiva: { color: "#1E40AF", fontWeight: "700" },
+  textoOpcion: {
+    fontSize: 10,
+    color: "#64748B",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  textoOpcionActiva: {
+    color: "#1E40AF",
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   filaFechas: { flexDirection: "row", gap: 12, marginBottom: 14 },
   columnaFecha: { flex: 1 },
   input: {
@@ -297,7 +347,7 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
   textArea: {
-    height: 70,
+    minHeight: 70,
     textAlignVertical: "top",
     paddingTop: 10,
     marginBottom: 16,
@@ -331,4 +381,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontStyle: "italic",
   },
+  empty: { textAlign: "center", color: "#64748B", marginTop: 10, fontSize: 14 },
 });

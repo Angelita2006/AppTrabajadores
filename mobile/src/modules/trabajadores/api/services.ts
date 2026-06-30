@@ -1,5 +1,15 @@
 import api from "../../../service/api/api";
+import {
+  AusenciaCreateRequest,
+  AusenciaResponse,
+} from "../../ausencias/types/ausencia";
+import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
+import {
+  IncidenciaCreateRequest,
+  IncidenciaResponse,
+} from "../../correcciones-fichaje/types/incidencia";
 import { Empresa } from "../../empresas/types/empresa";
+import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
 import { UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
@@ -82,7 +92,7 @@ export const obtenerEmpresasTrabajador = async (
 };
 
 // ====================================================================
-// 2. ENDPOINTS PARA LA FUTURA UI (VISTAS, CONTRATOS Y PLANIFICACIÓN)
+// 2. ENDPOINTS PARA LA UI (VISTAS, CONTRATOS Y PLANIFICACIÓN)
 // ====================================================================
 
 /**
@@ -112,7 +122,7 @@ export const obtenerAsignacionesTurnoTrabajador = async (
 
 /**
  * [VISTA DE CONTROL HORARIO] Consulta el histórico completo de marcajes inmutables.
- * Utilizado para rellenar las tablas de auditoría horaria en la interfaz del perfil.
+ * Utilizado para rellenar la tabla horaria en la interfaz del trabajador.
  */
 export const obtenerFichajesTrabajadorYEmpresa = async (
   idTrabajador: string,
@@ -209,6 +219,15 @@ export const obtenerFichajesHoy = async (trabajadorId: string) => {
   return respuesta.data;
 };
 
+export const obtenerFichajesSemanaActual = async (
+  idTrabajador: string,
+): Promise<RegistroFichaje[]> => {
+  const respuesta = await api.get(
+    `/api/fichajes/trabajador/${idTrabajador}/semana`,
+  );
+  return respuesta.data;
+};
+
 /**
  * Descarga de forma eficiente el marcaje más reciente del operario.
  * Apunta al endpoint especializado '/ultimo' de FastAPI de forma rápida.
@@ -216,6 +235,106 @@ export const obtenerFichajesHoy = async (trabajadorId: string) => {
 export const obtenerUltimoFichaje = async (trabajadorId: string) => {
   const respuesta = await api.get(
     `/api/fichajes/trabajador/${trabajadorId}/ultimo`,
+  );
+  return respuesta.data;
+};
+
+/**
+ * Recupera un Centro de Trabajo específico desde PostgreSQL por su ID único.
+ * URI: GET /api/auth/centros-trabajo/{id} o la ruta de tu APIRouter
+ */
+export const obtenerCentroTrabajo = async (
+  centroTrabajoId: string,
+): Promise<CentroTrabajo> => {
+  // Ajusta el prefijo "/api/centros-trabajo" según cómo lo tengas en el @router.post de tu FastAPI
+  const respuesta = await api.get(`/api/centros-trabajo/${centroTrabajoId}`);
+  return respuesta.data;
+};
+
+/**
+ * Recupera el historial consolidado de marcajes de toda la plantilla para una fecha concreta.
+ * URI: GET /api/fichajes/empresa/{empresa_id}?fecha=YYYY-MM-DD
+ */
+export const obtenerFichajesEmpresaPorFecha = async (
+  empresaId: string,
+  fechaStr: string,
+): Promise<RegistroFichaje[]> => {
+  // Realiza la consulta pasando la fecha como Query Parameter (?fecha=...)
+  const respuesta = await api.get(`/api/fichajes/empresa/${empresaId}`, {
+    params: { fecha: fechaStr },
+  });
+  return respuesta.data;
+};
+
+/**
+ * Transmite una nueva petición de días libres o baja hacia la tabla 'ausencias' de PostgreSQL.
+ * URI: POST /api/ausencias
+ */
+export const solicitarAusenciaOVacaciones = async (
+  data: AusenciaCreateRequest,
+): Promise<AusenciaResponse> => {
+  const respuesta = await api.post<AusenciaResponse>("/api/ausencias", data);
+  return respuesta.data;
+};
+
+/**
+ * [VISTA DE INCIDENCIAS] Envía una solicitud de rectificación horaria a Recursos Humanos.
+ * URI: POST /api/correcciones
+ */
+export const solicitarCorreccionHoraria = async (
+  data: IncidenciaCreateRequest,
+): Promise<IncidenciaResponse> => {
+  const respuesta = await api.post<IncidenciaResponse>(
+    "/api/correcciones",
+    data,
+  );
+  return respuesta.data;
+};
+
+/**
+ * [VISTA DE INCIDENCIAS] Descarga el histórico de incidencias de un operario particular.
+ * URI: GET /api/correcciones/trabajador/{id_trabajador}
+ */
+export const obtenerIncidenciasTrabajador = async (
+  idTrabajador: string,
+): Promise<IncidenciaResponse[]> => {
+  const respuesta = await api.get<IncidenciaResponse[]>(
+    `/api/correcciones/trabajador/${idTrabajador}`,
+  );
+  return respuesta.data;
+};
+
+/**
+ * [CONSOLA ADMIN] Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
+ * URI: PUT /api/correcciones/{id_correccion}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
+ */
+export const resolverSolicitudCorreccion = async (
+  idCorreccion: string,
+  nuevoEstado: "aprobada" | "rechazada",
+  resolutorUsuarioId: string,
+): Promise<IncidenciaResponse> => {
+  const respuesta = await api.put<IncidenciaResponse>(
+    `/api/correcciones/${idCorreccion}/resolver`,
+    null, // El cuerpo (body) va vacío porque FastAPI lee los parámetros desde la URL
+    {
+      params: {
+        nuevo_estado: nuevoEstado,
+        resolutor_usuario_id: resolutorUsuarioId,
+      },
+    },
+  );
+  return respuesta.data;
+};
+
+/**
+ * [CONSOLA ADMIN] Lista todas las correcciones solicitadas por una empresa específica (Tenant).
+ * URI: GET /api/correcciones/empresa/{id_empresa}
+ */
+export const obtenerCorreccionesPorEmpresa = async (
+  idEmpresa: string,
+): Promise<IncidenciaResponse[]> => {
+  const respuesta = await api.get<IncidenciaResponse[]>(
+    `/api/correcciones/empresa/${idEmpresa}`,
   );
   return respuesta.data;
 };

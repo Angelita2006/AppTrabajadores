@@ -1,6 +1,4 @@
 import { Tabs } from "expo-router";
-import { LogBox, Platform } from "react-native";
-
 import {
   ProveedorSesion,
   useSesion,
@@ -8,14 +6,6 @@ import {
 import { TipoUsuario } from "../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
-// Silencia este aviso específico en el entorno de desarrollo web/móvil
-LogBox.ignoreLogs(['props.pointerEvents is deprecated']);
-
-// Desactivamos las alertas visuales solo si la aplicación se ejecuta en navegadores.
-// Esto evita que el bug interno del LogContext de Expo rompa el árbol de renderizado de la web.
-if (Platform.OS === "web") {
-  LogBox.ignoreAllLogs(true);
-}
 
 function TabsNavigation() {
   const { usuarioActual } = useSesion();
@@ -59,19 +49,19 @@ function TabsNavigation() {
     >
       <Tabs.Screen
         name="(protected)/home"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Fichar",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="house.fill" color={color} />
           ),
-          href: tieneSesion ? "/(protected)/home" : null,
+          href: tieneSesion ? (!esAdmin ? "/(protected)/home" : null) : null,
         }}
       />
 
       <Tabs.Screen
         name="(protected)/plantilla"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Plantilla",
           tabBarIcon: ({ color }) => (
@@ -94,7 +84,7 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/empresas"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Empresas",
           tabBarIcon: ({ color }) => (
@@ -106,56 +96,65 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/horarios"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Horarios",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="schedule" color={color} />
           ),
-          href: tieneSesion ? "/(protected)/horarios" : null,
+          href: tieneSesion
+            ? !esAdmin
+              ? "/(protected)/horarios"
+              : null
+            : null,
         }}
       />
 
       <Tabs.Screen
         name="(protected)/vacaciones"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Vacaciones",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="event" color={color} />
           ),
-          href: tieneSesion ? "/(protected)/vacaciones" : null,
+          href: tieneSesion
+            ? !esAdmin
+              ? "/(protected)/vacaciones"
+              : null
+            : null,
         }}
       />
 
       <Tabs.Screen
         name="(protected)/incidencias"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Incidencias",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="warning" color={color} />
           ),
-          href: tieneSesion ? "/(protected)/incidencias" : null,
+          href: tieneSesion
+            ? !esAdmin
+              ? "/(protected)/incidencias"
+              : null
+            : null,
         }}
       />
 
       <Tabs.Screen
-        name="(protected)/trabajadores"
-        redirect={Platform.OS === "web" ? false : !tieneSesion}
+        name="(protected)/fichajes"
+        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
-          title: "Trabajadores",
+          title: "Registro",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="person" color={color} />
+            <IconSymbol size={26} name="schedule" color={color} />
           ),
-          href: tieneSesion ? (esAdmin ? "/(protected)/empresas" : null) : null,
+          href: tieneSesion ? (esAdmin ? "/(protected)/fichajes" : null) : null,
         }}
       />
 
       {/* Controladores ocultos de ruteo interno */}
-      <Tabs.Screen name="(protected)/fichajes" options={{ href: null }} />
-      {/* <Tabs.Screen name="(protected)/perfil" options={{ href: null }} /> */}
-      {/* <Tabs.Screen name="(authentication)/login" options={{ href: null }} /> */}
       <Tabs.Screen name="(authentication)/registro" options={{ href: null }} />
       <Tabs.Screen
         name="(authentication)/recuperar-password"

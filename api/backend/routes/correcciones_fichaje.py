@@ -119,3 +119,21 @@ def resolver_solicitud_correccion(
     db.commit()
     db.refresh(solicitud)
     return solicitud
+
+@router.delete("/{id_correccion}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_solicitud_correccion(id_correccion: UUID, db: Session = Depends(get_db)):
+    """
+    URI: DELETE /api/correcciones/{id_correccion}
+    Elimina físicamente un registro de solicitud de corrección por su ID.
+    Retorna un estado 204 No Content si la operación es exitosa.
+    """
+    solicitud = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.id == id_correccion).first()
+    if not solicitud:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Solicitud de corrección no encontrada."
+        )
+
+    db.delete(solicitud)
+    db.commit()
+    return

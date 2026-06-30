@@ -7,9 +7,11 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../empresas/types/empresa";
 import {
   obtenerAsignacionesTurnoTrabajador,
+  obtenerCentroTrabajo,
   obtenerContratosTrabajador,
   obtenerTrabajador,
 } from "../api/services";
@@ -63,7 +65,7 @@ interface SesionContextValue {
   trabajadorActual: Trabajador | null; // Ficha básica de RRHH (NIF, teléfono, SS)
   contratoActual: ContratoLaboral | null; // Condiciones contractuales activas
   turnoActual: AsignacionTurno | null; // Turno/Cuadrante asignado vigente
-
+  centroTrabajoActual: CentroTrabajo | null;
   // 3. PROPIEDADES DIRECTAS CALCULADAS DE ALTA COMODIDAD PARA LA UI
   centroTrabajoId: string | null; // Extraído automáticamente del contrato activo
   departamentoId: string | null; // Extraído automáticamente del contrato activo
@@ -93,6 +95,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     null,
   );
   const [turnoActual, setTurnoActual] = useState<AsignacionTurno | null>(null);
+  const [centroTrabajoActual, setCentroTrabajoActual] =
+    useState<CentroTrabajo | null>(null);
 
   const [cargandoSesionLocal, setCargandoSesionLocal] = useState<boolean>(true);
 
@@ -136,6 +140,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         setTrabajadorActual(null);
         setContratoActual(null);
         setTurnoActual(null);
+        setCentroTrabajoActual(null);
         return;
       }
 
@@ -158,6 +163,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         );
         setContratoActual(contratoVigente ?? null);
 
+        if (contratoVigente?.centro_trabajo_id) {
+          try {
+            const datosCentro = await obtenerCentroTrabajo(
+              contratoVigente.centro_trabajo_id,
+            );
+            setCentroTrabajoActual(datosCentro);
+          } catch (errCentro) {
+            console.error(
+              "Error al resolver el objeto Centro de Trabajo:",
+              errCentro,
+            );
+            setCentroTrabajoActual(null);
+          }
+        } else {
+          setCentroTrabajoActual(null);
+        }
+
         // Filtramos la asignación de turno vigente para el día de hoy
         const hoyStr = new Date().toISOString().split("T")[0];
         const turnoVigente = listaTurnos.find((t: AsignacionTurno) => {
@@ -175,6 +197,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         setTrabajadorActual(null);
         setContratoActual(null);
         setTurnoActual(null);
+        setCentroTrabajoActual(null);
       }
     }
 
@@ -245,6 +268,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       cargandoSesionLocal,
       contratoActual,
       turnoActual,
+      centroTrabajoActual,
       centroTrabajoId,
       departamentoId,
       rolUsuario,
@@ -257,6 +281,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       cargandoSesionLocal,
       contratoActual,
       turnoActual,
+      centroTrabajoActual,
       centroTrabajoId,
       departamentoId,
       rolUsuario,

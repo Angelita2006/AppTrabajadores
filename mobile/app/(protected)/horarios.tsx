@@ -1,42 +1,58 @@
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
-import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/trabajadores/api/services";
+import {
+  obtenerAsignacionesTurnoTrabajador,
+  obtenerFichajesSemanaActual,
+} from "@/src/modules/trabajadores/api/services";
 import { useSesion } from "@/src/modules/trabajadores/store/SesionContext";
 import { obtenerTurno } from "@/src/modules/turnos/services/services";
 import { ItemTurno, Turno } from "@/src/modules/turnos/types/turno";
 import { ThemedText } from "@/src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
+import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+
+// Interfaz para el tipado local de fichajes (basado en tus códigos anteriores)
+interface RegistroFichaje {
+  id: string;
+  fecha_hora: string;
+  tipo_evento: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
+}
 
 export default function HorariosScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
   const [cuadrante, setCuadrante] = useState<ItemTurno[]>([]);
-  // const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [fichajesRealizados, setFichajesRealizados] = useState<
+    RegistroFichaje[]
+  >([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    // Declaramos la función de red aquí adentro.
-    // Al ser local, encapsula sus dependencias y elimina advertencias de ESLint.
-    const cargarPlanificacionHoraria = async () => {
+    const cargarPlanificacionYFichajes = async () => {
+      if (!usuarioActual?.trabajador_id) {
+        setCargando(false);
+        return;
+      }
+
       try {
         setCargando(true);
 
+        // 1. Descargamos las asignaciones de turnos
         const asignaciones: AsignacionTurno[] =
           await obtenerAsignacionesTurnoTrabajador(
             usuarioActual!.trabajador_id,
           );
 
+        // 2. Descargamos el historial de marcajes del trabajador
+        // NOTA: Si 'obtenerFichajesHoy' solo trae un día, cámbiala por tu función de historial si la tienes.
+        const todosLosFichajes: RegistroFichaje[] =
+          await obtenerFichajesSemanaActual(usuarioActual!.trabajador_id);
+        setFichajesRealizados(todosLosFichajes);
+
         let turnos: ItemTurno[] = [];
 
-        // REPARACIÓN ASÍNCRONA: Usamos for...of para que JavaScript respete estrictamente los 'await'
         for (const asignacion_turno of asignaciones) {
           if (
             asignacion_turno.fecha_fin !== null &&
@@ -45,65 +61,50 @@ export default function HorariosScreen() {
             const fecha_inicio = new Date(asignacion_turno.fecha_inicio);
             const fecha_fin = new Date(asignacion_turno.fecha_fin);
 
-            // CÁLCULO CRONOLÓGICO SEGURO: Restamos milisegundos puros y convertimos a días reales.
-            // Esto funciona a la perfección incluso si el turno cambia de mes o de año.
             const diferenciaMilisegundos =
               fecha_fin.getTime() - fecha_inicio.getTime();
             const dias_asignados = Math.floor(
               diferenciaMilisegundos / (1000 * 60 * 60 * 24),
             );
 
-            // Descargamos el objeto base del turno desde FastAPI una sola vez antes de entrar al for
             const turno: Turno = await obtenerTurno(asignacion_turno.turno_id);
-
-            // Clonamos la fecha de inicio para ir incrementándola de forma limpia sin romper el cursor original
             let fechaCursor = new Date(fecha_inicio);
 
             for (let i = 0; i <= dias_asignados; i++) {
-              // CONGELAMOS EL INSTANTE: Creamos una copia inmutable para esta iteración específica
               const fechaInstanteActual = new Date(fechaCursor);
 
               const itemTurno: ItemTurno = {
                 id: Crypto.randomUUID(),
                 turno_id: turno.id,
                 empresa_id: turno.empresa_id,
-                // Guardamos el texto legible: "lunes", "martes", "miércoles"...
                 nombre: fechaInstanteActual.toLocaleDateString("es-ES", {
                   weekday: "long",
                 }),
                 hora_inicio: turno.hora_inicio,
                 hora_fin: turno.hora_fin,
                 minutos_pausa_obligatoria: turno.minutos_pausa_obligatoria,
-                color_hex: turno.color_hex,
-                // STRING PURO: Guardamos el texto "2026-06-24" limpio para que el sort() no falle
+                color_hex: turno.color_hex || "#2563EB",
                 fecha_real: fechaInstanteActual.toISOString().split("T")[0],
               };
 
               turnos.push(itemTurno);
-
-              // Incrementamos de forma segura el cursor hacia el siguiente día
               fechaCursor.setDate(fechaCursor.getDate() + 1);
             }
           }
         }
 
-        // ALGORITMO DE ORDENACIÓN DE DOBLE CRITERIO SIN DESFASES
         turnos.sort((a, b) => {
-          // Criterio 1: Si las fechas del calendario son distintas, ordenamos de forma cronológica real
           if (a.fecha_real !== b.fecha_real) {
             return a.fecha_real.localeCompare(b.fecha_real);
           }
-          // Criterio 2: ¡EL DESEMPATE CRÍTICO! Si caen el mismo día, comparamos por hora de inicio.
-          // De este modo, las 10:00:00 siempre subirá arriba y las 16:30:00 bajará de forma inquebrantable.
           return a.hora_inicio.localeCompare(b.hora_inicio);
         });
 
-        // Subimos el listado perfectamente ordenado al estado de la pantalla
         setCuadrante(turnos);
       } catch (error) {
         Alert.alert(
           "Error de Sincronización",
-          "No se ha podido descargar tu calendario de turnos oficiales.",
+          "No se ha podido descargar tu calendario de turnos o marcajes.",
         );
       } finally {
         setCargando(false);
@@ -111,16 +112,15 @@ export default function HorariosScreen() {
     };
 
     if (usuarioActual?.trabajador_id) {
-      cargarPlanificacionHoraria();
+      cargarPlanificacionYFichajes();
     }
-  }, [usuarioActual]); // El array vigila únicamente la cuenta de usuario de PostgreSQL
+  }, [usuarioActual]);
 
   return (
     <AppScreen
       title="Mi Planificación"
       subtitle={`Calendario oficial asignado por: ${empresaSeleccionada?.nombre_comercial ?? "Tu Organización"}`}
     >
-      {/* Resúmenes analíticos rápidos del cuadrante superior */}
       <Row>
         <StatCard label="Turnos Vigentes" value={cuadrante.length.toString()} />
         <StatCard
@@ -141,24 +141,189 @@ export default function HorariosScreen() {
           style={{ marginTop: 40 }}
         />
       ) : (
-        <FlatList
-          data={cuadrante}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          renderItem={({ item }) => {
+        <View style={{ gap: 12, paddingBottom: 20 }}>
+          {cuadrante.map((item) => {
+            // FILTRADO QUIRÚRGICO DE MARCAJES
+            const marcajesDelDia = fichajesRealizados.filter((fichaje) => {
+              // 1. Separamos "2026-06-29T14:30:00" en fecha y hora
+              const partesFechaHora = fichaje.fecha_hora.split("T");
+              const fechaFichajeStr = partesFechaHora[0]; // "2026-06-29"
+              const horaFichajeStr = partesFechaHora[1]; // "14:30:00.000Z" o similar
+
+              // 2. Filtros de coincidencia básica
+              const esMismoDia = fechaFichajeStr === item.fecha_real;
+              const esEntradaOSalida =
+                fichaje.tipo_evento === "ENTRADA" ||
+                fichaje.tipo_evento === "SALIDA";
+
+              if (!esMismoDia || !esEntradaOSalida) return false;
+
+              // 3. Extracción de subcadenas para comparar en formato "HH:MM:SS"
+              // Recortamos la hora del fichaje (primeros 8 caracteres)
+              const horaFichajeComparar = horaFichajeStr.substring(0, 8);
+              // Nos aseguramos de que el turno tenga el formato completo "HH:MM:SS"
+              const inicioTurno =
+                item.hora_inicio.length === 5
+                  ? `${item.hora_inicio}:00`
+                  : item.hora_inicio;
+              const finTurno =
+                item.hora_fin.length === 5
+                  ? `${item.hora_fin}:00`
+                  : item.hora_fin;
+
+              // 4. Comprobación de ventanas de tiempo (Rango inclusivo)
+              const entraEnRango =
+                horaFichajeComparar >= inicioTurno &&
+                horaFichajeComparar <= finTurno;
+
+              // Creamos un margen de tolerancia de 1 hora antes y después del turno para capturar retrasos o entradas tempranas
+              const [hIn, mIn] = inicioTurno.split(":").map(Number);
+              const [hFi, mFi] = finTurno.split(":").map(Number);
+
+              // Reducimos el multiplicador de resta/suma a 1 hora exacta para blindar los tramos
+              const horaInicioMargen = `${String(Math.max(0, hIn - 1)).padStart(2, "0")}:00:00`;
+              const horaFinMargen = `${String(Math.min(23, hFi + 1)).padStart(2, "0")}:59:59`;
+
+              // La evaluación final distribuirá los marcajes quirúrgicamente
+              const entraEnVentanaTurno =
+                horaFichajeComparar >= horaInicioMargen &&
+                horaFichajeComparar <= horaFinMargen;
+
+              return entraEnVentanaTurno;
+            });
+
+            // 1. FILTRADO DE EVENTOS DE DESCANSO EN ESTE TURNO Y DÍA
+            const pausasDelDia = fichajesRealizados.filter((fichaje) => {
+              const partesFechaHora = fichaje.fecha_hora.split("T");
+              const esMismoDia = partesFechaHora[0] === item.fecha_real;
+              const esPausa =
+                fichaje.tipo_evento === "INICIO_PAUSA" ||
+                fichaje.tipo_evento === "FIN_PAUSA";
+
+              if (!esMismoDia || !esPausa) return false;
+
+              const horaFichaje = partesFechaHora[1].substring(0, 8);
+              const inicioTurno =
+                item.hora_inicio.length === 5
+                  ? `${item.hora_inicio}:00`
+                  : item.hora_inicio;
+              const finTurno =
+                item.hora_fin.length === 5
+                  ? `${item.hora_fin}:00`
+                  : item.hora_fin;
+
+              return horaFichaje >= inicioTurno && horaFichaje <= finTurno;
+            });
+
+            // 2. ALGORITMO DE EMPAREJAMIENTO CRONOLÓGICO PARA CALCULAR MINUTOS
+            let minutosConsumidos = 0;
+            const pausasOrdenadas = [...pausasDelDia].sort(
+              (a, b) =>
+                new Date(a.fecha_hora).getTime() -
+                new Date(b.fecha_hora).getTime(),
+            );
+
+            let marcaInicioPausa: number | null = null;
+
+            pausasOrdenadas.forEach((fichaje) => {
+              const tMs = new Date(fichaje.fecha_hora).getTime();
+
+              if (fichaje.tipo_evento === "INICIO_PAUSA") {
+                marcaInicioPausa = tMs;
+              } else if (
+                fichaje.tipo_evento === "FIN_PAUSA" &&
+                marcaInicioPausa !== null
+              ) {
+                const diferenciaMinutos =
+                  (tMs - marcaInicioPausa) / (1000 * 60);
+                minutosConsumidos += Math.round(diferenciaMinutos);
+                marcaInicioPausa = null; // Reseteamos el par cerrado
+              }
+            });
+
+            // 3. CALCULAR TIEMPO REAL TRABAJADO EN ESTE TURNO (EN MINUTOS)
+            let minutosTrabajadosReales = 0;
+            const marcajesOrdenados = [...marcajesDelDia].sort(
+              (a, b) =>
+                new Date(a.fecha_hora).getTime() -
+                new Date(b.fecha_hora).getTime(),
+            );
+
+            let marcaEntradaTurno: number | null = null;
+
+            marcajesOrdenados.forEach((fichaje) => {
+              const tMs = new Date(fichaje.fecha_hora).getTime();
+
+              if (fichaje.tipo_evento === "ENTRADA") {
+                marcaEntradaTurno = tMs;
+              } else if (
+                fichaje.tipo_evento === "SALIDA" &&
+                marcaEntradaTurno !== null
+              ) {
+                minutosTrabajadosReales +=
+                  (tMs - marcaEntradaTurno) / (1000 * 60);
+                marcaEntradaTurno = null;
+              }
+            });
+
+            // Restamos los descansos tomados para que las horas netas trabajadas sean reales
+            minutosTrabajadosReales = Math.max(
+              0,
+              Math.round(minutosTrabajadosReales - minutosConsumidos),
+            );
+
+            // 4. CALCULAR TIEMPO TEÓRICO COMPLETO QUE HABÍA QUE TRABAJAR
+            const [hIn, mIn] = item.hora_inicio.split(":").map(Number);
+            const [hFi, mFi] = item.hora_fin.split(":").map(Number);
+
+            // Convertimos todo a minutos puros para operar con seguridad
+            let minutosTeoricosTotales = hFi * 60 + mFi - (hIn * 60 + mIn);
+            // Si el turno es nocturno y cruza la medianoche (ej. 22:00 a 06:00)
+            if (minutosTeoricosTotales < 0) minutosTeoricosTotales += 24 * 60;
+
+            // Descontamos la pausa obligatoria del contrato para saber las horas netas a trabajar
+            const minutosTeoricosNetos = Math.max(
+              0,
+              minutosTeoricosTotales - (item?.minutos_pausa_obligatoria ?? 0),
+            );
+
+            // Funciones auxiliares para formatear los minutos a formato legible "Xh Ymin"
+            const formatearAHorasYMinutos = (
+              minutosTotales: number,
+            ): string => {
+              const hrs = Math.floor(minutosTotales / 60);
+              const mins = minutosTotales % 60;
+              return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+            };
+
+            const textoTrabajadoReal = formatearAHorasYMinutos(
+              minutosTrabajadosReales,
+            );
+            const textoTrabajadoTeorico =
+              formatearAHorasYMinutos(minutosTeoricosNetos);
+
             return (
-              <Card>
+              <Card key={item.id}>
                 <View style={styles.filaAsignacion}>
-                  {/* Barra de color dinámica inyectada desde los ajustes del turno */}
                   <View
-                    style={[styles.barraColor, { backgroundColor: "#2563EB" }]}
+                    style={[
+                      styles.barraColor,
+                      { backgroundColor: item.color_hex || "#2563EB" },
+                    ]}
                   />
 
                   <View style={styles.cuerpoTarjeta}>
                     <View style={styles.headerTarjeta}>
-                      <ThemedText style={styles.nombreTurno}>
-                        {item?.nombre ?? "Turno Sin Especificar"}
-                      </ThemedText>
+                      <View>
+                        <ThemedText style={styles.nombreTurno}>
+                          {item?.nombre
+                            ? item.nombre.toUpperCase()
+                            : "Turno Sin Especificar"}
+                        </ThemedText>
+                        <ThemedText style={styles.fechaSubtexto}>
+                          {item.fecha_real}
+                        </ThemedText>
+                      </View>
                       <View style={styles.badgeVigencia}>
                         <ThemedText style={styles.textoVigencia}>
                           Activo
@@ -166,47 +331,126 @@ export default function HorariosScreen() {
                       </View>
                     </View>
 
-                    {/* Tramos horarios de entrada y salida oficiales */}
                     <View style={styles.gridHoras}>
                       <View style={styles.itemHora}>
                         <IconSymbol name="schedule" size={16} color="#475569" />
                         <ThemedText style={styles.textoHoras}>
-                          {item
-                            ? `${item.hora_inicio.substring(0, 5)} a ${item.hora_fin.substring(0, 5)}`
-                            : "-"}
+                          {`${item.hora_inicio.substring(0, 5)} a ${item.hora_fin.substring(0, 5)}`}
                         </ThemedText>
                       </View>
+
+                      {/* Muestra los minutos consumidos reales frente al total obligatorio programado */}
                       <ThemedText style={styles.textoPausa}>
-                        Descanso: {item?.minutos_pausa_obligatoria ?? 0} min.
+                        Descanso: {minutosConsumidos} /{" "}
+                        {item?.minutos_pausa_obligatoria ?? 0} min.
                       </ThemedText>
                     </View>
 
-                    <View style={styles.separador} />
+                    <View
+                      style={[
+                        styles.gridHoras,
+                        {
+                          marginTop: 4,
+                          paddingTop: 4,
+                          borderTopWidth: 1,
+                          borderTopColor: "#F1F5F9",
+                        },
+                      ]}
+                    >
+                      <View style={styles.itemHora}>
+                        <IconSymbol
+                          name="briefcase.fill"
+                          size={18}
+                          color="#475569"
+                        />
+                        <ThemedText
+                          style={[styles.textoPausa, { color: "#334155" }]}
+                        >
+                          Jornada Efectiva
+                        </ThemedText>
+                      </View>
+                      <ThemedText
+                        style={[
+                          styles.textoHoras,
+                          {
+                            fontSize: 13,
+                            color:
+                              minutosTrabajadosReales >= minutosTeoricosNetos
+                                ? "#16803D"
+                                : "#475569",
+                          },
+                        ]}
+                      >
+                        Trabajado: {textoTrabajadoReal} /{" "}
+                        {textoTrabajadoTeorico}
+                      </ThemedText>
+                    </View>
 
-                    {/* Fechas de validez del cuadrante
-                    <ThemedText style={styles.textoRangoFechas}>
-                      Válido desde el {item.fecha_inicio}{" "}
-                      {item.fecha_fin
-                        ? `hasta el ${item.fecha_fin}`
-                        : "en adelante"}
-                    </ThemedText> */}
+                    {/* ==================================================================== */}
+                    {/* RENDREIZADO CONDICIONAL: SOLO SE MUESTRA SI EXISTEN MARCAJES REALES  */}
+                    {/* ==================================================================== */}
+                    {marcajesDelDia.length > 0 && (
+                      <View style={styles.itemcontenedorFichajesReales}>
+                        <View style={styles.separadorFichajes} />
+                        <ThemedText style={styles.tituloFichajesSeccion}>
+                          Marcajes en este turno:
+                        </ThemedText>
+
+                        {marcajesDelDia.map((fichaje) => {
+                          const partes = fichaje.fecha_hora.split("T");
+                          const horaLimpia = partes[1]
+                            ? partes[1].substring(0, 5)
+                            : "00:00";
+                          const esEntrada = fichaje.tipo_evento === "ENTRADA";
+
+                          return (
+                            <View
+                              key={fichaje.id}
+                              style={styles.filaFichajeItem}
+                            >
+                              {esEntrada ? (
+                                <FontAwesome5
+                                  name="door-open"
+                                  size={14}
+                                  color="#065F46"
+                                />
+                              ) : (
+                                <MaterialCommunityIcons
+                                  name="exit-run"
+                                  size={17}
+                                  color="#991B1B"
+                                />
+                              )}
+                              <ThemedText
+                                style={[
+                                  styles.textoFichajeItem,
+                                  { color: esEntrada ? "#065F46" : "#991B1B" },
+                                ]}
+                              >
+                                {esEntrada ? "ENTRADA" : "SALIDA"}: {horaLimpia}{" "}
+                                hs.
+                              </ThemedText>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 </View>
               </Card>
             );
-          }}
-          ListEmptyComponent={
+          })}
+
+          {cuadrante.length === 0 && (
             <ThemedText style={styles.emptyText}>
-              No tienes ningún cuadrante horario asignado todavía. Contacta con
-              RRHH.
+              No tienes turnos planificados asignados.
             </ThemedText>
-          }
-        />
+          )}
+        </View>
       )}
     </AppScreen>
   );
 }
-
 const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
@@ -217,17 +461,36 @@ const styles = StyleSheet.create({
   filaAsignacion: {
     flexDirection: "row",
     width: "100%",
+    minHeight: 90,
     gap: 14,
     paddingVertical: 2,
   },
-  barraColor: { width: 4, borderRadius: 2 },
-  cuerpoTarjeta: { flex: 1, gap: 4 },
+  barraColor: {
+    width: 5,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+  },
+  cuerpoTarjeta: {
+    flex: 1,
+    padding: 12,
+    gap: 4,
+  },
   headerTarjeta: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  nombreTurno: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  nombreTurno: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  fechaSubtexto: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 2,
+    fontWeight: "500",
+  },
   badgeVigencia: {
     backgroundColor: "#DCFCE7",
     paddingHorizontal: 8,
@@ -244,12 +507,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 6,
+    marginTop: 8,
   },
-  itemHora: { flexDirection: "row", alignItems: "center", gap: 6 },
-  textoHoras: { fontSize: 14, fontWeight: "700", color: "#334155" },
-  textoPausa: { fontSize: 12, color: "#64748B", fontWeight: "600" },
-  separador: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 8 },
+  itemHora: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  textoHoras: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  textoPausa: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  separador: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 8,
+  },
   textoRangoFechas: {
     fontSize: 12,
     color: "#64748B",
@@ -262,4 +541,36 @@ const styles = StyleSheet.create({
     marginTop: 24,
     lineHeight: 20,
   },
+  itemcontenedorFichajesReales: {
+    marginTop: 10,
+  },
+  separadorFichajes: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 8,
+    borderStyle: "dashed",
+  },
+  tituloFichajesSeccion: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 4,
+  },
+  textoNoFichajes: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontStyle: "italic",
+  },
+  filaFichajeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 2,
+  },
+  textoFichajeItem: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  contenedorFichajesReales: { marginTop: 10 },
 });

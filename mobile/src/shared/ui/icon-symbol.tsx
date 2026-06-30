@@ -1,5 +1,3 @@
-// Fallback for using MaterialIcons on Android and web.
-
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SymbolWeight } from "expo-symbols";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
@@ -29,6 +27,10 @@ const MAPPING = {
   stop: "stop",
   pause: "pause",
   "play-circle": "play-circle",
+  logout: "logout",
+  "manage-accounts": "manage-accounts",
+  business: "business",
+  description: "description",
 } as const;
 
 type IconSymbolName = keyof typeof MAPPING;

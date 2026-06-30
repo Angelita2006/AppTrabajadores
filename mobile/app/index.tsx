@@ -1,3 +1,4 @@
+import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import {
   getUsuarioByEmailYPassword,
+  obtenerCentroTrabajo,
   obtenerEmpresasTrabajador,
 } from "../src/modules/trabajadores/api/services";
 import { useSesion } from "../src/modules/trabajadores/store/SesionContext";
@@ -34,7 +36,12 @@ export default function RootIndexScreen() {
     setEmpresas,
     setEmpresaSeleccionada,
     empresaSeleccionada,
+    contratoActual,
+    centroTrabajoId,
   } = useSesion();
+  const [centroAsignado, setCentroAsignado] = useState<CentroTrabajo | null>(
+    null,
+  );
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
   const [password, setPassword] = useState("password123");
@@ -134,65 +141,196 @@ export default function RootIndexScreen() {
     };
   });
 
+  useEffect(() => {
+    const cargarInformacionExpediente = async () => {
+      if (!usuarioActual?.trabajador_id) return;
+
+      try {
+        if (contratoActual?.centro_trabajo_id) {
+          try {
+            const centroObj = await obtenerCentroTrabajo(
+              contratoActual.centro_trabajo_id,
+            );
+            setCentroAsignado(centroObj);
+          } catch (errCentro) {
+            console.log(
+              "No se pudo resolver el nombre del centro de trabajo:",
+              errCentro,
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error al cargar expediente:", error);
+      }
+    };
+
+    cargarInformacionExpediente();
+  }, [usuarioActual, contratoActual?.centro_trabajo_id]); // Vigila el ID del contrato
+
   // ====================================================================
   // VISTA DE PERFIL (USUARIO LOGUEADO)
   // ====================================================================
   if (usuarioActual && trabajadorActual) {
     return (
-      <AppScreen
-        title="Mi Perfil"
-        // subtitle="Consulta la ficha técnica de tu expediente laboral operativo."
-      >
+      <AppScreen title="Mi Perfil">
+        {/* FILA DE HITOS RÁPIDOS SUPERIORES */}
         <Row>
           <StatCard
-            label="Usuario"
-            value={usuarioActual.nombre}
-            tone="success"
+            label="Estado Alta"
+            value={usuarioActual.activo ? "Activo" : "Inactivo"}
+            tone={usuarioActual.activo ? "success" : "danger"}
           />
-          <StatCard label="Rol Sistema" value={usuarioActual.tipo_usuario} />
           <StatCard
-            label="Empresa Activa"
-            value={empresaSeleccionada?.nombre_comercial ?? "Ninguna"}
+            label="Empresa Principal"
+            value={empresaSeleccionada?.nombre_comercial ?? "Sin Asignar"}
           />
         </Row>
 
-        <Animated.View style={estiloTarjetaAnimada}>
+        <Animated.View
+          style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
+        >
+          {/* BLOCK 1: IDENTIDAD DEL TRABAJADOR */}
           <Card>
-            <ThemedText style={styles.perfilTitle}>
-              Ficha del Trabajador
-            </ThemedText>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="person" size={20} color="#2563EB" />
+              <ThemedText style={styles.perfilTitle}>
+                Información Personal
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
             <View style={styles.detailGrid}>
               <Detail
                 label="Nombre Completo"
                 value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`}
               />
               <Detail
-                label="Identificación (NIF/NIE)"
+                label="Documento (NIF/NIE)"
                 value={trabajadorActual.nif_nie}
               />
               <Detail
-                label="Fecha Alta Empresa"
-                value={trabajadorActual.fecha_alta_empresa}
-              />
-              <Detail
-                label="Número Seg. Social"
+                label="Número Seguridad Social"
                 value={
-                  trabajadorActual.numero_seguridad_social ?? "No registrado"
+                  trabajadorActual.numero_seguridad_social ?? "No cumplimentado"
                 }
               />
               <Detail
-                label="Teléfono de Contacto"
+                label="Teléfono Móvil"
                 value={trabajadorActual.telefono ?? "No registrado"}
               />
-              <Detail label="Email" value={usuarioActual.email} />
             </View>
-
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-              <ThemedText style={styles.logoutButtonText}>
-                Cerrar Sesión
-              </ThemedText>
-            </Pressable>
           </Card>
+
+          {/* BLOCK 2: DETALLES DE CONTRATACIÓN Y CONDICIONES (CONTRATOACTUAL) */}
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="description" size={20} color="#16A34A" />
+              <ThemedText style={[styles.perfilTitle, { color: "#16A34A" }]}>
+                Condiciones Contractuales
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.detailGrid}>
+              <Detail
+                label="Puesto de Trabajo"
+                value={
+                  contratoActual?.puesto_trabajo ?? "Operario / No Definido"
+                }
+              />
+              <Detail
+                label="Tipo de Contrato"
+                value={contratoActual?.tipo_contrato ?? "Régimen General"}
+              />
+              <Detail
+                label="Fecha Alta Contrato"
+                value={
+                  contratoActual?.fecha_inicio ??
+                  trabajadorActual.fecha_alta_empresa ??
+                  "No consta"
+                }
+              />
+              <Detail
+                label="Vencimiento / Fin"
+                value={contratoActual?.fecha_fin ?? "Indefinido / Continuo"}
+              />
+              <Detail
+                label="Jornada Semanal Anual"
+                value={
+                  contratoActual?.horas_semana
+                    ? `${contratoActual.horas_semana} hs/semana`
+                    : "Según Convenio Colectivo"
+                }
+              />
+            </View>
+          </Card>
+
+          {/* BLOCK 3: ADSCRIPCIÓN CORPORATIVA Y ORGANIZACIÓN */}
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="business" size={20} color="#EA580C" />
+              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
+                Organización y Destino
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.detailGrid}>
+              <Detail
+                label="Nombre Comercial"
+                value={empresaSeleccionada?.nombre_comercial ?? "No vinculada"}
+              />
+              <Detail
+                label="CIF / NIF Empresa"
+                value={empresaSeleccionada?.cif ?? "No disponible"}
+              />
+              <Detail
+                label="Centro de Trabajo"
+                value={centroAsignado?.nombre ?? "Sede Central"}
+              />
+              <Detail
+                label="Dirección"
+                value={centroAsignado?.direccion ?? "No registrada"}
+              />
+            </View>
+          </Card>
+
+          {/* BLOCK 4: CREDENCIALES DE ACCESO AL PORTAL */}
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="manage-accounts" size={20} color="#475569" />
+              <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
+                Seguridad y Cuenta
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.detailGrid}>
+              <Detail
+                label="Correo Electrónico (Login)"
+                value={usuarioActual.email}
+              />
+              <Detail
+                label="Rol Autorizado Sistema"
+                value={usuarioActual.tipo_usuario}
+              />
+              <Detail
+                label="Último Fichaje Registrado"
+                value={
+                  usuarioActual.ultimo_acceso
+                    ? usuarioActual.ultimo_acceso
+                        .replace("T", " Realizado a las ")
+                        .substring(0, 32)
+                        .concat(" horas")
+                    : "Sesión Actual"
+                }
+              />
+            </View>
+          </Card>
+
+          {/* BOTÓN CENTRALIZADO DE SALIDA SEGURA */}
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <IconSymbol name="logout" size={18} color="#FFFFFF" />
+            <ThemedText style={styles.logoutButtonText}>
+              Cerrar Sesión
+            </ThemedText>
+          </Pressable>
         </Animated.View>
       </AppScreen>
     );
@@ -458,10 +596,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   perfilTitle: {
-    color: "#0F172A",
+    color: "#2563EB",
     fontSize: 18,
     fontWeight: "800",
-    marginBottom: 16,
   },
   detailGrid: { gap: 12 },
   detailRow: {
@@ -481,14 +618,26 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 2,
   },
+  logoutButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  seccionPerfilHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
+  },
+  separadorPerfil: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 6,
+  },
   logoutButton: {
-    width: "100%",
-    height: 48,
     backgroundColor: "#EF4444",
-    borderRadius: 12,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 24,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  logoutButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 });

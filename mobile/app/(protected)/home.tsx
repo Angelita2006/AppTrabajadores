@@ -32,6 +32,8 @@ export default function HomeScreen() {
     centroTrabajoId,
   } = useSesion();
 
+  const [horaActual, setHoraActual] = useState("");
+
   // Estados principales de la jornada reactiva
   const [estadoActual, setEstadoActual] = useState<Estado>(Estado.Activo);
   const [cargando, setCargando] = useState(true);
@@ -56,6 +58,22 @@ export default function HomeScreen() {
     return `${horas}:${minutos}:${segundos}`;
   };
 
+  // Motor de reloj digital para la hora actual de fichaje
+  useEffect(() => {
+    const actualizarHoraServidor = () => {
+      const ahora = new Date();
+      const hrs = ahora.getHours().toString().padStart(2, "0");
+      const mins = ahora.getMinutes().toString().padStart(2, "0");
+      const secs = ahora.getSeconds().toString().padStart(2, "0");
+      setHoraActual(`${hrs}:${mins}:${secs}`);
+    };
+
+    actualizarHoraServidor(); // Disparo inicial inmediato
+    const intervaloReloj = setInterval(actualizarHoraServidor, 1000);
+
+    return () => clearInterval(intervaloReloj);
+  }, []);
+
   // Reconstrucción cronológica en caliente (Sincronización API)
   useEffect(() => {
     async function sincronizarJornadaActual() {
@@ -69,9 +87,6 @@ export default function HomeScreen() {
 
         if (fichajesHoy.length === 0) {
           setEstadoActual(Estado.Activo);
-          // setSegundosAcumuladosHoy(0);
-          // setTiempoFormateado("00:00:00");
-          // setTimestampBaseActual(null);
           return;
         }
 
@@ -232,7 +247,15 @@ export default function HomeScreen() {
         metodo_fichaje: Platform.OS === "web" ? "web" : "app_movil",
         fecha_hora_dispositivo: ahoraInstante.toISOString(),
         observaciones:
-          tipoLabel === "SALIDA" ? "Cierre de jornada móvil" : null,
+          tipoLabel === "ENTRADA"
+            ? "Inicio de jornada"
+            : tipoLabel === "SALIDA"
+              ? "Cierre de jornada"
+              : tipoLabel === "INICIO_PAUSA"
+                ? "Inicio de descanso"
+                : tipoLabel === "FIN_PAUSA"
+                  ? "Descanso terminado"
+                  : null,
       });
 
       // Antes de mutar el estado, recalculamos el acumulado del tramo que se acaba de cerrar
@@ -281,11 +304,7 @@ export default function HomeScreen() {
   return (
     <AppScreen
       title="Control de Jornada"
-      subtitle={`Empresa: ${empresaSeleccionada?.nombre_comercial ?? "Ninguna"} ${
-        contratoActual?.puesto_trabajo
-          ? `| Puesto: ${contratoActual.puesto_trabajo}`
-          : ""
-      }`}
+      subtitle={`Empresa: ${empresaSeleccionada?.nombre_comercial ?? "Ninguna"}`}
     >
       <Row>
         <StatCard
@@ -297,26 +316,84 @@ export default function HomeScreen() {
           }
           tone={estadoActual === Estado.Trabajando ? "success" : "warning"}
         />
-        <StatCard label="Jornada de Hoy" value={tiempoFormateado} />
+        <StatCard
+          label="Puesto Asignado"
+          value={contratoActual?.puesto_trabajo ?? "Operario"}
+        />
       </Row>
 
-      <Card>
-        <View style={styles.contenedorCentralHorario}>
-          <ThemedText style={styles.cronometroLabel}>
-            Tiempo Total Acumulado Hoy
-          </ThemedText>
-          <ThemedText style={styles.cronometroNumero}>
-            {tiempoFormateado}
-          </ThemedText>
-          {cargando && (
-            <ActivityIndicator
-              size="small"
-              color="#2563EB"
-              style={styles.loaderSpacing}
-            />
-          )}
+      <View style={{ height: 12 }} />
+
+      <View style={{ flexDirection: "row", width: "100%", gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Card>
+            <View
+              style={[
+                styles.contenedorCentralHorario,
+                { minHeight: 90, justifyContent: "center" },
+              ]}
+            >
+              <ThemedText
+                style={[
+                  styles.cronometroLabel,
+                  { color: "#64748B", fontWeight: "700", textAlign: "center" },
+                ]}
+              >
+                Hora Actual
+              </ThemedText>
+              <ThemedText
+                style={[
+                  styles.cronometroNumero,
+                  {
+                    color: "#0F172A",
+                    fontSize: 24,
+                    textAlign: "center",
+                    marginTop: 4,
+                  },
+                ]}
+              >
+                {horaActual || "00:00:00"}
+              </ThemedText>
+            </View>
+          </Card>
         </View>
-      </Card>
+
+        {/* COLUMNA DERECHA: TIEMPO ACUMULADO */}
+        <View style={{ flex: 1 }}>
+          <Card>
+            <View
+              style={[
+                styles.contenedorCentralHorario,
+                { minHeight: 90, justifyContent: "center" },
+              ]}
+            >
+              <ThemedText
+                style={[styles.cronometroLabel, { textAlign: "center" }]}
+              >
+                Acumulado Hoy
+              </ThemedText>
+              <ThemedText
+                style={[
+                  styles.cronometroNumero,
+                  { fontSize: 24, textAlign: "center", marginTop: 4 },
+                ]}
+              >
+                {tiempoFormateado}
+              </ThemedText>
+              {cargando && (
+                <ActivityIndicator
+                  size="small"
+                  color="#2563EB"
+                  style={[
+                    styles.loaderSpacing,
+                    { position: "absolute", right: 8, top: 8 },
+                  ]}
+                />
+              )}
+            </View>
+          </Card>
+        </View>
+      </View>
 
       <ThemedText style={styles.sectionTitle}>
         Acciones de Control Horario

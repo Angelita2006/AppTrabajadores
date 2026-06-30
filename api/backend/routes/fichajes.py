@@ -1,16 +1,20 @@
 import hashlib
 import ipaddress
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List
 from uuid import UUID
+from models.contratos import Contratos
 from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 from core.database import get_db
 from models.empresas import Empresas
 from models.fichajes import Fichajes
 from schemas.fichajes import FichajeCreate, FichajeResponse
 from models.trabajadores import Trabajadores
+from models.turnos import Turnos
 
 router = APIRouter(prefix="/api/fichajes", tags=["Fichajes"])
 
@@ -161,10 +165,6 @@ def obtener_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
         )
     return fichaje
 
-
-# ====================================================================
-# NUEVO ENDPOINT COMPATIBLE REQUERIDO POR TU CRONÓMETRO MÓVIL
-# ====================================================================
 @router.get("/trabajador/{id_trabajador}/hoy")
 def obtener_fichajes_hoy(id_trabajador: UUID, db: Session = Depends(get_db)):
     """
@@ -193,6 +193,51 @@ def obtener_fichajes_hoy(id_trabajador: UUID, db: Session = Depends(get_db)):
         
     return respuesta
 
+@router.get("/trabajador/{id_trabajador}/semana")
+def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(get_db)):
+    """
+    URI: GET /api/fichajes/trabajador/{id_trabajador}/semana
+    Recupera el historial de la semana formateando las fechas a ISO string 
+    y mapeando los IDs a strings de eventos legibles para el frontend.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trabajador no localizado."
+        )
+
+    # Cálculo del rango de la semana en curso (Solo la fecha, sin horas)
+    hoy = date.today()
+    dia_semana = hoy.weekday() 
+    lunes_esta_semana = hoy - timedelta(days=dia_semana)
+    domingo_esta_semana = lunes_esta_semana + timedelta(days=6)
+
+    # Consulta directa a PostgreSQL
+    fichajes_semana = (
+        db.query(Fichajes)
+        .filter(
+            Fichajes.trabajador_id == id_trabajador,
+            func.date(Fichajes.fecha_hora_dispositivo) >= lunes_esta_semana,
+            func.date(Fichajes.fecha_hora_dispositivo) <= domingo_esta_semana
+        )
+        .order_by(Fichajes.fecha_hora_dispositivo.asc())
+        .all()
+    )
+
+    respuesta_homologada = []
+    for f in fichajes_semana:
+        respuesta_homologada.append({
+            "id": str(f.id),
+            # Aseguramos el formato ISO con la "T" que tus filtros móviles necesitan
+            "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
+            "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
+            "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje)
+        })
+
+    return respuesta_homologada
+
+
 @router.get("/trabajador/{trabajador_id}/ultimo")
 def obtener_ultimo_fichaje_trabajador(trabajador_id: UUID, db: Session = Depends(get_db)):
     """
@@ -218,3 +263,72 @@ def obtener_ultimo_fichaje_trabajador(trabajador_id: UUID, db: Session = Depends
         "fecha_hora": ultimo_fichaje.fecha_hora.isoformat(),
         "tipo_evento": mapear_id_a_evento(ultimo_fichaje.tipo_evento_id)
     }
+
+@router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK)
+def listar_fichajes_empresa_por_fecha(
+    empresa_id: UUID, 
+    fecha: datetime, 
+    db: Session = Depends(get_db)
+):
+    """
+    URI: GET /api/fichajes/empresa/{empresa_id}
+    Devuelve los marcajes de la plantilla filtrados por fecha.
+    """
+    try:
+        # Si tu tabla de Fichajes ya tiene una relación directa con el modelo de trabajadores/usuarios,
+        # la recorremos de forma segura para evitar fallos de JOIN en la importación.
+        resultados = (
+            db.query(Fichajes)
+            .filter(
+                Fichajes.empresa_id == empresa_id,
+                # Comparamos la fecha de forma segura contra tu columna de timestamp de dispositivo
+                func.date(Fichajes.fecha_hora_dispositivo) == fecha
+            )
+            .all()
+        )
+
+        payload_respuesta = []
+        for fichaje in resultados:
+            # RESOLUCIÓN DIRECTA MEDIANTE LAS PROPIEDADES DEL OBJETO (Evita romper por los import de tablas)
+            # SQLAlchemy resuelve automáticamente fichaje.trabajador si está configurada la relación
+                    payload_respuesta = []
+        for fichaje in resultados:
+            nombre_completo = "Operario de Planta"
+            if hasattr(fichaje, "trabajador") and fichaje.trabajador:
+                nombre_completo = f"{fichaje.trabajador.nombre} {fichaje.trabajador.apellidos}"
+            elif hasattr(fichaje, "usuario") and fichaje.usuario:
+                nombre_completo = f"{fichaje.usuario.nombre}"
+
+            nombre_turno = "Sin Turno Programado"
+            if hasattr(fichaje, "turno") and fichaje.turno:
+                nombre_turno = fichaje.turno.nombre
+
+            # Si el timestamp existe, lo formateamos; si es None, inyectamos la fecha actual o un texto plano
+            if fichaje.fecha_hora_dispositivo:
+                fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # Fallback de emergencia por si la tupla de PostgreSQL carece de estampa de tiempo
+                fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            payload_respuesta.append({
+                "id": str(fichaje.id),
+                "trabajador_id": str(fichaje.trabajador_id),
+                "trabajador_nombre": nombre_completo,
+                "turno_nombre": nombre_turno,
+                "fecha_hora": fecha_hora_str,  # 👈 Usamos la variable validada e inmutable
+                "tipo_evento": fichaje.tipo_evento_id,
+                "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
+                "observaciones": fichaje.observaciones
+            })
+
+        return payload_respuesta
+
+
+    except Exception as e:
+        db.rollback()
+        # Esto imprimirá el error exacto en tu consola de Uvicorn si vuelve a fallar por alguna columna
+        print(f"[FICHAPP ERROR]: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en la auditoría de fichajes en PostgreSQL: {str(e)}"
+        )
