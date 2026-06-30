@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   textoOpcionActiva: {
     color: "#1E40AF",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
   },
