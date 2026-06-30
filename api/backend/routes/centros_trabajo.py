@@ -103,3 +103,31 @@ def cambiar_estado_centro(id_centro: UUID, activo: bool, db: Session = Depends(g
     db.commit()
     db.refresh(centro)
     return centro
+
+@router.delete("/{id_centro}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_centro_trabajo(id_centro: UUID, db: Session = Depends(get_db)):
+    """
+    URI: DELETE /api/centros-trabajo/{id_centro}
+    Elimina físicamente una sede de la base de datos si no viola restricciones de integridad.
+    """
+    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
+    if not centro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
+        )
+    
+    try:
+        db.delete(centro)
+        db.commit()
+        # Al usar 204 NO CONTENT no se devuelve ningún cuerpo (body)
+        return
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "No se puede eliminar el centro de trabajo porque contiene registros "
+                f"históricos activos (fichajes/contratos). Error: {str(error)}"
+            )
+        )

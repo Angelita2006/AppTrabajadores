@@ -1,3 +1,4 @@
+import axios from "axios";
 import api from "../../../service/api/api";
 import {
   AusenciaCreateRequest,
@@ -10,6 +11,7 @@ import {
 } from "../../correcciones-fichaje/types/incidencia";
 import { Empresa } from "../../empresas/types/empresa";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
+import { ItemTurno } from "../../turnos/types/turno";
 import { UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
@@ -338,3 +340,62 @@ export const obtenerCorreccionesPorEmpresa = async (
   );
   return respuesta.data;
 };
+
+/**
+ * Obtiene la lista de centros de trabajo vinculados a una empresa específica.
+ * URI del backend: GET /api/centros-trabajo/empresa/{id_empresa}
+ * * @param idEmpresa Identificador único UUID de la empresa
+ * @returns Promesa con el array de CentrosTrabajo
+ */
+export const obtenerCentrosPorEmpresa = async (
+  idEmpresa: string,
+): Promise<CentroTrabajo[]> => {
+  try {
+    const respuesta = await api.get<CentroTrabajo[]>(
+      `/api/centros-trabajo/empresa/${idEmpresa}`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    console.error(
+      `Error al recuperar centros de trabajo de la empresa ${idEmpresa}:`,
+      error,
+    );
+    throw error;
+  }
+};
+
+/**
+ * Recupera el turno con ese id.
+ * URI: GET /api/turnos/{id_turno}
+ */
+export const obtenerTurno = async (
+  idTurno: string,
+): Promise<ItemTurno | null> => {
+  try {
+    // Ajusta la URL base o el prefijo según la configuración de tu API en FastAPI
+    const respuesta = await axios.get<ItemTurno>(`/api/turnos/${idTurno}`);
+    return respuesta.data;
+  } catch (error) {
+    console.error(`Error al obtener turno ${idTurno}:`, error);
+    return null;
+  }
+};
+
+// /**
+//  * Recupera las asignaciones de turno para ese trabajador.
+//  * URI: GET /api/asignaciones-turno/trabajador/{id_trabajador}
+//  */
+// export const obtenerAsignacionesTurnoTrabajador = async (
+//   idTrabajador: string,
+// ): Promise<AsignacionTurno[] | null> => {
+//   try {
+//     // Ajusta la URL base o el prefijo según la configuración de tu API en FastAPI
+//     const respuesta = await axios.get<AsignacionTurno[]>(
+//       `/api/turnos/${idTrabajador}`,
+//     );
+//     return respuesta.data;
+//   } catch (error) {
+//     console.error(`Error al obtener turno ${idTrabajador}:`, error);
+//     return null;
+//   }
+// };

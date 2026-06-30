@@ -26,26 +26,47 @@ interface RegistroFichaje {
 export default function HomeScreen() {
   const {
     usuarioActual,
-    trabajadorActual,
     empresaSeleccionada,
     contratoActual,
-    centroTrabajoId,
+    centroTrabajoActual, // 💡 Usamos el objeto completo para máxima reactividad
   } = useSesion();
 
   const [horaActual, setHoraActual] = useState("");
-
-  // Estados principales de la jornada reactiva
   const [estadoActual, setEstadoActual] = useState<Estado>(Estado.Activo);
   const [cargando, setCargando] = useState(true);
 
-  // Motor de segundos planos acumulativos consistentes
   const [segundosAcumuladosHoy, setSegundosAcumuladosHoy] = useState<number>(0);
   const [tiempoFormateado, setTiempoFormateado] = useState("00:00:00");
-
-  // Almacena la estampa de tiempo oficial en la que arrancó el estado activo actual
   const [timestampBaseActual, setTimestampBaseActual] = useState<number | null>(
     null,
   );
+
+  /**
+   * Convierte la hora actual del dispositivo a un string ISO
+   * forzando la zona geográfica específica del centro de trabajo activo.
+   */
+  function obtenerFechaHoraCentroISO(zonaHoraria: string): string {
+    const ahora = new Date();
+    try {
+      const formateador = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: zonaHoraria,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      const partes = formateador.formatToParts(ahora);
+      const dic = Object.fromEntries(partes.map((p) => [p.type, p.value]));
+
+      return `${dic.year}-${dic.month}-${dic.day}T${dic.hour}:${dic.minute}:${dic.second}.000`;
+    } catch (error) {
+      console.error("Zona horaria inválida, usando UTC como fallback", error);
+      return ahora.toISOString().replace("Z", "");
+    }
+  }
 
   const formatearSegundos = (totales: number): string => {
     const horas = Math.floor(totales / 3600)
@@ -58,23 +79,34 @@ export default function HomeScreen() {
     return `${horas}:${minutos}:${segundos}`;
   };
 
-  // Motor de reloj digital para la hora actual de fichaje
   useEffect(() => {
     const actualizarHoraServidor = () => {
       const ahora = new Date();
-      const hrs = ahora.getHours().toString().padStart(2, "0");
-      const mins = ahora.getMinutes().toString().padStart(2, "0");
-      const secs = ahora.getSeconds().toString().padStart(2, "0");
-      setHoraActual(`${hrs}:${mins}:${secs}`);
+      // Extraemos la zona horaria directamente o usamos fallback
+      const zonaObjetivo = centroTrabajoActual?.zona_horaria || "Europe/Madrid";
+
+      try {
+        const horaCentroStr = ahora.toLocaleTimeString("es-ES", {
+          timeZone: zonaObjetivo,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        });
+        setHoraActual(horaCentroStr);
+      } catch (e) {
+        setHoraActual(ahora.toLocaleTimeString("es-ES", { hour12: false }));
+      }
     };
 
-    actualizarHoraServidor(); // Disparo inicial inmediato
+    // Ejecución inmediata
+    actualizarHoraServidor();
     const intervaloReloj = setInterval(actualizarHoraServidor, 1000);
 
     return () => clearInterval(intervaloReloj);
-  }, []);
+  }, [centroTrabajoActual?.id, centroTrabajoActual?.zona_horaria]);
 
-  // Reconstrucción cronológica en caliente (Sincronización API)
+  // Sincronización inicial de la jornada
   useEffect(() => {
     async function sincronizarJornadaActual() {
       if (!usuarioActual?.trabajador_id) return;
@@ -138,10 +170,8 @@ export default function HomeScreen() {
           }
         });
 
-        // Guardamos el acumulado fijo de los tramos cerrados del pasado
         setSegundosAcumuladosHoy(segundosCalculados);
 
-        // Sincronizamos la estampa de tiempo del tramo que continúa abierto en el presente
         const ultimoEvento = eventos[eventos.length - 1].tipo_evento;
         if (ultimoEvento === "ENTRADA" || ultimoEvento === "FIN_PAUSA") {
           setTimestampBaseActual(marcaEntradaActiva);
@@ -173,22 +203,20 @@ export default function HomeScreen() {
     sincronizarJornadaActual();
   }, [usuarioActual]);
 
-  // CRONÓMETRO INTEGRADO CON CONTROL DE APPLICACIÓN (APPSTATE)
+  // Cronómetro diferencial de segundo plano
   useEffect(() => {
-    // Importamos AppState dinámicamente para evitar colisiones en la Web
     const { AppState } = require("react-native");
     let intervalo: number;
 
     const actualizarRelojDiferencial = () => {
-      if (estadoActual === Estado.Activo || timestampBaseActual === null) {
+      if (estadoActual === Estado.Activo || timestampBaseActual === null)
         return;
-      }
-      // Calculamos de forma exacta la distancia entre el instante en que se pulsó el botón y el presente real
       const segundosTramoAbierto = Math.floor(
         (Date.now() - timestampBaseActual) / 1000,
       );
-      const totalSegundosReales = segundosAcumuladosHoy + segundosTramoAbierto;
-      setTiempoFormateado(formatearSegundos(totalSegundosReales));
+      setTiempoFormateado(
+        formatearSegundos(segundosAcumuladosHoy + segundosTramoAbierto),
+      );
     };
 
     if (
@@ -196,17 +224,14 @@ export default function HomeScreen() {
       !cargando &&
       timestampBaseActual !== null
     ) {
-      // Forzamos un refresco inmediato al cambiar de estado o volver a la vista
       actualizarRelojDiferencial();
       intervalo = setInterval(actualizarRelojDiferencial, 1000);
     }
 
-    // Escudero del Ciclo de Vida: Escucha si el operario minimiza la app o vuelve de buscar en Google
     const subscripcionAppState = AppState.addEventListener(
       "change",
       (siguienteEstadoAppState: string) => {
         if (siguienteEstadoAppState === "active") {
-          // Al ponerse en primer plano, recalculamos inmediatamente la resta matemática contra Date.now()
           actualizarRelojDiferencial();
         }
       },
@@ -218,7 +243,7 @@ export default function HomeScreen() {
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
-  // AJUSTE EN LA INSERCIÓN DE BOTONES
+  // Registro del marcaje utilizando el Centro de Trabajo dinámico
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
     tipoLabel: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA",
@@ -226,26 +251,27 @@ export default function HomeScreen() {
     if (
       !usuarioActual?.trabajador_id ||
       !empresaSeleccionada?.id ||
-      !centroTrabajoId
+      !centroTrabajoActual?.id // Aseguramos que el centro actual esté seteado
     ) {
       Alert.alert(
         "Expediente Incompleto",
-        "Faltan parámetros contractuales obligatorios.",
+        "Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
       );
       return;
     }
 
     try {
       setCargando(true);
-      const ahoraInstante = new Date();
+      const zonaDelCentro = centroTrabajoActual.zona_horaria || "UTC";
+      const fechaHoraAjustada = obtenerFechaHoraCentroISO(zonaDelCentro);
 
       await registrarFichaje({
         trabajador_id: usuarioActual.trabajador_id,
         empresa_id: empresaSeleccionada.id,
-        centro_trabajo_id: centroTrabajoId,
+        centro_trabajo_id: centroTrabajoActual.id, // 💡 Envía el ID del centro activo actual
         tipo_evento_id: tipoLabel,
         metodo_fichaje: Platform.OS === "web" ? "web" : "app_movil",
-        fecha_hora_dispositivo: ahoraInstante.toISOString(),
+        fecha_hora_dispositivo: fechaHoraAjustada,
         observaciones:
           tipoLabel === "ENTRADA"
             ? "Inicio de jornada"
@@ -253,12 +279,9 @@ export default function HomeScreen() {
               ? "Cierre de jornada"
               : tipoLabel === "INICIO_PAUSA"
                 ? "Inicio de descanso"
-                : tipoLabel === "FIN_PAUSA"
-                  ? "Descanso terminado"
-                  : null,
+                : "Descanso terminado",
       });
 
-      // Antes de mutar el estado, recalculamos el acumulado del tramo que se acaba de cerrar
       if (timestampBaseActual !== null) {
         const segundosDelTramoQueCierra = Math.floor(
           (Date.now() - timestampBaseActual) / 1000,
@@ -266,7 +289,6 @@ export default function HomeScreen() {
         setSegundosAcumuladosHoy((prev) => prev + segundosDelTramoQueCierra);
       }
 
-      // Establecemos el nuevo hito temporal base para el tramo que se abre en este milisegundo
       if (tipoLabel === "SALIDA") {
         setSegundosAcumuladosHoy(0);
         setTimestampBaseActual(null);
@@ -279,7 +301,7 @@ export default function HomeScreen() {
     } catch (error) {
       Alert.alert(
         "Error de Fichaje",
-        "La base de datos denegó el marcaje. " + error,
+        "La base de datos denegó el marcaje: " + error,
       );
     } finally {
       setCargando(false);
@@ -304,7 +326,7 @@ export default function HomeScreen() {
   return (
     <AppScreen
       title="Control de Jornada"
-      subtitle={`Empresa: ${empresaSeleccionada?.nombre_comercial ?? "Ninguna"}`}
+      subtitle={`Sede: ${centroTrabajoActual?.nombre ?? "Sin asignar"}`}
     >
       <Row>
         <StatCard
@@ -325,6 +347,7 @@ export default function HomeScreen() {
       <View style={{ height: 12 }} />
 
       <View style={{ flexDirection: "row", width: "100%", gap: 12 }}>
+        {/* COLUMNA IZQUIERDA: HORA DIGITAL ACTUALIZADA */}
         <View style={{ flex: 1 }}>
           <Card>
             <View
@@ -333,12 +356,7 @@ export default function HomeScreen() {
                 { minHeight: 90, justifyContent: "center" },
               ]}
             >
-              <ThemedText
-                style={[
-                  styles.cronometroLabel,
-                  { color: "#64748B", fontWeight: "700", textAlign: "center" },
-                ]}
-              >
+              <ThemedText style={styles.cronometroLabel}>
                 Hora Actual
               </ThemedText>
               <ThemedText
@@ -384,10 +402,7 @@ export default function HomeScreen() {
                 <ActivityIndicator
                   size="small"
                   color="#2563EB"
-                  style={[
-                    styles.loaderSpacing,
-                    { position: "absolute", right: 8, top: 8 },
-                  ]}
+                  style={{ position: "absolute", right: 8, top: 8 }}
                 />
               )}
             </View>
@@ -400,7 +415,7 @@ export default function HomeScreen() {
       </ThemedText>
 
       <View style={styles.panelAcciones}>
-        {estadoActual === Estado.Activo ? (
+        {estadoActual === Estado.Activo && (
           <Pressable
             style={[
               styles.botonAccion,
@@ -415,9 +430,9 @@ export default function HomeScreen() {
             <IconSymbol name="play-circle" size={24} color="#FFFFFF" />
             <ThemedText style={styles.textoBoton}>Iniciar Jornada</ThemedText>
           </Pressable>
-        ) : null}
+        )}
 
-        {estadoActual !== Estado.Activo ? (
+        {estadoActual !== Estado.Activo && (
           <Pressable
             style={[
               styles.botonAccion,
@@ -448,9 +463,9 @@ export default function HomeScreen() {
                 : "Iniciar Descanso"}
             </ThemedText>
           </Pressable>
-        ) : null}
+        )}
 
-        {estadoActual !== Estado.Activo ? (
+        {estadoActual !== Estado.Activo && (
           <Pressable
             style={[
               styles.botonAccion,
@@ -463,7 +478,7 @@ export default function HomeScreen() {
             <IconSymbol name="stop" size={24} color="#FFFFFF" />
             <ThemedText style={styles.textoBoton}>Finalizar Jornada</ThemedText>
           </Pressable>
-        ) : null}
+        )}
       </View>
     </AppScreen>
   );
@@ -483,6 +498,7 @@ const styles = StyleSheet.create({
     color: "#64748B",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    textAlign: "center",
   },
   cronometroNumero: {
     fontSize: 42,
@@ -493,7 +509,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     lineHeight: 50,
   },
-  loaderSpacing: { marginTop: 12 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
@@ -508,8 +523,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    boxShadow: "0px 2px 4px 0px rgba(0, 0, 0, 0.1)",
-    elevation: 2,
+    ...Platform.select({
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.1)" },
+      default: { elevation: 2 },
+    }),
   },
   botonEntrada: { backgroundColor: "#16A34A" },
   botonPausa: { backgroundColor: "#EA580C" },

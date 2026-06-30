@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { ThemedText } from "../components/themed-text";
-import AnimatedBackground from "./AnimatedBackground";
 
 // ==========================================
 // INTERFACES (TIPOS)
@@ -35,9 +34,6 @@ interface StatCardProps {
 export function AppScreen({ title, subtitle, children }: AppScreenProps) {
   return (
     <View style={styles.mainContainer}>
-      {/* fondo animado */}
-      <AnimatedBackground />
-
       {/* ScrollView por encima del fondo */}
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.header}>

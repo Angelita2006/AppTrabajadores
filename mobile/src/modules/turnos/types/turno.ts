@@ -22,3 +22,13 @@ export interface ItemTurno {
   color_hex?: string | null; // Color identificativo para pintar el calendario de la UI
   fecha_real: string;
 }
+
+export interface TurnoTrabajadorResponse {
+  id: string;
+  nombre: string; // Ej: "Mañana", "Tarde Rotativo"
+  hora_inicio: string; // Ej: "08:00"
+  hora_fin: string; // Ej: "16:00"
+  dias_semana?: string; // Ej: "L-V", "L-S" o "Lunes a Viernes"
+  tipo_jornada?: string; // Ej: "Completa", "Parcial"
+  duracion_pausa_minuto: number;
+}

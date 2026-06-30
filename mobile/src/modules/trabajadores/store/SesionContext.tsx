@@ -17,7 +17,6 @@ import {
 } from "../api/services";
 import { Trabajador, UsuarioSesion } from "../types/trabajador";
 
-// Interfaces estrictas basadas en tus modelos físicos de PostgreSQL
 interface ContratoLaboral {
   id: string;
   trabajador_id: string;
@@ -53,26 +52,28 @@ interface AsignacionTurno {
 
 interface SesionContextValue {
   // 1. IDENTIDAD Y CONTROL DE ACCESO
-  usuarioActual: UsuarioSesion | null; // Contiene id_usuario, email, nombre y rol (tipo_usuario)
+  usuarioActual: UsuarioSesion | null;
   setUsuarioActual: (usuario: UsuarioSesion | null) => void;
-  empresas: Empresa[]; // Lista de empresas (Tenants) a las que tiene acceso el usuario
+  empresas: Empresa[];
   setEmpresas: (empresas: Empresa[]) => void;
-  empresaSeleccionada: Empresa | null; // Empresa activa en la pestaña superior
+  empresaSeleccionada: Empresa | null;
   setEmpresaSeleccionada: (empresa: Empresa | null) => void;
   seleccionarEmpresa: (empresa: Empresa | null) => void;
 
-  // 2. EXPEDIENTE LABORAL COMPUESTO (Resuelto de forma síncrona en cascada)
-  trabajadorActual: Trabajador | null; // Ficha básica de RRHH (NIF, teléfono, SS)
-  contratoActual: ContratoLaboral | null; // Condiciones contractuales activas
-  turnoActual: AsignacionTurno | null; // Turno/Cuadrante asignado vigente
+  // 2. EXPEDIENTE LABORAL COMPUESTO Y SELECCIÓN DE ENTORNO
+  trabajadorActual: Trabajador | null;
+  contratoActual: ContratoLaboral | null;
+  turnoActual: AsignacionTurno | null;
   centroTrabajoActual: CentroTrabajo | null;
-  // 3. PROPIEDADES DIRECTAS CALCULADAS DE ALTA COMODIDAD PARA LA UI
-  centroTrabajoId: string | null; // Extraído automáticamente del contrato activo
-  departamentoId: string | null; // Extraído automáticamente del contrato activo
-  rolUsuario: string | null; // Atributo directo del rol del sistema (admin_empresa, trabajador, etc.)
+  setCentroTrabajoActual: (centro: CentroTrabajo | null) => void; // <--- MODIFICADO: Ahora es seteable externamente
 
-  // 4. CONTROL DE ASINCRONÍA Y FEEDBACK
-  cargandoSesionLocal: boolean; // TRUE mientras lee AsyncStorage o consulta la cascada de la API
+  // 3. PROPIEDADES DIRECTAS CALCULADAS
+  centroTrabajoId: string | null;
+  departamentoId: string | null;
+  rolUsuario: string | null;
+
+  // 4. CONTROL DE ASINCRONÍA
+  cargandoSesionLocal: boolean;
 }
 
 const SesionContext = createContext<SesionContextValue | undefined>(undefined);
@@ -80,6 +81,7 @@ const SesionContext = createContext<SesionContextValue | undefined>(undefined);
 const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESAS = "@fichapp_empresas_lista";
 const STORAGE_KEY_SELECCIONADA = "@fichapp_empresa_seleccionada";
+const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado"; // <--- NUEVA LLAVE
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioSesion | null>(
@@ -112,11 +114,15 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         const seleccionadaGuardada = await AsyncStorage.getItem(
           STORAGE_KEY_SELECCIONADA,
         );
+        const centroGuardado = await AsyncStorage.getItem(
+          STORAGE_KEY_CENTRO_SELECCIONADO,
+        );
 
         if (usuarioGuardado) setUsuarioActual(JSON.parse(usuarioGuardado));
         if (empresasGuardadas) setEmpresas(JSON.parse(empresasGuardadas));
         if (seleccionadaGuardada)
           setEmpresaSeleccionada(JSON.parse(seleccionadaGuardada));
+        if (centroGuardado) setCentroTrabajoActual(JSON.parse(centroGuardado));
       } catch (error) {
         console.error(
           "Error al restaurar los ficheros locales de sesión:",
@@ -130,7 +136,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   // ====================================================================
-  // MOTOR 2: RESOLUCIÓN EN CASCADA DE LA HOJA DE SERVICIOS
+  // MOTOR 2: RESOLUCIÓN EN CASCADA
   // ====================================================================
   useEffect(() => {
     if (cargandoSesionLocal) return;
@@ -145,7 +151,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       }
 
       try {
-        // Ejecución en paralelo para maximizar la velocidad de respuesta de la red
         const [datosTrabajador, listaContratos, listaTurnos] =
           await Promise.all([
             obtenerTrabajador(usuarioActual.trabajador_id),
@@ -153,34 +158,37 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             obtenerAsignacionesTurnoTrabajador(usuarioActual.trabajador_id),
           ]);
 
-        // Sincronizamos la ficha básica de RRHH
         setTrabajadorActual(datosTrabajador);
 
-        // Filtramos el contrato activo correspondiente a la empresa seleccionada
         const contratoVigente = listaContratos.find(
           (c: ContratoLaboral) =>
             c.activo === true && c.empresa_id === empresaSeleccionada.id,
         );
         setContratoActual(contratoVigente ?? null);
 
+        // MODIFICADO: Solo autoselecciona el centro del contrato si no hay uno ya fijado/guardado para esta empresa
         if (contratoVigente?.centro_trabajo_id) {
-          try {
-            const datosCentro = await obtenerCentroTrabajo(
-              contratoVigente.centro_trabajo_id,
-            );
-            setCentroTrabajoActual(datosCentro);
-          } catch (errCentro) {
-            console.error(
-              "Error al resolver el objeto Centro de Trabajo:",
-              errCentro,
-            );
-            setCentroTrabajoActual(null);
+          if (
+            !centroTrabajoActual ||
+            centroTrabajoActual.empresa_id !== empresaSeleccionada.id
+          ) {
+            try {
+              const datosCentro = await obtenerCentroTrabajo(
+                contratoVigente.centro_trabajo_id,
+              );
+              setCentroTrabajoActual(datosCentro);
+            } catch (errCentro) {
+              console.error(
+                "Error al resolver el objeto Centro de Trabajo:",
+                errCentro,
+              );
+              setCentroTrabajoActual(null);
+            }
           }
-        } else {
+        } else if (!centroTrabajoActual) {
           setCentroTrabajoActual(null);
         }
 
-        // Filtramos la asignación de turno vigente para el día de hoy
         const hoyStr = new Date().toISOString().split("T")[0];
         const turnoVigente = listaTurnos.find((t: AsignacionTurno) => {
           const coincideFiltro = t.empresa_id === empresaSeleccionada.id;
@@ -219,16 +227,26 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             STORAGE_KEY_EMPRESAS,
             JSON.stringify(empresas),
           );
+
           if (empresaSeleccionada) {
             await AsyncStorage.setItem(
               STORAGE_KEY_SELECCIONADA,
               JSON.stringify(empresaSeleccionada),
             );
           }
+          if (centroTrabajoActual) {
+            await AsyncStorage.setItem(
+              STORAGE_KEY_CENTRO_SELECCIONADO,
+              JSON.stringify(centroTrabajoActual),
+            );
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
+          }
         } else {
           await AsyncStorage.removeItem(STORAGE_KEY_USUARIO);
           await AsyncStorage.removeItem(STORAGE_KEY_EMPRESAS);
           await AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA);
+          await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
         }
       } catch (error) {
         console.error("Error al persistir cambios de sesión:", error);
@@ -237,14 +255,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (!cargandoSesionLocal) {
       guardarEstadosEnDisco();
     }
-  }, [usuarioActual, empresas, empresaSeleccionada, cargandoSesionLocal]);
+  }, [
+    usuarioActual,
+    empresas,
+    empresaSeleccionada,
+    centroTrabajoActual,
+    cargandoSesionLocal,
+  ]);
 
   // ====================================================================
-  // PROPIEDADES DIRECTAS CALCULADAS (MEMORIZADAS)
+  // PROPIEDADES DIRECTAS CALCULADAS
   // ====================================================================
   const centroTrabajoId = useMemo(
-    () => contratoActual?.centro_trabajo_id ?? null,
-    [contratoActual],
+    () => centroTrabajoActual?.id ?? contratoActual?.centro_trabajo_id ?? null,
+    [centroTrabajoActual, contratoActual],
   );
   const departamentoId = useMemo(
     () => contratoActual?.departamento_id ?? null,
@@ -269,6 +293,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       contratoActual,
       turnoActual,
       centroTrabajoActual,
+      setCentroTrabajoActual,
       centroTrabajoId,
       departamentoId,
       rolUsuario,

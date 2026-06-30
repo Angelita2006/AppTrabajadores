@@ -19,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import {
   getUsuarioByEmailYPassword,
-  obtenerCentroTrabajo,
+  obtenerCentrosPorEmpresa,
   obtenerEmpresasTrabajador,
 } from "../src/modules/trabajadores/api/services";
 import { useSesion } from "../src/modules/trabajadores/store/SesionContext";
@@ -33,23 +33,27 @@ export default function RootIndexScreen() {
     usuarioActual,
     setUsuarioActual,
     trabajadorActual,
+    empresas,
     setEmpresas,
-    setEmpresaSeleccionada,
     empresaSeleccionada,
+    setEmpresaSeleccionada,
     contratoActual,
-    centroTrabajoId,
+    centroTrabajoActual,
+    setCentroTrabajoActual,
   } = useSesion();
-  const [centroAsignado, setCentroAsignado] = useState<CentroTrabajo | null>(
-    null,
-  );
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
   const [password, setPassword] = useState("password123");
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
+  const [cargandoCentros, setCargandoCentros] = useState(false);
 
   const [errorEmail, setErrorEmail] = useState(false);
   const [errorPassword, setErrorPassword] = useState(false);
+
+  const [centrosDisponibles, setCentrosDisponibles] = useState<CentroTrabajo[]>(
+    [],
+  );
 
   const opacidadTarjeta = useSharedValue(0);
 
@@ -60,6 +64,36 @@ export default function RootIndexScreen() {
     opacidadTarjeta.value = 0;
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
   }, [opacidadTarjeta, setUsuarioActual, usuarioActual]);
+
+  // CARGA REACTIVA DE CENTROS AL CAMBIAR DE EMPRESA EN EL PERFIL
+  useEffect(() => {
+    const cargarCentrosDeLaEmpresa = async () => {
+      if (!empresaSeleccionada?.id) return;
+
+      try {
+        setCargandoCentros(true);
+        const centros = await obtenerCentrosPorEmpresa(empresaSeleccionada.id);
+        setCentrosDisponibles(centros);
+
+        if (centros.length > 0) {
+          if (
+            !centroTrabajoActual ||
+            centroTrabajoActual.empresa_id !== empresaSeleccionada.id
+          ) {
+            setCentroTrabajoActual(centros[0]);
+          }
+        } else {
+          setCentroTrabajoActual(null);
+        }
+      } catch (err) {
+        console.error("Error al cargar centros de trabajo:", err);
+      } finally {
+        setCargandoCentros(false);
+      }
+    };
+
+    cargarCentrosDeLaEmpresa();
+  }, [empresaSeleccionada?.id]);
 
   const validarFormulario = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,43 +106,24 @@ export default function RootIndexScreen() {
   };
 
   const handleLogin = async () => {
-    // Si el formulario no es válido, detenemos la ejecución inmediatamente
-    if (!validarFormulario()) {
-      console.log("Formulario no válido.");
-      return;
-    }
+    if (!validarFormulario()) return;
 
     try {
-      console.log("Cargando...");
       setCargando(true);
-
-      // Intentamos el login en el backend
       const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
       setUsuarioActual(usuarioSesion);
-      console.log("Usuario actual: " + usuarioSesion?.nombre.toString());
 
-      // Si el login fue exitoso y tiene un trabajador asociado, cargamos sus empresas
       if (usuarioSesion.trabajador_id !== null) {
         try {
-          const empresas = await obtenerEmpresasTrabajador(
+          const empresasTrabajador = await obtenerEmpresasTrabajador(
             usuarioSesion.trabajador_id,
           );
-          setEmpresas(empresas);
-          if (empresas.length > 0) {
-            setEmpresaSeleccionada(empresas[0]);
-            console.log(
-              "Empresa seleccionada: " + empresas[0].nombre_comercial,
-            );
-          } else {
-            console.log("Este trabajador no tiene empresas asignadas.");
+          setEmpresas(empresasTrabajador);
+          if (empresasTrabajador.length > 0) {
+            setEmpresaSeleccionada(empresasTrabajador[0]);
           }
         } catch (errorEmpresa) {
-          console.log(
-            "Error secundario al cargar empresas o turnos:",
-            errorEmpresa,
-          );
-          // Aquí podrías poner una alerta secundaria si lo deseas,
-          // pero el usuario ya habrá iniciado sesión correctamente.
+          console.log("Error al cargar empresas del trabajador:", errorEmpresa);
         }
       }
     } catch (error: any) {
@@ -116,7 +131,11 @@ export default function RootIndexScreen() {
         error.response?.data?.detail ||
         "No se pudo conectar con el servidor. Revisa tu conexión.";
 
-      Alert.alert("Fallo de Autenticación", mensajeErrorApi);
+      if (Platform.OS === "web") {
+        alert(`Fallo de Autenticación: ${mensajeErrorApi}`);
+      } else {
+        Alert.alert("Fallo de Autenticación", mensajeErrorApi);
+      }
     } finally {
       setCargando(false);
     }
@@ -126,6 +145,8 @@ export default function RootIndexScreen() {
     setUsuarioActual(null);
     setEmpresas([]);
     setEmpresaSeleccionada(null);
+    setCentroTrabajoActual(null);
+    setCentrosDisponibles([]);
   };
 
   const estiloTarjetaAnimada = useAnimatedStyle(() => {
@@ -141,39 +162,12 @@ export default function RootIndexScreen() {
     };
   });
 
-  useEffect(() => {
-    const cargarInformacionExpediente = async () => {
-      if (!usuarioActual?.trabajador_id) return;
-
-      try {
-        if (contratoActual?.centro_trabajo_id) {
-          try {
-            const centroObj = await obtenerCentroTrabajo(
-              contratoActual.centro_trabajo_id,
-            );
-            setCentroAsignado(centroObj);
-          } catch (errCentro) {
-            console.log(
-              "No se pudo resolver el nombre del centro de trabajo:",
-              errCentro,
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Error al cargar expediente:", error);
-      }
-    };
-
-    cargarInformacionExpediente();
-  }, [usuarioActual, contratoActual?.centro_trabajo_id]); // Vigila el ID del contrato
-
   // ====================================================================
   // VISTA DE PERFIL (USUARIO LOGUEADO)
   // ====================================================================
   if (usuarioActual && trabajadorActual) {
     return (
       <AppScreen title="Mi Perfil">
-        {/* FILA DE HITOS RÁPIDOS SUPERIORES */}
         <Row>
           <StatCard
             label="Estado Alta"
@@ -181,7 +175,7 @@ export default function RootIndexScreen() {
             tone={usuarioActual.activo ? "success" : "danger"}
           />
           <StatCard
-            label="Empresa Principal"
+            label="Empresa Activa"
             value={empresaSeleccionada?.nombre_comercial ?? "Sin Asignar"}
           />
         </Row>
@@ -220,7 +214,7 @@ export default function RootIndexScreen() {
             </View>
           </Card>
 
-          {/* BLOCK 2: DETALLES DE CONTRATACIÓN Y CONDICIONES (CONTRATOACTUAL) */}
+          {/* BLOCK 2: DETALLES DE CONTRATACIÓN */}
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="description" size={20} color="#16A34A" />
@@ -253,7 +247,7 @@ export default function RootIndexScreen() {
                 value={contratoActual?.fecha_fin ?? "Indefinido / Continuo"}
               />
               <Detail
-                label="Jornada Semanal Anual"
+                label="Jornada Semanal"
                 value={
                   contratoActual?.horas_semana
                     ? `${contratoActual.horas_semana} hs/semana`
@@ -263,36 +257,122 @@ export default function RootIndexScreen() {
             </View>
           </Card>
 
-          {/* BLOCK 3: ADSCRIPCIÓN CORPORATIVA Y ORGANIZACIÓN */}
+          {/* BLOCK 3: ADSCRIPCIÓN CORPORATIVA E INTERCAMBIO DE ENTIDADES */}
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="business" size={20} color="#EA580C" />
               <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                Organización y Destino
+                Organización y Centro de Fichaje
               </ThemedText>
             </View>
             <View style={styles.separadorPerfil} />
+
             <View style={styles.detailGrid}>
+              {/* SELECTOR DE EMPRESAS DISPONIBLES */}
+              <View style={styles.selectorContainer}>
+                <ThemedText style={styles.detailLabel}>
+                  Cambiar de Empresa
+                </ThemedText>
+                <View style={styles.pickerWrapper}>
+                  {empresas.map((emp) => (
+                    <Pressable
+                      key={emp.id}
+                      style={[
+                        styles.selectorItem,
+                        empresaSeleccionada?.id === emp.id &&
+                          styles.selectorItemActivo,
+                      ]}
+                      onPress={() => {
+                        if (empresaSeleccionada?.id !== emp.id) {
+                          setEmpresaSeleccionada(emp);
+                        }
+                      }}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.selectorItemText,
+                          empresaSeleccionada?.id === emp.id &&
+                            styles.selectorItemTextActivo,
+                        ]}
+                      >
+                        {emp.nombre_comercial}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* SELECTOR EN CASCADA DE CENTROS DE TRABAJO */}
+              <View style={styles.selectorContainer}>
+                <ThemedText style={styles.detailLabel}>
+                  Seleccionar Sede / Centro
+                </ThemedText>
+                {cargandoCentros ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#EA580C"
+                    style={{ marginVertical: 10 }}
+                  />
+                ) : (
+                  <View style={styles.pickerWrapperHorizontal}>
+                    {centrosDisponibles.length > 0 ? (
+                      centrosDisponibles.map((centro) => (
+                        <Pressable
+                          key={centro.id}
+                          style={[
+                            styles.chipCentro,
+                            centroTrabajoActual?.id === centro.id &&
+                              styles.chipCentroActivo,
+                          ]}
+                          onPress={() => {
+                            if (centroTrabajoActual?.id !== centro.id) {
+                              setCentroTrabajoActual(centro);
+                            }
+                          }}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.chipCentroText,
+                              centroTrabajoActual?.id === centro.id &&
+                                styles.chipCentroTextActivo,
+                            ]}
+                          >
+                            {centro.nombre}
+                          </ThemedText>
+                        </Pressable>
+                      ))
+                    ) : (
+                      <ThemedText style={styles.detailValue}>
+                        No hay centros configurados para esta empresa
+                      </ThemedText>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* CONTENEDOR DE LA ZONA HORARIA DINÁMICA */}
+              <View style={styles.zonaHorariaCard}>
+                <IconSymbol name="schedule" size={16} color="#475569" />
+                <ThemedText style={styles.zonaHorariaTexto}>
+                  Zona Horaria de Registro:{" "}
+                  <ThemedText style={{ fontWeight: "700", color: "#0F172A" }}>
+                    {centroTrabajoActual?.zona_horaria ?? "Europe/Madrid"}
+                  </ThemedText>
+                </ThemedText>
+              </View>
+
               <Detail
-                label="Nombre Comercial"
-                value={empresaSeleccionada?.nombre_comercial ?? "No vinculada"}
+                label="Dirección de la Sede"
+                value={centroTrabajoActual?.direccion ?? "No registrada"}
               />
               <Detail
                 label="CIF / NIF Empresa"
                 value={empresaSeleccionada?.cif ?? "No disponible"}
               />
-              <Detail
-                label="Centro de Trabajo"
-                value={centroAsignado?.nombre ?? "Sede Central"}
-              />
-              <Detail
-                label="Dirección"
-                value={centroAsignado?.direccion ?? "No registrada"}
-              />
             </View>
           </Card>
 
-          {/* BLOCK 4: CREDENCIALES DE ACCESO AL PORTAL */}
+          {/* BLOCK 4: SEGURIDAD Y CUENTA */}
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="manage-accounts" size={20} color="#475569" />
@@ -302,29 +382,25 @@ export default function RootIndexScreen() {
             </View>
             <View style={styles.separadorPerfil} />
             <View style={styles.detailGrid}>
-              <Detail
-                label="Correo Electrónico (Login)"
-                value={usuarioActual.email}
-              />
+              <Detail label="Correo Electrónico" value={usuarioActual.email} />
               <Detail
                 label="Rol Autorizado Sistema"
                 value={usuarioActual.tipo_usuario}
               />
               <Detail
-                label="Último Fichaje Registrado"
+                label="Último Acceso Registrado"
                 value={
                   usuarioActual.ultimo_acceso
                     ? usuarioActual.ultimo_acceso
-                        .replace("T", " Realizado a las ")
+                        .replace("T", " a las ")
                         .substring(0, 32)
-                        .concat(" horas")
+                        .concat(" hs")
                     : "Sesión Actual"
                 }
               />
             </View>
           </Card>
 
-          {/* BOTÓN CENTRALIZADO DE SALIDA SEGURA */}
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <IconSymbol name="logout" size={18} color="#FFFFFF" />
             <ThemedText style={styles.logoutButtonText}>
@@ -421,7 +497,6 @@ export default function RootIndexScreen() {
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
               />
-
               <Pressable
                 onPress={() => setIsObscured(!isObscured)}
                 style={styles.eyeButton}
@@ -438,11 +513,7 @@ export default function RootIndexScreen() {
               onPress={() =>
                 router.replace("/(authentication)/recuperar-password")
               }
-              style={{
-                alignSelf: "center",
-                marginBottom: 16,
-                marginTop: 16,
-              }}
+              style={{ alignSelf: "center", marginVertical: 16 }}
             >
               <ThemedText
                 style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
@@ -473,11 +544,7 @@ export default function RootIndexScreen() {
           </Pressable>
           <Pressable
             onPress={() => router.replace("/(authentication)/registro")}
-            style={{
-              alignSelf: "center",
-              marginBottom: 16,
-              marginTop: 16,
-            }}
+            style={{ alignSelf: "center", marginVertical: 16 }}
           >
             <ThemedText
               style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
@@ -509,23 +576,15 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   loginCard: {
-    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
     width: "90%",
     maxWidth: 420,
-
-    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
     alignSelf: "center",
-
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
     alignItems: "center",
-
-    // Filtro inteligente para aplicar sombras seguras según la plataforma
     ...Platform.select({
-      web: {
-        boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
-      },
+      web: { boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)" },
       default: {
         boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
         elevation: 8,
@@ -589,17 +648,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingHorizontal: 4,
   },
-  helpText: {
-    textAlign: "center",
-    color: "#94A3B8",
-    fontSize: 12,
-    marginTop: 20,
-  },
-  perfilTitle: {
-    color: "#2563EB",
-    fontSize: 18,
-    fontWeight: "800",
-  },
+  perfilTitle: { color: "#2563EB", fontSize: 18, fontWeight: "800" },
   detailGrid: { gap: 12 },
   detailRow: {
     paddingVertical: 8,
@@ -625,11 +674,7 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center",
   },
-  separadorPerfil: {
-    height: 1,
-    backgroundColor: "#E2E8F0",
-    marginVertical: 6,
-  },
+  separadorPerfil: { height: 1, backgroundColor: "#E2E8F0", marginVertical: 6 },
   logoutButton: {
     backgroundColor: "#EF4444",
     flexDirection: "row",
@@ -640,4 +685,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
+  selectorContainer: { marginVertical: 4 },
+  pickerWrapper: { flexDirection: "column", gap: 6, marginTop: 6 },
+  pickerWrapperHorizontal: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  selectorItem: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  selectorItemActivo: { borderColor: "#EA580C", backgroundColor: "#FFF7ED" },
+  selectorItemText: { fontSize: 14, color: "#475569", fontWeight: "500" },
+  selectorItemTextActivo: { color: "#EA580C", fontWeight: "700" },
+  chipCentro: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+  },
+  chipCentroActivo: { borderColor: "#EA580C", backgroundColor: "#EA580C" },
+  chipCentroText: { fontSize: 13, color: "#64748B", fontWeight: "600" },
+  chipCentroTextActivo: { color: "#FFFFFF", fontWeight: "700" },
+  zonaHorariaCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F1F5F9",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  zonaHorariaTexto: { fontSize: 13, color: "#64748B" },
 });
