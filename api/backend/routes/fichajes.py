@@ -318,7 +318,8 @@ def listar_fichajes_empresa_por_fecha(
                 "fecha_hora": fecha_hora_str,  # 👈 Usamos la variable validada e inmutable
                 "tipo_evento": fichaje.tipo_evento_id,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
-                "observaciones": fichaje.observaciones
+                "observaciones": fichaje.observaciones,
+                "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado)
             })
 
         return payload_respuesta
@@ -331,4 +332,63 @@ def listar_fichajes_empresa_por_fecha(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en la auditoría de fichajes en PostgreSQL: {str(e)}"
+        )
+
+@router.delete("/fichajes/{id_fichaje}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
+    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
+    if not fichaje:
+        raise HTTPException(status_code=404, detail="Fichaje no encontrado.")
+    
+    try:
+        db.delete(fichaje)
+        db.commit()
+        return None  # Al ser 204 No Content, no se devuelve cuerpo
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar el fichaje: {str(e)}"
+        )
+
+def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento_id: int, fecha_iso: str) -> str:
+    """Genera el hash inmutable SHA-256 para auditoría legal"""
+    datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento_id}-{fecha_iso}"
+    return hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
+
+@router.patch("/{id_fichaje}/validar", response_model=FichajeResponse, status_code=status.HTTP_200_OK)
+def validar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
+    """
+    URI: PATCH /api/fichajes/{id_fichaje}/validar
+    Modifica el estado de un marcaje a 'VALIDO' y recalcula de forma segura el hash criptográfico.
+    """
+    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
+    if not fichaje:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró el registro de fichaje con ID {id_fichaje}."
+        )
+
+    # Actualizamos el estado usando el Enum que tienes importado
+    fichaje.estado = EstadoFichajeEnum.VALIDO
+    
+    # Recalculamos el hash de integridad al actualizar los datos mutables por control de auditoría
+    # Usamos la fecha_hora original o la actual según las políticas de tu sistema
+    fecha_iso = fichaje.fecha_hora.isoformat() if fichaje.fecha_hora else datetime.now().isoformat()
+    fichaje.hash_integridad = calcular_hash_fichaje(
+        str(fichaje.trabajador_id), 
+        str(fichaje.empresa_id), 
+        fichaje.tipo_evento_id, 
+        fecha_iso
+    )
+
+    try:
+        db.commit()
+        db.refresh(fichaje)
+        return fichaje
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al guardar la validación del fichaje en la base de datos: {str(e)}"
         )

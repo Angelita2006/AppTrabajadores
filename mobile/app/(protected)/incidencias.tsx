@@ -1,3 +1,4 @@
+import { TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -31,7 +32,7 @@ interface FichajeSimplificado {
   id: string;
   fecha: string;
   hora: string;
-  tipo_evento: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA"; // Ampliado para soportar los nuevos eventos si hiciera falta
+  tipo_evento: TipoFichaje;
 }
 
 export default function IncidenciasScreen() {
@@ -48,8 +49,8 @@ export default function IncidenciasScreen() {
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
   const [fechaAfectada, setFechaAfectada] = useState("2026-06-29");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
-  const [eventoSolitado, setEventoSolicitado] = useState<"ENTRADA" | "SALIDA">(
-    "ENTRADA",
+  const [eventoSolitado, setEventoSolicitado] = useState<TipoFichaje>(
+    TipoFichaje.ENTRADA,
   );
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
@@ -93,8 +94,8 @@ export default function IncidenciasScreen() {
         // 1. FILTRADO: Nos quedamos únicamente con eventos de ENTRADA o SALIDA
         const fichajesFiltrados = listaFichajesRaw.filter(
           (fichaje) =>
-            fichaje.tipo_evento === "ENTRADA" ||
-            fichaje.tipo_evento === "SALIDA",
+            fichaje.tipo_evento === TipoFichaje.ENTRADA ||
+            fichaje.tipo_evento === TipoFichaje.SALIDA,
         );
 
         // 2. MAPEADO SIMPLIFICADO: Transformamos solo los fichajes filtrados
@@ -113,7 +114,7 @@ export default function IncidenciasScreen() {
               id: fichaje.id,
               fecha: fecha,
               hora: horaMinutos,
-              tipo_evento: fichaje.tipo_evento as "ENTRADA" | "SALIDA", // Casteo seguro tras el filtro
+              tipo_evento: fichaje.tipo_evento as TipoFichaje, // Casteo seguro tras el filtro
             };
           },
         );
@@ -145,8 +146,8 @@ export default function IncidenciasScreen() {
       setHoraAnterior(fichaje.hora);
       // Control preventivo por si viene PAUSA del nuevo tipado, forzar a una opción válida del estado reactivo
       if (
-        fichaje.tipo_evento === "ENTRADA" ||
-        fichaje.tipo_evento === "SALIDA"
+        fichaje.tipo_evento === TipoFichaje.ENTRADA ||
+        fichaje.tipo_evento === TipoFichaje.SALIDA
       ) {
         setEventoSolicitado(fichaje.tipo_evento);
       }
@@ -397,26 +398,32 @@ export default function IncidenciasScreen() {
 
                   <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
                   <View style={styles.selectorTipos}>
-                    {(["ENTRADA", "SALIDA"] as const).map((evento) => (
-                      <Pressable
-                        key={evento}
-                        style={[
-                          styles.opcionTipo,
-                          eventoSolitado === evento && styles.opcionTipoActiva,
-                        ]}
-                        onPress={() => setEventoSolicitado(evento)}
-                      >
-                        <ThemedText
+                    {([TipoFichaje.ENTRADA, TipoFichaje.SALIDA] as const).map(
+                      (evento) => (
+                        <Pressable
+                          key={evento}
                           style={[
-                            styles.textoOpcion,
+                            styles.opcionTipo,
                             eventoSolitado === evento &&
-                              styles.textoOpcionActiva,
+                              styles.opcionTipoActiva,
                           ]}
+                          onPress={() => setEventoSolicitado(evento)}
                         >
-                          {evento}
-                        </ThemedText>
-                      </Pressable>
-                    ))}
+                          <ThemedText
+                            style={[
+                              styles.textoOpcion,
+                              eventoSolitado === evento &&
+                                styles.textoOpcionActiva,
+                            ]}
+                          >
+                            {TipoFichaje[evento]
+                              ?.toString()
+                              .replace("_", " ")
+                              .toUpperCase()}
+                          </ThemedText>
+                        </Pressable>
+                      ),
+                    )}
                   </View>
                 </>
               )}
@@ -510,7 +517,7 @@ export default function IncidenciasScreen() {
                   {tieneValoresNuevos && fechaD && (
                     <ThemedText style={styles.itemTipo}>
                       Propuesto: {fechaD} a las {horaP ?? "00:00"} hs (
-                      {eventoS ?? "N/A"})
+                      {eventoS?.toString().toUpperCase() ?? "N/A"})
                     </ThemedText>
                   )}
 

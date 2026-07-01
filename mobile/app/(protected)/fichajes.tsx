@@ -56,23 +56,29 @@ const horaAMinutos = (horaStr: string): number => {
   return hrs * 60 + min;
 };
 
-const obtenerConfiguracionEvento = (tipo: string) => {
-  switch (tipo) {
-    case "ENTRADA":
-      return { icono: "door-open", color: "#16A34A", texto: "ENTRADA" };
-    case "SALIDA":
-      return { icono: "exit-run", color: "#DC2626", texto: "SALIDA" };
-    case "INICIO_PAUSA":
-      return { icono: "coffee-to-go", color: "#EA580C", texto: "INICIO PAUSA" };
-    case "FIN_PAUSA":
-      return { icono: "briefcase-check", color: "#2563EB", texto: "FIN PAUSA" };
-    default:
-      return {
-        icono: "clock-outline",
-        color: "#475569",
-        texto: tipo || "OTRO",
-      };
+// Modificado para aceptar tanto el string como el ID numérico que viene de la API
+const obtenerConfiguracionEvento = (tipo: string | number) => {
+  const tipoStr = tipo?.toString().toUpperCase();
+
+  if (tipoStr === "ENTRADA" || tipo === 1) {
+    return { icono: "door-open", color: "#16A34A", texto: "ENTRADA" };
+  } else if (tipoStr === "SALIDA" || tipo === 2) {
+    return { icono: "exit-run", color: "#DC2626", texto: "SALIDA" };
+  } else if (
+    tipoStr === "INICIO_PAUSA" ||
+    tipoStr === "INICIO PAUSA" ||
+    tipo === 3
+  ) {
+    return { icono: "coffee-to-go", color: "#EA580C", texto: "INICIO PAUSA" };
+  } else if (tipoStr === "FIN_PAUSA" || tipoStr === "FIN PAUSA" || tipo === 4) {
+    return { icono: "briefcase-check", color: "#2563EB", texto: "FIN PAUSA" };
   }
+
+  return {
+    icono: "clock-outline",
+    color: "#475569",
+    text: tipoStr || "OTRO",
+  };
 };
 
 export default function FichajesHistorialScreen() {
@@ -133,10 +139,14 @@ export default function FichajesHistorialScreen() {
 
       const resultadosDias = await Promise.all(promesasFichajes);
       const todosLosFichajes: RegistroFichaje[] = resultadosDias.flat();
-      setFichajesSemanales(todosLosFichajes);
+
+      const fichajesValidos = todosLosFichajes.filter(
+        (f) => f.estado?.toLowerCase() === "valido",
+      );
+      setFichajesSemanales(fichajesValidos);
 
       const idTrabajadoresUnicos = Array.from(
-        new Set(todosLosFichajes.map((f) => f.trabajador_id)),
+        new Set(fichajesValidos.map((f) => f.trabajador_id)),
       );
       const nuevoMapaObjetosTurnos: { [key: string]: ItemTurno[] } = {};
 
@@ -215,19 +225,7 @@ export default function FichajesHistorialScreen() {
   };
 
   const trabajadoresAgrupadosSemanales = useMemo(() => {
-    const mapa: {
-      [trabajadorId: string]: {
-        id: string;
-        nombre: string;
-        turnoResumen: string;
-        dias: {
-          [fechaStr: string]: {
-            nombreDia: string;
-            turnos: { [turnoNombre: string]: RegistroFichaje[] };
-          };
-        };
-      };
-    } = {};
+    const mapa: { [trabajadorId: string]: any } = {};
 
     fichajesSemanales.forEach((f) => {
       if (!mapa[f.trabajador_id]) {
@@ -296,10 +294,12 @@ export default function FichajesHistorialScreen() {
       });
     });
 
-    Object.values(mapa).forEach((t) => {
-      Object.values(t.dias).forEach((d) => {
-        Object.values(d.turnos).forEach((arr) => {
-          arr.sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora));
+    Object.values(mapa).forEach((t: any) => {
+      Object.values(t.dias).forEach((d: any) => {
+        Object.values(d.turnos).forEach((arr: any) => {
+          arr.sort((a: any, b: any) =>
+            a.fecha_hora.localeCompare(b.fecha_hora),
+          );
         });
       });
     });
@@ -328,31 +328,48 @@ export default function FichajesHistorialScreen() {
           const datosDia = t.dias[isoFechaStr];
 
           if (datosDia) {
-            Object.entries(datosDia.turnos).forEach(([nombreTurno, marcas]) => {
-              let entrada = "-";
-              let salida = "-";
-              let aPausaInicio: Date | null = null;
-              let tiempoPausasMinutos = 0;
+            Object.entries(datosDia.turnos).forEach(
+              ([nombreTurno, marcas]: [string, any]) => {
+                let entrada = "-";
+                let salida = "-";
+                let aPausaInicio: Date | null = null;
+                let tiempoPausasMinutos = 0;
 
-              marcas.forEach((m) => {
-                const hora = extraerHora(m.fecha_hora, false);
-                if (m.tipo_evento === TipoFichaje.ENTRADA) entrada = hora;
-                if (m.tipo_evento === TipoFichaje.SALIDA) salida = hora;
-                if (m.tipo_evento === TipoFichaje.INICIO_PAUSA)
-                  aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
-                if (m.tipo_evento === TipoFichaje.FIN_PAUSA && aPausaInicio) {
-                  const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
-                  tiempoPausasMinutos += Math.round(
-                    (fin.getTime() - aPausaInicio.getTime()) / 60000,
-                  );
-                  aPausaInicio = null;
-                }
-              });
+                marcas.forEach((m: any) => {
+                  const hora = extraerHora(m.fecha_hora, false);
+                  // Validamos tanto por el enum/string como por el ID numérico de tu API
+                  if (
+                    m.tipo_evento === TipoFichaje.ENTRADA ||
+                    m.tipo_evento_id === 1
+                  )
+                    entrada = hora;
+                  if (
+                    m.tipo_evento === TipoFichaje.SALIDA ||
+                    m.tipo_evento_id === 2
+                  )
+                    salida = hora;
+                  if (
+                    m.tipo_evento === TipoFichaje.INICIO_PAUSA ||
+                    m.tipo_evento_id === 3
+                  )
+                    aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
+                  if (
+                    (m.tipo_evento === TipoFichaje.FIN_PAUSA ||
+                      m.tipo_evento_id === 4) &&
+                    aPausaInicio
+                  ) {
+                    const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
+                    tiempoPausasMinutos += Math.round(
+                      (fin.getTime() - aPausaInicio.getTime()) / 60000,
+                    );
+                    aPausaInicio = null;
+                  }
+                });
 
-              const pausasTexto =
-                tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
+                const pausasTexto =
+                  tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
 
-              filasCalendarioHtml += `
+                filasCalendarioHtml += `
             <tr>
               <td><strong>${nombreDiaUI}</strong><br/><small style="color:#555;">${nombreTurno}</small></td>
               <td>${entrada}</td>
@@ -362,7 +379,8 @@ export default function FichajesHistorialScreen() {
               <td class="celda-firma"></td>
             </tr>
           `;
-            });
+              },
+            );
           } else {
             filasCalendarioHtml += `
           <tr>
@@ -377,7 +395,6 @@ export default function FichajesHistorialScreen() {
           }
         }
 
-        // DATOS EXTRACCIONALES DE LA EMPRESA SELECCIONADA PARA EL PDF LEGAL
         const rSocial =
           empresaSeleccionada?.razon_social ||
           empresaSeleccionada?.nombre_comercial ||
@@ -524,7 +541,6 @@ export default function FichajesHistorialScreen() {
       title="Auditoría de Fichajes"
       subtitle={`Panel corporativo: ${empresaSeleccionada?.nombre_comercial ?? "Administrador Global"}`}
     >
-      {/* CUADRO METADATOS: Muestra la información de la empresa seleccionada */}
       {empresaSeleccionada && (
         <View style={styles.cajaInfoEmpresa}>
           <View style={styles.filaInfoEmpresa}>
@@ -602,7 +618,7 @@ export default function FichajesHistorialScreen() {
         />
       ) : (
         <View style={styles.contenedorEstructura}>
-          {trabajadoresAgrupadosSemanales.map((trabajador) => (
+          {trabajadoresAgrupadosSemanales.map((trabajador: any) => (
             <Card key={trabajador.id}>
               <View style={styles.headerTrabajador}>
                 <View style={styles.avatarCirculo}>
@@ -621,75 +637,72 @@ export default function FichajesHistorialScreen() {
               </View>
 
               <View style={styles.gridDias}>
-                {Object.entries(trabajador.dias).map(([fechaKey, datosDia]) => (
-                  <View key={fechaKey} style={styles.contenedorDia}>
-                    <ThemedText style={styles.tituloDia}>
-                      {datosDia.nombreDia}
-                    </ThemedText>
+                {Object.entries(trabajador.dias).map(
+                  ([fechaKey, datosDia]: [string, any]) => (
+                    <View key={fechaKey} style={styles.contenedorDia}>
+                      <ThemedText style={styles.tituloDia}>
+                        {datosDia.nombreDia}
+                      </ThemedText>
 
-                    {Object.entries(datosDia.turnos).map(
-                      ([nombreTurno, eventos]) => (
-                        <View
-                          key={nombreTurno}
-                          style={styles.bloqueTurnoEspecial}
-                        >
-                          <View style={styles.badgeTurno}>
-                            <FontAwesome5
-                              name="clock"
-                              size={9}
-                              color="#475569"
-                              style={{ marginRight: 3 }}
-                            />
-                            <ThemedText style={styles.textoBadgeTurno}>
-                              {nombreTurno}
-                            </ThemedText>
-                          </View>
+                      {Object.entries(datosDia.turnos).map(
+                        ([nombreTurno, eventos]: [string, any]) => (
+                          <View
+                            key={nombreTurno}
+                            style={styles.bloqueTurnoEspecial}
+                          >
+                            <View style={styles.badgeTurno}>
+                              <FontAwesome5
+                                name="clock"
+                                size={9}
+                                color="#475569"
+                                style={{ marginRight: 3 }}
+                              />
+                              <ThemedText style={styles.textoBadgeTurno}>
+                                {nombreTurno}
+                              </ThemedText>
+                            </View>
 
-                          <View style={{ gap: 4, marginTop: 2 }}>
-                            {eventos.map((item) => {
-                              const config = obtenerConfiguracionEvento(
-                                item.tipo_evento.toString(),
-                              );
-                              const horaLimpia = extraerHora(
-                                item.fecha_hora,
-                                false,
-                              );
+                            <View style={{ gap: 4, marginTop: 2 }}>
+                              {eventos.map((item: any) => {
+                                // Usamos tanto tipo_evento (string) como tipo_evento_id (número) de tu payload
+                                const config = obtenerConfiguracionEvento(
+                                  item.tipo_evento_id || item.tipo_evento,
+                                );
+                                const horaLimpia = extraerHora(
+                                  item.fecha_hora,
+                                  false,
+                                );
 
-                              return (
-                                <View key={item.id} style={styles.filaFichaje}>
-                                  <MaterialCommunityIcons
-                                    name={config.icono as any}
-                                    size={13}
-                                    color={config.color}
-                                  />
-                                  <View style={{ flex: 1 }}>
-                                    <ThemedText
-                                      style={[
-                                        styles.textoEvento,
-                                        { color: config.color },
-                                      ]}
-                                    >
-                                      {TipoFichaje[
-                                        Number.parseInt(config.texto)
-                                      ]
-                                        ? TipoFichaje[
-                                            Number.parseInt(config.texto)
-                                          ]
-                                            .toString()
-                                            .replace("_", " ")
-                                        : config.texto}{" "}
-                                      {horaLimpia} hs
-                                    </ThemedText>
+                                return (
+                                  <View
+                                    key={item.id}
+                                    style={styles.filaFichaje}
+                                  >
+                                    <MaterialCommunityIcons
+                                      name={config.icono as any}
+                                      size={13}
+                                      color={config.color}
+                                    />
+                                    <View style={{ flex: 1 }}>
+                                      <ThemedText
+                                        style={[
+                                          styles.textoEvento,
+                                          { color: config.color },
+                                        ]}
+                                      >
+                                        {config.texto} {horaLimpia} hs
+                                      </ThemedText>
+                                    </View>
                                   </View>
-                                </View>
-                              );
-                            })}
+                                );
+                              })}
+                            </View>
                           </View>
-                        </View>
-                      ),
-                    )}
-                  </View>
-                ))}
+                        ),
+                      )}
+                    </View>
+                  ),
+                )}
               </View>
             </Card>
           ))}

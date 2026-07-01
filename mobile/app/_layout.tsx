@@ -49,7 +49,6 @@ function TabsNavigation() {
     >
       <Tabs.Screen
         name="(protected)/home"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Fichar",
           tabBarIcon: ({ color }) => (
@@ -61,7 +60,6 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/plantilla"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Plantilla",
           tabBarIcon: ({ color }) => (
@@ -84,7 +82,6 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/empresas"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Empresas",
           tabBarIcon: ({ color }) => (
@@ -96,7 +93,6 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/horarios"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Horarios",
           tabBarIcon: ({ color }) => (
@@ -112,7 +108,6 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/vacaciones"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Vacaciones",
           tabBarIcon: ({ color }) => (
@@ -128,7 +123,6 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/incidencias"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Incidencias",
           tabBarIcon: ({ color }) => (
@@ -144,13 +138,27 @@ function TabsNavigation() {
 
       <Tabs.Screen
         name="(protected)/fichajes"
-        // redirect={Platform.OS === "web" ? false : !tieneSesion}
         options={{
           title: "Registro",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="schedule" color={color} />
           ),
           href: tieneSesion ? (esAdmin ? "/(protected)/fichajes" : null) : null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="(protected)/resolver-incidencias"
+        options={{
+          title: "Incidencias",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="warning" color={color} />
+          ),
+          href: tieneSesion
+            ? esAdmin
+              ? "/(protected)/resolver-incidencias"
+              : null
+            : null,
         }}
       />
 

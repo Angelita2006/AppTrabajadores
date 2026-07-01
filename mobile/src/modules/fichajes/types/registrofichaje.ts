@@ -6,6 +6,11 @@ export enum TipoFichaje {
   FIN_PAUSA = 4,
 }
 
+export enum EstadoFichaje {
+  VALIDO = "valido",
+  PENDIENTE_REVISION = "pendiente_revision",
+}
+
 export interface RegistroFichaje {
   id: string;
   trabajador_id: string;
@@ -15,4 +20,5 @@ export interface RegistroFichaje {
   tipo_evento: TipoFichaje; // Ahora utiliza el Enum fuertemente tipado
   metodo_fichaje: string;
   observaciones?: string | null;
+  estado: EstadoFichaje;
 }

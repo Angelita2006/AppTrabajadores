@@ -311,18 +311,40 @@ export const obtenerIncidenciasTrabajador = async (
   return respuesta.data;
 };
 
+// /**
+//  * [CONSOLA ADMIN] Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
+//  * URI: PUT /api/correcciones/{id_correccion}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
+//  */
+// export const resolverSolicitudCorreccion = async (
+//   idCorreccion: string,
+//   nuevoEstado: "aprobada" | "rechazada",
+//   resolutorUsuarioId: string,
+// ): Promise<IncidenciaResponse> => {
+//   const respuesta = await api.put<IncidenciaResponse>(
+//     `/api/correcciones/${idCorreccion}/resolver`,
+//     null, // El cuerpo (body) va vacío porque FastAPI lee los parámetros desde la URL
+//     {
+//       params: {
+//         nuevo_estado: nuevoEstado,
+//         resolutor_usuario_id: resolutorUsuarioId,
+//       },
+//     },
+//   );
+//   return respuesta.data;
+// };
+
 /**
  * [CONSOLA ADMIN] Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
  * URI: PUT /api/correcciones/{id_correccion}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
  */
 export const resolverSolicitudCorreccion = async (
   idCorreccion: string,
-  nuevoEstado: "aprobada" | "rechazada",
+  nuevoEstado: "aprobada" | "rechazada", // Coincide exactamente con EstadoCorreccionEnum
   resolutorUsuarioId: string,
 ): Promise<IncidenciaResponse> => {
   const respuesta = await api.put<IncidenciaResponse>(
     `/api/correcciones/${idCorreccion}/resolver`,
-    null, // El cuerpo (body) va vacío porque FastAPI lee los parámetros desde la URL
+    null,
     {
       params: {
         nuevo_estado: nuevoEstado,
