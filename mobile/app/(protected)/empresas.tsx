@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Pressable,
   StyleSheet,
   View,
 } from "react-native";
@@ -13,7 +14,8 @@ import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
 export default function EmpresasScreen() {
-  const { usuarioActual } = useSesion();
+  const { usuarioActual, empresaSeleccionada, setEmpresaSeleccionada } =
+    useSesion();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -30,7 +32,28 @@ export default function EmpresasScreen() {
   const cargarCatalogoEmpresas = async () => {
     try {
       setCargando(true);
-      setEmpresas(await obtenerEmpresas());
+      const todasLasEmpresas = await obtenerEmpresas();
+
+      // 1. Filtrar según los permisos del administrador
+      let empresasPermitidas: Empresa[] = [];
+      if (esGestoria) {
+        empresasPermitidas = todasLasEmpresas;
+      } else if (esAdminEmpresa && usuarioActual?.empresa_id) {
+        empresasPermitidas = todasLasEmpresas.filter(
+          (e: { id: string | null }) => e.id === usuarioActual.empresa_id,
+        );
+      }
+
+      setEmpresas(empresasPermitidas);
+
+      // 2. Establecer selección por defecto si no hay ninguna activa
+      if (
+        empresasPermitidas.length > 0 &&
+        !empresaSeleccionada &&
+        setEmpresaSeleccionada
+      ) {
+        setEmpresaSeleccionada(empresasPermitidas[0]);
+      }
     } catch {
       Alert.alert(
         "Error Saas",
@@ -38,6 +61,16 @@ export default function EmpresasScreen() {
       );
     } finally {
       setCargando(false);
+    }
+  };
+
+  const handleSeleccionarEmpresa = (empresa: Empresa) => {
+    if (setEmpresaSeleccionada) {
+      setEmpresaSeleccionada(empresa);
+      Alert.alert(
+        "Entidad Activa",
+        `Se ha seleccionado: ${empresa.razon_social}`,
+      );
     }
   };
 
@@ -71,7 +104,7 @@ export default function EmpresasScreen() {
     >
       <Row>
         <StatCard
-          label="Entidades Registradas"
+          label="Entidades Accesibles"
           value={empresas.length.toString()}
         />
         <StatCard
@@ -81,7 +114,11 @@ export default function EmpresasScreen() {
         />
       </Row>
 
-      <ThemedText style={styles.sectionTitle}>Entidades Vinculadas</ThemedText>
+      <ThemedText style={styles.sectionTitle}>
+        {esGestoria
+          ? "Selecciona una Entidad Vinculada"
+          : "Tu Entidad Vinculada"}
+      </ThemedText>
 
       {cargando ? (
         <ActivityIndicator
@@ -94,63 +131,79 @@ export default function EmpresasScreen() {
           data={empresas}
           keyExtractor={(item) => item.id}
           scrollEnabled={false}
-          renderItem={({ item }) => (
-            <Card>
-              <View style={styles.empresaItem}>
-                <View style={styles.headerEmpresa}>
-                  <ThemedText style={styles.razonSocial}>
-                    {item.razon_social}
-                  </ThemedText>
-                  <View style={styles.badgeCif}>
-                    <ThemedText style={styles.cifTexto}>{item.cif}</ThemedText>
-                  </View>
-                </View>
+          renderItem={({ item }) => {
+            const estaSeleccionada = empresaSeleccionada?.id === item.id;
 
-                {item.nombre_comercial && (
-                  <ThemedText style={styles.nombreComercial}>
-                    Firma: {item.nombre_comercial}
-                  </ThemedText>
-                )}
+            return (
+              <Pressable
+                onPress={() => handleSeleccionarEmpresa(item)}
+                style={({ pressed }) => [
+                  styles.tarjetaInteractiva,
+                  estaSeleccionada && styles.tarjetaSeleccionada,
+                  pressed && styles.tarjetaPresionada,
+                ]}
+              >
+                <Card>
+                  <View style={styles.empresaItem}>
+                    <View style={styles.headerEmpresa}>
+                      <ThemedText style={styles.nombreComercial}>
+                        {item.nombre_comercial}{" "}
+                        {estaSeleccionada && "🔹 (Activa)"}
+                      </ThemedText>
+                      <View style={styles.badgeCif}>
+                        <ThemedText style={styles.cifTexto}>
+                          {item.cif}
+                        </ThemedText>
+                      </View>
+                    </View>
 
-                <View style={styles.separador} />
+                    {item.razon_social && (
+                      <ThemedText style={styles.razonSocial}>
+                        Razón social: {item.razon_social}
+                      </ThemedText>
+                    )}
 
-                <View style={styles.gridDetalles}>
-                  <View style={styles.filaDetalle}>
-                    <ThemedText style={styles.detalleLabel}>
-                      Convenio:
-                    </ThemedText>
-                    <ThemedText style={styles.detalleValue}>
-                      {item.convenio_colectivo ?? "-"}
-                    </ThemedText>
+                    <View style={styles.separador} />
+
+                    <View style={styles.gridDetalles}>
+                      <View style={styles.filaDetalle}>
+                        <ThemedText style={styles.detalleLabel}>
+                          Convenio:
+                        </ThemedText>
+                        <ThemedText style={styles.detalleValue}>
+                          {item.convenio_colectivo ?? "-"}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.filaDetalle}>
+                        <ThemedText style={styles.detalleLabel}>
+                          Código CNAE:
+                        </ThemedText>
+                        <ThemedText style={styles.detalleValue}>
+                          {item.codigo_cnae ?? "-"}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.filaDetalle}>
+                        <ThemedText style={styles.detalleLabel}>
+                          Zona Horaria:
+                        </ThemedText>
+                        <ThemedText style={styles.detalleValue}>
+                          {item.zona_horaria}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.filaDetalle}>
+                        <ThemedText style={styles.detalleLabel}>
+                          Dirección:
+                        </ThemedText>
+                        <ThemedText style={styles.detalleValue}>
+                          {item.direccion_fiscal ?? "-"}
+                        </ThemedText>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.filaDetalle}>
-                    <ThemedText style={styles.detalleLabel}>
-                      Código CNAE:
-                    </ThemedText>
-                    <ThemedText style={styles.detalleValue}>
-                      {item.codigo_cnae ?? "-"}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.filaDetalle}>
-                    <ThemedText style={styles.detalleLabel}>
-                      Zona Horaria:
-                    </ThemedText>
-                    <ThemedText style={styles.detalleValue}>
-                      {item.zona_horaria}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.filaDetalle}>
-                    <ThemedText style={styles.detalleLabel}>
-                      Dirección:
-                    </ThemedText>
-                    <ThemedText style={styles.detalleValue}>
-                      {item.direccion_fiscal ?? "-"}
-                    </ThemedText>
-                  </View>
-                </View>
-              </View>
-            </Card>
-          )}
+                </Card>
+              </Pressable>
+            );
+          }}
         />
       )}
     </AppScreen>
@@ -179,6 +232,18 @@ const styles = StyleSheet.create({
     color: "#1E293B",
     marginVertical: 14,
   },
+  tarjetaInteractiva: {
+    borderRadius: 12,
+    marginVertical: 4,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  tarjetaSeleccionada: {
+    borderColor: "#2563EB", // Borde azul para destacar la empresa seleccionada por defecto/click
+  },
+  tarjetaPresionada: {
+    opacity: 0.8,
+  },
   empresaItem: { width: "100%", paddingVertical: 4 },
   headerEmpresa: {
     flexDirection: "row",
@@ -186,7 +251,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
-  razonSocial: { fontSize: 16, fontWeight: "800", color: "#0F172A", flex: 1 },
+  nombreComercial: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    flex: 1,
+  },
   badgeCif: {
     backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
@@ -196,7 +266,7 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
   cifTexto: { fontSize: 11, fontWeight: "700", color: "#475569" },
-  nombreComercial: {
+  razonSocial: {
     fontSize: 13,
     color: "#64748B",
     fontWeight: "600",

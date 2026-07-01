@@ -170,3 +170,17 @@ def cambiar_password_usuario(id_usuario: UUID, antigua_password: str, nueva_pass
     db.commit()
     db.refresh(usuario)
     return usuario
+
+@router.get("/trabajador/{id_trabajador}", response_model=UsuarioResponse)
+def get_usuario_por_id_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)) -> UsuarioResponse:
+    """
+    URI: GET /api/usuarios/{id_trabajador}
+    Devuelve la cuenta de usuario asociada a un expediente de trabajador.
+    """
+    usuario = db.query(Usuarios).filter(Usuarios.trabajador_id == id_trabajador).first()
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró una cuenta de usuario asociada al expediente de trabajador con ID {id_trabajador}."
+        )
+    return usuario

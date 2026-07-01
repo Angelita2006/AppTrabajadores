@@ -1,4 +1,3 @@
-import axios from "axios";
 import api from "../../../service/api/api";
 import {
   AusenciaCreateRequest,
@@ -11,7 +10,6 @@ import {
 } from "../../correcciones-fichaje/types/incidencia";
 import { Empresa } from "../../empresas/types/empresa";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
-import { ItemTurno } from "../../turnos/types/turno";
 import { UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
@@ -35,8 +33,16 @@ export const getUsuarioByEmailYPassword = async (
   return respuesta.data;
 };
 
-/** Alias de compatibilidad para la función de inicio de sesión */
-export const obtenerUsuarioPorEmailYPassword = getUsuarioByEmailYPassword;
+/**
+ * Recupera la información del usuario asociado a un trabajador específico.
+ * @param idTrabajador Identificador único de tipo UUID (string)
+ */
+export const getUsuarioByIdTrabajador = async (
+  idTrabajador: string,
+): Promise<UsuarioSesion> => {
+  const respuesta = await api.get(`/api/usuarios/trabajador/${idTrabajador}`);
+  return respuesta.data;
+};
 
 /**
  * Obtiene la plantilla completa de usuarios registrados en el sistema Saas.
@@ -261,7 +267,6 @@ export const obtenerFichajesEmpresaPorFecha = async (
   empresaId: string,
   fechaStr: string,
 ): Promise<RegistroFichaje[]> => {
-  // Realiza la consulta pasando la fecha como Query Parameter (?fecha=...)
   const respuesta = await api.get(`/api/fichajes/empresa/${empresaId}`, {
     params: { fecha: fechaStr },
   });
@@ -368,34 +373,12 @@ export const obtenerCentrosPorEmpresa = async (
  * Recupera el turno con ese id.
  * URI: GET /api/turnos/{id_turno}
  */
-export const obtenerTurno = async (
-  idTurno: string,
-): Promise<ItemTurno | null> => {
+export const obtenerTurno = async (idTurno: string) => {
   try {
-    // Ajusta la URL base o el prefijo según la configuración de tu API en FastAPI
-    const respuesta = await axios.get<ItemTurno>(`/api/turnos/${idTurno}`);
+    const respuesta = await api.get(`/api/turnos/${idTurno}`);
     return respuesta.data;
   } catch (error) {
     console.error(`Error al obtener turno ${idTurno}:`, error);
-    return null;
+    throw error;
   }
 };
-
-// /**
-//  * Recupera las asignaciones de turno para ese trabajador.
-//  * URI: GET /api/asignaciones-turno/trabajador/{id_trabajador}
-//  */
-// export const obtenerAsignacionesTurnoTrabajador = async (
-//   idTrabajador: string,
-// ): Promise<AsignacionTurno[] | null> => {
-//   try {
-//     // Ajusta la URL base o el prefijo según la configuración de tu API en FastAPI
-//     const respuesta = await axios.get<AsignacionTurno[]>(
-//       `/api/turnos/${idTrabajador}`,
-//     );
-//     return respuesta.data;
-//   } catch (error) {
-//     console.error(`Error al obtener turno ${idTrabajador}:`, error);
-//     return null;
-//   }
-// };
