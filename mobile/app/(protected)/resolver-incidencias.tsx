@@ -2,20 +2,20 @@ import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
 import {
-    EstadoCorreccion,
-    IncidenciaResponse,
+  EstadoCorreccion,
+  IncidenciaResponse,
 } from "../../src/modules/correcciones-fichaje/types/incidencia";
 import {
-    obtenerCorreccionesPorEmpresa,
-    obtenerTrabajador,
-    resolverSolicitudCorreccion,
+  obtenerCorreccionesPorEmpresa,
+  obtenerTrabajador,
+  resolverSolicitudCorreccion,
 } from "../../src/modules/trabajadores/api/services";
 import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
@@ -25,8 +25,8 @@ export default function AdminIncidenciasScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
   const [incidencias, setIncidencias] = useState<IncidenciaResponse[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [procesandoId, setProcesandoId] = useState<string | null>(null);
 
-  // Filtros rápidos para el administrador (Opcional, mejora la UX)
   const [filtroEstado, setFiltroEstado] = useState<"todas" | "pendientes">(
     "pendientes",
   );
@@ -41,25 +41,36 @@ export default function AdminIncidenciasScreen() {
     return { pendientes, aprobadas };
   }, [incidencias]);
 
-  // Cargar las correcciones globales de la empresa asignada
   const cargarIncidenciasGlobales = useCallback(async () => {
     if (!empresaSeleccionada?.id) return;
+
     try {
       setCargando(true);
+
       const datosGlobales = await obtenerCorreccionesPorEmpresa(
         empresaSeleccionada.id,
       );
 
-      await Promise.all(
+      const incidenciasConTrabajador = await Promise.all(
         datosGlobales.map(async (incidencia) => {
-          const trabajador: Trabajador = await obtenerTrabajador(
-            incidencia.trabajador_id,
-          );
-          incidencia.trabajador_id =
-            trabajador.nombre + " " + trabajador.apellidos;
+          try {
+            const trabajador: Trabajador = await obtenerTrabajador(
+              incidencia.trabajador_id,
+            );
+
+            return {
+              ...incidencia,
+              trabajador_id:
+                `${trabajador?.nombre ?? ""} ${trabajador?.apellidos ?? ""}`.trim() ||
+                incidencia.trabajador_id,
+            };
+          } catch {
+            return incidencia;
+          }
         }),
       );
-      setIncidencias(datosGlobales);
+
+      setIncidencias(incidenciasConTrabajador);
     } catch (error) {
       console.error("Error al cargar incidencias globales:", error);
       Alert.alert(
@@ -75,37 +86,56 @@ export default function AdminIncidenciasScreen() {
     cargarIncidenciasGlobales();
   }, [cargarIncidenciasGlobales]);
 
-  // Resolución de incidencias (Aprobar / Rechazar)
   const handleResolverIncidencia = useCallback(
     async (idCorreccion: string, decision: "aprobada" | "rechazada") => {
-      try {
-        setCargando(true);
-        if (!usuarioActual?.id) return;
+      // if (procesandoId) return;
 
+      if (!usuarioActual?.id) {
+        alert("Sesión inválida" + " No se pudo identificar al usuario.");
+        return;
+      }
+
+      setProcesandoId(idCorreccion);
+
+      try {
         const resuelta = await resolverSolicitudCorreccion(
           idCorreccion,
           decision,
           usuarioActual.id,
         );
 
+        const nuevoEstado =
+          (resuelta?.estado as EstadoCorreccion | undefined) ??
+          (decision === "aprobada"
+            ? EstadoCorreccion.aprobada
+            : EstadoCorreccion.rechazada);
+
         setIncidencias((prev) =>
-          prev.map((item) => (item.id === idCorreccion ? resuelta : item)),
+          prev.map((item) =>
+            item.id === idCorreccion
+              ? {
+                  ...item,
+                  ...(resuelta ?? {}),
+                  estado: nuevoEstado,
+                }
+              : item,
+          ),
         );
 
         Alert.alert(
-          "Acción Procesada",
+          "Acción procesada",
           `La incidencia ha sido marcada como ${decision} con éxito.`,
         );
       } catch (error: any) {
         const msg =
-          error.response?.data?.detail ||
+          error?.response?.data?.detail ||
           "Fallo al interactuar con el servidor corporativo.";
-        Alert.alert("Error de Red", msg);
+        Alert.alert("Error de red", msg);
       } finally {
-        setCargando(false);
+        setProcesandoId(null);
       }
     },
-    [usuarioActual?.id],
+    [procesandoId, usuarioActual?.id],
   );
 
   const getColoresEstado = (estado: EstadoCorreccion) => {
@@ -119,7 +149,6 @@ export default function AdminIncidenciasScreen() {
     }
   };
 
-  // Filtrado dinámico en base a la selección del Admin
   const incidenciasFiltradas = useMemo(() => {
     if (filtroEstado === "pendientes") {
       return incidencias.filter((i) => i.estado === EstadoCorreccion.pendiente);
@@ -132,7 +161,6 @@ export default function AdminIncidenciasScreen() {
       title="Auditoría de Incidencias"
       subtitle={`Panel corporativo: ${empresaSeleccionada?.nombre_comercial ?? "Administrador Global"}`}
     >
-      {/* Panel de Estadísticas */}
       <Row>
         <StatCard
           label="Pendientes"
@@ -146,7 +174,6 @@ export default function AdminIncidenciasScreen() {
         />
       </Row>
 
-      {/* Selectores de visualización rápida para el Admin */}
       <View style={styles.contenedorFiltros}>
         <Pressable
           style={[
@@ -164,6 +191,7 @@ export default function AdminIncidenciasScreen() {
             Ver Pendientes ({conteoEstados.pendientes})
           </ThemedText>
         </Pressable>
+
         <Pressable
           style={[
             styles.miniBoton,
@@ -203,36 +231,39 @@ export default function AdminIncidenciasScreen() {
           {incidenciasFiltradas.map((item) => {
             const colores = getColoresEstado(item.estado);
             const tieneValoresNuevos =
-              item.valor_nuevo && Object.keys(item.valor_nuevo).length > 0;
+              !!item.valor_nuevo && Object.keys(item.valor_nuevo).length > 0;
             const fechaD = item.valor_nuevo?.fecha_descuadre;
             const horaP = item.valor_nuevo?.hora_propuesta;
             const eventoS = item.valor_nuevo?.evento_solicitado;
+            const tipoCorreccion =
+              item.tipo_correccion?.replace(/_/g, " ").toUpperCase() ??
+              "SIN TIPO";
+            const isBusy = Boolean(procesandoId);
+            const isCurrentItemProcessing = procesandoId === item.id;
 
             return (
               <Card key={item.id}>
                 <View style={styles.itemCard}>
-                  {/* Fila Superior: Tipo de corrección y Estado */}
                   <View style={styles.headerCard}>
                     <ThemedText style={styles.itemFecha}>
-                      {item.tipo_correccion.replace("_", " ").toUpperCase()}
+                      {tipoCorreccion}
                     </ThemedText>
+
                     <View
                       style={[styles.badge, { backgroundColor: colores.bg }]}
                     >
                       <ThemedText
                         style={[styles.badgeText, { color: colores.texto }]}
                       >
-                        {item.estado.toUpperCase()}
+                        {item.estado?.toUpperCase() ?? "PENDIENTE"}
                       </ThemedText>
                     </View>
                   </View>
 
-                  {/* IDENTIFICADOR DEL TRABAJADOR (Esencial para el Admin) */}
                   <ThemedText style={styles.nombreTrabajador}>
-                    👤 Trabajador: {item.trabajador_id}
+                    👤 Trabajador: {item.trabajador_id ?? "Sin datos"}
                   </ThemedText>
 
-                  {/* Detalles del Cambio */}
                   {tieneValoresNuevos && fechaD && (
                     <ThemedText style={styles.itemTipo}>
                       🎯 Propuesta: {fechaD} a las {horaP ?? "00:00"} hs (
@@ -247,33 +278,46 @@ export default function AdminIncidenciasScreen() {
                   )}
 
                   <ThemedText style={styles.itemMotivo}>
-                    Motivo: "{item.motivo}"
+                    Motivo: "{item.motivo ?? "Sin motivo"}"
                   </ThemedText>
 
-                  {/* Panel Resolutor Directo */}
                   {item.estado === EstadoCorreccion.pendiente && (
                     <View style={styles.panelControlJefe}>
                       <Pressable
-                        style={[styles.botonResolutor, styles.botonRechazar]}
+                        disabled={isBusy}
+                        style={[
+                          styles.botonResolutor,
+                          styles.botonRechazar,
+                          isBusy && styles.botonDeshabilitado,
+                        ]}
                         onPress={() =>
                           handleResolverIncidencia(item.id, "rechazada")
                         }
                       >
                         <FontAwesome5 name="times" size={12} color="#FFFFFF" />
                         <ThemedText style={styles.textoBotonResolutor}>
-                          Rechazar
+                          {isCurrentItemProcessing
+                            ? "Procesando..."
+                            : "Rechazar"}
                         </ThemedText>
                       </Pressable>
 
                       <Pressable
-                        style={[styles.botonResolutor, styles.botonAprobar]}
+                        disabled={isBusy}
+                        style={[
+                          styles.botonResolutor,
+                          styles.botonAprobar,
+                          isBusy && styles.botonDeshabilitado,
+                        ]}
                         onPress={() =>
                           handleResolverIncidencia(item.id, "aprobada")
                         }
                       >
                         <FontAwesome5 name="check" size={12} color="#FFFFFF" />
                         <ThemedText style={styles.textoBotonResolutor}>
-                          Aprobar
+                          {isCurrentItemProcessing
+                            ? "Procesando..."
+                            : "Aprobar"}
                         </ThemedText>
                       </Pressable>
                     </View>
@@ -380,5 +424,8 @@ const styles = StyleSheet.create({
   },
   botonRechazar: { backgroundColor: "#DC2626" },
   botonAprobar: { backgroundColor: "#16A34A" },
+  botonDeshabilitado: {
+    opacity: 0.6,
+  },
   textoBotonResolutor: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
 });

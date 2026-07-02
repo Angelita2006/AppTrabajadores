@@ -1,4 +1,3 @@
-import { TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,12 +26,11 @@ import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
-// Estructura interna que ya usa tu componente
 interface FichajeSimplificado {
   id: string;
   fecha: string;
   hora: string;
-  tipo_evento: TipoFichaje;
+  tipo_evento: string;
 }
 
 export default function IncidenciasScreen() {
@@ -49,9 +47,9 @@ export default function IncidenciasScreen() {
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
   const [fechaAfectada, setFechaAfectada] = useState("2026-06-29");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
-  const [eventoSolitado, setEventoSolicitado] = useState<TipoFichaje>(
-    TipoFichaje.ENTRADA,
-  );
+
+  // CORRECCIÓN 1: Forzamos string plano "ENTRADA" desde el inicio
+  const [eventoSolitado, setEventoSolicitado] = useState<string>("ENTRADA");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
 
@@ -85,36 +83,48 @@ export default function IncidenciasScreen() {
       } else {
         if (!trabajadorActual?.id) return;
 
-        // Ejecutamos en paralelo las incidencias y el nuevo servicio de la semana actual
         const [datosPersonales, listaFichajesRaw] = await Promise.all([
           obtenerIncidenciasTrabajador(trabajadorActual.id),
-          obtenerFichajesSemanaActual(trabajadorActual.id).catch(() => []), // Fallback seguro
+          obtenerFichajesSemanaActual(trabajadorActual.id),
         ]);
 
-        // 1. FILTRADO: Nos quedamos únicamente con eventos de ENTRADA o SALIDA
-        const fichajesFiltrados = listaFichajesRaw.filter(
-          (fichaje) =>
-            fichaje.tipo_evento === TipoFichaje.ENTRADA ||
-            fichaje.tipo_evento === TipoFichaje.SALIDA,
-        );
+        if (!Array.isArray(listaFichajesRaw)) {
+          setFichajesDisponibles([]);
+          return;
+        }
 
-        // 2. MAPEADO SIMPLIFICADO: Transformamos solo los fichajes filtrados
+        const fichajesFiltrados = listaFichajesRaw.filter((fichaje) => {
+          if (!fichaje || !fichaje.estado) return false;
+
+          const estadoFichajeApi = fichaje.estado
+            .toString()
+            .trim()
+            .toLowerCase();
+
+          const esValido = estadoFichajeApi === "valido";
+          if (!esValido) return false;
+
+          const tipoEventoStr = fichaje.tipo_evento?.toString().toUpperCase();
+          return tipoEventoStr === "ENTRADA" || tipoEventoStr === "SALIDA";
+        });
+
         const fichajesProcesados: FichajeSimplificado[] = fichajesFiltrados.map(
           (fichaje) => {
-            // Asumiendo formato "YYYY-MM-DD HH:MM:SS" o ISO "YYYY-MM-DDTHH:MM:SS..."
-            const [fecha, horaCompleta] = fichaje.fecha_hora.includes("T")
-              ? fichaje.fecha_hora.split("T")
-              : fichaje.fecha_hora.split(" ");
+            const fechaHoraStr = fichaje.fecha_hora || "";
+            const [fecha, horaCompleta] = fechaHoraStr.includes("T")
+              ? fechaHoraStr.split("T")
+              : fechaHoraStr.split(" ");
 
             const horaMinutos = horaCompleta
               ? horaCompleta.substring(0, 5)
-              : "00:00"; // Extrae "HH:MM"
+              : "00:00";
 
             return {
               id: fichaje.id,
               fecha: fecha,
               hora: horaMinutos,
-              tipo_evento: fichaje.tipo_evento as TipoFichaje, // Casteo seguro tras el filtro
+              // CORRECCIÓN 2: Guardamos siempre en mayúsculas limpias como string
+              tipo_evento: fichaje.tipo_evento.toString().toUpperCase(),
             };
           },
         );
@@ -136,7 +146,6 @@ export default function IncidenciasScreen() {
     cargarDatosInciales();
   }, [cargarDatosInciales]);
 
-  // Manejador del cambio de fichaje en el dropdown
   const handleSeleccionarFichaje = (idSeleccionado: string) => {
     setFichajeAfectadoId(idSeleccionado);
     const fichaje = fichajesDisponibles.find((f) => f.id === idSeleccionado);
@@ -144,12 +153,11 @@ export default function IncidenciasScreen() {
     if (fichaje) {
       setFechaAfectada(fichaje.fecha);
       setHoraAnterior(fichaje.hora);
-      // Control preventivo por si viene PAUSA del nuevo tipado, forzar a una opción válida del estado reactivo
-      if (
-        fichaje.tipo_evento === TipoFichaje.ENTRADA ||
-        fichaje.tipo_evento === TipoFichaje.SALIDA
-      ) {
-        setEventoSolicitado(fichaje.tipo_evento);
+
+      // CORRECCIÓN 3: Validación directa por texto plano string
+      const tipoUpper = fichaje.tipo_evento.toUpperCase();
+      if (tipoUpper === "ENTRADA" || tipoUpper === "SALIDA") {
+        setEventoSolicitado(tipoUpper);
       }
     } else {
       setHoraAnterior("");
@@ -197,7 +205,7 @@ export default function IncidenciasScreen() {
             ? {
                 fecha_descuadre: fechaAfectada.trim(),
                 hora_propuesta: horaRealPropuesta.trim(),
-                evento_solicitado: eventoSolitado,
+                evento_solicitado: eventoSolitado, // Se envía "ENTRADA" o "SALIDA" limpios
               }
             : {},
         valor_anterior:
@@ -337,7 +345,6 @@ export default function IncidenciasScreen() {
                 ))}
               </View>
 
-              {/* DESPLEGABLE DE FICHAJES AFECTADOS SEMANALES */}
               {tipoCorreccion !== "alta_manual" && (
                 <View style={{ marginBottom: 12 }}>
                   <ThemedText style={styles.label}>
@@ -398,32 +405,27 @@ export default function IncidenciasScreen() {
 
                   <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
                   <View style={styles.selectorTipos}>
-                    {([TipoFichaje.ENTRADA, TipoFichaje.SALIDA] as const).map(
-                      (evento) => (
-                        <Pressable
-                          key={evento}
+                    {/* CORRECCIÓN 4: Iteramos un array de strings puros estáticos */}
+                    {["ENTRADA", "SALIDA"].map((evento) => (
+                      <Pressable
+                        key={evento}
+                        style={[
+                          styles.opcionTipo,
+                          eventoSolitado === evento && styles.opcionTipoActiva,
+                        ]}
+                        onPress={() => setEventoSolicitado(evento)}
+                      >
+                        <ThemedText
                           style={[
-                            styles.opcionTipo,
+                            styles.textoOpcion,
                             eventoSolitado === evento &&
-                              styles.opcionTipoActiva,
+                              styles.textoOpcionActiva,
                           ]}
-                          onPress={() => setEventoSolicitado(evento)}
                         >
-                          <ThemedText
-                            style={[
-                              styles.textoOpcion,
-                              eventoSolitado === evento &&
-                                styles.textoOpcionActiva,
-                            ]}
-                          >
-                            {TipoFichaje[evento]
-                              ?.toString()
-                              .replace("_", " ")
-                              .toUpperCase()}
-                          </ThemedText>
-                        </Pressable>
-                      ),
-                    )}
+                          {evento}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
                   </View>
                 </>
               )}
@@ -453,6 +455,7 @@ export default function IncidenciasScreen() {
                 style={[styles.input, styles.textArea]}
                 placeholder="Indica el motivo detallado de la corrección o el olvido..."
                 placeholderTextColor="#94A3B8"
+                maxLength={250}
               />
             </View>
             <Pressable
@@ -473,7 +476,9 @@ export default function IncidenciasScreen() {
       )}
 
       <ThemedText style={styles.sectionTitle}>
-        {esAdmin ? "Bitácora Global de la Empresa" : "Trazabilidad de Ajustes"}
+        {esAdmin
+          ? "Historial de Incidencias Global de la Empresa"
+          : "Trazabilidad de Ajustes"}
       </ThemedText>
 
       {cargando && incidencias.length === 0 ? (
@@ -494,7 +499,11 @@ export default function IncidenciasScreen() {
               item.valor_nuevo && Object.keys(item.valor_nuevo).length > 0;
             const fechaD = item.valor_nuevo?.fecha_descuadre;
             const horaP = item.valor_nuevo?.hora_propuesta;
-            const eventoS = item.valor_nuevo?.evento_solicitado;
+
+            // CORRECCIÓN 5: Aseguramos fallback seguro por si viene vacío desde la base de datos
+            const eventoS = item.valor_nuevo?.evento_solicitado
+              ? item.valor_nuevo.evento_solicitado.toString().toUpperCase()
+              : "N/A";
 
             return (
               <Card key={item.id}>
@@ -516,8 +525,8 @@ export default function IncidenciasScreen() {
 
                   {tieneValoresNuevos && fechaD && (
                     <ThemedText style={styles.itemTipo}>
-                      Propuesto: {fechaD} a las {horaP ?? "00:00"} hs (
-                      {eventoS?.toString().toUpperCase() ?? "N/A"})
+                      Propuesto: {fechaD} a las {horaP ?? "00:00"} hs ({eventoS}
+                      )
                     </ThemedText>
                   )}
 
@@ -544,7 +553,6 @@ export default function IncidenciasScreen() {
                           Rechazar
                         </ThemedText>
                       </Pressable>
-
                       <Pressable
                         style={[styles.botonResolutor, styles.botonAprobar]}
                         onPress={() =>
@@ -568,7 +576,6 @@ export default function IncidenciasScreen() {
   );
 }
 
-// ... Mantén tus estilos intactos (StyleSheet.create) tal como los tienes abajo
 const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,

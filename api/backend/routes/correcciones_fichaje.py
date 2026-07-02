@@ -1,10 +1,9 @@
-import hashlib
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
 from uuid import UUID
+from models.contratos import Contratos
 from routes.fichajes import calcular_hash_fichaje, mapear_evento_a_id
 from core.database import get_db
 from models.empresas import Empresas
@@ -13,6 +12,7 @@ from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFich
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.fichajes import Fichajes
+from models.trabajadores import Trabajadores
 from models.correcciones_fichaje import CorreccionesFichaje
 
 router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
@@ -85,6 +85,8 @@ def obtener_correcciones_por_trabajador(id_trabajador: UUID, db: Session = Depen
     Permite al empleado seguir el estado de sus peticiones enviadas desde la app móvil.
     """
     return db.query(CorreccionesFichaje).filter(CorreccionesFichaje.trabajador_id == id_trabajador).all()
+
+
 @router.put("/{id_correccion}/resolver")
 def resolver_incidencia(
     id_correccion: UUID, 
@@ -111,7 +113,6 @@ def resolver_incidencia(
             fichaje_original = db.query(Fichajes).filter(Fichajes.id == incidencia.fichaje_afectado_id).first()
             
             # --- FASE 1: DESACTIVACIÓN (Para Anulaciones y Modificaciones) ---
-            # Cambia el estado del anterior y actualiza su hash debido a la mutación de datos
             if incidencia.tipo_correccion in [TipoCorreccionEnum.ANULACION, TipoCorreccionEnum.MODIFICACION]:
                 if fichaje_original:
                     fichaje_original.estado = EstadoFichajeEnum.PENDIENTE_REVISION
@@ -123,38 +124,54 @@ def resolver_incidencia(
                     )
             
             # --- FASE 2: CREACIÓN DEL SUSTITUTO (Para Modificaciones y Altas Manuales) ---
-            # Bloque independiente: una MODIFICACION pasará por la Fase 1 y también entrará aquí
             if incidencia.tipo_correccion in [TipoCorreccionEnum.MODIFICACION, TipoCorreccionEnum.ALTA_MANUAL]:
                 v_nuevo = incidencia.valor_nuevo or {}
-                fecha_str = v_nuevo.get("fecha_descuadre")   # Ej: "2026-06-29"
-                hora_str = v_nuevo.get("hora_propuesta")     # Ej: "10:00"
-                evento_str = v_nuevo.get("evento_solicitado") # Ej: "ENTRADA"
+                fecha_str = v_nuevo.get("fecha_descuadre")   
+                hora_str = v_nuevo.get("hora_propuesta")     
+                evento_str = v_nuevo.get("evento_solicitado") 
 
                 if not fecha_str or not hora_str:
                     raise HTTPException(status_code=400, detail="Datos de tiempo insuficientes en la solicitud.")
 
-                # Construir string ISO con el offset indicado en tus fichajes (+02:00)
-                # Esto asegura que .isoformat() devuelva exactamente el string esperado por tu validador
+                # Construir string ISO con el offset indicado (+02:00)
                 fecha_hora_propuesta = datetime.fromisoformat(f"{fecha_str}T{hora_str}:00+02:00")
 
-                # 1. Aseguramos que id_real_evento sea un int válido
                 if isinstance(evento_str, str):
                     id_real_evento = mapear_evento_a_id(evento_str)
                 else:
-                    # Si viene como int, lo usamos; si viene None o inválido, usamos 1 (ENTRADA) por defecto
                     id_real_evento = int(evento_str) if evento_str is not None else 1
 
-                # Pylance ahora sabrá con certeza que es un 'int'
                 sha256_calculado = calcular_hash_fichaje(
                     trabajador_id=str(incidencia.trabajador_id),
                     empresa_id=str(incidencia.empresa_id),
                     tipo_evento_id=id_real_evento,
-                    fecha_iso=fecha_hora_propuesta.isoformat())
+                    fecha_iso=fecha_hora_propuesta.isoformat()
+                )
+
+                # --- RESOLUCIÓN DEL CENTRO DE TRABAJO ---
+                centro_id = None
+                if fichaje_original:
+                    # Si viene de una modificación/anulación, heredamos el centro del fichaje previo
+                    centro_id = fichaje_original.centro_trabajo_id
+                else:
+                    # Si es un ALTA MANUAL, lo rescatamos de su contrato vigente
+                    # (Asegúrate de tener importado tu modelo 'Contrato' arriba)
+                    contrato = db.query(Contratos).filter(Contratos.trabajador_id == incidencia.trabajador_id).first()
+                    if contrato:
+                        centro_id = contrato.centro_trabajo_id
+                
+                # Si sigue siendo None, lanzamos un error controlado antes de tocar la BD
+                if not centro_id:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="No se pudo procesar el alta: El trabajador no posee un contrato con centro de trabajo asignado."
+                    )
+                # ----------------------------------------
 
                 nuevo_fichaje = Fichajes(
                     empresa_id=incidencia.empresa_id,
                     trabajador_id=incidencia.trabajador_id,
-                    centro_trabajo_id=fichaje_original.centro_trabajo_id if fichaje_original else None,
+                    centro_trabajo_id=centro_id,  # <-- Ahora viaja seguro y nunca será null
                     tipo_evento_id=id_real_evento,
                     fecha_hora=fecha_hora_propuesta,
                     fecha_hora_dispositivo=fecha_hora_propuesta,
@@ -162,7 +179,7 @@ def resolver_incidencia(
                     origen=OrigenFichajeEnum.CORRECCION_RRHH,
                     estado=EstadoFichajeEnum.VALIDO,
                     hash_integridad=sha256_calculado,
-                    fichaje_sustituido_id=incidencia.fichaje_afectado_id, # Enlace de auditoría al original
+                    fichaje_sustituido_id=incidencia.fichaje_afectado_id, 
                     observaciones=f"Fichaje corrector mediante incidencia: {incidencia.motivo}"
                 )
                 db.add(nuevo_fichaje)
@@ -170,12 +187,16 @@ def resolver_incidencia(
         db.commit()
         return {"detail": "Incidencia procesada con éxito."}
 
+    except HTTPException as he:
+        db.rollback()
+        raise he
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Error al resolver la corrección de fichajes: {str(e)}"
         )
+
 
 @router.delete("/{id_correccion}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_solicitud_correccion(id_correccion: UUID, db: Session = Depends(get_db)):

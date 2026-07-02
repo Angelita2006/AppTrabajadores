@@ -16,8 +16,8 @@ export interface RegistroFichaje {
   trabajador_id: string;
   trabajador_nombre: string;
   turno_nombre: string;
-  fecha_hora: string; // Formato "YYYY-MM-DD HH:MM:SS" o ISO string
-  tipo_evento: TipoFichaje; // Ahora utiliza el Enum fuertemente tipado
+  fecha_hora: string;
+  tipo_evento: TipoFichaje;
   metodo_fichaje: string;
   observaciones?: string | null;
   estado: EstadoFichaje;

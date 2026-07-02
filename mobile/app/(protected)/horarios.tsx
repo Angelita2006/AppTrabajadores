@@ -1,5 +1,10 @@
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import {
+  EstadoFichaje,
+  RegistroFichaje,
+  TipoFichaje,
+} from "@/src/modules/fichajes/types/registrofichaje";
+import {
   obtenerAsignacionesTurnoTrabajador,
   obtenerFichajesSemanaActual,
 } from "@/src/modules/trabajadores/api/services";
@@ -13,14 +18,6 @@ import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
-
-// Interfaz corregida con el campo "estado" para el filtrado seguro
-interface RegistroFichaje {
-  id: string;
-  fecha_hora: string;
-  tipo_evento: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
-  estado?: string;
-}
 
 export default function HorariosScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
@@ -46,7 +43,7 @@ export default function HorariosScreen() {
             usuarioActual!.trabajador_id,
           );
 
-        // 2. Descargamos el historial de marcajes y forzamos el casteo para evitar el error ts(2322)
+        // 2. Descargamos el historial de marcajes
         const todosLosFichajes = await obtenerFichajesSemanaActual(
           usuarioActual!.trabajador_id,
         );
@@ -56,12 +53,14 @@ export default function HorariosScreen() {
           (f: any) => ({
             id: f.id,
             fecha_hora: f.fecha_hora,
-            tipo_evento: String(f.tipo_evento) as
-              | "ENTRADA"
-              | "SALIDA"
-              | "INICIO_PAUSA"
-              | "FIN_PAUSA",
+            tipo_evento: String(
+              f.tipo_evento,
+            ) as unknown as RegistroFichaje["tipo_evento"],
             estado: f.estado,
+            trabajador_id: f.trabajador_id ?? usuarioActual.trabajador_id,
+            trabajador_nombre: f.trabajador_nombre ?? "",
+            turno_nombre: f.turno_nombre ?? "",
+            metodo_fichaje: f.metodo_fichaje ?? "",
           }),
         );
 
@@ -159,65 +158,97 @@ export default function HorariosScreen() {
       ) : (
         <View style={{ gap: 12, paddingBottom: 20 }}>
           {cuadrante.map((item) => {
-            // 1. OBTENER INFORMACIÓN HORARIA BASE DEL TURNO
-            const [añoT, mesT, diaT] = item.fecha_real.split("-").map(Number);
-            const [hIn, mIn] = item.hora_inicio.split(":").map(Number);
-            const [hFi, mFi] = item.hora_fin.split(":").map(Number);
+            // 1. OBTENER INFORMACIÓN HORARIA BASE DEL TURNO (Formato string HH:MM)
+            const horaInicioTurno = item.hora_inicio.substring(0, 5); // "10:00"
+            const horaFinTurno = item.hora_fin.substring(0, 5); // "14:00"
+            const fechaRealStr = item.fecha_real; // "YYYY-MM-DD"
 
-            const fechaInicioTurno = new Date(
-              añoT,
-              mesT - 1,
-              diaT,
-              hIn,
-              mIn,
-              0,
-            );
-            const fechaFinTurno = new Date(añoT, mesT - 1, diaT, hFi, mFi, 0);
+            // Convertir una hora "HH:MM" a minutos totales desde la medianoche para operar fácilmente
+            const aMinutos = (horaStr: string) => {
+              const [h, m] = horaStr.split(":").map(Number);
+              return h * 60 + m;
+            };
 
-            // Ajuste automático por si el turno cruza la medianoche (nocturnos)
-            if (fechaFinTurno < fechaInicioTurno) {
-              fechaFinTurno.setDate(fechaFinTurno.getDate() + 1);
-            }
+            const minInicio = aMinutos(horaInicioTurno);
+            let minFin = aMinutos(horaFinTurno);
 
-            // Ventana de tolerancia extendida a 4 horas para captar cualquier marcaje temprano/tardío
-            const margenToleranciaMs = 4 * 60 * 60 * 1000;
-            const margenInicio =
-              fechaInicioTurno.getTime() - margenToleranciaMs;
-            const margenFin = fechaFinTurno.getTime() + margenToleranciaMs;
+            // Si el turno cruza la medianoche (nocturno), sumamos 24 horas al fin
+            const esNocturno = minFin < minInicio;
+            if (esNocturno) minFin += 24 * 60;
 
-            // 2. FILTRADO FILTRADO DE MARCAJES DE ENTRADA Y SALIDA (SÓLO VALIDOS)
+            // Definimos el margen de tolerancia (1 hora = 60 minutos)
+            const TOLERANCIA_MINS = 60;
+            const limiteInferiorMins = minInicio - TOLERANCIA_MINS;
+            const limiteSuperiorMins = minFin + TOLERANCIA_MINS;
+
+            // Helper para extraer la hora limpia de un fichaje y convertirla a minutos
+            const obtenerMinutosFichaje = (fechaHoraIso: string) => {
+              // Extrae "HH:MM" ignorando la zona horaria/letra T
+              const partes = fechaHoraIso.split("T");
+              if (!partes[1]) return 0;
+              const horaLimpia = partes[1].substring(0, 5);
+              return aMinutos(horaLimpia);
+            };
+
+            // 2. FILTRADO SEGURO DE MARCAJES DE ENTRADA Y SALIDA
             const marcajesDelDia = fichajesRealizados.filter((fichaje) => {
-              // Filtrado por validez
-              if (fichaje.estado?.toLowerCase() !== "valido") return false;
+              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
+                return false;
 
-              const esEntradaOSalida =
-                fichaje.tipo_evento === "ENTRADA" ||
-                fichaje.tipo_evento === "SALIDA";
+              // Comprobamos el día calendario
+              const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
+              if (fechaFichajeStr !== fechaRealStr) return false;
 
-              if (!esEntradaOSalida) return false;
+              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
+              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA")
+                return false;
 
-              // Comprobación de ventana de tiempo exacta por timestamp
-              const tiempoFichajeMs = new Date(fichaje.fecha_hora).getTime();
+              // Evaluamos si los minutos del fichaje entran en el rango del turno
+              let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
+
+              // Ajuste por si el fichaje es del día siguiente en turnos nocturnos
+              if (esNocturno && minsFichaje < limiteInferiorMins) {
+                minsFichaje += 24 * 60;
+              }
+
               return (
-                tiempoFichajeMs >= margenInicio && tiempoFichajeMs <= margenFin
+                minsFichaje >= limiteInferiorMins &&
+                minsFichaje <= limiteSuperiorMins
               );
             });
 
-            // 3. FILTRADO DE EVENTOS DE DESCANSO (SÓLO VALIDOS)
-            const pausasDelDia = fichajesRealizados.filter((fichaje) => {
-              // Filtrado por validez
-              if (fichaje.estado?.toLowerCase() !== "valido") return false;
+            // Ordenamos cronológicamente usando el timestamp real
+            marcajesDelDia.sort(
+              (a, b) =>
+                new Date(a.fecha_hora).getTime() -
+                new Date(b.fecha_hora).getTime(),
+            );
 
+            // 3. FILTRADO DE EVENTOS DE DESCANSO EN EL MISMO RANGO HORARIO
+            const pausasDelDia = fichajesRealizados.filter((fichaje) => {
+              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
+                return false;
+
+              const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
+              if (fechaFichajeStr !== fechaRealStr) return false;
+
+              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
               const esPausa =
-                fichaje.tipo_evento === "INICIO_PAUSA" ||
-                fichaje.tipo_evento === "FIN_PAUSA";
+                fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
+                tipoEventoStr === "INICIO_PAUSA" ||
+                fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
+                tipoEventoStr === "FIN_PAUSA";
 
               if (!esPausa) return false;
 
-              // Comprobación de ventana de tiempo exacta por timestamp
-              const tiempoFichajeMs = new Date(fichaje.fecha_hora).getTime();
+              let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
+              if (esNocturno && minsFichaje < limiteInferiorMins) {
+                minsFichaje += 24 * 60;
+              }
+
               return (
-                tiempoFichajeMs >= margenInicio && tiempoFichajeMs <= margenFin
+                minsFichaje >= limiteInferiorMins &&
+                minsFichaje <= limiteSuperiorMins
               );
             });
 
@@ -233,11 +264,16 @@ export default function HorariosScreen() {
 
             pausasOrdenadas.forEach((fichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
+              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
 
-              if (fichaje.tipo_evento === "INICIO_PAUSA") {
+              if (
+                fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
+                tipoEventoStr === "INICIO_PAUSA"
+              ) {
                 marcaInicioPausa = tMs;
               } else if (
-                fichaje.tipo_evento === "FIN_PAUSA" &&
+                (fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
+                  tipoEventoStr === "FIN_PAUSA") &&
                 marcaInicioPausa !== null
               ) {
                 const diferenciaMinutos =
@@ -247,49 +283,38 @@ export default function HorariosScreen() {
               }
             });
 
-            // 5. CALCULAR TIEMPO REAL TRABAJADO EN ESTE TURNO (EN MINUTOS)
+            // 5. CALCULAR TIEMPO REAL TRABAJADO EN ESTE TURNO ESPECÍFICO
             let minutosTrabajadosReales = 0;
-            const marcajesOrdenados = [...marcajesDelDia].sort(
-              (a, b) =>
-                new Date(a.fecha_hora).getTime() -
-                new Date(b.fecha_hora).getTime(),
-            );
-
             let marcaEntradaTurno: number | null = null;
 
-            marcajesOrdenados.forEach((fichaje) => {
+            marcajesDelDia.forEach((fichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
+              const esEntrada =
+                fichaje.tipo_evento === TipoFichaje.ENTRADA ||
+                String(fichaje.tipo_evento).toUpperCase() === "ENTRADA";
 
-              if (fichaje.tipo_evento === "ENTRADA") {
+              if (esEntrada) {
                 marcaEntradaTurno = tMs;
-              } else if (
-                fichaje.tipo_evento === "SALIDA" &&
-                marcaEntradaTurno !== null
-              ) {
+              } else if (marcaEntradaTurno !== null) {
                 minutosTrabajadosReales +=
                   (tMs - marcaEntradaTurno) / (1000 * 60);
                 marcaEntradaTurno = null;
               }
             });
 
-            // Restamos los descansos tomados para que las horas netas trabajadas sean reales
             minutosTrabajadosReales = Math.max(
               0,
               Math.round(minutosTrabajadosReales - minutosConsumidos),
             );
 
-            // 6. CALCULAR TIEMPO TEÓRICO COMPLETO QUE HABÍA QUE TRABAJAR
-            let minutosTeoricosTotales =
-              (fechaFinTurno.getTime() - fechaInicioTurno.getTime()) /
-              (1000 * 60);
+            // 6. CALCULAR TIEMPO TEÓRICO COMPLETO
+            const minutosTeoricosTotales = minFin - minInicio;
 
-            // Descontamos la pausa obligatoria del contrato para saber las horas netas a trabajar
             const minutosTeoricosNetos = Math.max(
               0,
               minutosTeoricosTotales - (item?.minutos_pausa_obligatoria ?? 0),
             );
 
-            // Funciones auxiliares para formatear los minutos a formato legible "Xh Ymin"
             const formatearAHorasYMinutos = (
               minutosTotales: number,
             ): string => {
@@ -387,7 +412,7 @@ export default function HorariosScreen() {
                       </ThemedText>
                     </View>
 
-                    {/* RENDREIZADO DE MARCAJES VALIDOS */}
+                    {/* RENDREIZADO DE MARCAJES VÁLIDOS */}
                     {marcajesDelDia.length > 0 && (
                       <View style={styles.itemcontenedorFichajesReales}>
                         <View style={styles.separadorFichajes} />
@@ -400,7 +425,10 @@ export default function HorariosScreen() {
                           const horaLimpia = partes[1]
                             ? partes[1].substring(0, 5)
                             : "00:00";
-                          const esEntrada = fichaje.tipo_evento === "ENTRADA";
+                          const esEntrada =
+                            fichaje.tipo_evento === TipoFichaje.ENTRADA ||
+                            String(fichaje.tipo_evento).toUpperCase() ===
+                              "ENTRADA";
 
                           return (
                             <View

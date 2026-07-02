@@ -232,7 +232,8 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
             # Aseguramos el formato ISO con la "T" que tus filtros móviles necesitan
             "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
             "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
-            "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje)
+            "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje),
+            "estado": f.estado.value if hasattr(f.estado, "value") else str(f.estado),
         })
 
     return respuesta_homologada
