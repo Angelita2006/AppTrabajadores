@@ -32,3 +32,12 @@ export interface TurnoTrabajadorResponse {
   tipo_jornada?: string; // Ej: "Completa", "Parcial"
   duracion_pausa_minuto: number;
 }
+
+export interface TurnoCreate {
+  empresa_id: string;
+  nombre: string;
+  hora_inicio: string;
+  hora_fin: string;
+  duracion_pausa_minutos: number;
+  dias_semana: number[];
+}

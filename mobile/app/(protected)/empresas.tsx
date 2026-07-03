@@ -1,3 +1,4 @@
+import { obtenerEmpresas } from "@/src/modules/empresas/api/services";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,8 +10,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { obtenerEmpresas } from "../../src/modules/empresas/api/services";
 import { Empresa } from "../../src/modules/empresas/types/empresa";
+import {
+  crearCentroTrabajo,
+  crearTurnoLaboral,
+} from "../../src/modules/trabajadores/api/services";
 import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import api from "../../src/service/api/api";
 import { ThemedText } from "../../src/shared/components/themed-text";
@@ -34,23 +38,21 @@ export default function EmpresasScreen() {
   const [cnaeInput, setCnaeInput] = useState("");
   const [direccionInput, setDireccionInput] = useState("");
 
-  // 2. ESTADOS: Centros de Trabajo
+  // 2. ESTADOS: Centros de Trabajo (Acoplados a CentroTrabajoCreate)
   const [nombreCentro, setNombreCentro] = useState("");
   const [direccionCentro, setDireccionCentro] = useState("");
+  const [zonaHoraria, setZonaHoraria] = useState("Europe/Madrid"); // Valor por defecto
+  const [codigoCcc, setCodigoCcc] = useState("");
 
-  // 3. ESTADOS: Configuración de Turnos Maestros
+  // 3. ESTADOS: Configuración de Turnos Maestros (Acoplados a TurnoCreate)
   const [nombreTurno, setNombreTurno] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
+  const [duracionPausa, setDuracionPausa] = useState("0");
 
   // 4. ESTADOS: Calendario Laboral y Festivos
   const [fechaFestivo, setFechaFestivo] = useState("");
   const [descripcionFestivo, setDescripcionFestivo] = useState("");
-
-  // 5. ESTADOS: Roles y Permisos RBAC
-  const [rolSeleccionado, setRolSeleccionado] = useState<
-    "admin_empresa" | "trabajador"
-  >("trabajador");
 
   const esGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
@@ -112,7 +114,6 @@ export default function EmpresasScreen() {
           params: { nueva_razon_social: razonSocialInput },
         },
       );
-      // Simulación de guardado del resto de metadatos mapeados
       Alert.alert("Éxito", "Parámetros fiscales actualizados correctamente.");
       await cargarCatalogoEmpresas();
     } catch (error: any) {
@@ -125,52 +126,63 @@ export default function EmpresasScreen() {
     }
   };
 
-  // ACCIÓN: Crear un nuevo Centro de Trabajo (PostgreSQL)
+  // ACCIÓN: Crear un nuevo Centro de Trabajo (Usa tu servicio e interfaz)
   const handleCrearCentroTrabajo = async () => {
-    if (!nombreCentro || !direccionCentro || !empresaSeleccionada) {
+    if (!nombreCentro || !zonaHoraria || !empresaSeleccionada) {
       Alert.alert(
         "Campos incompletos",
-        "Por favor introduce el nombre y la dirección del centro.",
+        "Por favor introduce el nombre y la zona horaria del centro.",
       );
       return;
     }
     try {
       setGuardando(true);
-      await api.post("/api/centros-trabajo", {
+      await crearCentroTrabajo({
         empresa_id: empresaSeleccionada.id,
-        nombre: nombreCentro,
-        direccion: direccionCentro,
+        nombre: nombreCentro.trim(),
+        zona_horaria: zonaHoraria.trim(),
+        direccion: direccionCentro.trim() || null,
+        codigo_ccc: codigoCcc.trim() || null,
       });
+
       Alert.alert(
         "Alta Exitosa",
         `Centro "${nombreCentro}" configurado en el Tenant.`,
       );
       setNombreCentro("");
       setDireccionCentro("");
-    } catch {
-      Alert.alert("Error", "No se pudo registrar el centro de trabajo.");
+      setCodigoCcc("");
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail ||
+          "No se pudo registrar el centro de trabajo.",
+      );
     } finally {
       setGuardando(false);
     }
   };
 
-  // ACCIÓN: Definir un Turno Maestro para la organización
+  // ACCIÓN: Definir un Turno Maestro (Usa tu servicio e interfaz)
   const handleCrearTurnoMaestro = async () => {
     if (!nombreTurno || !horaInicio || !horaFin || !empresaSeleccionada) {
       Alert.alert(
         "Campos de Turno Vacíos",
-        "Especifica nombre, hora de inicio y fin (HH:MM).",
+        "Especifica nombre, hora de inicio y fin (HH:MM:SS).",
       );
       return;
     }
     try {
       setGuardando(true);
-      await api.post("/api/turnos", {
+      await crearTurnoLaboral({
         empresa_id: empresaSeleccionada.id,
-        nombre: nombreTurno,
-        hora_inicio: horaInicio,
-        hora_fin: horaFin,
+        nombre: nombreTurno.trim(),
+        hora_inicio: horaInicio.trim(),
+        hora_fin: horaFin.trim(),
+        duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
+        dias_semana: [1, 2, 3, 4, 5], // Lunes a Viernes por defecto mapeado en tu servicio
       });
+
       Alert.alert(
         "Turno Guardado",
         `El turno estructural "${nombreTurno}" ha sido guardado.`,
@@ -178,8 +190,13 @@ export default function EmpresasScreen() {
       setNombreTurno("");
       setHoraInicio("");
       setHoraFin("");
-    } catch {
-      Alert.alert("Error", "Error al procesar el guardado del turno maestro.");
+      setDuracionPausa("0");
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail ||
+          "Error al procesar el guardado del turno maestro.",
+      );
     } finally {
       setGuardando(false);
     }
@@ -304,7 +321,7 @@ export default function EmpresasScreen() {
           />
         )}
 
-        {/* BARRA DE PESTAÑAS (TABS NAVIGATOR PARA ANDROID/IOS FLUIDO) */}
+        {/* BARRA DE PESTAÑAS */}
         {empresaSeleccionada && (
           <View style={styles.contenedorTabs}>
             <ScrollView
@@ -376,22 +393,6 @@ export default function EmpresasScreen() {
                   Calendario Laboral
                 </ThemedText>
               </Pressable>
-              {/* <Pressable
-                style={[
-                  styles.tabButton,
-                  tabActiva === "roles" && styles.tabButtonActivo,
-                ]}
-                onPress={() => setTabActiva("roles")}
-              >
-                <ThemedText
-                  style={[
-                    styles.tabTexto,
-                    tabActiva === "roles" && styles.tabTextoActivo,
-                  ]}
-                >
-                  Permisos y Roles
-                </ThemedText>
-              </Pressable> */}
             </ScrollView>
           </View>
         )}
@@ -467,7 +468,7 @@ export default function EmpresasScreen() {
                   </ThemedText>
                   <View style={styles.campoFormulario}>
                     <ThemedText style={styles.labelInput}>
-                      Nombre del Centro
+                      Nombre del Centro *
                     </ThemedText>
                     <TextInput
                       style={styles.inputForm}
@@ -487,6 +488,36 @@ export default function EmpresasScreen() {
                       placeholder="Calle, número y ciudad"
                     />
                   </View>
+                  <Row>
+                    <View
+                      style={[
+                        styles.campoFormulario,
+                        { flex: 1, marginRight: 8 },
+                      ]}
+                    >
+                      <ThemedText style={styles.labelInput}>
+                        Zona Horaria *
+                      </ThemedText>
+                      <TextInput
+                        style={styles.inputForm}
+                        value={zonaHoraria}
+                        onChangeText={setZonaHoraria}
+                        placeholder="Europe/Madrid"
+                      />
+                    </View>
+                    <View style={[styles.campoFormulario, { flex: 1 }]}>
+                      <ThemedText style={styles.labelInput}>
+                        Código CCC
+                      </ThemedText>
+                      <TextInput
+                        style={styles.inputForm}
+                        value={codigoCcc}
+                        onChangeText={setCodigoCcc}
+                        keyboardType="numeric"
+                        placeholder="28123456789"
+                      />
+                    </View>
+                  </Row>
                   <Pressable
                     style={[
                       styles.botonGuardar,
@@ -527,27 +558,39 @@ export default function EmpresasScreen() {
                       ]}
                     >
                       <ThemedText style={styles.labelInput}>
-                        Hora Inicio
+                        Hora Inicio (HH:MM:SS)
                       </ThemedText>
                       <TextInput
                         style={styles.inputForm}
                         value={horaInicio}
                         onChangeText={setHoraInicio}
-                        placeholder="06:00"
+                        placeholder="06:00:00"
                       />
                     </View>
                     <View style={[styles.campoFormulario, { flex: 1 }]}>
                       <ThemedText style={styles.labelInput}>
-                        Hora Fin
+                        Hora Fin (HH:MM:SS)
                       </ThemedText>
                       <TextInput
                         style={styles.inputForm}
                         value={horaFin}
                         onChangeText={setHoraFin}
-                        placeholder="14:00"
+                        placeholder="14:00:00"
                       />
                     </View>
                   </Row>
+                  <View style={styles.campoFormulario}>
+                    <ThemedText style={styles.labelInput}>
+                      Duración Pausa (Minutos)
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputForm}
+                      value={duracionPausa}
+                      onChangeText={setDuracionPausa}
+                      keyboardType="numeric"
+                      placeholder="30"
+                    />
+                  </View>
                   <Pressable
                     style={[
                       styles.botonGuardar,
@@ -605,72 +648,6 @@ export default function EmpresasScreen() {
                   </Pressable>
                 </View>
               )}
-
-              {/* TAB 5: ROLES Y CONFIGURACIÓN RBAC */}
-              {/* {tabActiva === "roles" && (
-                <View>
-                  <ThemedText style={styles.formularioTitulo}>
-                    Matriz de Roles y Niveles de Permisos de Empresa
-                  </ThemedText>
-                  <ThemedText style={styles.textoInformativo}>
-                    Define el comportamiento de seguridad corporativa por
-                    defecto para los usuarios de este Tenant.
-                  </ThemedText>
-                  <View style={{ marginTop: 10, gap: 10 }}>
-                    <Row>
-                      <Pressable
-                        style={[
-                          styles.selectorRolCard,
-                          rolSeleccionado === "trabajador" &&
-                            styles.selectorRolCardActivo,
-                        ]}
-                        onPress={() => setRolSeleccionado("trabajador")}
-                      >
-                        <IconSymbol
-                          name="person"
-                          size={24}
-                          color={
-                            rolSeleccionado === "trabajador"
-                              ? "#2563EB"
-                              : "#64748B"
-                          }
-                        />
-                        <ThemedText style={styles.rolTitulo}>
-                          Trabajador
-                        </ThemedText>
-                        <ThemedText style={styles.rolDescripcion}>
-                          Fichajes, ver cuadrante y solicitar ausencias.
-                        </ThemedText>
-                      </Pressable>
-
-                      <Pressable
-                        style={[
-                          styles.selectorRolCard,
-                          rolSeleccionado === "admin_empresa" &&
-                            styles.selectorRolCardActivo,
-                        ]}
-                        onPress={() => setRolSeleccionado("admin_empresa")}
-                      >
-                        <IconSymbol
-                          name="shield"
-                          size={24}
-                          color={
-                            rolSeleccionado === "admin_empresa"
-                              ? "#2563EB"
-                              : "#64748B"
-                          }
-                        />
-                        <ThemedText style={styles.rolTitulo}>
-                          Admin Empresa
-                        </ThemedText>
-                        <ThemedText style={styles.rolDescripcion}>
-                          Control completo, resolución de incidencias y centros.
-                        </ThemedText>
-                      </Pressable>
-                    </Row>
-                  </View>
-                </View>
-              )} */}
             </Card>
           </View>
         )}
@@ -727,8 +704,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   cifTexto: { fontSize: 11, fontWeight: "700", color: "#475569" },
-
-  // Tabs Estilos
   contenedorTabs: { flexDirection: "row", marginTop: 16, height: 46 },
   tabButton: {
     paddingHorizontal: 16,
@@ -741,15 +716,12 @@ const styles = StyleSheet.create({
   tabButtonActivo: { backgroundColor: "#0F172A" },
   tabTexto: { fontSize: 13, fontWeight: "700", color: "#475569" },
   tabTextoActivo: { color: "#FFFFFF" },
-
-  // Formularios Estilos
   formularioTitulo: {
     fontSize: 15,
     fontWeight: "800",
     color: "#0F172A",
     marginBottom: 12,
   },
-  textoInformativo: { fontSize: 13, color: "#64748B", lineHeight: 18 },
   campoFormulario: { marginBottom: 12 },
   labelInput: {
     fontSize: 12,
@@ -776,26 +748,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   textoBotonGuardar: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
-
-  selectorRolCard: {
-    flex: 1,
-    padding: 14,
-    borderWidth: 2,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    backgroundColor: "#F8FAFC",
-  },
-  selectorRolCardActivo: { borderColor: "#2563EB", backgroundColor: "#EFF6FF" },
-  rolTitulo: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginTop: 6,
-  },
-  rolDescripcion: {
-    fontSize: 11,
-    color: "#64748B",
-    marginTop: 2,
-    lineHeight: 15,
-  },
 });

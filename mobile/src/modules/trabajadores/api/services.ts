@@ -3,7 +3,10 @@ import {
   AusenciaCreateRequest,
   AusenciaResponse,
 } from "../../ausencias/types/ausencia";
-import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
+import {
+  CentroTrabajo,
+  CentroTrabajoCreate,
+} from "../../centros-trabajo/types/centro-trabajo";
 import {
   IncidenciaCreateRequest,
   IncidenciaResponse,
@@ -14,6 +17,7 @@ import {
   RespuestaRegistroCompleto,
 } from "../../empresas/types/empresa";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
+import { TurnoCreate } from "../../turnos/types/turno";
 import { UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
@@ -502,5 +506,39 @@ export const asignarTurnoTrabajador = async (data: {
   fecha_fin?: string | null; // Formato AAAA-MM-DD
 }) => {
   const respuesta = await api.post("/api/asignaciones-turno", data);
+  return respuesta.data;
+};
+
+/**
+ * Registra un nuevo cuadrante de turno teórico validando los datos con Pydantic.
+ * URI: POST /api/turnos
+ */
+export const crearTurnoLaboral = async (datosTurno: TurnoCreate) => {
+  const respuesta = await api.post("/api/turnos", {
+    empresa_id: datosTurno.empresa_id,
+    nombre: datosTurno.nombre,
+    hora_inicio: datosTurno.hora_inicio,
+    hora_fin: datosTurno.hora_fin,
+    duracion_pausa_minutos: datosTurno.duracion_pausa_minutos || 0,
+    dias_semana: datosTurno.dias_semana || [1, 2, 3, 4, 5], // Lunes a Viernes por defecto
+  });
+  return respuesta.data;
+};
+
+/**
+ * Recupera los cuadrantes horarios dados de alta de forma aislada por una organización (tenant).
+ * URI: GET /api/turnos/empresa/{id_empresa}
+ */
+export const obtenerTurnosEmpresa = async (idEmpresa: string) => {
+  const respuesta = await api.get(`/api/turnos/empresa/${idEmpresa}`);
+  return respuesta.data;
+};
+
+/**
+ * Registra un nuevo centro de trabajo (PostgreSQL)
+ * URI: POST /api/centros-trabajo
+ */
+export const crearCentroTrabajo = async (datosCentro: CentroTrabajoCreate) => {
+  const respuesta = await api.post("/api/centros-trabajo", datosCentro);
   return respuesta.data;
 };

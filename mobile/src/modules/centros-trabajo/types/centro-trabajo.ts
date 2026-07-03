@@ -9,3 +9,11 @@ export interface CentroTrabajo {
   codigo_ccc?: string | null; // Optional[str] -> Puede venir como string, undefined o null
   direccion?: string | null; // Optional[str] Mapped_column(Text)
 }
+
+export interface CentroTrabajoCreate {
+  empresa_id: string; // Identificador UUID de la empresa (tenant)
+  nombre: string; // Nombre de la sede física
+  zona_horaria: string; // Zona horaria (ej. "Europe/Madrid")
+  codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
+  direccion?: string | null; // Dirección física (opcional)
+}

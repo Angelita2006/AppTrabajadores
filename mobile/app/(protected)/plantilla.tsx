@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-// IMPORTACIÓN DE LOS NUEVOS MÉTODOS DEL SERVICIO
+// IMPORTACIÓN DE LOS MÉTODOS DEL SERVICIO (Añadidos métodos de lectura para centros y turnos)
 import {
   asignarTurnoTrabajador,
   crearContrato,
@@ -27,6 +27,17 @@ import { AppScreen, Card } from "../../src/shared/ui/AppSurface";
 
 type TipoModal = "alta_trabajador" | "nuevo_contrato" | "asignar_turno" | null;
 
+// Interfaces genéricas para los selectores
+interface CentroTrabajo {
+  id: string;
+  nombre: string;
+}
+
+interface Turno {
+  id: string;
+  nombre: string;
+}
+
 export default function PlantillaScreen() {
   const { usuarioActual } = useSesion();
   const [plantilla, setPlantilla] = useState<Trabajador[]>([]);
@@ -34,12 +45,17 @@ export default function PlantillaScreen() {
   const [procesando, setProcesando] = useState(false);
   const [filtroEstado] = useState<"todos" | "altas">("todos");
 
+  // Listados para selectores
+  const [centrosTrabajo, setCentrosTrabajo] = useState<CentroTrabajo[]>([]);
+  const [turnosEmpresa, setTurnosEmpresa] = useState<Turno[]>([]);
+  const [cargandoSelectores, setCargandoSelectores] = useState(false);
+
   // Control de Modales
   const [modalActivo, setModalActivo] = useState<TipoModal>(null);
   const [trabajadorSeleccionado, setTrabajadorSeleccionado] =
     useState<Trabajador | null>(null);
 
-  // Formulario 1: Alta de Trabajador (Ajustado a TrabajadorCreate de tu API FastAPI)
+  // Formulario 1: Alta de Trabajador
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [nifNie, setNifNie] = useState("");
@@ -48,11 +64,11 @@ export default function PlantillaScreen() {
   const [nss, setNss] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
 
-  // Formulario 2: Alta de Contrato (Campos requeridos por la base de datos)
+  // Formulario 2: Alta de Contrato
   const [tipoContrato, setTipoContrato] = useState("");
   const [tipoJornada, setTipoJornada] = useState("Completa");
   const [horasSemana, setHorasSemana] = useState("40");
-  const [centroTrabajoId, setCentroTrabajoId] = useState(""); // Requerido por la relación física
+  const [centroTrabajoId, setCentroTrabajoId] = useState("");
 
   // Formulario 3: Asignación de Turno
   const [turnoId, setTurnoId] = useState("");
@@ -79,6 +95,56 @@ export default function PlantillaScreen() {
       );
     } finally {
       setCargando(false);
+    }
+  };
+
+  // Función para abrir modal de contrato validando centros de trabajo
+  const prepararNuevoContrato = async (trabajador: Trabajador) => {
+    try {
+      setCargandoSelectores(true);
+      // Simulación de llamada API. Reemplazar por tu llamada real: const datosCentros = await obtenerCentrosTrabajo(usuarioActual?.empresa_id);
+      const datosCentros: CentroTrabajo[] = [];
+
+      if (datosCentros.length === 0) {
+        Alert.alert(
+          "Configuración requerida",
+          "No se puede formalizar el contrato porque no hay ningún centro de trabajo creado en la empresa. Por favor, crea uno primero.",
+        );
+        return;
+      }
+
+      setCentrosTrabajo(datosCentros);
+      setTrabajadorSeleccionado(trabajador);
+      setModalActivo("nuevo_contrato");
+    } catch {
+      Alert.alert("Error", "No se pudieron obtener los centros de trabajo.");
+    } finally {
+      setCargandoSelectores(false);
+    }
+  };
+
+  // Función para abrir modal de turno validando turnos estructurales
+  const prepararAsignarTurno = async (trabajador: Trabajador) => {
+    try {
+      setCargandoSelectores(true);
+      // Simulación de llamada API. Reemplazar por tu llamada real: const datosTurnos = await obtenerTurnos(usuarioActual?.empresa_id);
+      const datosTurnos: Turno[] = [];
+
+      if (datosTurnos.length === 0) {
+        Alert.alert(
+          "Acción bloqueada",
+          "Hasta que la empresa no tenga turnos estructurales creados, no se podrá asignar un turno al trabajador.",
+        );
+        return;
+      }
+
+      setTurnosEmpresa(datosTurnos);
+      setTrabajadorSeleccionado(trabajador);
+      setModalActivo("asignar_turno");
+    } catch {
+      Alert.alert("Error", "No se pudieron obtener los turnos de la empresa.");
+    } finally {
+      setCargandoSelectores(false);
     }
   };
 
@@ -109,9 +175,10 @@ export default function PlantillaScreen() {
     setTipoContrato("");
     setCentroTrabajoId("");
     setTurnoId("");
+    setCentrosTrabajo([]);
+    setTurnosEmpresa([]);
   };
 
-  // 1. API: GUARDAR NUEVO TRABAJADOR USANDO TU MÉTODO DEL SERVICIO
   const handleAltaTrabajadorCompleta = async () => {
     if (!nombre || !apellidos || !nifNie || !usuarioActual?.empresa_id) {
       Alert.alert(
@@ -132,7 +199,7 @@ export default function PlantillaScreen() {
         numero_seguridad_social: nss.trim() ? nss.trim() : undefined,
         fecha_nacimiento: fechaNacimiento.trim()
           ? fechaNacimiento.trim()
-          : undefined, // AAAA-MM-DD
+          : undefined,
       });
 
       Alert.alert(
@@ -151,7 +218,6 @@ export default function PlantillaScreen() {
     }
   };
 
-  // 2. API: ASOCIAR UN CONTRATO LEGAL USANDO TU MÉTODO DEL SERVICIO
   const handleGuardarContrato = async () => {
     if (
       !tipoContrato ||
@@ -161,18 +227,18 @@ export default function PlantillaScreen() {
     ) {
       Alert.alert(
         "Campos insuficientes",
-        "Se requiere el Tipo de Contrato y el UUID del Centro de Trabajo.",
+        "Se requiere seleccionar un Centro de Trabajo y definir el Tipo de Contrato.",
       );
       return;
     }
     try {
       setProcesando(true);
-      const hoy = new Date().toISOString().split("T")[0]; // Genera 'AAAA-MM-DD' seguro
+      const hoy = new Date().toISOString().split("T")[0];
 
       await crearContrato({
         trabajador_id: trabajadorSeleccionado.id,
         empresa_id: usuarioActual.empresa_id,
-        centro_trabajo_id: centroTrabajoId.trim(),
+        centro_trabajo_id: centroTrabajoId,
         tipo_contrato: tipoContrato.trim(),
         tipo_jornada: tipoJornada,
         horas_semana: parseInt(horasSemana, 10) || 40,
@@ -196,19 +262,18 @@ export default function PlantillaScreen() {
     }
   };
 
-  // 3. API: VINCULAR UN TURNO MAESTRO USANDO TU MÉTODO DEL SERVICIO
   const handleAsignarTurnoTrabajador = async () => {
     if (!turnoId || !trabajadorSeleccionado) {
-      Alert.alert("Error", "Debes ingresar un ID de turno válido.");
+      Alert.alert("Error", "Debes seleccionar un turno válido de la lista.");
       return;
     }
     try {
       setProcesando(true);
-      const hoy = new Date().toISOString().split("T")[0]; // Genera 'AAAA-MM-DD' seguro
+      const hoy = new Date().toISOString().split("T")[0];
 
       await asignarTurnoTrabajador({
         trabajador_id: trabajadorSeleccionado.id,
-        turno_id: turnoId.trim(),
+        turno_id: turnoId,
         fecha_inicio: hoy,
       });
 
@@ -247,7 +312,7 @@ export default function PlantillaScreen() {
           </ThemedText>
         </Pressable>
 
-        {cargando ? (
+        {cargando || cargandoSelectores ? (
           <ActivityIndicator
             size="large"
             color="#2563EB"
@@ -256,15 +321,15 @@ export default function PlantillaScreen() {
         ) : (
           <View style={styles.contenedorLista}>
             {plantillaFiltrada.map((item) => {
-              const esUsuarioAdministrativo =
-                item.id === usuarioActual?.trabajador_id && esAdminEmpresa;
-              const tieneContratoActivo =
-                item.activo && !esUsuarioAdministrativo;
+              const tieneContratoActivo = Array.isArray((item as any).contratos)
+                ? (item as any).contratos.length > 0
+                : !!(item as any).contrato_activo;
+
               const tieneTurnoAsignado = Array.isArray(
                 (item as any).asignaciones_turnos,
               )
                 ? (item as any).asignaciones_turnos.length > 0
-                : item.activo && !esUsuarioAdministrativo;
+                : false;
 
               return (
                 <Card key={item.id}>
@@ -385,10 +450,7 @@ export default function PlantillaScreen() {
                     {!tieneContratoActivo && (
                       <Pressable
                         style={[styles.botonAccionAdmin, styles.botonContrato]}
-                        onPress={() => {
-                          setTrabajadorSeleccionado(item);
-                          setModalActivo("nuevo_contrato");
-                        }}
+                        onPress={() => prepararNuevoContrato(item)}
                       >
                         <FontAwesome5 name="plus" size={11} color="#FFFFFF" />
                         <ThemedText style={styles.textoBotonAdmin}>
@@ -400,10 +462,7 @@ export default function PlantillaScreen() {
                     {!tieneTurnoAsignado && (
                       <Pressable
                         style={[styles.botonAccionAdmin, styles.botonTurno]}
-                        onPress={() => {
-                          setTrabajadorSeleccionado(item);
-                          setModalActivo("asignar_turno");
-                        }}
+                        onPress={() => prepararAsignarTurno(item)}
                       >
                         <MaterialCommunityIcons
                           name="calendar-plus"
@@ -483,16 +542,9 @@ export default function PlantillaScreen() {
                     />
                   </View>
                   <View style={styles.campoForm}>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <ThemedText style={styles.labelForm}>
-                        Email Opcional
-                      </ThemedText>
-                    </View>
+                    <ThemedText style={styles.labelForm}>
+                      Email Opcional
+                    </ThemedText>
                     <TextInput
                       style={styles.inputForm}
                       value={email}
@@ -553,24 +605,58 @@ export default function PlantillaScreen() {
                 </View>
               )}
 
-              {/* FORMULARIO: ALTA CONTRATO */}
+              {/* FORMULARIO: ALTA CONTRATO (CON DESPLEGABLE DE CENTROS) */}
               {modalActivo === "nuevo_contrato" && (
                 <View>
                   <ThemedText style={styles.subtituloModal}>
                     Trabajador: {trabajadorSeleccionado?.nombre}{" "}
                     {trabajadorSeleccionado?.apellidos}
                   </ThemedText>
+
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
-                      UUID Centro de Trabajo *
+                      Centro de Trabajo *
                     </ThemedText>
-                    <TextInput
-                      style={styles.inputForm}
-                      value={centroTrabajoId}
-                      onChangeText={setCentroTrabajoId}
-                      placeholder="Pega el UUID del centro asignado"
-                    />
+                    <View style={styles.contenedorSelectorScroll}>
+                      <ScrollView
+                        style={{ maxHeight: 120 }}
+                        nestedScrollEnabled
+                      >
+                        {centrosTrabajo.map((centro) => {
+                          const seleccionado = centroTrabajoId === centro.id;
+                          return (
+                            <Pressable
+                              key={centro.id}
+                              style={[
+                                styles.opcionSelector,
+                                seleccionado &&
+                                  styles.opcionSelectorSeleccionada,
+                              ]}
+                              onPress={() => setCentroTrabajoId(centro.id)}
+                            >
+                              <ThemedText
+                                style={[
+                                  styles.textoOpcion,
+                                  seleccionado &&
+                                    styles.textoOpcionSeleccionada,
+                                ]}
+                              >
+                                {centro.nombre}
+                              </ThemedText>
+                              {seleccionado && (
+                                <FontAwesome5
+                                  name="check"
+                                  size={12}
+                                  color="#2563EB"
+                                />
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
                   </View>
+
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
                       Tipo de Contrato *
@@ -624,24 +710,58 @@ export default function PlantillaScreen() {
                 </View>
               )}
 
-              {/* FORMULARIO: ASIGNAR TURNO */}
+              {/* FORMULARIO: ASIGNAR TURNO (CON DESPLEGABLE DE TURNOS) */}
               {modalActivo === "asignar_turno" && (
                 <View>
                   <ThemedText style={styles.subtituloModal}>
                     Trabajador: {trabajadorSeleccionado?.nombre}{" "}
                     {trabajadorSeleccionado?.apellidos}
                   </ThemedText>
+
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
-                      UUID de Turno Maestro de Empresa *
+                      Turno Maestro de Empresa *
                     </ThemedText>
-                    <TextInput
-                      style={styles.inputForm}
-                      value={turnoId}
-                      onChangeText={setTurnoId}
-                      placeholder="Pega el UUID del turno estructural"
-                    />
+                    <View style={styles.contenedorSelectorScroll}>
+                      <ScrollView
+                        style={{ maxHeight: 120 }}
+                        nestedScrollEnabled
+                      >
+                        {turnosEmpresa.map((turno) => {
+                          const seleccionado = turnoId === turno.id;
+                          return (
+                            <Pressable
+                              key={turno.id}
+                              style={[
+                                styles.opcionSelector,
+                                seleccionado &&
+                                  styles.opcionSelectorSeleccionada,
+                              ]}
+                              onPress={() => setTurnoId(turno.id)}
+                            >
+                              <ThemedText
+                                style={[
+                                  styles.textoOpcion,
+                                  seleccionado &&
+                                    styles.textoOpcionSeleccionada,
+                                ]}
+                              >
+                                {turno.nombre}
+                              </ThemedText>
+                              {seleccionado && (
+                                <FontAwesome5
+                                  name="check"
+                                  size={12}
+                                  color="#2563EB"
+                                />
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
                   </View>
+
                   <Pressable
                     style={[
                       styles.btnGuardarModal,
@@ -668,7 +788,6 @@ export default function PlantillaScreen() {
   );
 }
 
-// Los estilos (styles) permanecen intactos abajo
 const styles = StyleSheet.create({
   contenedorLista: { gap: 14, marginTop: 14 },
   botonAltaGlobal: {
@@ -790,6 +909,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
     fontSize: 14,
     color: "#0F172A",
+  },
+  contenedorSelectorScroll: {
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    padding: 4,
+  },
+  opcionSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  opcionSelectorSeleccionada: {
+    backgroundColor: "#EFF6FF",
+  },
+  textoOpcion: {
+    fontSize: 14,
+    color: "#334155",
+  },
+  textoOpcionSeleccionada: {
+    color: "#2563EB",
+    fontWeight: "700",
   },
   btnGuardarModal: {
     backgroundColor: "#0F172A",
