@@ -31,6 +31,9 @@ const MAPPING = {
   "manage-accounts": "manage-accounts",
   business: "business",
   description: "description",
+  "corporate-fare": "corporate-fare",
+  badge: "badge",
+  shield: "shield",
 } as const;
 
 type IconSymbolName = keyof typeof MAPPING;

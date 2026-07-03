@@ -8,7 +8,11 @@ import {
   IncidenciaCreateRequest,
   IncidenciaResponse,
 } from "../../correcciones-fichaje/types/incidencia";
-import { Empresa } from "../../empresas/types/empresa";
+import {
+  Empresa,
+  RegistroOrganizacionDTO,
+  RespuestaRegistroCompleto,
+} from "../../empresas/types/empresa";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
 import { UsuarioSesion } from "../types/trabajador";
 
@@ -69,22 +73,22 @@ export const obtenerTrabajador = async (idTrabajador: string) => {
   return respuesta.data;
 };
 
-/**
- * Registra un nuevo empleado en el backend bajo una estructura Multiempresa.
- */
-export const crearTrabajador = async (data: {
-  empresa_id: string;
-  nif_nie: string;
-  nombre: string;
-  apellidos: string;
-  email?: string;
-  telefono?: string;
-  numero_seguridad_social?: string;
-  fecha_nacimiento?: string; // Formato AAAA-MM-DD
-}) => {
-  const respuesta = await api.post("/api/trabajadores", data);
-  return respuesta.data;
-};
+// /**
+//  * Registra un nuevo empleado en el backend bajo una estructura Multiempresa.
+//  */
+// export const crearTrabajador = async (data: {
+//   empresa_id: string;
+//   nif_nie: string;
+//   nombre: string;
+//   apellidos: string;
+//   email?: string;
+//   telefono?: string;
+//   numero_seguridad_social?: string;
+//   fecha_nacimiento?: string; // Formato AAAA-MM-DD
+// }) => {
+//   const respuesta = await api.post("/api/trabajadores", data);
+//   return respuesta.data;
+// };
 
 /**
  * Consulta la organización o empresa principal asignada al expediente del empleado.
@@ -311,28 +315,6 @@ export const obtenerIncidenciasTrabajador = async (
   return respuesta.data;
 };
 
-// /**
-//  * [CONSOLA ADMIN] Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
-//  * URI: PUT /api/correcciones/{id_correccion}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
-//  */
-// export const resolverSolicitudCorreccion = async (
-//   idCorreccion: string,
-//   nuevoEstado: "aprobada" | "rechazada",
-//   resolutorUsuarioId: string,
-// ): Promise<IncidenciaResponse> => {
-//   const respuesta = await api.put<IncidenciaResponse>(
-//     `/api/correcciones/${idCorreccion}/resolver`,
-//     null, // El cuerpo (body) va vacío porque FastAPI lee los parámetros desde la URL
-//     {
-//       params: {
-//         nuevo_estado: nuevoEstado,
-//         resolutor_usuario_id: resolutorUsuarioId,
-//       },
-//     },
-//   );
-//   return respuesta.data;
-// };
-
 /**
  * [CONSOLA ADMIN] Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
  * URI: PUT /api/correcciones/{id_correccion}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
@@ -403,4 +385,122 @@ export const obtenerTurno = async (idTurno: string) => {
     console.error(`Error al obtener turno ${idTurno}:`, error);
     throw error;
   }
+};
+
+/**
+ * [ALTA SISTEMA] Registra en cadena una nueva Empresa, su primer expediente de Trabajador
+ * y la cuenta de UsuarioSesion (con rol admin_empresa) vinculada.
+ */
+export const registrarOrganizacionCompleta = async (
+  datos: RegistroOrganizacionDTO,
+): Promise<RespuestaRegistroCompleto> => {
+  try {
+    // 1. POST /api/empresas -> Crear Organización Primaria
+    const responseEmpresa = await api.post<Empresa>("/api/empresas", {
+      nombre_comercial: datos.nombre_comercial,
+      razon_social: datos.razon_social || datos.nombre_comercial,
+      cif: datos.cif,
+      zona_horaria: "Europe/Madrid", // Parámetro estándar de localización
+      configuracion: {},
+      codigo_cnae: null,
+      convenio_colectivo: null,
+      direccion_fiscal: null,
+    });
+
+    const empresaCreada = responseEmpresa.data;
+
+    // 2. POST /api/trabajadores -> Crear Expediente Laboral Asociado
+    // Utilizamos la misma función interna o mapeamos la estructura requerida por tu backend
+    const responseTrabajador = await api.post("/api/trabajadores", {
+      empresa_id: empresaCreada.id,
+      nif_nie: datos.cif, // Provisionalmente vinculamos el CIF de empresa como NIF del gestor
+      nombre: datos.nombre_admin || "Admin",
+      apellidos: datos.apellidos_admin || datos.nombre_comercial,
+      email: datos.email,
+      telefono: null,
+      numero_seguridad_social: null,
+      fecha_nacimiento: null,
+    });
+
+    const trabajadorCreado = responseTrabajador.data;
+
+    // 3. POST /api/usuarios -> Generar Credenciales y Cuenta de Acceso de Plataforma
+    const responseUsuario = await api.post<UsuarioSesion>("/api/usuarios", {
+      nombre: `${trabajadorCreado.nombre} ${trabajadorCreado.apellidos}`,
+      email: datos.email,
+      password_raw: datos.password_raw,
+      tipo_usuario: "admin_empresa", // Rol específico de tu RBAC
+      empresa_id: empresaCreada.id,
+      trabajador_id: trabajadorCreado.id,
+    });
+
+    const usuarioCreado = responseUsuario.data;
+
+    return {
+      empresa: empresaCreada,
+      trabajador: trabajadorCreado,
+      usuario: usuarioCreado,
+    };
+  } catch (error: any) {
+    // Extrae y propaga de manera limpia la excepción controlada de FastAPI (HTTPException)
+    const apiMessage = error.response?.data?.detail;
+    throw new Error(
+      apiMessage ||
+        "Ha ocurrido un error inesperado al procesar el alta de organización.",
+    );
+  }
+};
+
+/**
+ * Registra un nuevo empleado en la base de datos (Tabla: /api/trabajadores)
+ * Comprueba el aislamiento de identidad por empresa.
+ * URI: POST /api/trabajadores
+ */
+export const crearTrabajador = async (data: {
+  empresa_id: string;
+  nif_nie: string;
+  nombre: string;
+  apellidos: string;
+  email?: string;
+  telefono?: string;
+  numero_seguridad_social?: string;
+  fecha_nacimiento?: string; // Formato AAAA-MM-DD
+}) => {
+  const respuesta = await api.post("/api/trabajadores", data);
+  return respuesta.data;
+};
+
+/**
+ * Registra un nuevo contrato laboral asociándolo al expediente del empleado.
+ * URI: POST /api/contratos
+ */
+export const crearContrato = async (data: {
+  trabajador_id: string;
+  empresa_id: string;
+  centro_trabajo_id: string;
+  tipo_contrato: string;
+  tipo_jornada: string;
+  horas_semana: number;
+  fecha_inicio: string; // Formato AAAA-MM-DD
+  departamento_id?: string | null;
+  puesto_trabajo?: string | null;
+  categoria_profesional?: string | null;
+  fecha_fin?: string | null; // Formato AAAA-MM-DD
+}) => {
+  const respuesta = await api.post("/api/contratos", data);
+  return respuesta.data;
+};
+
+/**
+ * Vincula a un trabajador con un turno teórico fijando su fecha de inicio de vigencia.
+ * URI: POST /api/asignaciones-turno
+ */
+export const asignarTurnoTrabajador = async (data: {
+  trabajador_id: string;
+  turno_id: string;
+  fecha_inicio: string; // Formato AAAA-MM-DD
+  fecha_fin?: string | null; // Formato AAAA-MM-DD
+}) => {
+  const respuesta = await api.post("/api/asignaciones-turno", data);
+  return respuesta.data;
 };

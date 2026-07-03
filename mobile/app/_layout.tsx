@@ -1,4 +1,6 @@
 import { Tabs } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -9,6 +11,33 @@ import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
 function TabsNavigation() {
   const { usuarioActual } = useSesion();
+  const [estaListo, setEstaListo] = useState(false);
+
+  // Escudo de tiempo: Damos 300ms para que el almacenamiento nativo del móvil
+  // devuelva los datos del usuario antes de que Expo Router calcule los href locales.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setEstaListo(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [usuarioActual]);
+
+  // Si el dispositivo físico sigue leyendo los datos de sesión, mostramos un cargando nativo
+  if (!estaListo) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#FFFFFF",
+        }}
+      >
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
   const tieneSesion = usuarioActual !== null;
 
   // Escudo de control horario: Evaluamos si el perfil cuenta con rango directivo
@@ -122,6 +151,21 @@ function TabsNavigation() {
       />
 
       <Tabs.Screen
+        name="(protected)/aprobar-vacaciones"
+        options={{
+          title: "Vacaciones",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="event" color={color} />
+          ),
+          href: tieneSesion
+            ? esAdmin
+              ? "/(protected)/aprobar-vacaciones"
+              : null
+            : null,
+        }}
+      />
+
+      <Tabs.Screen
         name="(protected)/incidencias"
         options={{
           title: "Incidencias",
@@ -164,6 +208,10 @@ function TabsNavigation() {
 
       {/* Controladores ocultos de ruteo interno */}
       <Tabs.Screen name="(authentication)/registro" options={{ href: null }} />
+      <Tabs.Screen
+        name="(authentication)/registro-organizacion"
+        options={{ href: null }}
+      />
       <Tabs.Screen
         name="(authentication)/recuperar-password"
         options={{ href: null }}

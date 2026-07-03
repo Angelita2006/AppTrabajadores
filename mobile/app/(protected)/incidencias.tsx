@@ -209,7 +209,7 @@ export default function IncidenciasScreen() {
               }
             : {},
         valor_anterior:
-          tipoCorreccion === "modificacion"
+          tipoCorreccion === "modificacion" || tipoCorreccion === "anulacion"
             ? { hora_anterior: horaAnterior.trim() }
             : null,
       };
@@ -532,7 +532,7 @@ export default function IncidenciasScreen() {
 
                   {item.valor_anterior?.hora_anterior && (
                     <ThemedText style={styles.itemIdAfectado}>
-                      Valor anterior: {item.valor_anterior.hora_anterior} hs
+                      Valor anterior: {item.valor_anterior?.hora_anterior} hs
                     </ThemedText>
                   )}
 

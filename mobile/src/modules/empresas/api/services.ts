@@ -11,7 +11,7 @@ export const obtenerEmpresas = async () => {
 /**
  * Recupera la información detallada de una empresa específica mediante su ID único.
  */
-export const obtenerEmpresa = async (idEmpresa: number) => {
+export const obtenerEmpresa = async (idEmpresa: string) => {
   const respuesta = await api.get(`api/empresas/${idEmpresa}`);
   return respuesta.data;
 };

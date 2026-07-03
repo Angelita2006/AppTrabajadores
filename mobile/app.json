@@ -4,20 +4,22 @@
     "slug": "FICHAPP",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/icon.png",
+    "icon": "./assets/icons/icon3.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tuusuario.fichapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.tuusuario.fichapp",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/foreground-app-android.png",
-        "backgroundImage": "./assets/images/background-app-android.png",
-        "monochromeImage": "./assets/images/monochrome-app-android.png"
+        "foregroundImage": "./assets/icons/icon3.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -42,12 +44,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/icons/splash-icon.png",
+          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "resizeMode": "cover",
+          "backgroundColor": "#011640",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#011640"
           }
         }
       ],

@@ -17,6 +17,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { obtenerEmpresa } from "../src/modules/empresas/api/services";
 import {
   getUsuarioByEmailYPassword,
   obtenerCentrosPorEmpresa,
@@ -41,6 +42,11 @@ export default function RootIndexScreen() {
     centroTrabajoActual,
     setCentroTrabajoActual,
   } = useSesion();
+
+  const esTrabajador = usuarioActual?.tipo_usuario === "trabajador";
+  const esAdminGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
+  const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
+  const esAdmin = esAdminGestoria || esAdminEmpresa;
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
   const [password, setPassword] = useState("password123");
@@ -113,7 +119,14 @@ export default function RootIndexScreen() {
       const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
       setUsuarioActual(usuarioSesion);
 
-      if (usuarioSesion.trabajador_id !== null) {
+      if (
+        usuarioSesion.tipo_usuario === "admin_empresa" &&
+        usuarioSesion.empresa_id
+      ) {
+        const empresa = await obtenerEmpresa(usuarioSesion.empresa_id);
+        setEmpresas([empresa]);
+        setEmpresaSeleccionada(empresa);
+      } else if (usuarioSesion.trabajador_id) {
         try {
           const empresasTrabajador = await obtenerEmpresasTrabajador(
             usuarioSesion.trabajador_id,
@@ -162,17 +175,147 @@ export default function RootIndexScreen() {
     };
   });
 
-  // ====================================================================
-  // VISTA DE PERFIL (USUARIO LOGUEADO)
-  // ====================================================================
+  const puedeCambiarEmpresa =
+    esAdminGestoria && empresas.length > 1 && !!empresaSeleccionada;
+
+  const renderEmpresaSelection = (usuario: typeof usuarioActual) => {
+    const esAdminEmpresaLocal = usuario?.tipo_usuario === "admin_empresa";
+
+    return (
+      <View style={styles.selectorContainer}>
+        <ThemedText style={styles.detailLabel}>
+          {puedeCambiarEmpresa ? "Cambiar de Empresa" : "Empresa vinculada"}
+        </ThemedText>
+        <View style={styles.pickerWrapper}>
+          {puedeCambiarEmpresa ? (
+            empresas.map((emp) => {
+              const estaSeleccionada = empresaSeleccionada?.id === emp.id;
+              return (
+                <Pressable
+                  key={emp.id}
+                  style={[
+                    styles.selectorItem,
+                    estaSeleccionada && styles.selectorItemActivo,
+                  ]}
+                  onPress={() => {
+                    if (empresaSeleccionada?.id !== emp.id) {
+                      setEmpresaSeleccionada(emp);
+                    }
+                  }}
+                >
+                  <ThemedText
+                    style={[
+                      styles.selectorItemText,
+                      estaSeleccionada && styles.selectorItemTextActivo,
+                    ]}
+                  >
+                    {emp.nombre_comercial}
+                  </ThemedText>
+                </Pressable>
+              );
+            })
+          ) : (
+            <ThemedText style={styles.selectorSingleText}>
+              {empresaSeleccionada?.nombre_comercial ??
+                "No hay empresa vinculada"}
+            </ThemedText>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderAdminProfile = () => {
+    const usuario = usuarioActual;
+    if (!usuario) return null;
+
+    return (
+      <AppScreen title="Panel de Gestión">
+        <Row>
+          <StatCard
+            label="Rol de Sistema"
+            value={usuario.tipo_usuario
+              .toString()
+              .replace("_", " ")
+              .toUpperCase()}
+          />
+          <StatCard
+            label="Empresas visibles"
+            value={empresas.length.toString()}
+          />
+        </Row>
+
+        <Animated.View
+          style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
+        >
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="business" size={20} color="#EA580C" />
+              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
+                Mi Empresa Activa
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.detailGrid}>
+              {renderEmpresaSelection(usuario)}
+              <Detail
+                label="CIF / NIF"
+                value={empresaSeleccionada?.cif ?? "No disponible"}
+              />
+              <Detail
+                label="Zona Horaria"
+                value={empresaSeleccionada?.zona_horaria ?? "Europe/Madrid"}
+              />
+            </View>
+          </Card>
+
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="manage-accounts" size={20} color="#475569" />
+              <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
+                Seguridad y Cuenta
+              </ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.detailGrid}>
+              <Detail label="Correo Electrónico" value={usuario.email} />
+              <Detail
+                label="Último Acceso"
+                value={
+                  usuario.ultimo_acceso
+                    ? usuario.ultimo_acceso
+                        .replace("T", " a las ")
+                        .substring(0, 32)
+                        .concat(" hs")
+                    : "Sesión Actual"
+                }
+              />
+            </View>
+          </Card>
+
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <IconSymbol name="logout" size={18} color="#FFFFFF" />
+            <ThemedText style={styles.logoutButtonText}>
+              Cerrar Sesión
+            </ThemedText>
+          </Pressable>
+        </Animated.View>
+      </AppScreen>
+    );
+  };
+
+  if (usuarioActual && esAdmin) {
+    return renderAdminProfile();
+  }
+
   if (usuarioActual && trabajadorActual) {
     return (
       <AppScreen title="Mi Perfil">
         <Row>
           <StatCard
             label="Estado Alta"
-            value={usuarioActual.activo ? "Activo" : "Inactivo"}
-            tone={usuarioActual.activo ? "success" : "danger"}
+            value={usuarioActual?.activo ? "Activo" : "Inactivo"}
+            tone={usuarioActual?.activo ? "success" : "danger"}
           />
           <StatCard
             label="Empresa Activa"
@@ -195,21 +338,22 @@ export default function RootIndexScreen() {
             <View style={styles.detailGrid}>
               <Detail
                 label="Nombre Completo"
-                value={`${trabajadorActual.nombre} ${trabajadorActual.apellidos}`}
+                value={`${trabajadorActual?.nombre} ${trabajadorActual.apellidos}`}
               />
               <Detail
                 label="Documento (NIF/NIE)"
-                value={trabajadorActual.nif_nie}
+                value={trabajadorActual?.nif_nie}
               />
               <Detail
                 label="Número Seguridad Social"
                 value={
-                  trabajadorActual.numero_seguridad_social ?? "No cumplimentado"
+                  trabajadorActual?.numero_seguridad_social ??
+                  "No cumplimentado"
                 }
               />
               <Detail
                 label="Teléfono Móvil"
-                value={trabajadorActual.telefono ?? "No registrado"}
+                value={trabajadorActual?.telefono ?? "No registrado"}
               />
             </View>
           </Card>
@@ -271,35 +415,46 @@ export default function RootIndexScreen() {
               {/* SELECTOR DE EMPRESAS DISPONIBLES */}
               <View style={styles.selectorContainer}>
                 <ThemedText style={styles.detailLabel}>
-                  Cambiar de Empresa
+                  {empresas.length > 1
+                    ? "Cambiar de Empresa"
+                    : "Empresa vinculada"}
                 </ThemedText>
-                <View style={styles.pickerWrapper}>
-                  {empresas.map((emp) => (
-                    <Pressable
-                      key={emp.id}
-                      style={[
-                        styles.selectorItem,
-                        empresaSeleccionada?.id === emp.id &&
-                          styles.selectorItemActivo,
-                      ]}
-                      onPress={() => {
-                        if (empresaSeleccionada?.id !== emp.id) {
-                          setEmpresaSeleccionada(emp);
-                        }
-                      }}
-                    >
-                      <ThemedText
+                {empresas.length > 1 ? (
+                  <View style={styles.pickerWrapper}>
+                    {empresas.map((emp) => (
+                      <Pressable
+                        key={emp.id}
                         style={[
-                          styles.selectorItemText,
+                          styles.selectorItem,
                           empresaSeleccionada?.id === emp.id &&
-                            styles.selectorItemTextActivo,
+                            styles.selectorItemActivo,
                         ]}
+                        onPress={() => {
+                          if (empresaSeleccionada?.id !== emp.id) {
+                            setEmpresaSeleccionada(emp);
+                          }
+                        }}
                       >
-                        {emp.nombre_comercial}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
+                        <ThemedText
+                          style={[
+                            styles.selectorItemText,
+                            empresaSeleccionada?.id === emp.id &&
+                              styles.selectorItemTextActivo,
+                          ]}
+                        >
+                          {emp.nombre_comercial}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.pickerWrapper}>
+                    <ThemedText style={styles.selectorSingleText}>
+                      {empresaSeleccionada?.nombre_comercial ??
+                        "No hay empresa vinculada"}
+                    </ThemedText>
+                  </View>
+                )}
               </View>
 
               {/* SELECTOR EN CASCADA DE CENTROS DE TRABAJO */}
@@ -385,7 +540,7 @@ export default function RootIndexScreen() {
               <Detail label="Correo Electrónico" value={usuarioActual.email} />
               <Detail
                 label="Rol Autorizado Sistema"
-                value={usuarioActual.tipo_usuario}
+                value={usuarioActual.tipo_usuario.toString().toUpperCase()}
               />
               <Detail
                 label="Último Acceso Registrado"
@@ -552,6 +707,23 @@ export default function RootIndexScreen() {
               ¿No tienes una cuenta? Regístrate
             </ThemedText>
           </Pressable>
+
+          <Pressable
+            onPress={() =>
+              router.replace("/(authentication)/registro-organizacion")
+            }
+            style={styles.organizationRegisterButton}
+          >
+            <IconSymbol
+              name="business"
+              size={16}
+              color="#1E293B"
+              style={{ marginRight: 6 }}
+            />
+            <ThemedText style={styles.organizationRegisterText}>
+              Quiero registrar mi organización / empresa
+            </ThemedText>
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -687,6 +859,17 @@ const styles = StyleSheet.create({
   },
   selectorContainer: { marginVertical: 4 },
   pickerWrapper: { flexDirection: "column", gap: 6, marginTop: 6 },
+  selectorSingleText: {
+    color: "#334155",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  selectorNote: {
+    color: "#475569",
+    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 20,
+  },
   pickerWrapperHorizontal: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -724,4 +907,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   zonaHorariaTexto: { fontSize: 13, color: "#64748B" },
+  organizationRegisterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: 48,
+    borderWidth: 1.5,
+    borderColor: "#CBD5E1",
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  organizationRegisterText: {
+    fontSize: 13,
+    color: "#1E293B",
+    fontWeight: "700",
+  },
 });

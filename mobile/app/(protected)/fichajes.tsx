@@ -56,7 +56,6 @@ const horaAMinutos = (horaStr: string): number => {
   return hrs * 60 + min;
 };
 
-// Modificado para aceptar tanto el string como el ID numérico que viene de la API
 const obtenerConfiguracionEvento = (tipo: string | number) => {
   const tipoStr = tipo?.toString().toUpperCase();
 
@@ -99,11 +98,12 @@ export default function FichajesHistorialScreen() {
     return new Date(d.setDate(diff));
   }, [fechaReferencia]);
 
+  // CAMBIO 1: El rango de texto ahora muestra de Lunes a Sábado (+5 días en vez de +6)
   const rangoSemanaStr = useMemo(() => {
     const lunes = new Date(lunesSemanaActual);
-    const domingo = new Date(lunes);
-    domingo.setDate(lunes.getDate() + 6);
-    return `Del ${lunes.toLocaleDateString("es-ES")} al ${domingo.toLocaleDateString("es-ES")}`;
+    const sabado = new Date(lunes);
+    sabado.setDate(lunes.getDate() + 5);
+    return `Del ${lunes.toLocaleDateString("es-ES")} al ${sabado.toLocaleDateString("es-ES")}`;
   }, [lunesSemanaActual]);
 
   const cambiarSemana = (direccion: "anterior" | "siguiente") => {
@@ -119,7 +119,8 @@ export default function FichajesHistorialScreen() {
       setCargando(true);
       const promesasFichajes = [];
 
-      for (let i = 0; i < 7; i++) {
+      // CAMBIO 2: Solo pedir a la API los 6 días de la semana laboral (i < 6 -> Lunes a Sábado)
+      for (let i = 0; i < 6; i++) {
         const diaConsultar = new Date(lunesSemanaActual);
         diaConsultar.setDate(lunesSemanaActual.getDate() + i);
         const offset = diaConsultar.getTimezoneOffset();
@@ -256,6 +257,9 @@ export default function FichajesHistorialScreen() {
               : objetoFecha.getDay()
           ];
 
+        // Medida de seguridad adicional: Si por alguna razón llega un fichaje del domingo, no procesarlo
+        if (nombreDia === "Domingo") return;
+
         if (!mapa[trabajadorId].dias[fechaFichajeLimpia]) {
           mapa[trabajadorId].dias[fechaFichajeLimpia] = {
             nombreDia: `${nombreDia} (${fechaFichajeLimpia.split("-").reverse().slice(0, 2).join("/")})`,
@@ -320,7 +324,8 @@ export default function FichajesHistorialScreen() {
       .map((t) => {
         let filasCalendarioHtml = "";
 
-        for (let i = 0; i < 7; i++) {
+        // CAMBIO 3: Compilar la tabla del documento PDF únicamente de Lunes a Sábado (i < 6)
+        for (let i = 0; i < 6; i++) {
           const diaActual = new Date(lunesSemanaActual);
           diaActual.setDate(lunesSemanaActual.getDate() + i);
           const isoFechaStr = diaActual.toISOString().split("T")[0];
@@ -337,7 +342,6 @@ export default function FichajesHistorialScreen() {
 
                 marcas.forEach((m: any) => {
                   const hora = extraerHora(m.fecha_hora, false);
-                  // Validamos tanto por el enum/string como por el ID numérico de tu API
                   if (
                     m.tipo_evento === TipoFichaje.ENTRADA ||
                     m.tipo_evento_id === 1
@@ -384,7 +388,7 @@ export default function FichajesHistorialScreen() {
           } else {
             filasCalendarioHtml += `
           <tr>
-            <td>${nombreDiaUI}</td>
+            <td><strong>${nombreDiaUI}</strong></td>
             <td>-</td>
             <td>-</td>
             <td>-</td>
@@ -664,7 +668,6 @@ export default function FichajesHistorialScreen() {
 
                             <View style={{ gap: 4, marginTop: 2 }}>
                               {eventos.map((item: any) => {
-                                // Usamos tanto tipo_evento (string) como tipo_evento_id (número) de tu payload
                                 const config = obtenerConfiguracionEvento(
                                   item.tipo_evento_id || item.tipo_evento,
                                 );

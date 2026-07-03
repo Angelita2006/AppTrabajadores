@@ -8,11 +8,13 @@ import React, {
   useState,
 } from "react";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
+import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import {
   obtenerAsignacionesTurnoTrabajador,
   obtenerCentroTrabajo,
   obtenerContratosTrabajador,
+  obtenerEmpresasTrabajador,
   obtenerTrabajador,
 } from "../api/services";
 import { Trabajador, UsuarioSesion } from "../types/trabajador";
@@ -65,7 +67,7 @@ interface SesionContextValue {
   contratoActual: ContratoLaboral | null;
   turnoActual: AsignacionTurno | null;
   centroTrabajoActual: CentroTrabajo | null;
-  setCentroTrabajoActual: (centro: CentroTrabajo | null) => void; // <--- MODIFICADO: Ahora es seteable externamente
+  setCentroTrabajoActual: (centro: CentroTrabajo | null) => void;
 
   // 3. PROPIEDADES DIRECTAS CALCULADAS
   centroTrabajoId: string | null;
@@ -81,7 +83,7 @@ const SesionContext = createContext<SesionContextValue | undefined>(undefined);
 const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESAS = "@fichapp_empresas_lista";
 const STORAGE_KEY_SELECCIONADA = "@fichapp_empresa_seleccionada";
-const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado"; // <--- NUEVA LLAVE
+const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado";
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioSesion | null>(
@@ -136,8 +138,49 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   // ====================================================================
-  // MOTOR 2: RESOLUCIÓN EN CASCADA
+  // MOTOR 2: SELECCIÓN AUTOMÁTICA DE TENANT Y RESOLUCIÓN EN CASCADA
   // ====================================================================
+  useEffect(() => {
+    if (cargandoSesionLocal || !usuarioActual || empresaSeleccionada) return;
+
+    async function inicializarEmpresaSeleccionada() {
+      const usuario = usuarioActual;
+      if (!usuario) return;
+
+      try {
+        if (usuario.tipo_usuario === "admin_empresa" && usuario.empresa_id) {
+          const empresa = await obtenerEmpresa(usuario.empresa_id);
+          setEmpresas([empresa]);
+          setEmpresaSeleccionada(empresa);
+          return;
+        }
+
+        if (usuario.tipo_usuario === "admin_gestoria") {
+          const todasLasEmpresas = await obtenerEmpresas();
+          setEmpresas(todasLasEmpresas);
+          if (todasLasEmpresas.length > 0) {
+            setEmpresaSeleccionada(todasLasEmpresas[0]);
+          }
+          return;
+        }
+
+        if (usuario.trabajador_id) {
+          const empresasTrabajador = await obtenerEmpresasTrabajador(
+            usuario.trabajador_id,
+          );
+          setEmpresas(empresasTrabajador);
+          if (empresasTrabajador.length > 0) {
+            setEmpresaSeleccionada(empresasTrabajador[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Error al inicializar la empresa seleccionada:", error);
+      }
+    }
+
+    inicializarEmpresaSeleccionada();
+  }, [usuarioActual, empresaSeleccionada, cargandoSesionLocal]);
+
   useEffect(() => {
     if (cargandoSesionLocal) return;
 
@@ -166,7 +209,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         );
         setContratoActual(contratoVigente ?? null);
 
-        // MODIFICADO: Solo autoselecciona el centro del contrato si no hay uno ya fijado/guardado para esta empresa
         if (contratoVigente?.centro_trabajo_id) {
           if (
             !centroTrabajoActual ||
@@ -213,9 +255,11 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, [usuarioActual, empresaSeleccionada, cargandoSesionLocal]);
 
   // ====================================================================
-  // MOTOR 3: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO
+  // MOTOR 3: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO (CORREGIDO)
   // ====================================================================
   useEffect(() => {
+    if (cargandoSesionLocal) return;
+
     async function guardarEstadosEnDisco() {
       try {
         if (usuarioActual) {
@@ -233,7 +277,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
               STORAGE_KEY_SELECCIONADA,
               JSON.stringify(empresaSeleccionada),
             );
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA);
           }
+
           if (centroTrabajoActual) {
             await AsyncStorage.setItem(
               STORAGE_KEY_CENTRO_SELECCIONADO,
@@ -243,18 +290,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
           }
         } else {
-          await AsyncStorage.removeItem(STORAGE_KEY_USUARIO);
-          await AsyncStorage.removeItem(STORAGE_KEY_EMPRESAS);
-          await AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA);
-          await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
+          // Limpieza total en caso de Logout
+          await Promise.all([
+            AsyncStorage.removeItem(STORAGE_KEY_USUARIO),
+            AsyncStorage.removeItem(STORAGE_KEY_EMPRESAS),
+            AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA),
+            AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO),
+          ]);
         }
       } catch (error) {
         console.error("Error al persistir cambios de sesión:", error);
       }
     }
-    if (!cargandoSesionLocal) {
-      guardarEstadosEnDisco();
-    }
+
+    guardarEstadosEnDisco();
   }, [
     usuarioActual,
     empresas,

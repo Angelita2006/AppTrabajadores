@@ -1,3 +1,7 @@
+import {
+  UsuarioSesion
+} from "../../trabajadores/types/trabajador";
+
 /**
  * Representa el modelo de una Empresa cliente (Tenant) en el frontend,
  * sincronizado exactamente con el esquema de respuesta del backend (Pydantic / SQLAlchemy).
@@ -44,4 +48,20 @@ export interface Empresa {
   // Relaciones (Opcionales dependiendo de si la consulta API incluye los joins)
   /** IDs o datos parciales de los trabajadores asociados (ajustar según el endpoint). */
   trabajadores?: string[];
+}
+
+export interface RegistroOrganizacionDTO {
+  nombre_comercial: string;
+  cif: string;
+  email: string;
+  password_raw: string;
+  razon_social?: string;
+  nombre_admin?: string;
+  apellidos_admin?: string;
+}
+
+export interface RespuestaRegistroCompleto {
+  empresa: Empresa;
+  trabajador: "trabajador";
+  usuario: UsuarioSesion;
 }

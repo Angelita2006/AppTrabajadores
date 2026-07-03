@@ -28,7 +28,7 @@ export default function HomeScreen() {
     usuarioActual,
     empresaSeleccionada,
     contratoActual,
-    centroTrabajoActual, // 💡 Usamos el objeto completo para máxima reactividad
+    centroTrabajoActual,
   } = useSesion();
 
   const [horaActual, setHoraActual] = useState("");
@@ -41,10 +41,6 @@ export default function HomeScreen() {
     null,
   );
 
-  /**
-   * Convierte la hora actual del dispositivo a un string ISO
-   * forzando la zona geográfica específica del centro de trabajo activo.
-   */
   function obtenerFechaHoraCentroISO(zonaHoraria: string): string {
     const ahora = new Date();
     try {
@@ -82,7 +78,6 @@ export default function HomeScreen() {
   useEffect(() => {
     const actualizarHoraServidor = () => {
       const ahora = new Date();
-      // Extraemos la zona horaria directamente o usamos fallback
       const zonaObjetivo = centroTrabajoActual?.zona_horaria || "Europe/Madrid";
 
       try {
@@ -99,14 +94,12 @@ export default function HomeScreen() {
       }
     };
 
-    // Ejecución inmediata
     actualizarHoraServidor();
     const intervaloReloj = setInterval(actualizarHoraServidor, 1000);
 
     return () => clearInterval(intervaloReloj);
   }, [centroTrabajoActual?.id, centroTrabajoActual?.zona_horaria]);
 
-  // Sincronización inicial de la jornada
   useEffect(() => {
     async function sincronizarJornadaActual() {
       if (!usuarioActual?.trabajador_id) return;
@@ -203,7 +196,6 @@ export default function HomeScreen() {
     sincronizarJornadaActual();
   }, [usuarioActual]);
 
-  // Cronómetro diferencial de segundo plano
   useEffect(() => {
     const { AppState } = require("react-native");
     let intervalo: number;
@@ -243,7 +235,6 @@ export default function HomeScreen() {
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
-  // Registro del marcaje utilizando el Centro de Trabajo dinámico
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
     tipoLabel: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA",
@@ -251,7 +242,7 @@ export default function HomeScreen() {
     if (
       !usuarioActual?.trabajador_id ||
       !empresaSeleccionada?.id ||
-      !centroTrabajoActual?.id // Aseguramos que el centro actual esté seteado
+      !centroTrabajoActual?.id
     ) {
       Alert.alert(
         "Expediente Incompleto",
@@ -268,7 +259,7 @@ export default function HomeScreen() {
       await registrarFichaje({
         trabajador_id: usuarioActual.trabajador_id,
         empresa_id: empresaSeleccionada.id,
-        centro_trabajo_id: centroTrabajoActual.id, // 💡 Envía el ID del centro activo actual
+        centro_trabajo_id: centroTrabajoActual.id,
         tipo_evento_id: tipoLabel,
         metodo_fichaje: Platform.OS === "web" ? "web" : "app_movil",
         fecha_hora_dispositivo: fechaHoraAjustada,
@@ -289,10 +280,9 @@ export default function HomeScreen() {
         setSegundosAcumuladosHoy((prev) => prev + segundosDelTramoQueCierra);
       }
 
+      // Cerramos el tramo activo fijando la base del cronómetro a null.
       if (tipoLabel === "SALIDA") {
-        setSegundosAcumuladosHoy(0);
         setTimestampBaseActual(null);
-        setTiempoFormateado("00:00:00");
       } else {
         setTimestampBaseActual(Date.now());
       }
@@ -334,7 +324,7 @@ export default function HomeScreen() {
           value={
             estadoActual === Estado.Descansando
               ? "En Descanso"
-              : Estado[estadoActual]
+              : Estado[Number.parseInt(estadoActual.toString())]
           }
           tone={estadoActual === Estado.Trabajando ? "success" : "warning"}
         />
@@ -347,7 +337,6 @@ export default function HomeScreen() {
       <View style={{ height: 12 }} />
 
       <View style={{ flexDirection: "row", width: "100%", gap: 12 }}>
-        {/* COLUMNA IZQUIERDA: HORA DIGITAL ACTUALIZADA */}
         <View style={{ flex: 1 }}>
           <Card>
             <View
@@ -376,7 +365,6 @@ export default function HomeScreen() {
           </Card>
         </View>
 
-        {/* COLUMNA DERECHA: TIEMPO ACUMULADO */}
         <View style={{ flex: 1 }}>
           <Card>
             <View
