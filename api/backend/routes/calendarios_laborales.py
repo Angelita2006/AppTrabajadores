@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from schemas.festivos import FestivoResponse2
 from core.database import get_db
+from models.festivos import Festivos
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.calendarios_laborales import CalendariosLaborales
-from schemas.calendarios_laborales import CalendarioLaboralCreate, CalendarioLaboralResponse
+from schemas.calendarios_laborales import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse
 
 router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Laborales"])
 
@@ -116,3 +118,49 @@ def eliminar_calendario_laboral(id_calendario: UUID, db: Session = Depends(get_d
     db.delete(calendario)
     db.commit()
     return {"detail": f"Calendario laboral ({id_calendario}) eliminado correctamente junto con sus festivos asociados."}
+
+@router.get("/empresa/{id_empresa}/con-festivos", response_model=List[CalendarioConFestivosResponse])
+def obtener_calendarios_y_festivos_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
+    """
+    Recupera todos los calendarios de una empresa integrando sus respectivos días festivos.
+    """
+    # 1. Verificamos si la empresa existe
+    empresa_existe = db.query(Empresas).filter(Empresas.id == id_empresa).first()
+    if not empresa_existe:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"La empresa con ID {id_empresa} no existe."
+        )
+
+    # 2. Buscamos los calendarios de la empresa
+    calendarios = db.query(CalendariosLaborales).filter(CalendariosLaborales.empresa_id == id_empresa).all()
+    
+    resultado = []
+    for cal in calendarios:
+        # 3. Buscamos manualmente los festivos en la BD asociados a este calendario
+        festivos_db = db.query(Festivos).filter(Festivos.calendario_id == cal.id).order_by(Festivos.fecha.asc()).all()
+        
+        # 4. Construimos la lista utilizando el Schema de Pydantic explícitamente
+        lista_festivos = []
+        for f in festivos_db:
+            # IMPORTANTE: Si en tu modelo 'Festivos' la columna no se llama 'fecha' o 'descripcion',
+            # cámbialo aquí a la derecha (ej: f.fecha_festivo o f.nombre_festivo)
+            lista_festivos.append(
+                FestivoResponse2(
+                    id=f.id,
+                    fecha=f.fecha,          
+                    descripcion=f.descripcion if f.descripcion is not None else "",
+                    tipo=f.tipo
+                )
+            )
+        
+        # 5. Agregamos el objeto del calendario empaquetando sus festivos
+        resultado.append(
+            CalendarioConFestivosResponse(
+                id=cal.id,
+                anio=cal.anio, # Si en tu BD se llama 'ano', cámbialo a cal.ano
+                festivos=lista_festivos
+            )
+        )
+        
+    return resultado

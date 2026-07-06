@@ -1,5 +1,5 @@
-import datetime
-from pydantic import BaseModel, Field
+from datetime import date
+from pydantic import UUID4, BaseModel, Field
 from typing import Optional
 from uuid import UUID
 
@@ -7,13 +7,23 @@ from uuid import UUID
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
 
+class FestivoResponse2(BaseModel):
+    id: UUID4
+    fecha: date          # Pydantic lo convertirá automáticamente a String "YYYY-MM-DD"
+    descripcion: str
+    tipo: str
+
+    class Config:
+        from_attributes = True  # Permite leer objetos de SQLAlchemy
+
+
 class FestivoBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de un día festivo
     basado en el modelo relacional mapeado por sqlacodegen.
     """
     calendario_id: UUID = Field(..., description="ID único UUID del calendario laboral al que se asocia")
-    fecha: datetime.date = Field(..., description="Fecha del día festivo en formato AAAA-MM-DD")
+    fecha: date = Field(..., description="Fecha del día festivo en formato AAAA-MM-DD")
     tipo: str = Field("nacional", max_length=30, description="Ámbito del festivo (ej: 'nacional', 'autonomico', 'local')")
 
 

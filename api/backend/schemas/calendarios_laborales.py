@@ -1,11 +1,19 @@
 import datetime
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import UUID4, BaseModel, Field
+from typing import List, Optional
 from uuid import UUID
+from schemas.festivos import FestivoResponse2
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
+class CalendarioConFestivosResponse(BaseModel):
+    id: UUID4
+    anio: int
+    festivos: List[FestivoResponse2]
+
+    class Config:
+        from_attributes = True
 
 class CalendarioLaboralBase(BaseModel):
     """

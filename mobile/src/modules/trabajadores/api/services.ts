@@ -3,6 +3,7 @@ import {
   AusenciaCreateRequest,
   AusenciaResponse,
 } from "../../ausencias/types/ausencia";
+import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
 import {
   CentroTrabajo,
   CentroTrabajoCreate,
@@ -541,4 +542,62 @@ export const obtenerTurnosEmpresa = async (idEmpresa: string) => {
 export const crearCentroTrabajo = async (datosCentro: CentroTrabajoCreate) => {
   const respuesta = await api.post("/api/centros-trabajo", datosCentro);
   return respuesta.data;
+};
+
+/**
+ * Recupera la lista de centros de trabajo asociados a una empresa específica.
+ * URI: GET /api/centros-trabajo/empresa/{id_empresa}
+ * @param idEmpresa Identificador único UUID de la empresa
+ * @returns Promesa con el array de CentrosTrabajo
+ */
+export const guardarDatosEmpresa = async (
+  empresaId: string,
+  nueva_razon_social: string,
+  nuevo_convenio: string,
+  nuevo_cnae: string,
+  nueva_direccion: string,
+) => {
+  const respuesta = await api.put(`/api/empresas/${empresaId}`, {
+    nueva_razon_social,
+    nuevo_convenio,
+    nuevo_cnae,
+    nueva_direccion,
+  });
+  return respuesta.data;
+};
+
+/**
+ * Recupera los calendarios anuales de una empresa junto con el listado de sus días festivos.
+ * @param empresaId UUID de la empresa seleccionada
+ */
+export const obtenerCalendarioYFestivos = async (
+  empresaId: string,
+): Promise<CalendarioFestivo[]> => {
+  try {
+    const respuesta = await api.get(
+      `/api/calendarios-laborales/empresa/${empresaId}/con-festivos`,
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error("Error en obtenerCalendarioYFestivos service:", error);
+    throw error;
+  }
+};
+
+/**
+ * Recupera los calendarios anuales de una empresa junto con el listado de sus días festivos.
+ * @param empresaId UUID de la empresa seleccionada
+ */
+export const obtenerCalendario = async (
+  calendarioId: string,
+): Promise<CalendarioFestivo> => {
+  try {
+    const respuesta = await api.get(
+      `/api/calendarios-laborales/${calendarioId}`,
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error("Error en obtenerCalendario service:", error);
+    throw error;
+  }
 };

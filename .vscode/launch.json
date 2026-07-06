@@ -1,21 +1,20 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Chrome 8081",
+      "name": "Debug Android (Pixel 9)",
+      "type": "node",
       "request": "launch",
-      "type": "chrome",
-      "url": "http://localhost:8081",
-      "webRoot": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}/mobile",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--android"],
+      "console": "integratedTerminal"
     },
     {
+      "name": "Debug Web (Chrome)",
       "type": "chrome",
       "request": "launch",
-      "name": "Launch Chrome against localhost",
-      "url": "http://localhost:8080",
+      "url": "http://localhost:8081",
       "webRoot": "${workspaceFolder}"
     }
   ]

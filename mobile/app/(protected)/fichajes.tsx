@@ -184,6 +184,8 @@ export default function FichajesHistorialScreen() {
                     fecha_real:
                       asig.fecha_inicio ||
                       new Date().toISOString().split("T")[0],
+                    diasSemana: tInfo.diasSemana || "",
+                    tipo_jornada: tInfo.tipo_jornada || "Completa",
                   });
                 }
               }

@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 from core.database import get_db
 from models.empresas import Empresas
-from schemas.empresas import EmpresaCreate, EmpresaResponse
+from schemas.empresas import EmpresaCreate, EmpresaResponse, EmpresaUpdate
 from schemas.trabajadores import TrabajadorResponse
 
 router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
@@ -126,3 +126,35 @@ def cambiar_razon_social_empresa(id_empresa: UUID, nueva_razon_social: str, db: 
     db.commit()
     db.refresh(empresa)
     return empresa
+
+@router.put("/{id_empresa}", response_model=EmpresaResponse)
+def actualizar_datos_empresa(id_empresa: UUID, payload: EmpresaUpdate, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/empresas/{id_empresa}
+    Actualiza los datos modificados de una empresa específica utilizando su UUID.
+    """
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
+    
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ninguna empresa con el ID {id_empresa}."
+        )
+    
+    setattr(empresa, "razon_social", payload.nueva_razon_social)
+    setattr(empresa, "convenio_colectivo", payload.nuevo_convenio)
+    setattr(empresa, "codigo_cnae", payload.nuevo_cnae)
+    setattr(empresa, "direccion_fiscal", payload.nueva_direccion)
+
+    setattr(empresa, "updated_at", datetime.now())
+    
+    try:
+        db.commit()
+        db.refresh(empresa)
+        return empresa
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar los datos de la empresa: {str(error)}"
+        )

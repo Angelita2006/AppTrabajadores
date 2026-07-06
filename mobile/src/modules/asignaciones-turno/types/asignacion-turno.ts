@@ -12,7 +12,6 @@ export interface AsignacionTurno {
   fecha_inicio: string; // Formato AAAA-MM-DD
   fecha_fin?: string | null; // NULL si es indefinido o indefinido temporal
   created_at: string;
-
   // Objetos anidados opcionales cargados mediante relaciones (relationship) de SQLAlchemy
   turno?: Turno | null;
   trabajador?: Trabajador | null;

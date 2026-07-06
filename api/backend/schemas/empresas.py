@@ -7,6 +7,12 @@ from uuid import UUID
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
 
+class EmpresaUpdate(BaseModel):
+    nueva_razon_social: str
+    nuevo_convenio: str
+    nuevo_cnae: str
+    nueva_direccion: str
+
 class EmpresaBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de una empresa cliente
