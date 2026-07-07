@@ -1,3 +1,4 @@
+import { ItemTurno } from "@/src/modules/turnos/types/turno";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -10,12 +11,16 @@ import {
   TextInput,
   View,
 } from "react-native";
-// IMPORTACIÓN DE LOS MÉTODOS DEL SERVICIO (Añadidos métodos de lectura para centros y turnos)
 import {
   asignarTurnoTrabajador,
   crearContrato,
   crearTrabajador,
+  obtenerAsignacionesPorTrabajador,
+  obtenerCentrosPorEmpresa,
+  obtenerContratosPorTrabajador,
   obtenerTrabajadores,
+  obtenerTurnoPorId,
+  obtenerTurnosEmpresa,
 } from "../../src/modules/trabajadores/api/services";
 import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import {
@@ -25,15 +30,19 @@ import {
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card } from "../../src/shared/ui/AppSurface";
 
-type TipoModal = "alta_trabajador" | "nuevo_contrato" | "asignar_turno" | null;
+type TipoModal =
+  | "alta_trabajador"
+  | "nuevo_contrato"
+  | "asignar_turno"
+  | "cambiar_contrato"
+  | "reasignar_turno"
+  | "rescindir_contrato"
+  | "eliminar_turno"
+  | "baja_trabajador"
+  | null;
 
 // Interfaces genéricas para los selectores
 interface CentroTrabajo {
-  id: string;
-  nombre: string;
-}
-
-interface Turno {
   id: string;
   nombre: string;
 }
@@ -47,7 +56,7 @@ export default function PlantillaScreen() {
 
   // Listados para selectores
   const [centrosTrabajo, setCentrosTrabajo] = useState<CentroTrabajo[]>([]);
-  const [turnosEmpresa, setTurnosEmpresa] = useState<Turno[]>([]);
+  const [turnosEmpresa, setTurnosEmpresa] = useState<ItemTurno[]>([]);
   const [cargandoSelectores, setCargandoSelectores] = useState(false);
 
   // Control de Modales
@@ -86,9 +95,68 @@ export default function PlantillaScreen() {
   const cargarPlantilla = async () => {
     try {
       setCargando(true);
-      const datos = await obtenerTrabajadores();
-      setPlantilla(datos);
-    } catch {
+
+      // 1. Obtener la nómina base de trabajadores
+      const trabajadores = await obtenerTrabajadores();
+
+      // 2. Resolver contratos y asignaciones para cada trabajador en paralelo
+      const plantillaCompleta = await Promise.all(
+        trabajadores.map(async (trabajador: any) => {
+          try {
+            const [contratos, asignaciones] = await Promise.all([
+              obtenerContratosPorTrabajador(trabajador.id),
+              obtenerAsignacionesPorTrabajador(trabajador.id),
+            ]);
+
+            // 3. Por cada asignación de turno, buscar la información completa del turno maestro
+            const asignacionesConTurnoDetalle = await Promise.all(
+              asignaciones.map(async (asignacion: any) => {
+                try {
+                  const turnoDetalle = await obtenerTurnoPorId(
+                    asignacion.turno_id,
+                  );
+                  return {
+                    ...asignacion,
+                    turno: turnoDetalle, // Insertamos el objeto descriptivo del turno (nombre, horas, etc.)
+                  };
+                } catch (errorTurno) {
+                  console.error(
+                    `Error al recuperar turno maestro ${asignacion.turno_id}:`,
+                    errorTurno,
+                  );
+                  return { ...asignacion, turno: null };
+                }
+              }),
+            );
+
+            // Retornamos el objeto del trabajador completamente enriquecido
+            return {
+              ...trabajador,
+              contratos: contratos || [], // Lista con su secuencia histórica de contratos
+              contratoActivo:
+                contratos?.find((c: any) => c.activo === true) || null, // Atajo para el contrato vigente
+              asignacionesTurno: asignacionesConTurnoDetalle || [], // Lista de turnos vinculados con su detalle
+            };
+          } catch (errorEmpleado) {
+            console.error(
+              `Error procesando relaciones para el trabajador ${trabajador.id}:`,
+              errorEmpleado,
+            );
+            // Si falla un trabajador, retornamos sus datos base para que la interfaz no se rompa por completo
+            return {
+              ...trabajador,
+              contratos: [],
+              contratoActivo: null,
+              asignacionesTurno: [],
+            };
+          }
+        }),
+      );
+
+      // 4. Guardar la estructura de datos anidada en el estado
+      setPlantilla(plantillaCompleta);
+    } catch (error) {
+      console.error("Error global en cargarPlantilla:", error);
       Alert.alert(
         "Error de Red",
         "Fallo al sincronizar el catálogo de la plantilla.",
@@ -102,8 +170,14 @@ export default function PlantillaScreen() {
   const prepararNuevoContrato = async (trabajador: Trabajador) => {
     try {
       setCargandoSelectores(true);
-      // Simulación de llamada API. Reemplazar por tu llamada real: const datosCentros = await obtenerCentrosTrabajo(usuarioActual?.empresa_id);
-      const datosCentros: CentroTrabajo[] = [];
+      if (!usuarioActual?.empresa_id) {
+        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
+        return;
+      }
+
+      const datosCentros: CentroTrabajo[] = await obtenerCentrosPorEmpresa(
+        usuarioActual!.empresa_id,
+      );
 
       if (datosCentros.length === 0) {
         Alert.alert(
@@ -127,8 +201,13 @@ export default function PlantillaScreen() {
   const prepararAsignarTurno = async (trabajador: Trabajador) => {
     try {
       setCargandoSelectores(true);
-      // Simulación de llamada API. Reemplazar por tu llamada real: const datosTurnos = await obtenerTurnos(usuarioActual?.empresa_id);
-      const datosTurnos: Turno[] = [];
+      if (!usuarioActual?.empresa_id) {
+        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
+        return;
+      }
+      const datosTurnos: ItemTurno[] = await obtenerTurnosEmpresa(
+        usuarioActual!.empresa_id,
+      );
 
       if (datosTurnos.length === 0) {
         Alert.alert(
@@ -245,10 +324,7 @@ export default function PlantillaScreen() {
         fecha_inicio: hoy,
       });
 
-      Alert.alert(
-        "Contrato Activo",
-        "Vínculo contractual formalizado en PostgreSQL.",
-      );
+      Alert.alert("Contrato Activo", "Vínculo contractual formalizado.");
       cerrarModales();
       await cargarPlantilla();
     } catch (err: any) {
@@ -326,9 +402,9 @@ export default function PlantillaScreen() {
                 : !!(item as any).contrato_activo;
 
               const tieneTurnoAsignado = Array.isArray(
-                (item as any).asignaciones_turnos,
+                (item as any).asignacionesTurno,
               )
-                ? (item as any).asignaciones_turnos.length > 0
+                ? (item as any).asignacionesTurno.length > 0
                 : false;
 
               return (
@@ -598,7 +674,7 @@ export default function PlantillaScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={styles.btnGuardarModalTexto}>
-                        Guardar Expediente Físico
+                        Guardar Expediente
                       </ThemedText>
                     )}
                   </Pressable>
@@ -774,7 +850,7 @@ export default function PlantillaScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={styles.btnGuardarModalTexto}>
-                        Inyectar Turno en Calendario
+                        Asignar Turno
                       </ThemedText>
                     )}
                   </Pressable>

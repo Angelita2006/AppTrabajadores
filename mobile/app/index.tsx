@@ -1,6 +1,6 @@
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -50,6 +50,7 @@ export default function RootIndexScreen() {
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
   const [password, setPassword] = useState("password123");
+  const passwordInputRef = useRef<TextInput | null>(null);
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
   const [cargandoCentros, setCargandoCentros] = useState(false);
@@ -590,7 +591,7 @@ export default function RootIndexScreen() {
               Portal de Control Horario
             </ThemedText>
           </View>
-
+          {/* CAMPO CORREO ELECTRÓNICO */}
           <View style={styles.field}>
             <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
             <View
@@ -617,6 +618,8 @@ export default function RootIndexScreen() {
                 placeholder="nombre@empresa.com"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
               />
             </View>
             {errorEmail && (
@@ -625,7 +628,7 @@ export default function RootIndexScreen() {
               </ThemedText>
             )}
           </View>
-
+          {/* CAMPO CONTRASEÑA */}
           <View style={styles.field}>
             <ThemedText style={styles.label}>Contraseña</ThemedText>
             <View
@@ -641,6 +644,7 @@ export default function RootIndexScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={passwordInputRef}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -651,6 +655,8 @@ export default function RootIndexScreen() {
                 placeholder="Introduce tu contraseña"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
               />
               <Pressable
                 onPress={() => setIsObscured(!isObscured)}
@@ -682,7 +688,6 @@ export default function RootIndexScreen() {
               </ThemedText>
             )}
           </View>
-
           <Pressable
             style={[
               styles.primaryButton,
@@ -707,7 +712,6 @@ export default function RootIndexScreen() {
               ¿No tienes una cuenta? Regístrate
             </ThemedText>
           </Pressable>
-
           <Pressable
             onPress={() =>
               router.replace("/(authentication)/registro-organizacion")
@@ -720,10 +724,11 @@ export default function RootIndexScreen() {
               color="#1E293B"
               style={{ marginRight: 6 }}
             />
+
             <ThemedText style={styles.organizationRegisterText}>
               Quiero registrar mi organización / empresa
             </ThemedText>
-          </Pressable>
+          </Pressable>{" "}
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>

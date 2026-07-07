@@ -601,3 +601,31 @@ export const obtenerCalendario = async (
     throw error;
   }
 };
+
+/**
+ * Obtiene el historial de contratos de un trabajador específico.
+ */
+export const obtenerContratosPorTrabajador = async (idTrabajador: string) => {
+  const respuesta = await api.get(`/api/contratos/trabajador/${idTrabajador}`);
+  return respuesta.data;
+};
+
+/**
+ * Obtiene las asignaciones de turno de un trabajador específico.
+ */
+export const obtenerAsignacionesPorTrabajador = async (
+  idTrabajador: string,
+) => {
+  const respuesta = await api.get(
+    `/api/asignaciones-turno/trabajador/${idTrabajador}`,
+  );
+  return respuesta.data;
+};
+
+/**
+ * Obtiene los detalles maestros de un turno mediante su ID.
+ */
+export const obtenerTurnoPorId = async (idTurno: string) => {
+  const respuesta = await api.get(`/api/turnos/${idTurno}`);
+  return respuesta.data;
+};
