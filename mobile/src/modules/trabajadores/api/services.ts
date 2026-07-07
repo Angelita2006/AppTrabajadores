@@ -629,3 +629,24 @@ export const obtenerTurnoPorId = async (idTurno: string) => {
   const respuesta = await api.get(`/api/turnos/${idTurno}`);
   return respuesta.data;
 };
+
+/**
+ * Asigna o reasigna múltiples turnos a un trabajador específico.
+ * @param trabajadorId ID del trabajador al que se le asignan los turnos
+ * @param idsTurnos Arreglo con los IDs de los turnos seleccionados
+ */
+export const asignarTurnosTrabajador = async (
+  trabajadorId: string | number,
+  idsTurnos: string[],
+): Promise<any> => {
+  try {
+    // Ajusta la URL de tu endpoint según tu API de backend
+    const response = await api.post(`/trabajadores/${trabajadorId}/turnos`, {
+      turnos: idsTurnos,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error en turnosService.asignarTurnosTrabajador:", error);
+    throw error; // Re-lanzamos el error para que el componente pueda manejarlo (ej. mostrar alerta)
+  }
+};

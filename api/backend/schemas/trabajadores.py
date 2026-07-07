@@ -1,11 +1,14 @@
 import datetime
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
+
+class AsignarTurnosRequest(BaseModel):
+    turnos: List[UUID]
 
 class TrabajadorBase(BaseModel):
     """

@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from models.asignaciones_turno import AsignacionesTurno
 from core.database import get_db
 from schemas.empresas import EmpresaResponse
-from schemas.trabajadores import TrabajadorCreate, TrabajadorResponse
+from schemas.trabajadores import AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse
 from schemas.usuarios import LoginRequest
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
+from models.turnos import Turnos
 
 # Inicialización del enrutador modular para el personal y autenticación
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
@@ -144,3 +146,68 @@ def eliminar_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
     db.delete(trabajador)
     db.commit()
     return {"detail": f"Trabajador ({id_trabajador}) eliminado correctamente junto con su planificación en cascada."}
+
+@router.post("/{id_trabajador}/turnos", status_code=status.HTTP_200_OK)
+def asignar_turnos_trabajador(
+    id_trabajador: UUID, 
+    obj_in: AsignarTurnosRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    URI: POST /api/trabajadores/{id_trabajador}/turnos
+    Procesa de manera masiva la asignación o reasignación de múltiples turnos independientes 
+    para un expediente de trabajador específico.
+    """
+    # 1. Validación de seguridad: Verificar que el trabajador exista
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador con ID {id_trabajador} no encontrado."
+        )
+
+    try:
+        # 2. Opcional (Reasignación): Si tu lógica de "Reasignar" implica limpiar 
+        # las asignaciones previas del trabajador antes de salvar las nuevas, descomenta esto:
+        # db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == id_trabajador).delete()
+
+        # 3. Registrar de forma independiente cada turno del array recibido
+        nuevas_asignaciones = []
+        for turno_id in obj_in.turnos:
+            # Validar que el turno maestro realmente exista en el catálogo general
+            turno_existe = db.query(Turnos).filter(Turnos.id == turno_id).first()
+            if not turno_existe:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"El turno con ID {turno_id} no existe en el catálogo."
+                )
+            
+            # Crear el registro independiente de la asignación
+            # Nota: Cambia 'AsignacionesTurno' por el nombre real de tu modelo relacional
+            nueva_asignacion = AsignacionesTurno(
+                trabajador_id=id_trabajador,
+                turno_id=turno_id,
+                # Aquí puedes añadir campos adicionales si tu tabla los requiere (ej: fecha_inicio, semana, etc.)
+            )
+            db.add(nueva_asignacion)
+            nuevas_asignaciones.append(nueva_asignacion)
+
+        # 4. Consolidar los cambios en la base de datos
+        db.commit()
+
+        return {
+            "status": "success",
+            "detail": f"Se han asignado exitosamente {len(nuevas_asignaciones)} turnos al trabajador.",
+            "trabajador_id": id_trabajador,
+            "turnos_asignados": obj_in.turnos
+        }
+
+    except HTTPException as http_error:
+        db.rollback()
+        raise http_error
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error crítico al procesar la asignación múltiple de turnos: {str(error)}"
+        )

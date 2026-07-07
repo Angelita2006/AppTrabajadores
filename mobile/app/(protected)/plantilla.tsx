@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import {
-  asignarTurnoTrabajador,
+  asignarTurnosTrabajador,
   crearContrato,
   crearTrabajador,
   obtenerAsignacionesPorTrabajador,
@@ -55,7 +55,6 @@ export default function PlantillaScreen() {
   const [filtroEstado] = useState<"todos" | "altas">("todos");
 
   // Listados para selectores
-  const [centrosTrabajo, setCentrosTrabajo] = useState<CentroTrabajo[]>([]);
   const [turnosEmpresa, setTurnosEmpresa] = useState<ItemTurno[]>([]);
   const [cargandoSelectores, setCargandoSelectores] = useState(false);
 
@@ -81,6 +80,7 @@ export default function PlantillaScreen() {
 
   // Formulario 3: Asignación de Turno
   const [turnoId, setTurnoId] = useState("");
+  const [turnosSeleccionados, setTurnosSeleccionados] = useState<any[]>([]);
 
   const esGestoria =
     usuarioActual?.tipo_usuario === ("admin_gestoria" as TipoUsuario);
@@ -187,7 +187,7 @@ export default function PlantillaScreen() {
         return;
       }
 
-      setCentrosTrabajo(datosCentros);
+      // setCentrosTrabajo(datosCentros);
       setTrabajadorSeleccionado(trabajador);
       setModalActivo("nuevo_contrato");
     } catch {
@@ -254,7 +254,7 @@ export default function PlantillaScreen() {
     setTipoContrato("");
     setCentroTrabajoId("");
     setTurnoId("");
-    setCentrosTrabajo([]);
+    // setCentrosTrabajo([]);
     setTurnosEmpresa([]);
   };
 
@@ -337,37 +337,62 @@ export default function PlantillaScreen() {
       setProcesando(false);
     }
   };
-
   const handleAsignarTurnoTrabajador = async () => {
-    if (!turnoId || !trabajadorSeleccionado) {
-      Alert.alert("Error", "Debes seleccionar un turno válido de la lista.");
+    // 1. Validaciones previas básicas
+    if (!trabajadorSeleccionado) {
+      Alert.alert("Error", "No se ha seleccionado ningún trabajador.");
       return;
     }
+
+    if (turnosSeleccionados.length === 0) {
+      Alert.alert("Error", "Debes seleccionar al menos un turno de la lista.");
+      return;
+    }
+
     try {
       setProcesando(true);
-      const hoy = new Date().toISOString().split("T")[0];
 
-      await asignarTurnoTrabajador({
-        trabajador_id: trabajadorSeleccionado.id,
-        turno_id: turnoId,
-        fecha_inicio: hoy,
-      });
+      // 2. Llamamos al método del servicio pasando el ID del trabajador y el array de IDs de turnos
+      await asignarTurnosTrabajador(
+        trabajadorSeleccionado.id,
+        turnosSeleccionados,
+      );
 
+      // 3. Feedback de éxito al usuario
       Alert.alert(
         "Planificación Sincronizada",
-        "Turno operativo inyectado en el cuadrante.",
+        "Los turnos operativos han sido inyectados en el cuadrante con éxito.",
       );
-      cerrarModales();
-      await cargarPlantilla();
+
+      // 4. Limpieza de estados del componente
+      setTurnosSeleccionados([]); // Limpia la lista de seleccionados del modal
+      cerrarModales(); // Cierra el modal de la vista
+      await cargarPlantilla(); // Refresca la lista de trabajadores para ver los cambios
     } catch (err: any) {
+      // 5. Control de errores con respuesta del backend
+      console.error("Error al asignar turnos:", err);
       Alert.alert(
         "Error",
-        err.response?.data?.detail || "Fallo al asignar el turno.",
+        err.response?.data?.detail || "Fallo al asignar los turnos laborales.",
       );
     } finally {
       setProcesando(false);
     }
   };
+
+  useEffect(() => {
+    if (plantillaFiltrada && plantillaFiltrada.length > 0) {
+      // Extrae y aplana todos los turnos de todos los trabajadores de forma segura
+      const todosLosTurnos = plantillaFiltrada.flatMap((item: any) => {
+        const asignaciones = Array.isArray(item.asignacionesTurno)
+          ? item.asignacionesTurno
+          : [];
+        return asignaciones.map((a: any) => a.turno).filter(Boolean);
+      });
+
+      setTurnosEmpresa(todosLosTurnos);
+    }
+  }, [plantillaFiltrada]);
 
   return (
     <AppScreen
@@ -397,23 +422,36 @@ export default function PlantillaScreen() {
         ) : (
           <View style={styles.contenedorLista}>
             {plantillaFiltrada.map((item) => {
-              const tieneContratoActivo = Array.isArray((item as any).contratos)
-                ? (item as any).contratos.length > 0
-                : !!(item as any).contrato_activo;
+              // 1. Extraemos los contratos de forma segura en una constante local
+              const contratosDelTrabajador = Array.isArray(
+                (item as any).contratos,
+              )
+                ? (item as any).contratos
+                : [];
 
-              const tieneTurnoAsignado = Array.isArray(
+              // 2. Evaluamos si tiene contrato activo
+              const tieneContratoActivo =
+                contratosDelTrabajador.length > 0
+                  ? true
+                  : !!(item as any).contratoActivo;
+
+              // 3. Extraemos las asignaciones de este trabajador específico
+              const asignacionesDelTrabajador = Array.isArray(
                 (item as any).asignacionesTurno,
               )
-                ? (item as any).asignacionesTurno.length > 0
-                : false;
+                ? (item as any).asignacionesTurno
+                : [];
+
+              const tieneTurnoAsignado = asignacionesDelTrabajador.length > 0;
 
               return (
                 <Card key={item.id}>
+                  {/* CABECERA: AVATAR Y ESTADO */}
                   <View style={styles.cardHeader}>
                     <View style={styles.avatarCirculo}>
                       <ThemedText style={styles.avatarTexto}>
-                        {item.nombre.charAt(0)}
-                        {item.apellidos.charAt(0)}
+                        {item.nombre ? item.nombre.charAt(0) : ""}
+                        {item.apellidos ? item.apellidos.charAt(0) : ""}
                       </ThemedText>
                     </View>
                     <View style={{ flex: 1 }}>
@@ -442,6 +480,7 @@ export default function PlantillaScreen() {
 
                   <View style={styles.separador} />
 
+                  {/* DETALLES DE IDENTIDAD Y SEGURIDAD SOCIAL */}
                   <View style={styles.gridDetalles}>
                     <View style={styles.bloqueDato}>
                       <ThemedText style={styles.labelDato}>
@@ -482,84 +521,319 @@ export default function PlantillaScreen() {
 
                   <View style={styles.separadorDashed} />
 
+                  {/* CONTENEDOR PRINCIPAL DE AUDITORÍA Y ACCIONES INTERNAS */}
                   <View style={styles.contenedorAuditoria}>
+                    {/* SECCIÓN 1: CONTRATO */}
                     <View style={styles.filaAuditoriaItem}>
                       <FontAwesome5
                         name="file-contract"
                         size={13}
                         color={tieneContratoActivo ? "#16803D" : "#EA580C"}
                       />
-                      <ThemedText
-                        style={[
-                          styles.textoAuditoria,
-                          {
-                            color: tieneContratoActivo ? "#16803D" : "#EA580C",
-                          },
-                        ]}
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: "column",
+                          marginLeft: 6,
+                        }}
                       >
-                        {tieneContratoActivo
-                          ? "Contrato en vigor registrado"
-                          : "⚠️ Alerta: El trabajador carece de contrato activo"}
-                      </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.textoAuditoria,
+                            {
+                              color: tieneContratoActivo
+                                ? "#16803D"
+                                : "#EA580C",
+                            },
+                          ]}
+                        >
+                          {tieneContratoActivo
+                            ? "Contrato en vigor registrado"
+                            : "⚠️ Alerta: El trabajador carece de contrato activo"}
+                        </ThemedText>
+
+                        {tieneContratoActivo &&
+                          contratosDelTrabajador.length > 0 && (
+                            <ThemedText
+                              style={{
+                                color: "#64748B",
+                                fontSize: 12,
+                                marginTop: 2,
+                              }}
+                            >
+                              {"Tipo: " +
+                                contratosDelTrabajador
+                                  .map((c: any) => c.tipo_contrato || "General")
+                                  .join(", ")}
+                            </ThemedText>
+                          )}
+
+                        {/* OPCIONES ABAJO DEL CONTRATO */}
+                        {tieneContratoActivo ? (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              marginTop: 8,
+                              gap: 8,
+                            }}
+                          >
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#EFF6FF" },
+                              ]}
+                              onPress={() => {
+                                setTrabajadorSeleccionado(item);
+                                setModalActivo("cambiar_contrato");
+                              }}
+                            >
+                              <FontAwesome5
+                                name="edit"
+                                size={10}
+                                color="#2563EB"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#2563EB",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Cambiar Contrato
+                              </ThemedText>
+                            </Pressable>
+
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#FEF2F2" },
+                              ]}
+                              onPress={() => {
+                                setTrabajadorSeleccionado(item);
+                                setModalActivo("rescindir_contrato");
+                              }}
+                            >
+                              <FontAwesome5
+                                name="file-signature"
+                                size={10}
+                                color="#DC2626"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#DC2626",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Rescindir
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <View style={{ flexDirection: "row", marginTop: 8 }}>
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#2563EB" },
+                              ]}
+                              onPress={() => {
+                                setTrabajadorSeleccionado(item);
+                                setModalActivo("nuevo_contrato");
+                              }}
+                            >
+                              <FontAwesome5
+                                name="plus"
+                                size={10}
+                                color="#FFFFFF"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Alta Contrato
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
                     </View>
 
-                    <View style={[styles.filaAuditoriaItem, { marginTop: 4 }]}>
+                    <View style={[styles.separador, { marginVertical: 12 }]} />
+
+                    {/* SECCIÓN 2: TURNOS */}
+                    <View style={styles.filaAuditoriaItem}>
                       <MaterialCommunityIcons
                         name="calendar-clock"
                         size={15}
                         color={tieneTurnoAsignado ? "#16803D" : "#EA580C"}
                       />
-                      <ThemedText
-                        style={[
-                          styles.textoAuditoria,
-                          { color: tieneTurnoAsignado ? "#16803D" : "#EA580C" },
-                        ]}
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: "column",
+                          marginLeft: 6,
+                        }}
                       >
-                        {tieneTurnoAsignado
-                          ? "Turno asignado en cuadrante"
-                          : "⚠️ Sin asignación horaria de turnos en este mes"}
-                      </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.textoAuditoria,
+                            {
+                              color: tieneTurnoAsignado ? "#16803D" : "#EA580C",
+                            },
+                          ]}
+                        >
+                          {tieneTurnoAsignado
+                            ? "Turno asignado en cuadrante"
+                            : "⚠️ Sin asignación horaria de turnos en este mes"}
+                        </ThemedText>
+
+                        {tieneTurnoAsignado && (
+                          <ThemedText
+                            style={{
+                              color: "#64748B",
+                              fontSize: 12,
+                              marginTop: 2,
+                            }}
+                          >
+                            {"Turnos: " +
+                              asignacionesDelTrabajador
+                                .map((t: any) => t.turno?.nombre || t.turno_id)
+                                .join(", ")}
+                          </ThemedText>
+                        )}
+
+                        {/* OPCIONES ABAJO DE LOS TURNOS */}
+                        {tieneTurnoAsignado ? (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              marginTop: 8,
+                              gap: 8,
+                            }}
+                          >
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#FDF4FF" },
+                              ]}
+                              onPress={() => {
+                                setTrabajadorSeleccionado(item);
+                                setModalActivo("reasignar_turno");
+                              }}
+                            >
+                              <MaterialCommunityIcons
+                                name="calendar-refresh"
+                                size={12}
+                                color="#D946EF"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#D946EF",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Reasignar Turno
+                              </ThemedText>
+                            </Pressable>
+
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#FFF5EB" },
+                              ]}
+                              onPress={() => {
+                                setTrabajadorSeleccionado(item);
+                                setModalActivo("eliminar_turno");
+                              }}
+                            >
+                              <MaterialCommunityIcons
+                                name="calendar-remove"
+                                size={12}
+                                color="#EA580C"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#EA580C",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Eliminar Asignación
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <View style={{ flexDirection: "row", marginTop: 8 }}>
+                            <Pressable
+                              style={[
+                                styles.botonAccionSecundario,
+                                { backgroundColor: "#16A34A" },
+                              ]}
+                              onPress={() => prepararAsignarTurno(item)}
+                            >
+                              <MaterialCommunityIcons
+                                name="calendar-plus"
+                                size={12}
+                                color="#FFFFFF"
+                              />
+                              <ThemedText
+                                style={{
+                                  color: "#FFFFFF",
+                                  fontSize: 11,
+                                  fontWeight: "600",
+                                  marginLeft: 4,
+                                }}
+                              >
+                                Asignar Turno
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
 
-                  <View style={styles.panelAccionesJefe}>
-                    {!tieneContratoActivo && (
+                  {/* SECCIÓN 3: DAR DE BAJA AL TRABAJADOR (ABAJO DE AMBOS BLOQUES) */}
+                  {item.activo && (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        paddingTop: 8,
+                        borderTopWidth: 1,
+                        borderTopColor: "#E2E8F0",
+                        borderStyle: "dashed",
+                      }}
+                    >
                       <Pressable
-                        style={[styles.botonAccionAdmin, styles.botonContrato]}
-                        onPress={() => prepararNuevoContrato(item)}
+                        style={styles.botonBajaEmpresa}
+                        onPress={() => {
+                          setTrabajadorSeleccionado(item);
+                          setModalActivo("baja_trabajador");
+                        }}
                       >
-                        <FontAwesome5 name="plus" size={11} color="#FFFFFF" />
-                        <ThemedText style={styles.textoBotonAdmin}>
-                          Alta Contrato
-                        </ThemedText>
-                      </Pressable>
-                    )}
-
-                    {!tieneTurnoAsignado && (
-                      <Pressable
-                        style={[styles.botonAccionAdmin, styles.botonTurno]}
-                        onPress={() => prepararAsignarTurno(item)}
-                      >
-                        <MaterialCommunityIcons
-                          name="calendar-plus"
-                          size={14}
-                          color="#FFFFFF"
+                        <FontAwesome5
+                          name="user-slash"
+                          size={11}
+                          color="#991B1B"
                         />
-                        <ThemedText style={styles.textoBotonAdmin}>
-                          Asignar Turno
+                        <ThemedText style={styles.textoBotonBajaEmpresa}>
+                          Tramitar Baja del Trabajador en Empresa
                         </ThemedText>
                       </Pressable>
-                    )}
-                  </View>
+                    </View>
+                  )}
                 </Card>
               );
             })}
-
-            {plantillaFiltrada.length === 0 && (
-              <ThemedText style={styles.textoVacio}>
-                No hay expedientes disponibles para mostrar.
-              </ThemedText>
-            )}
           </View>
         )}
       </ScrollView>
@@ -574,7 +848,16 @@ export default function PlantillaScreen() {
                   "Alta de Expediente (Trabajador)"}
                 {modalActivo === "nuevo_contrato" &&
                   "Formalizar Contrato Legal"}
+                {modalActivo === "cambiar_contrato" &&
+                  "Modificar Contrato Existente"}
+                {modalActivo === "rescindir_contrato" &&
+                  "Rescindir Contrato Laboral"}
+                {modalActivo === "baja_trabajador" &&
+                  "Tramitar Baja en Empresa"}
                 {modalActivo === "asignar_turno" && "Asignar Turno de Trabajo"}
+                {modalActivo === "reasignar_turno" &&
+                  "Reasignar Turno (Modificación)"}
+                {modalActivo === "eliminar_turno" && "Quitar Turno Asignado"}
               </ThemedText>
               <Pressable onPress={cerrarModales}>
                 <FontAwesome5 name="times" size={18} color="#64748B" />
@@ -681,57 +964,14 @@ export default function PlantillaScreen() {
                 </View>
               )}
 
-              {/* FORMULARIO: ALTA CONTRATO (CON DESPLEGABLE DE CENTROS) */}
-              {modalActivo === "nuevo_contrato" && (
+              {/* FORMULARIO: ALTA / CAMBIO DE CONTRATO */}
+              {(modalActivo === "nuevo_contrato" ||
+                modalActivo === "cambiar_contrato") && (
                 <View>
                   <ThemedText style={styles.subtituloModal}>
                     Trabajador: {trabajadorSeleccionado?.nombre}{" "}
                     {trabajadorSeleccionado?.apellidos}
                   </ThemedText>
-
-                  <View style={styles.campoForm}>
-                    <ThemedText style={styles.labelForm}>
-                      Centro de Trabajo *
-                    </ThemedText>
-                    <View style={styles.contenedorSelectorScroll}>
-                      <ScrollView
-                        style={{ maxHeight: 120 }}
-                        nestedScrollEnabled
-                      >
-                        {centrosTrabajo.map((centro) => {
-                          const seleccionado = centroTrabajoId === centro.id;
-                          return (
-                            <Pressable
-                              key={centro.id}
-                              style={[
-                                styles.opcionSelector,
-                                seleccionado &&
-                                  styles.opcionSelectorSeleccionada,
-                              ]}
-                              onPress={() => setCentroTrabajoId(centro.id)}
-                            >
-                              <ThemedText
-                                style={[
-                                  styles.textoOpcion,
-                                  seleccionado &&
-                                    styles.textoOpcionSeleccionada,
-                                ]}
-                              >
-                                {centro.nombre}
-                              </ThemedText>
-                              {seleccionado && (
-                                <FontAwesome5
-                                  name="check"
-                                  size={12}
-                                  color="#2563EB"
-                                />
-                              )}
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-                  </View>
 
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
@@ -770,7 +1010,12 @@ export default function PlantillaScreen() {
                   <Pressable
                     style={[
                       styles.btnGuardarModal,
-                      { backgroundColor: "#16A34A" },
+                      {
+                        backgroundColor:
+                          modalActivo === "cambiar_contrato"
+                            ? "#2563EB"
+                            : "#16A34A",
+                      },
                     ]}
                     onPress={handleGuardarContrato}
                     disabled={procesando}
@@ -779,69 +1024,223 @@ export default function PlantillaScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={styles.btnGuardarModalTexto}>
-                        Formalizar Alta Contrato
+                        {modalActivo === "cambiar_contrato"
+                          ? "Actualizar Contrato"
+                          : "Formalizar Alta Contrato"}
                       </ThemedText>
                     )}
                   </Pressable>
                 </View>
               )}
 
-              {/* FORMULARIO: ASIGNAR TURNO (CON DESPLEGABLE DE TURNOS) */}
-              {modalActivo === "asignar_turno" && (
+              {/* FORMULARIO: RESCINDIR CONTRATO O BAJA TRABAJADOR */}
+              {(modalActivo === "rescindir_contrato" ||
+                modalActivo === "baja_trabajador") && (
                 <View>
-                  <ThemedText style={styles.subtituloModal}>
-                    Trabajador: {trabajadorSeleccionado?.nombre}{" "}
-                    {trabajadorSeleccionado?.apellidos}
+                  <ThemedText
+                    style={[
+                      styles.subtituloModal,
+                      { color: "#991B1B", marginBottom: 16 },
+                    ]}
+                  >
+                    ¿Está seguro de que desea proceder con esta operación para{" "}
+                    {trabajadorSeleccionado?.nombre}? Esta acción modificará su
+                    estado laboral inmediato.
                   </ThemedText>
-
+                  <Pressable
+                    style={[
+                      styles.btnGuardarModal,
+                      { backgroundColor: "#DC2626" },
+                    ]}
+                    onPress={
+                      modalActivo === "rescindir_contrato"
+                        ? handleGuardarContrato
+                        : handleAltaTrabajadorCompleta
+                    }
+                    disabled={procesando}
+                  >
+                    {procesando ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText style={styles.btnGuardarModalTexto}>
+                        Confirmar Operación
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+              {/* FORMULARIO: ASIGNAR / REASIGNAR TURNO (MULTISELECCIÓN) */}
+              {(modalActivo === "asignar_turno" ||
+                modalActivo === "reasignar_turno") && (
+                <View style={styles.contenedorModal}>
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
-                      Turno Maestro de Empresa *
+                      {modalActivo === "reasignar_turno"
+                        ? "Seleccione los Nuevos Turnos (Puede elegir varios) *"
+                        : "Turnos de la Empresa (Puede elegir varios) *"}
                     </ThemedText>
+
                     <View style={styles.contenedorSelectorScroll}>
                       <ScrollView
-                        style={{ maxHeight: 120 }}
-                        nestedScrollEnabled
+                        style={{ maxHeight: 160 }}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
                       >
-                        {turnosEmpresa.map((turno) => {
-                          const seleccionado = turnoId === turno.id;
-                          return (
-                            <Pressable
-                              key={turno.id}
-                              style={[
-                                styles.opcionSelector,
-                                seleccionado &&
-                                  styles.opcionSelectorSeleccionada,
-                              ]}
-                              onPress={() => setTurnoId(turno.id)}
+                        {turnosEmpresa.length === 0 ? (
+                          <View style={{ padding: 16, alignItems: "center" }}>
+                            <ThemedText
+                              style={{ color: "#6B7280", fontSize: 14 }}
                             >
-                              <ThemedText
+                              No hay turnos disponibles configurados.
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          turnosEmpresa.map((turno: ItemTurno) => {
+                            // NOTA CRÍTICA: Si tus turnos repiten ID entre semanas, usa una clave compuesta única.
+                            // Por ejemplo: const identificadorUnico = `${turno.id}-${turno.fecha O turno.semana}`;
+                            // Si cada objeto en 'turnosEmpresa' ya tiene un ID 100% único global, usa solo 'turno.id'.
+                            const identificadorUnico = turno.id;
+
+                            // Comprobamos si este identificador específico ya está en el array de seleccionados
+                            const seleccionado =
+                              turnosSeleccionados.includes(identificadorUnico);
+
+                            const handleManejarSeleccion = () => {
+                              if (seleccionado) {
+                                // Si ya estaba seleccionado, lo removemos del array
+                                setTurnosSeleccionados(
+                                  turnosSeleccionados.filter(
+                                    (id) => id !== identificadorUnico,
+                                  ),
+                                );
+                              } else {
+                                // Si no estaba, lo agregamos conservando los anteriores
+                                setTurnosSeleccionados([
+                                  ...turnosSeleccionados,
+                                  identificadorUnico,
+                                ]);
+                              }
+                            };
+
+                            return (
+                              <Pressable
+                                key={identificadorUnico}
+                                accessible={true}
+                                accessibilityRole="checkbox" // Cambiado a checkbox porque ahora es selección múltiple
+                                accessibilityState={{ checked: seleccionado }}
+                                accessibilityLabel={`Turno ${turno.nombre}`}
                                 style={[
-                                  styles.textoOpcion,
+                                  styles.opcionSelector,
                                   seleccionado &&
-                                    styles.textoOpcionSeleccionada,
+                                    styles.opcionSelectorSeleccionada,
                                 ]}
+                                onPress={handleManejarSeleccion}
                               >
-                                {turno.nombre}
-                              </ThemedText>
-                              {seleccionado && (
-                                <FontAwesome5
-                                  name="check"
-                                  size={12}
-                                  color="#2563EB"
-                                />
-                              )}
-                            </Pressable>
-                          );
-                        })}
+                                <View style={{ flex: 1 }}>
+                                  <ThemedText
+                                    style={[
+                                      styles.textoOpcion,
+                                      seleccionado &&
+                                        styles.textoOpcionSeleccionada,
+                                    ]}
+                                  >
+                                    {turno.nombre}
+                                  </ThemedText>
+                                  {/* Opcional: Si el objeto trae información de la semana/fecha, muéstrala aquí para diferenciarlos */}
+                                  {turno.fecha_real && (
+                                    <ThemedText
+                                      style={{
+                                        fontSize: 11,
+                                        color: "#6B7280",
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      {turno.fecha_real}
+                                    </ThemedText>
+                                  )}
+                                </View>
+
+                                {seleccionado && (
+                                  <FontAwesome5
+                                    name="check-square" // Icono de checkbox para indicar selección múltiple
+                                    size={16}
+                                    color="#2563EB"
+                                  />
+                                )}
+                              </Pressable>
+                            );
+                          })
+                        )}
                       </ScrollView>
                     </View>
                   </View>
 
+                  {/* BOTONES DE ACCIÓN */}
+                  <View style={styles.contenedorAccionesModal}>
+                    <Pressable
+                      accessible={true}
+                      accessibilityRole="button"
+                      style={styles.btnCancelarModal}
+                      onPress={() => {
+                        setTurnosSeleccionados([]); // Limpiamos la selección al cerrar
+                        setModalActivo(null);
+                      }}
+                      disabled={procesando}
+                    >
+                      <ThemedText style={styles.btnCancelarModalTexto}>
+                        Cancelar
+                      </ThemedText>
+                    </Pressable>
+
+                    <Pressable
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        disabled:
+                          procesando || turnosSeleccionados.length === 0,
+                      }}
+                      style={[
+                        styles.btnGuardarModal,
+                        {
+                          backgroundColor:
+                            modalActivo === "reasignar_turno"
+                              ? "#D946EF"
+                              : "#2563EB",
+                        },
+                        (procesando || turnosSeleccionados.length === 0) && {
+                          opacity: 0.5,
+                        },
+                      ]}
+                      onPress={() => handleAsignarTurnoTrabajador} // Pasamos el array de IDs seleccionados
+                      disabled={procesando || turnosSeleccionados.length === 0}
+                    >
+                      {procesando ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <ThemedText style={styles.btnGuardarModalTexto}>
+                          {modalActivo === "reasignar_turno"
+                            ? `Actualizar (${turnosSeleccionados.length})`
+                            : `Asignar (${turnosSeleccionados.length})`}
+                        </ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* FORMULARIO: ELIMINAR ASIGNACIÓN DE TURNO */}
+              {modalActivo === "eliminar_turno" && (
+                <View>
+                  <ThemedText
+                    style={[styles.subtituloModal, { marginBottom: 16 }]}
+                  >
+                    ¿Desea desvincular los turnos activos de{" "}
+                    {trabajadorSeleccionado?.nombre} para el mes actual?
+                  </ThemedText>
                   <Pressable
                     style={[
                       styles.btnGuardarModal,
-                      { backgroundColor: "#2563EB" },
+                      { backgroundColor: "#EA580C" },
                     ]}
                     onPress={handleAsignarTurnoTrabajador}
                     disabled={procesando}
@@ -850,7 +1249,7 @@ export default function PlantillaScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={styles.btnGuardarModalTexto}>
-                        Asignar Turno
+                        Confirmar Eliminación de Asignación
                       </ThemedText>
                     )}
                   </Pressable>
@@ -1014,11 +1413,66 @@ const styles = StyleSheet.create({
   },
   btnGuardarModal: {
     backgroundColor: "#0F172A",
-    height: 46,
-    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
   btnGuardarModalTexto: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  botonAccionSecundario: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "rgba(0,0,0,0.05)",
+  },
+  botonBajaEmpresa: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  textoBotonBajaEmpresa: {
+    color: "#991B1B",
+    fontSize: 12,
+    fontWeight: "700",
+    marginLeft: 8,
+  },
+  contenedorModal: {
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  tituloModalInterno: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#1F2937", // Un color gris oscuro/negro neutro
+  },
+  contenedorAccionesModal: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 20,
+  },
+  btnCancelarModal: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6", // Fondo gris claro sutil
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnCancelarModalTexto: {
+    color: "#4B5563", // Texto gris oscuro legible
+    fontWeight: "600",
+    fontSize: 14,
+  },
 });
