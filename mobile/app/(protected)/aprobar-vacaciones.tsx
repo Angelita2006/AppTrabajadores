@@ -5,7 +5,15 @@ import {
   ItemAusencia,
   TipoAusencia,
 } from "@/src/modules/ausencias/types/ausencia";
-import { solicitarAusenciaOVacaciones } from "@/src/modules/trabajadores/api/services";
+import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
+import {
+  actualizarEstadoAusencia,
+  getUsuarioByIdTrabajador,
+  obtenerAusenciasYVacacionesEmpresa,
+  obtenerTrabajador,
+  solicitarAusenciaOVacaciones,
+} from "@/src/modules/trabajadores/api/services";
+import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,18 +28,14 @@ import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
-// Interfaz local simulada para los trabajadores que el admin puede seleccionar
-interface TrabajadorSimplificado {
-  id: string;
-  nombre: string;
-}
+type SolicitudConEmpleado = ItemAusencia & {
+  nombre_trabajador: string;
+};
 
 export default function AdminVacacionesScreen() {
   const { empresaSeleccionada } = useSesion();
-  const [solicitudes, setSolicitudes] = useState<ItemAusencia[]>([]);
-  const [trabajadores, setTrabajadores] = useState<TrabajadorSimplificado[]>(
-    [],
-  );
+  const [solicitudes, setSolicitudes] = useState<SolicitudConEmpleado[]>([]);
+  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [cargando, setCargando] = useState(false);
   const [buscandoInicial, setBuscandoInicial] = useState(true);
 
@@ -44,7 +48,6 @@ export default function AdminVacacionesScreen() {
     TipoAusencia.vacaciones,
   );
 
-  // Carga global de datos para el Administrador
   const cargarDatosAdmin = async () => {
     if (!empresaSeleccionada?.id) {
       setBuscandoInicial(false);
@@ -54,20 +57,59 @@ export default function AdminVacacionesScreen() {
     try {
       setBuscandoInicial(true);
 
-      // 1. Cargar todas las ausencias de la empresa (Reemplazar con tu endpoint real)
-      // const todasLasAusencias = await obtenerAusenciasEmpresa(empresaSeleccionada.id);
-      // setSolicitudes(todasLasAusencias || []);
+      // 1. Cargar la lista completa de trabajadores de la empresa
+      const listaTrabajadoresCompleta: Trabajador[] =
+        await obtenerTrabajadoresEmpresa(empresaSeleccionada.id);
 
-      // 2. Cargar lista de trabajadores para el asignador (Reemplazar con tu endpoint real)
-      // const listaTrabajadores = await obtenerTrabajadoresEmpresa(empresaSeleccionada.id);
-      // setTrabajadores(listaTrabajadores || []);
+      // 2. Cargar las ausencias en crudo
+      const ausenciasEnCrudo = await obtenerAusenciasYVacacionesEmpresa(
+        empresaSeleccionada.id,
+      );
 
-      // Mock temporal para que compile perfectamente:
-      setSolicitudes([]);
-      setTrabajadores([
-        { id: "emp-1", nombre: "Juan Pérez" },
-        { id: "emp-2", nombre: "Ana Gómez" },
-      ]);
+      // 3. Cruzar los datos de las ausencias con sus nombres (Para la sección inferior)
+      const solicitudesConEmpleado = await Promise.all(
+        ausenciasEnCrudo.map(async (item: any) => {
+          try {
+            const trabajador = await obtenerTrabajador(item.trabajador_id);
+            return {
+              ...item,
+              nombre_trabajador: `${trabajador.nombre} ${trabajador.apellidos || ""}`,
+            };
+          } catch {
+            return { ...item, nombre_trabajador: "Empleado Desconocido" };
+          }
+        }),
+      );
+      setSolicitudes(solicitudesConEmpleado);
+
+      // 4. FILTRAR TRABAJADORES: Solo dejamos pasar a los que NO sean administradores
+      // Consultamos el usuario/roles de cada trabajador para validar su rol de acceso
+      const soloTrabajadoresOperativos = await Promise.all(
+        listaTrabajadoresCompleta.map(async (t) => {
+          try {
+            // Obtenemos los detalles extendidos del trabajador (o de su usuario vinculado)
+            const detallesUsuario = await getUsuarioByIdTrabajador(t.id);
+
+            // Adaptación de la condición según tu backend:
+            // Opción A: Si tu backend devuelve 'roles' dentro del usuario:
+            const esAdmin = detallesUsuario.tipo_usuario !== "trabajador";
+
+            if (esAdmin) {
+              return null; // Si es admin lo marcamos como null para descartarlo
+            }
+            return t;
+          } catch {
+            return t; // En caso de error de red, lo dejamos por defecto para no romper la UX
+          }
+        }),
+      );
+
+      // Limpiamos los nulos del array filtrado y los asignamos al selector superior
+      setTrabajadores(
+        soloTrabajadoresOperativos.filter((t): t is Trabajador => t !== null),
+      );
+
+      setTrabajadorSeleccionadoId(trabajadores[0].id);
     } catch (error) {
       console.error("Error cargando datos de administración:", error);
     } finally {
@@ -100,10 +142,8 @@ export default function AdminVacacionesScreen() {
   ) => {
     try {
       setCargando(true);
-      // Llamada a tu API para actualizar el estado de la fila
-      // await actualizarEstadoAusencia(ausenciaId, nuevoEstado);
+      await actualizarEstadoAusencia(ausenciaId, nuevoEstado);
 
-      // Actualizar el estado en la interfaz localmente
       setSolicitudes((prev) =>
         prev.map((solicitud) =>
           solicitud.id === ausenciaId
@@ -153,22 +193,33 @@ export default function AdminVacacionesScreen() {
         justificante_metadata: {},
       };
 
-      // Reutiliza tu servicio de creación pasándole el ID del empleado elegido
       const respuestaBackend: AusenciaResponse =
         await solicitarAusenciaOVacaciones(payload);
 
-      const nueva: ItemAusencia = {
+      // Buscamos el nombre en local para no tener que hacer otra llamada a la API
+      const empleadoLocal = trabajadores.find(
+        (t) => t.id === trabajadorSeleccionadoId,
+      );
+      const nombreCompleto = empleadoLocal
+        ? `${empleadoLocal.nombre} ${empleadoLocal.apellidos || ""}`
+        : "Empleado Asignado";
+
+      // Inyectamos el objeto respetando el tipo SolicitudConEmpleado
+      const nueva: SolicitudConEmpleado = {
         id: respuestaBackend.id,
+        trabajador_id: trabajadorSeleccionadoId,
         tipo_ausencia: respuestaBackend.tipo_ausencia,
-        estado: EstadoAusencia.aprobado, // Al ser asignado por el admin, nace aprobado directamente
+        estado: EstadoAusencia.aprobado,
         fecha_inicio: respuestaBackend.fecha_inicio,
         fecha_fin: respuestaBackend.fecha_fin,
         motivo: respuestaBackend.motivo,
+        nombre_trabajador: nombreCompleto, // Añadido para que no rompa TypeScript ni la UI
       };
 
       setSolicitudes([nueva, ...solicitudes]);
       setMotivo("");
       setTrabajadorSeleccionadoId("");
+
       Alert.alert(
         "Asignación Correcta",
         "El periodo se ha registrado y aprobado automáticamente.",
@@ -193,7 +244,7 @@ export default function AdminVacacionesScreen() {
       title="Panel de Control: Vacaciones"
       subtitle="Revisa peticiones de tu equipo o asigna días de vacaciones directamente."
     >
-      {/* Kpis Globales de Gestión */}
+      {/* Globales de Gestión */}
       <Row>
         <StatCard
           label="Por Revisar"
@@ -221,9 +272,7 @@ export default function AdminVacacionesScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            // Atributo nativo exclusivo para Android que suaviza los cortes visuales en los bordes
             fadingEdgeLength={25}
-            // Obliga a que los elementos internos no se queden pegados al inicio/final del scroll
             contentContainerStyle={[
               styles.selectorTrabajadoresContainer,
               { paddingHorizontal: 16 },
@@ -319,9 +368,7 @@ export default function AdminVacacionesScreen() {
           {cargando ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <ThemedText style={styles.submitText}>
-              Asignar y Aprobar Días
-            </ThemedText>
+            <ThemedText style={styles.submitText}>Asignar Días</ThemedText>
           )}
         </Pressable>
       </Card>
@@ -351,9 +398,8 @@ export default function AdminVacacionesScreen() {
                     <ThemedText style={styles.solicitudTipo}>
                       {item.tipo_ausencia.replace(/_/g, " ").toUpperCase()}
                     </ThemedText>
-                    {/* Nota: Si tu backend devuelve el nombre del empleado en ItemAusencia, renderízalo aquí */}
                     <ThemedText style={styles.solicitudEmpleado}>
-                      Solicitado por ID: {item.id}
+                      Solicitado por: {item.nombre_trabajador}
                     </ThemedText>
                   </View>
 
@@ -381,7 +427,6 @@ export default function AdminVacacionesScreen() {
                   {item.motivo}
                 </ThemedText>
 
-                {/* BOTONES DE ACCIÓN PARA EL ADMIN: Sólo visibles si está Pendiente */}
                 {item.estado === EstadoAusencia.pendiente && (
                   <View style={styles.contenedorAcciones}>
                     <Pressable

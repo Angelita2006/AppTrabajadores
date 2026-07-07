@@ -47,6 +47,7 @@ export interface AusenciaResponse {
 
 export interface ItemAusencia {
   id: string;
+  trabajador_id: string;
   tipo_ausencia: TipoAusencia;
   estado: EstadoAusencia;
   fecha_inicio: string;

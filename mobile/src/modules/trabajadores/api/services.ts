@@ -2,6 +2,7 @@ import api from "../../../service/api/api";
 import {
   AusenciaCreateRequest,
   AusenciaResponse,
+  EstadoAusencia,
 } from "../../ausencias/types/ausencia";
 import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
 import {
@@ -77,23 +78,6 @@ export const obtenerTrabajador = async (idTrabajador: string) => {
   const respuesta = await api.get(`/api/trabajadores/${idTrabajador}`);
   return respuesta.data;
 };
-
-// /**
-//  * Registra un nuevo empleado en el backend bajo una estructura Multiempresa.
-//  */
-// export const crearTrabajador = async (data: {
-//   empresa_id: string;
-//   nif_nie: string;
-//   nombre: string;
-//   apellidos: string;
-//   email?: string;
-//   telefono?: string;
-//   numero_seguridad_social?: string;
-//   fecha_nacimiento?: string; // Formato AAAA-MM-DD
-// }) => {
-//   const respuesta = await api.post("/api/trabajadores", data);
-//   return respuesta.data;
-// };
 
 /**
  * Consulta la organización o empresa principal asignada al expediente del empleado.
@@ -648,5 +632,36 @@ export const asignarTurnosTrabajador = async (
   } catch (error) {
     console.error("Error en turnosService.asignarTurnosTrabajador:", error);
     throw error; // Re-lanzamos el error para que el componente pueda manejarlo (ej. mostrar alerta)
+  }
+};
+
+export const obtenerAusenciasYVacacionesEmpresa = async (idEmpresa: string) => {
+  const respuesta = await api.get(`/api/ausencias/empresa/${idEmpresa}`);
+  return respuesta.data;
+};
+
+/**
+ * Envía una petición PUT para actualizar el estado de una ausencia específica.
+ * @param ausenciaId UUID de la solicitud de ausencia.
+ * @param nuevoEstado El estado de tipo EstadoAusencia (pendiente, aprobado, rechazado).
+ */
+export const actualizarEstadoAusencia = async (
+  ausenciaId: string,
+  nuevoEstado: EstadoAusencia,
+): Promise<AusenciaResponse> => {
+  // Nota: Reemplaza 'clienteApi' o 'fetch' por la instancia de axios/fetch que use tu proyecto
+  // Si usas una URL base global configurada, solo necesitas la ruta relativa.
+
+  const url = `/api/ausencias/${ausenciaId}/estado?nuevo_estado=${nuevoEstado}`;
+
+  try {
+    const respuesta = await api.put<AusenciaResponse>(url);
+    return respuesta.data;
+  } catch (error) {
+    console.error(
+      `Error en actualizarEstadoAusencia para el ID ${ausenciaId}:`,
+      error,
+    );
+    throw error;
   }
 };

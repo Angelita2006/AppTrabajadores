@@ -118,3 +118,40 @@ def resolver_solicitud_ausencia(
     db.commit()
     db.refresh(ausencia)
     return ausencia
+
+@router.put("/{id_ausencia}/estado", response_model=AusenciaResponse)
+def actualizar_estado_ausencia(
+    id_ausencia: UUID, 
+    nuevo_estado: str,  # O EstadoAusencia si usas un Enum de Python/SQLAlchemy
+    db: Session = Depends(get_db)
+):
+    """
+    URI: PUT /api/ausencias/{id_ausencia}/estado?nuevo_estado=aprobado
+    Modifica el estado de una solicitud de ausencia (aprobar o rechazar).
+    """
+    # 1. Buscar la ausencia por su ID único
+    ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
+    
+    if not ausencia:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró ninguna solicitud de ausencia con el ID {id_ausencia}."
+        )
+
+    # 2. Actualizar el campo de estado de forma dinámica
+    setattr(ausencia, "estado", nuevo_estado.lower())
+    
+    # Opcional: Si tienes una columna 'updated_at', puedes actualizarla aquí
+    # import datetime
+    # setattr(ausencia, "updated_at", datetime.datetime.now())
+
+    try:
+        db.commit()
+        db.refresh(ausencia)
+        return ausencia
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar el estado de la ausencia: {str(error)}"
+        )

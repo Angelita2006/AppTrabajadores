@@ -42,7 +42,7 @@ export const crearEmpresa = async (data: {
 /**
  * Recupera el listado completo de empleados vinculados a un centro de trabajo específico.
  */
-export const obtenerTrabajadoresEmpresa = async (idEmpresa: number) => {
+export const obtenerTrabajadoresEmpresa = async (idEmpresa: string) => {
   const respuesta = await api.get(`api/empresas/${idEmpresa}/trabajadores`);
   return respuesta.data;
 };

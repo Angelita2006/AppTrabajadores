@@ -1,16 +1,16 @@
 import { create } from "axios";
-// import { Platform } from "react-native";
+import { Platform } from "react-native";
 
 // Detectamos la URL correcta según la plataforma
 const getBaseURL = () => {
-  // if (Platform.OS === "web") {
-  //   return "http://localhost:8080"; // Para el navegador web
-  // }
-  // if (Platform.OS === "android") {
-  //   return "http://10.0.2.2:8080"; // Para el emulador de Android
-  // }
-  return "https://api.registrohorariosimple.es";
-  // return "http://localhost:8080"; // Para iOS (emulador) u otros
+  if (Platform.OS === "web") {
+    return "http://localhost:8080"; // Para el navegador web
+  }
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8080"; // Para el emulador de Android
+  }
+  // return "https://api.registrohorariosimple.es";
+  return "http://localhost:8080"; // Para iOS (emulador) u otros
 };
 
 const api = create({

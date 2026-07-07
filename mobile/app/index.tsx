@@ -43,7 +43,6 @@ export default function RootIndexScreen() {
     setCentroTrabajoActual,
   } = useSesion();
 
-  const esTrabajador = usuarioActual?.tipo_usuario === "trabajador";
   const esAdminGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
   const esAdmin = esAdminGestoria || esAdminEmpresa;
@@ -180,8 +179,6 @@ export default function RootIndexScreen() {
     esAdminGestoria && empresas.length > 1 && !!empresaSeleccionada;
 
   const renderEmpresaSelection = (usuario: typeof usuarioActual) => {
-    const esAdminEmpresaLocal = usuario?.tipo_usuario === "admin_empresa";
-
     return (
       <View style={styles.selectorContainer}>
         <ThemedText style={styles.detailLabel}>
