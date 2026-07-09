@@ -73,8 +73,8 @@ export const CalendarLaboralAnual: React.FC<Props> = ({
 
       let bgColor = COLORS.diaNormal;
       if (festivoEncontrado) {
-        if (festivoEncontrado.tipo === "nacional") bgColor = COLORS.nacional;
-        else if (festivoEncontrado.tipo === "autonomico")
+        if (festivoEncontrado.tipo === "Nacional") bgColor = COLORS.nacional;
+        else if (festivoEncontrado.tipo === "Autonómico")
           bgColor = COLORS.autonomico;
         else bgColor = COLORS.local;
       }

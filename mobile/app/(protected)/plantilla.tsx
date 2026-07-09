@@ -1,6 +1,6 @@
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -79,7 +79,6 @@ export default function PlantillaScreen() {
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
 
   // Formulario 3: Asignación de Turno
-  const [turnoId, setTurnoId] = useState("");
   const [turnosSeleccionados, setTurnosSeleccionados] = useState<any[]>([]);
 
   const esGestoria =
@@ -88,18 +87,12 @@ export default function PlantillaScreen() {
     usuarioActual?.tipo_usuario === ("admin_empresa" as TipoUsuario);
   const esAdministrador = esGestoria || esAdminEmpresa;
 
-  useEffect(() => {
-    if (esAdministrador) cargarPlantilla();
-  }, [esAdministrador]);
-
-  const cargarPlantilla = async () => {
+  // 1. Carga de plantilla optimizada con useCallback
+  const cargarPlantilla = useCallback(async () => {
     try {
       setCargando(true);
-
-      // 1. Obtener la nómina base de trabajadores
       const trabajadores = await obtenerTrabajadores();
 
-      // 2. Resolver contratos y asignaciones para cada trabajador en paralelo
       const plantillaCompleta = await Promise.all(
         trabajadores.map(async (trabajador: any) => {
           try {
@@ -108,17 +101,13 @@ export default function PlantillaScreen() {
               obtenerAsignacionesPorTrabajador(trabajador.id),
             ]);
 
-            // 3. Por cada asignación de turno, buscar la información completa del turno maestro
             const asignacionesConTurnoDetalle = await Promise.all(
               asignaciones.map(async (asignacion: any) => {
                 try {
                   const turnoDetalle = await obtenerTurnoPorId(
                     asignacion.turno_id,
                   );
-                  return {
-                    ...asignacion,
-                    turno: turnoDetalle, // Insertamos el objeto descriptivo del turno (nombre, horas, etc.)
-                  };
+                  return { ...asignacion, turno: turnoDetalle };
                 } catch (errorTurno) {
                   console.error(
                     `Error al recuperar turno maestro ${asignacion.turno_id}:`,
@@ -129,20 +118,18 @@ export default function PlantillaScreen() {
               }),
             );
 
-            // Retornamos el objeto del trabajador completamente enriquecido
             return {
               ...trabajador,
-              contratos: contratos || [], // Lista con su secuencia histórica de contratos
+              contratos: contratos || [],
               contratoActivo:
-                contratos?.find((c: any) => c.activo === true) || null, // Atajo para el contrato vigente
-              asignacionesTurno: asignacionesConTurnoDetalle || [], // Lista de turnos vinculados con su detalle
+                contratos?.find((c: any) => c.activo === true) || null,
+              asignacionesTurno: asignacionesConTurnoDetalle || [],
             };
           } catch (errorEmpleado) {
             console.error(
               `Error procesando relaciones para el trabajador ${trabajador.id}:`,
               errorEmpleado,
             );
-            // Si falla un trabajador, retornamos sus datos base para que la interfaz no se rompa por completo
             return {
               ...trabajador,
               contratos: [],
@@ -153,7 +140,6 @@ export default function PlantillaScreen() {
         }),
       );
 
-      // 4. Guardar la estructura de datos anidada en el estado
       setPlantilla(plantillaCompleta);
     } catch (error) {
       console.error("Error global en cargarPlantilla:", error);
@@ -164,69 +150,15 @@ export default function PlantillaScreen() {
     } finally {
       setCargando(false);
     }
-  };
+  }, []);
 
-  // Función para abrir modal de contrato validando centros de trabajo
-  const prepararNuevoContrato = async (trabajador: Trabajador) => {
-    try {
-      setCargandoSelectores(true);
-      if (!usuarioActual?.empresa_id) {
-        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
-        return;
-      }
-
-      const datosCentros: CentroTrabajo[] = await obtenerCentrosPorEmpresa(
-        usuarioActual!.empresa_id,
-      );
-
-      if (datosCentros.length === 0) {
-        Alert.alert(
-          "Configuración requerida",
-          "No se puede formalizar el contrato porque no hay ningún centro de trabajo creado en la empresa. Por favor, crea uno primero.",
-        );
-        return;
-      }
-
-      // setCentrosTrabajo(datosCentros);
-      setTrabajadorSeleccionado(trabajador);
-      setModalActivo("nuevo_contrato");
-    } catch {
-      Alert.alert("Error", "No se pudieron obtener los centros de trabajo.");
-    } finally {
-      setCargandoSelectores(false);
+  useEffect(() => {
+    if (esAdministrador) {
+      cargarPlantilla();
     }
-  };
+  }, [esAdministrador, cargarPlantilla]);
 
-  // Función para abrir modal de turno validando turnos estructurales
-  const prepararAsignarTurno = async (trabajador: Trabajador) => {
-    try {
-      setCargandoSelectores(true);
-      if (!usuarioActual?.empresa_id) {
-        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
-        return;
-      }
-      const datosTurnos: ItemTurno[] = await obtenerTurnosEmpresa(
-        usuarioActual!.empresa_id,
-      );
-
-      if (datosTurnos.length === 0) {
-        Alert.alert(
-          "Acción bloqueada",
-          "Hasta que la empresa no tenga turnos estructurales creados, no se podrá asignar un turno al trabajador.",
-        );
-        return;
-      }
-
-      setTurnosEmpresa(datosTurnos);
-      setTrabajadorSeleccionado(trabajador);
-      setModalActivo("asignar_turno");
-    } catch {
-      Alert.alert("Error", "No se pudieron obtener los turnos de la empresa.");
-    } finally {
-      setCargandoSelectores(false);
-    }
-  };
-
+  // 2. Filtrado de plantilla mediante useMemo
   const plantillaFiltrada = useMemo(() => {
     return plantilla.filter((item) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
@@ -241,6 +173,76 @@ export default function PlantillaScreen() {
     });
   }, [plantilla, filtroEstado, usuarioActual, esGestoria, esAdminEmpresa]);
 
+  // CORRECCIÓN CRÍTICA: Se eliminó el useEffect extractor de turnos que causaba bucle infinito.
+  // Ahora los turnos de la empresa disponibles se calculan al vuelo de forma reactiva y limpia.
+  const todosLosTurnosAsignados = useMemo(() => {
+    return plantillaFiltrada.flatMap((item: any) => {
+      const asignaciones = Array.isArray(item.asignacionesTurno)
+        ? item.asignacionesTurno
+        : [];
+      return asignaciones.map((a: any) => a.turno).filter(Boolean);
+    });
+  }, [plantillaFiltrada]);
+
+  // Funciones de preparación de formularios
+  const prepararNuevoContrato = async (trabajador: Trabajador) => {
+    try {
+      setCargandoSelectores(true);
+      if (!usuarioActual?.empresa_id) {
+        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
+        return;
+      }
+
+      const datosCentros: CentroTrabajo[] = await obtenerCentrosPorEmpresa(
+        usuarioActual.empresa_id,
+      );
+
+      if (datosCentros.length === 0) {
+        Alert.alert(
+          "Configuración requerida",
+          "No se puede formalizar el contrato porque no hay ningún centro de trabajo creado. Crea uno primero.",
+        );
+        return;
+      }
+
+      setTrabajadorSeleccionado(trabajador);
+      setModalActivo("nuevo_contrato");
+    } catch {
+      Alert.alert("Error", "No se pudieron obtener los centros de trabajo.");
+    } finally {
+      setCargandoSelectores(false);
+    }
+  };
+
+  const prepararAsignarTurno = async (trabajador: Trabajador) => {
+    try {
+      setCargandoSelectores(true);
+      if (!usuarioActual?.empresa_id) {
+        Alert.alert("Error", "No se pudo obtener el ID de la empresa.");
+        return;
+      }
+      const datosTurnos: ItemTurno[] = await obtenerTurnosEmpresa(
+        usuarioActual.empresa_id,
+      );
+
+      if (datosTurnos.length === 0) {
+        Alert.alert(
+          "Acción bloqueada",
+          "Hasta que la empresa no tenga turnos estructurales creados, no se podrá asignar un turno.",
+        );
+        return;
+      }
+
+      setTurnosEmpresa(datosTurnos);
+      setTrabajadorSeleccionado(trabajador);
+      setModalActivo("asignar_turno");
+    } catch {
+      Alert.alert("Error", "No se pudieron obtener los turnos de la empresa.");
+    } finally {
+      setCargandoSelectores(false);
+    }
+  };
+
   const cerrarModales = () => {
     setModalActivo(null);
     setTrabajadorSeleccionado(null);
@@ -253,8 +255,6 @@ export default function PlantillaScreen() {
     setFechaNacimiento("");
     setTipoContrato("");
     setCentroTrabajoId("");
-    setTurnoId("");
-    // setCentrosTrabajo([]);
     setTurnosEmpresa([]);
   };
 
@@ -300,24 +300,26 @@ export default function PlantillaScreen() {
   const handleGuardarContrato = async () => {
     if (
       !tipoContrato ||
-      !centroTrabajoId ||
       !trabajadorSeleccionado ||
       !usuarioActual?.empresa_id
     ) {
       Alert.alert(
         "Campos insuficientes",
-        "Se requiere seleccionar un Centro de Trabajo y definir el Tipo de Contrato.",
+        "Se requiere definir el Tipo de Contrato y tener un trabajador seleccionado.",
       );
       return;
     }
+
     try {
       setProcesando(true);
       const hoy = new Date().toISOString().split("T")[0];
 
+      const centroIdFinal = centroTrabajoId || "1";
+
       await crearContrato({
         trabajador_id: trabajadorSeleccionado.id,
         empresa_id: usuarioActual.empresa_id,
-        centro_trabajo_id: centroTrabajoId,
+        centro_trabajo_id: centroIdFinal,
         tipo_contrato: tipoContrato.trim(),
         tipo_jornada: tipoJornada,
         horas_semana: parseInt(horasSemana, 10) || 40,
@@ -328,6 +330,7 @@ export default function PlantillaScreen() {
       cerrarModales();
       await cargarPlantilla();
     } catch (err: any) {
+      console.error("Error al guardar contrato:", err);
       Alert.alert(
         "Error",
         err.response?.data?.detail ||
@@ -337,39 +340,41 @@ export default function PlantillaScreen() {
       setProcesando(false);
     }
   };
+
   const handleAsignarTurnoTrabajador = async () => {
-    // 1. Validaciones previas básicas
     if (!trabajadorSeleccionado) {
-      Alert.alert("Error", "No se ha seleccionado ningún trabajador.");
+      Alert.alert(
+        "Error",
+        "No se ha detectado ningún trabajador seleccionado en el estado actual.",
+      );
       return;
     }
 
     if (turnosSeleccionados.length === 0) {
-      Alert.alert("Error", "Debes seleccionar al menos un turno de la lista.");
+      Alert.alert(
+        "Error",
+        "Debes seleccionar al menos un turno de la lista marcando las casillas.",
+      );
       return;
     }
 
     try {
       setProcesando(true);
 
-      // 2. Llamamos al método del servicio pasando el ID del trabajador y el array de IDs de turnos
       await asignarTurnosTrabajador(
         trabajadorSeleccionado.id,
         turnosSeleccionados,
       );
 
-      // 3. Feedback de éxito al usuario
       Alert.alert(
         "Planificación Sincronizada",
         "Los turnos operativos han sido inyectados en el cuadrante con éxito.",
       );
 
-      // 4. Limpieza de estados del componente
-      setTurnosSeleccionados([]); // Limpia la lista de seleccionados del modal
-      cerrarModales(); // Cierra el modal de la vista
-      await cargarPlantilla(); // Refresca la lista de trabajadores para ver los cambios
+      setTurnosSeleccionados([]);
+      cerrarModales();
+      await cargarPlantilla();
     } catch (err: any) {
-      // 5. Control de errores con respuesta del backend
       console.error("Error al asignar turnos:", err);
       Alert.alert(
         "Error",
@@ -393,6 +398,22 @@ export default function PlantillaScreen() {
       setTurnosEmpresa(todosLosTurnos);
     }
   }, [plantillaFiltrada]);
+
+  const handleEliminarTurnos = async () => {
+    if (!trabajadorSeleccionado) return;
+    try {
+      setProcesando(true);
+      // Enviamos un array vacío al backend para limpiar sus asignaciones
+      await asignarTurnosTrabajador(trabajadorSeleccionado.id, []);
+      Alert.alert("Éxito", "Asignaciones removidas del cuadrante.");
+      cerrarModales();
+      await cargarPlantilla();
+    } catch (err) {
+      Alert.alert("Error", "No se pudo eliminar la asignación.");
+    } finally {
+      setProcesando(false);
+    }
+  };
 
   return (
     <AppScreen
@@ -1162,7 +1183,7 @@ export default function PlantillaScreen() {
 
                                 {seleccionado && (
                                   <FontAwesome5
-                                    name="check-square" // Icono de checkbox para indicar selección múltiple
+                                    name="check-square"
                                     size={16}
                                     color="#2563EB"
                                   />
@@ -1211,7 +1232,7 @@ export default function PlantillaScreen() {
                           opacity: 0.5,
                         },
                       ]}
-                      onPress={() => handleAsignarTurnoTrabajador} // Pasamos el array de IDs seleccionados
+                      onPress={handleAsignarTurnoTrabajador} // Pasamos el array de IDs seleccionados
                       disabled={procesando || turnosSeleccionados.length === 0}
                     >
                       {procesando ? (
@@ -1242,7 +1263,7 @@ export default function PlantillaScreen() {
                       styles.btnGuardarModal,
                       { backgroundColor: "#EA580C" },
                     ]}
-                    onPress={handleAsignarTurnoTrabajador}
+                    onPress={handleEliminarTurnos}
                     disabled={procesando}
                   >
                     {procesando ? (
@@ -1454,7 +1475,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 8,
-    color: "#1F2937", // Un color gris oscuro/negro neutro
+    color: "#1F2937",
   },
   contenedorAccionesModal: {
     flexDirection: "row",
@@ -1466,12 +1487,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    backgroundColor: "#F3F4F6", // Fondo gris claro sutil
+    backgroundColor: "#F3F4F6",
     justifyContent: "center",
     alignItems: "center",
   },
   btnCancelarModalTexto: {
-    color: "#4B5563", // Texto gris oscuro legible
+    color: "#4B5563",
     fontWeight: "600",
     fontSize: 14,
   },

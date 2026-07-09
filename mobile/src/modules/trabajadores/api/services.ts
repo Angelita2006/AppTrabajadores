@@ -4,7 +4,12 @@ import {
   AusenciaResponse,
   EstadoAusencia,
 } from "../../ausencias/types/ausencia";
-import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
+import {
+  CalendarioFestivo,
+  CalendarioLaboralCreate,
+  CalendarioLaboralResponse,
+  CalendarioLaboralUpdate,
+} from "../../calendarios-laborales/types/calendario";
 import {
   CentroTrabajo,
   CentroTrabajoCreate,
@@ -18,6 +23,11 @@ import {
   RegistroOrganizacionDTO,
   RespuestaRegistroCompleto,
 } from "../../empresas/types/empresa";
+import {
+  Festivo,
+  FestivoCreate,
+  FestivoUpdate,
+} from "../../festivos/types/festivo";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
 import { TurnoCreate } from "../../turnos/types/turno";
 import { UsuarioSesion } from "../types/trabajador";
@@ -662,6 +672,170 @@ export const actualizarEstadoAusencia = async (
       `Error en actualizarEstadoAusencia para el ID ${ausenciaId}:`,
       error,
     );
+    throw error;
+  }
+};
+
+/**
+ * Registra un nuevo calendario laboral en el sistema.
+ * URI: POST /api/calendarios-laborales
+ */
+export const crearCalendarioLaboral = async (
+  payload: CalendarioLaboralCreate,
+): Promise<CalendarioLaboralResponse> => {
+  try {
+    // Reemplaza 'clienteApi' por la instancia de Axios/Fetch que use tu proyecto (ej: api.post)
+    const respuesta = await api.post<CalendarioLaboralResponse>(
+      "/api/calendarios-laborales",
+      payload,
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error("Error en crearCalendarioLaboral:", error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza las propiedades básicas de un calendario laboral (Año, Nombre, Centro).
+ * URI: PUT /api/calendarios-laborales/{id_calendario}
+ */
+export const modificarCalendarioLaboral = async (
+  idCalendario: string,
+  payload: CalendarioLaboralUpdate,
+): Promise<CalendarioLaboralResponse> => {
+  try {
+    const respuesta = await api.put<CalendarioLaboralResponse>(
+      `/api/calendarios-laborales/${idCalendario}`,
+      payload,
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error(
+      `Error en modificarCalendarioLaboral para ID ${idCalendario}:`,
+      error,
+    );
+    throw error;
+  }
+};
+
+/**
+ * Elimina físicamente un calendario laboral de la base de datos por su ID único.
+ * Al eliminarse, la base de datos borrará en cascada todos los días festivos asociados.
+ * URI: DELETE /api/calendarios-laborales/{id_calendario}
+ *
+ * @param idCalendario UUID único del calendario que se desea eliminar.
+ */
+export const eliminarCalendarioLaboral = async (
+  idCalendario: string,
+): Promise<void> => {
+  try {
+    // Reemplaza 'clienteApi' por la instancia de Axios o Fetch configurada en tu app (ej: api.delete)
+    await api.delete(`/api/calendarios-laborales/${idCalendario}`);
+  } catch (error) {
+    console.error(
+      `Error en el servicio eliminarCalendarioLaboral para ID ${idCalendario}:`,
+      error,
+    );
+    throw error;
+  }
+};
+
+/**
+ * Registra un nuevo día festivo en el backend.
+ * POST /api/festivos
+ */
+export const crearFestivo = async (
+  payload: FestivoCreate,
+): Promise<Festivo> => {
+  try {
+    const response = await api.post<Festivo>("/api/festivos", payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error al crear festivo en el servidor:", error);
+    throw error;
+  }
+};
+
+/**
+ * Modifica un festivo existente mediante Query Params (según la firma de tu endpoint en FastAPI).
+ * PUT /api/festivos/{id_festivo}/editar
+ */
+export const editarFestivo = async (
+  idFestivo: string,
+  params: FestivoUpdate,
+): Promise<Festivo> => {
+  try {
+    // Como tu endpoint recibe parámetros opcionales sueltos (Query Params),
+    // los mapeamos usando el objeto `params` de Axios.
+    const response = await api.put<Festivo>(
+      `/api/festivos/${idFestivo}/editar`,
+      null,
+      {
+        params: {
+          nueva_fecha: params.nueva_fecha,
+          nuevo_tipo: params.nuevo_tipo,
+          nueva_descripcion: params.nueva_descripcion,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(
+      `Error al editar festivo ${idFestivo} en el servidor:`,
+      error,
+    );
+    throw error;
+  }
+};
+
+/**
+ * Elimina un día festivo del calendario.
+ * DELETE /api/festivos/{id_festivo}
+ */
+export const eliminarFestivo = async (
+  idFestivo: string,
+): Promise<{ detail: string }> => {
+  try {
+    const response = await api.delete<{ detail: string }>(
+      `/api/festivos/${idFestivo}`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error al eliminar festivo ${idFestivo}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Envía un archivo binario PDF al servidor para ser analizado mediante IA (Gemini)
+ * y persistir automáticamente los días festivos detectados en el calendario indicado.
+ * * URI: POST /api/calendarios-laborales/calendarios/{calendarioId}/importar-pdf
+ * @param calendarioId Identificador único UUID del calendario laboral de destino
+ * @param formData Objeto FormData que contiene el archivo bajo la clave 'file'
+ */
+export const importarCalendarioPDF = async (
+  calendarioId: string,
+  formData: FormData,
+): Promise<{
+  status: string;
+  total_importados: number;
+  festivos: Festivo[];
+}> => {
+  try {
+    const respuesta = await api.post(
+      `/api/calendarios-laborales/calendarios/${calendarioId}/importar-pdf`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 45000,
+      },
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error(`Error en servicio importarCalendarioPDF con Axios:`, error);
     throw error;
   }
 };

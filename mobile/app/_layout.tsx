@@ -112,7 +112,7 @@ function TabsNavigation() {
       <Tabs.Screen
         name="(protected)/empresas"
         options={{
-          title: "Empresas",
+          title: "Empresa",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="briefcase.fill" color={color} />
           ),

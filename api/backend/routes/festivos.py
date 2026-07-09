@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import String
 from sqlalchemy.orm import Session
@@ -94,7 +96,7 @@ def editar_festivo(id_festivo: UUID, nueva_fecha = None, nuevo_tipo = None, nuev
         setattr(festivo, "tipo", nuevo_tipo)
     if nueva_descripcion is not None:
         setattr(festivo, "descripcion", nueva_descripcion)
-    # setattr(festivo, "updated_at", datetime.now())
+    setattr(festivo, "updated_at", datetime.now())
     
     db.commit()
     db.refresh(festivo)

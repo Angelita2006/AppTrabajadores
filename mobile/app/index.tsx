@@ -725,7 +725,7 @@ export default function RootIndexScreen() {
             <ThemedText style={styles.organizationRegisterText}>
               Quiero registrar mi organización / empresa
             </ThemedText>
-          </Pressable>{" "}
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>

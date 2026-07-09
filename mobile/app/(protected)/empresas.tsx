@@ -1,14 +1,27 @@
-import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/calendario";
+import {
+  CalendarioFestivo,
+  CalendarioLaboralCreate,
+  CalendarioLaboralResponse,
+  CalendarioLaboralUpdate,
+} from "@/src/modules/calendarios-laborales/types/calendario";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { obtenerEmpresas } from "@/src/modules/empresas/api/services";
 import { Festivo } from "@/src/modules/festivos/types/festivo";
+import {
+  crearCalendarioLaboral,
+  eliminarCalendarioLaboral,
+  importarCalendarioPDF,
+  modificarCalendarioLaboral,
+} from "@/src/modules/trabajadores/api/services";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,11 +31,12 @@ import {
 import { Empresa } from "../../src/modules/empresas/types/empresa";
 import {
   crearCentroTrabajo,
+  crearFestivo,
   crearTurnoLaboral,
+  editarFestivo,
   guardarDatosEmpresa,
   obtenerCalendarioYFestivos,
   obtenerCentrosPorEmpresa,
-  obtenerTurnosEmpresa,
 } from "../../src/modules/trabajadores/api/services";
 import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { CalendarLaboralAnual } from "../../src/shared/components/calendar";
@@ -38,7 +52,6 @@ export default function EmpresasScreen() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
-  // Estados locales para almacenar listas estructuradas asíncronas
   const [centrosConfigurados, setCentrosConfigurados] = useState<
     CentroTrabajo[]
   >([]);
@@ -49,14 +62,12 @@ export default function EmpresasScreen() {
     CalendarioFestivo[]
   >([]);
 
-  // Pestaña activa de configuración
   const [tabActiva, setTabActiva] = useState<TabConfig>("fiscal");
 
-  // CONTROL DE VISIBILIDAD DE FORMULARIOS
   const [mostrarFormCentro, setMostrarFormCentro] = useState(false);
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false);
 
-  // 1. ESTADOS: Datos Fiscales y Organización
+  // 1. ESTADOS: Datos Fiscales
   const [razonSocialInput, setRazonSocialInput] = useState("");
   const [convenioInput, setConvenioInput] = useState("");
   const [cnaeInput, setCnaeInput] = useState("");
@@ -68,7 +79,7 @@ export default function EmpresasScreen() {
   const [zonaHoraria, setZonaHoraria] = useState("Europe/Madrid");
   const [codigoCcc, setCodigoCcc] = useState("");
 
-  // 3. ESTADOS: Configuración de Turnos Maestros
+  // 3. ESTADOS: Configuración de Turnos
   const [nombreTurno, setNombreTurno] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
@@ -76,14 +87,25 @@ export default function EmpresasScreen() {
 
   // --- ESTADOS PARA CALENDARIO ---
   const [anoNuevoCalendario, setAnoNuevoCalendario] = useState("");
+  const [nombreNuevoCalendario, setNombreNuevoCalendario] = useState("");
+  const [centroNuevoCalendario, setCentroNuevoCalendario] =
+    useState<string>("");
+  const [importandoPdf, setImportandoPdf] = useState(false);
+
   const [calendarioSeleccionado, setCalendarioSeleccionado] =
     useState<CalendarioFestivo | null>(null);
+  const [mostrarEdicionCampos, setMostrarEdicionCampos] = useState(false);
 
-  // Estado para el "Menú Contextual" (Modal)
+  // Estados para la edición/cambio de parámetros de un calendario existente
+  const [editAnio, setEditAnio] = useState("");
+  const [editNombre, setEditNombre] = useState("");
+  const [editCentroId, setEditCentroId] = useState<string | null>(null);
+
+  // Estado para el "Menú Contextual" del día (Modal)
   const [modalVisible, setModalVisible] = useState(false);
   const [diaSeleccionadoCtx, setDiaSeleccionadoCtx] = useState<string | null>(
     null,
-  ); // Guardará "AAAA-MM-DD"
+  );
   const [nuevaDescFestivo, setNuevaDescFestivo] = useState("");
   const [tipoFestivo, setNuevoTipoFestivo] = useState("");
 
@@ -104,26 +126,53 @@ export default function EmpresasScreen() {
       setCnaeInput(empresaSeleccionada.codigo_cnae || "");
       setDireccionInput(empresaSeleccionada.direccion_fiscal || "");
 
-      cargarDatosEstructurales(empresaSeleccionada.id);
+      cargarDatosEmpresa(empresaSeleccionada.id);
     }
   }, [empresaSeleccionada]);
 
-  const cargarDatosEstructurales = async (empresaId: string) => {
+  // Sincronizar el primer centro de trabajo de forma predeterminada
+  useEffect(() => {
+    if (centrosConfigurados && centrosConfigurados.length > 0) {
+      setCentroNuevoCalendario(centrosConfigurados[0].id);
+    } else {
+      setCentroNuevoCalendario("");
+    }
+  }, [centrosConfigurados]);
+
+  // Al cambiar el calendario activo, precargamos sus valores de edición
+  useEffect(() => {
+    if (calendarioSeleccionado) {
+      setEditAnio(String(calendarioSeleccionado.anio));
+      setEditNombre(calendarioSeleccionado.nombre || "");
+      setEditCentroId(calendarioSeleccionado.centro_trabajo_id || null);
+    }
+  }, [calendarioSeleccionado]);
+
+  const cargarDatosEmpresa = async (empresaId: string) => {
     try {
-      const [centros, turnos, dataCalendarios] = await Promise.all([
+      setCargando(true);
+      const [datosCentros, datosCalendarios] = await Promise.all([
         obtenerCentrosPorEmpresa(empresaId),
-        obtenerTurnosEmpresa(empresaId),
         obtenerCalendarioYFestivos(empresaId),
       ]);
-      setCentrosConfigurados(centros || []);
-      setTurnosEstructurales(turnos || []);
-      setCalendarioFestivos(dataCalendarios || []);
+      setCentrosConfigurados(datosCentros);
+      setCalendarioFestivos(datosCalendarios);
 
-      if (dataCalendarios && dataCalendarios.length > 0) {
-        setCalendarioSeleccionado(dataCalendarios[0]);
+      if (datosCalendarios.length > 0) {
+        const primerCalendario: CalendarioFestivo = datosCalendarios[0];
+        setCalendarioSeleccionado(primerCalendario);
+        setEditAnio(primerCalendario.anio.toString());
+        setEditNombre(primerCalendario.nombre || "");
+        setEditCentroId(primerCalendario.centro_trabajo_id || "");
       }
-    } catch {
-      console.warn("Error cargando centros o turnos.");
+    } catch (error) {
+      console.error("Error al cargar datos de empresa:", error);
+      Alert.alert(
+        "Error",
+        "No se pudieron obtener los datos completos de la empresa.",
+      );
+    } finally {
+      setCargando(false);
     }
   };
 
@@ -134,8 +183,7 @@ export default function EmpresasScreen() {
       let empresasPermitidas = esGestoria
         ? todasLasEmpresas
         : todasLasEmpresas.filter(
-            (e: { id: string | null | undefined }) =>
-              e.id === usuarioActual?.empresa_id,
+            (e: any) => e.id === usuarioActual?.empresa_id,
           );
 
       setEmpresas(empresasPermitidas);
@@ -160,7 +208,7 @@ export default function EmpresasScreen() {
     if (!empresaSeleccionada) return;
     try {
       setGuardando(true);
-      guardarDatosEmpresa(
+      await guardarDatosEmpresa(
         empresaSeleccionada.id,
         razonSocialInput.trim(),
         convenioInput.trim(),
@@ -205,7 +253,7 @@ export default function EmpresasScreen() {
       setDireccionCentro("");
       setCodigoCcc("");
       setMostrarFormCentro(false);
-      await cargarDatosEstructurales(empresaSeleccionada.id);
+      await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
       Alert.alert(
         "Error",
@@ -245,7 +293,7 @@ export default function EmpresasScreen() {
       setHoraFin("");
       setDuracionPausa("0");
       setMostrarFormTurno(false);
-      await cargarDatosEstructurales(empresaSeleccionada.id);
+      await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
       Alert.alert(
         "Error",
@@ -258,31 +306,185 @@ export default function EmpresasScreen() {
   };
 
   const handleCrearCalendarioAnual = async () => {
+    if (!centrosConfigurados || centrosConfigurados.length === 0) {
+      Alert.alert(
+        "Acción Bloqueada",
+        "No se puede crear un calendario si la empresa no tiene centros de trabajo.",
+      );
+      return;
+    }
+
     const ano = parseInt(anoNuevoCalendario, 10);
-    if (!ano || isNaN(ano) || !empresaSeleccionada) {
-      Alert.alert("Error", "Introduce un año válido (Ej: 2026)");
+    if (
+      !ano ||
+      isNaN(ano) ||
+      ano < 2020 ||
+      ano > 2100 ||
+      !empresaSeleccionada
+    ) {
+      Alert.alert("Error", "Introduce un año válido entre 2020 y 2100.");
       return;
     }
     try {
       setGuardando(true);
 
-      // NOTA: Aquí deberías hacer un await api.crearCalendario(empresaSeleccionada.id, ano)
-      const nuevoCal: CalendarioFestivo = {
-        id: Math.random().toString(), // Reemplazar por ID real del backend en producción
+      const payload: CalendarioLaboralCreate = {
+        empresa_id: empresaSeleccionada.id,
         anio: ano,
-        festivos: [], // Inicialmente vacío si es nuevo, pero conservará los que añadas
+        nombre: nombreNuevoCalendario.trim() || `Calendario Anual ${ano}`,
+        centro_trabajo_id: centroNuevoCalendario || null,
       };
 
-      const actualizados = [...calendarioFestivos, nuevoCal];
+      const respuestaBackend: CalendarioLaboralResponse =
+        await crearCalendarioLaboral(payload);
+
+      const nuevoCalendarioUI: CalendarioFestivo = {
+        id: respuestaBackend.id,
+        empresa_id: respuestaBackend.empresa_id,
+        centro_trabajo_id: respuestaBackend.centro_trabajo_id ?? "",
+        nombre: respuestaBackend.nombre,
+        anio: respuestaBackend.anio,
+        festivos: [],
+      };
+
+      const actualizados = [...calendarioFestivos, nuevoCalendarioUI];
       setCalendarioFestivos(actualizados);
-      setCalendarioSeleccionado(nuevoCal);
+      setCalendarioSeleccionado(nuevoCalendarioUI);
+
       setAnoNuevoCalendario("");
-      Alert.alert("Éxito", `Calendario para el año ${ano} creado.`);
-    } catch {
-      Alert.alert("Error", "No se pudo crear el calendario.");
+      setNombreNuevoCalendario("");
+      if (centrosConfigurados.length > 0) {
+        setCentroNuevoCalendario(centrosConfigurados[0].id);
+      }
+
+      Alert.alert(
+        "Éxito",
+        `Calendario "${nuevoCalendarioUI.nombre}" registrado en la BD.`,
+      );
+    } catch (error) {
+      console.error(error);
+      Alert.alert(
+        "Error",
+        "No se pudo crear el calendario en la base de datos.",
+      );
     } finally {
       setGuardando(false);
     }
+  };
+
+  const handleModificarCalendarioExistente = async () => {
+    if (!calendarioSeleccionado || !calendarioSeleccionado.id) return;
+    const anioNum = parseInt(editAnio, 10);
+
+    if (!anioNum || isNaN(anioNum) || anioNum < 2020 || anioNum > 2100) {
+      Alert.alert("Error", "Por favor, introduce un año válido (2020-2100).");
+      return;
+    }
+
+    try {
+      setGuardando(true);
+
+      // Si editCentroId es un string vacío o solo espacios, mandamos null para no romper el UUID en el Backend
+      const centroIdFinal =
+        editCentroId && editCentroId.trim() !== "" ? editCentroId.trim() : null;
+
+      const payload: CalendarioLaboralUpdate = {
+        anio: anioNum,
+        nombre: editNombre.trim() || `Calendario Anual ${anioNum}`,
+        centro_trabajo_id: centroIdFinal,
+      };
+
+      const respuestaBackend: CalendarioLaboralResponse =
+        await modificarCalendarioLaboral(calendarioSeleccionado.id, payload);
+
+      // Actualizamos el estado de la lista mapeando de forma limpia
+      const actualizados = calendarioFestivos.map((c) => {
+        if (c.id === calendarioSeleccionado.id) {
+          const modificado: CalendarioFestivo = {
+            ...c,
+            anio: respuestaBackend.anio,
+            nombre: respuestaBackend.nombre,
+            centro_trabajo_id: respuestaBackend.centro_trabajo_id ?? "",
+          };
+          return modificado;
+        }
+        return c;
+      });
+
+      setCalendarioFestivos(actualizados);
+
+      // Sincronizamos el objeto seleccionado actual para que cambie el formulario al instante
+      setCalendarioSeleccionado({
+        ...calendarioSeleccionado,
+        anio: respuestaBackend.anio,
+        nombre: respuestaBackend.nombre,
+        centro_trabajo_id: respuestaBackend.centro_trabajo_id ?? "",
+      });
+
+      setMostrarEdicionCampos(false);
+      Alert.alert("Éxito", "Calendario laboral actualizado de forma correcta.");
+    } catch (error) {
+      console.error("Error al modificar calendario:", error);
+      Alert.alert(
+        "Error",
+        "No se pudieron guardar los cambios del calendario.",
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleEliminarCalendario = async () => {
+    if (!calendarioSeleccionado || !calendarioSeleccionado.id) return;
+
+    Alert.alert(
+      "Confirmar eliminación",
+      "¿Estás seguro de que deseas eliminar por completo este calendario laboral y todos sus días festivos asociados?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setGuardando(true);
+
+              if (!calendarioSeleccionado.id) return;
+
+              // Ejecutamos la petición de borrado en la API externa
+              await eliminarCalendarioLaboral(calendarioSeleccionado.id);
+
+              // Removemos el elemento eliminado del estado local de React
+              const restantes = calendarioFestivos.filter(
+                (c) => c.id !== calendarioSeleccionado.id,
+              );
+              setCalendarioFestivos(restantes);
+
+              // ¡MUY IMPORTANTE!: Limpiamos la selección actual para restablecer la UI
+              if (restantes.length > 0) {
+                setCalendarioSeleccionado(restantes[0]);
+              } else {
+                setCalendarioSeleccionado(null);
+              }
+
+              setMostrarEdicionCampos(false);
+              Alert.alert(
+                "Éxito",
+                "Calendario laboral eliminado correctamente.",
+              );
+            } catch (error) {
+              console.error("Error al eliminar calendario:", error);
+              Alert.alert(
+                "Error",
+                "No se pudo eliminar el calendario laboral de la base de datos.",
+              );
+            } finally {
+              setGuardando(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleGuardarFestivoContextual = async () => {
@@ -290,62 +492,157 @@ export default function EmpresasScreen() {
       !diaSeleccionadoCtx ||
       !nuevaDescFestivo.trim() ||
       !empresaSeleccionada ||
-      !calendarioSeleccionado
+      !calendarioSeleccionado ||
+      !calendarioSeleccionado.id // Necesitamos el ID del calendario para la API
     )
       return;
 
     try {
       setGuardando(true);
 
-      // Formateamos el tipo de festivo de manera limpia (por defecto 'local' si está vacío)
-      const tipoValido: "nacional" | "autonomico" | "local" =
-        tipoFestivo.trim().toLowerCase() === "nacional" ||
-        tipoFestivo.trim().toLowerCase() === "autonómico" ||
-        tipoFestivo.trim().toLowerCase() === "autonomico"
-          ? "autonomico"
-          : tipoFestivo.trim().toLowerCase() === "nacional"
-            ? "nacional"
-            : "local";
+      // Mantenemos la tilde obligatoria "autonómico"
+      const tipoValido: "Nacional" | "Autonómico" | "Local" =
+        tipoFestivo.trim().toLowerCase() === "nacional"
+          ? "Nacional"
+          : tipoFestivo.trim().toLowerCase() === "autonómico"
+            ? "Autonómico"
+            : "Local";
 
-      // --- AQUÍ DEBERÍAS HACER LA LLAMADA A TU BACKEND ---
-      // await guardarFestivoEnBD({
-      //   calendario_id: calendarioSeleccionado.id,
-      //   fecha: diaSeleccionadoCtx,
-      //   descripcion: nuevaDescFestivo,
-      //   tipo: tipoValido
-      // });
+      // 1. Buscamos si el festivo ya existe en el estado local actual
+      const festivoExistente = calendarioSeleccionado.festivos.find(
+        (f) => f.fecha === diaSeleccionadoCtx,
+      );
 
-      // Actualizamos el estado local (Sincronizado con la Estructura Global)
+      let festivoGuardadoBackend: Festivo;
+
+      if (festivoExistente) {
+        // 2. Si YA existe en la base de datos, llamamos a la API de edición mediante Query Params
+        festivoGuardadoBackend = await editarFestivo(festivoExistente.id, {
+          nueva_fecha: diaSeleccionadoCtx,
+          nuevo_tipo: tipoValido,
+          nueva_descripcion: nuevaDescFestivo.trim(),
+        });
+      } else {
+        // 3. Si NO existe, llamamos a la API de creación enviando el body estructurado
+        festivoGuardadoBackend = await crearFestivo({
+          calendario_id: calendarioSeleccionado.id,
+          fecha: diaSeleccionadoCtx,
+          tipo: tipoValido,
+          descripcion: nuevaDescFestivo.trim(),
+        });
+      }
+
+      // 4. Sincronizamos las variables de estado locales de React con los datos reales devueltos por tu API
       const calendariosActualizados = calendarioFestivos.map((cal) => {
         if (cal.id === calendarioSeleccionado.id) {
-          // Comprobar si ya existía para actualizarlo o añadirlo
-          const existeFestivo = cal.festivos.some(
+          const existeFestivoLocal = cal.festivos.some(
             (f) => f.fecha === diaSeleccionadoCtx,
           );
 
-          const nuevosFestivos = existeFestivo
+          // Actualizamos usando una aserción de tipos para evitar problemas si la interfaz externa no lleva tilde
+          const nuevosFestivos = existeFestivoLocal
             ? cal.festivos.map((f) =>
                 f.fecha === diaSeleccionadoCtx
-                  ? {
-                      ...f,
-                      descripcion: nuevaDescFestivo.trim(),
-                      tipo: tipoValido,
-                    }
+                  ? (festivoGuardadoBackend as any)
                   : f,
               )
-            : [
-                ...cal.festivos,
-                {
-                  id: Math.random().toString(), // Reemplazar por ID devuelto por el Backend
-                  fecha: diaSeleccionadoCtx,
-                  descripcion: nuevaDescFestivo.trim(),
-                  tipo: tipoValido,
-                },
-              ];
+            : [...cal.festivos, festivoGuardadoBackend as any];
 
           const objetoActualizado = { ...cal, festivos: nuevosFestivos };
+          setCalendarioSeleccionado(objetoActualizado);
+          return objetoActualizado;
+        }
+        return cal;
+      });
 
-          // Sincronizamos inmediatamente el objeto visualizador activo
+      setCalendarioFestivos(calendariosActualizados as any[]);
+
+      Alert.alert(
+        "Éxito",
+        festivoExistente
+          ? `Festivo modificado correctamente.`
+          : `Festivo registrado el ${diaSeleccionadoCtx}`,
+      );
+
+      // 5. Reseteamos los estados del modal
+      setModalVisible(false);
+      setNuevaDescFestivo("");
+      setNuevoTipoFestivo("");
+      setDiaSeleccionadoCtx(null);
+    } catch (error: any) {
+      // Capturamos el detalle del HTTP HTTPException enviado desde FastAPI si ocurre un error
+      const msgError =
+        error.response?.data?.detail ||
+        "No se pudo sincronizar el festivo en el servidor.";
+      Alert.alert("Error de Sincronización", msgError);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleImportarCalendarioPDF = async () => {
+    if (!calendarioSeleccionado || !calendarioSeleccionado.id) {
+      Alert.alert(
+        "Aviso",
+        "Primero debes seleccionar un calendario laboral para poder importarle los festivos.",
+      );
+      return;
+    }
+
+    try {
+      // 1. Abrir el explorador de archivos nativo filtrando por documentos PDF
+      const resultado = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+        copyToCacheDirectory: true,
+      });
+
+      // Si el usuario cancela, salimos silenciosamente
+      if (
+        resultado.canceled ||
+        !resultado.assets ||
+        resultado.assets.length === 0
+      ) {
+        return;
+      }
+
+      const archivoPdf = resultado.assets[0];
+      setImportandoPdf(true);
+
+      // 2. Empaquetar el archivo con la estructura exacta para React Native
+      const formData = new FormData();
+
+      if (Platform.OS === "web") {
+        // SOLUCIÓN PARA ENTORNO WEB:
+        // Convertimos la URI local (blob:http://...) en un archivo real interpretable por el navegador y Axios
+        const respuestaBlob = await fetch(archivoPdf.uri);
+        const blobReal = await respuestaBlob.blob();
+
+        formData.append("file", blobReal, archivoPdf.name || "calendario.pdf");
+      } else {
+        // SOLUCIÓN PARA ENTORNO MÓVIL (Android/iOS):
+        formData.append("file", {
+          uri: archivoPdf.uri,
+          name: archivoPdf.name || "calendario.pdf",
+          type: "application/pdf",
+        } as any);
+      }
+
+      // 3. INVOCACIÓN AL SERVICIO DESACOPLADO
+      const datosRespuesta = await importarCalendarioPDF(
+        calendarioSeleccionado.id,
+        formData,
+      );
+
+      // 4. Sincronización del estado local de React
+      const festivosNuevos = datosRespuesta.festivos;
+
+      const calendariosActualizados = calendarioFestivos.map((cal: any) => {
+        if (cal.id === calendarioSeleccionado.id) {
+          const objetoActualizado = {
+            ...cal,
+            festivos: [...(cal.festivos || []), ...festivosNuevos],
+          };
+          // Enfocamos de inmediato el calendario modificado
           setCalendarioSeleccionado(objetoActualizado);
           return objetoActualizado;
         }
@@ -354,22 +651,28 @@ export default function EmpresasScreen() {
 
       setCalendarioFestivos(calendariosActualizados);
 
-      Alert.alert("Éxito", `Festivo registrado el ${diaSeleccionadoCtx}`);
-      setModalVisible(false);
-      setNuevaDescFestivo("");
-      setNuevoTipoFestivo("");
-      setDiaSeleccionadoCtx(null);
-    } catch (error) {
       Alert.alert(
-        "Error",
-        "No se pudo sincronizar el festivo en la base de datos.",
+        "Importación Exitosa",
+        `¡Perfecto! Gemini ha analizado el PDF y se han autocompletado automáticamente ${datosRespuesta.total_importados} días festivos en la base de datos.`,
       );
+    } catch (error: any) {
+      console.error(
+        "Error al importar calendario por medio del servicio:",
+        error,
+      );
+
+      // Capturamos el detalle enviado de forma controlada por tu Exception Handler de FastAPI
+      const msgError =
+        error.response?.data?.detail ||
+        error.message ||
+        "No se pudo procesar o extraer el archivo PDF.";
+
+      Alert.alert("Error de Importación", msgError);
     } finally {
-      setGuardando(false);
+      setImportandoPdf(false);
     }
   };
 
-  // Manejador disparado desde el componente modular de calendario
   const handleDayPress = (fechaStr: string, festivoExistente?: Festivo) => {
     setDiaSeleccionadoCtx(fechaStr);
     setNuevaDescFestivo(festivoExistente?.descripcion || "");
@@ -394,6 +697,9 @@ export default function EmpresasScreen() {
       </AppScreen>
     );
   }
+
+  const tieneCentrosValidos =
+    centrosConfigurados && centrosConfigurados.length > 0;
 
   return (
     <AppScreen
@@ -471,75 +777,32 @@ export default function EmpresasScreen() {
 
         {empresaSeleccionada && (
           <View style={styles.contenedorTabs}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              fadingEdgeLength={25}
-            >
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  tabActiva === "fiscal" && styles.tabButtonActivo,
-                ]}
-                onPress={() => setTabActiva("fiscal")}
-              >
-                <ThemedText
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {["fiscal", "centros", "turnos", "calendario"].map((tab) => (
+                <Pressable
+                  key={tab}
                   style={[
-                    styles.tabTexto,
-                    tabActiva === "fiscal" && styles.tabTextoActivo,
+                    styles.tabButton,
+                    tabActiva === tab && styles.tabButtonActivo,
                   ]}
+                  onPress={() => setTabActiva(tab as TabConfig)}
                 >
-                  Fiscal
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  tabActiva === "centros" && styles.tabButtonActivo,
-                ]}
-                onPress={() => setTabActiva("centros")}
-              >
-                <ThemedText
-                  style={[
-                    styles.tabTexto,
-                    tabActiva === "centros" && styles.tabTextoActivo,
-                  ]}
-                >
-                  Centros de Trabajo
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  tabActiva === "turnos" && styles.tabButtonActivo,
-                ]}
-                onPress={() => setTabActiva("turnos")}
-              >
-                <ThemedText
-                  style={[
-                    styles.tabTexto,
-                    tabActiva === "turnos" && styles.tabTextoActivo,
-                  ]}
-                >
-                  Turnos Maestros
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.tabButton,
-                  tabActiva === "calendario" && styles.tabButtonActivo,
-                ]}
-                onPress={() => setTabActiva("calendario")}
-              >
-                <ThemedText
-                  style={[
-                    styles.tabTexto,
-                    tabActiva === "calendario" && styles.tabTextoActivo,
-                  ]}
-                >
-                  Calendario Laboral
-                </ThemedText>
-              </Pressable>
+                  <ThemedText
+                    style={[
+                      styles.tabTexto,
+                      tabActiva === tab && styles.tabTextoActivo,
+                    ]}
+                  >
+                    {tab === "fiscal"
+                      ? "Fiscal"
+                      : tab === "centros"
+                        ? "Centros de Trabajo"
+                        : tab === "turnos"
+                          ? "Turnos Maestros"
+                          : "Calendario Laboral"}
+                  </ThemedText>
+                </Pressable>
+              ))}
             </ScrollView>
           </View>
         )}
@@ -547,7 +810,6 @@ export default function EmpresasScreen() {
         {empresaSeleccionada && (
           <View style={{ marginTop: 14 }}>
             <Card>
-              {/* TAB 1: DATOS FISCALES */}
               {tabActiva === "fiscal" && (
                 <View>
                   <ThemedText style={styles.formularioTitulo}>
@@ -591,7 +853,7 @@ export default function EmpresasScreen() {
                     <TextInput
                       style={styles.inputForm}
                       value={direccionInput}
-                      onChangeText={(text) => setDireccionInput(text)}
+                      onChangeText={setDireccionInput}
                     />
                   </View>
                   <Pressable
@@ -606,7 +868,6 @@ export default function EmpresasScreen() {
                 </View>
               )}
 
-              {/* TAB 2: CENTROS DE TRABAJO */}
               {tabActiva === "centros" && (
                 <View>
                   <Pressable
@@ -626,7 +887,6 @@ export default function EmpresasScreen() {
                         : "＋ Añadir Centro de Trabajo"}
                     </ThemedText>
                   </Pressable>
-
                   {mostrarFormCentro && (
                     <View style={styles.contenedorFormDesplegado}>
                       <ThemedText style={styles.formularioTitulo}>
@@ -640,7 +900,7 @@ export default function EmpresasScreen() {
                           style={styles.inputForm}
                           value={nombreCentro}
                           onChangeText={setNombreCentro}
-                          placeholder="Ej. Sede Principal, Almacén Norte..."
+                          placeholder="Ej. Sede Principal"
                         />
                       </View>
                       <View style={styles.campoFormulario}>
@@ -651,7 +911,6 @@ export default function EmpresasScreen() {
                           style={styles.inputForm}
                           value={direccionCentro}
                           onChangeText={setDireccionCentro}
-                          placeholder="Calle, número y ciudad"
                         />
                       </View>
                       <Row>
@@ -668,7 +927,6 @@ export default function EmpresasScreen() {
                             style={styles.inputForm}
                             value={zonaHoraria}
                             onChangeText={setZonaHoraria}
-                            placeholder="Europe/Madrid"
                           />
                         </View>
                         <View style={[styles.campoFormulario, { flex: 1 }]}>
@@ -680,7 +938,6 @@ export default function EmpresasScreen() {
                             value={codigoCcc}
                             onChangeText={setCodigoCcc}
                             keyboardType="numeric"
-                            placeholder="28123456789"
                           />
                         </View>
                       </Row>
@@ -698,11 +955,9 @@ export default function EmpresasScreen() {
                       </Pressable>
                     </View>
                   )}
-
                   <ThemedText style={styles.subseccionTitulo}>
                     Centros Registrados
                   </ThemedText>
-
                   {centrosConfigurados.length > 0 ? (
                     centrosConfigurados.map((centro: any) => (
                       <View key={centro.id} style={styles.itemListaEstructural}>
@@ -723,7 +978,6 @@ export default function EmpresasScreen() {
                 </View>
               )}
 
-              {/* TAB 3: TURNOS MAESTROS */}
               {tabActiva === "turnos" && (
                 <View>
                   <Pressable
@@ -743,11 +997,10 @@ export default function EmpresasScreen() {
                         : "＋ Crear Turno Estructural"}
                     </ThemedText>
                   </Pressable>
-
                   {mostrarFormTurno && (
                     <View style={styles.contenedorFormDesplegado}>
                       <ThemedText style={styles.formularioTitulo}>
-                        Estructurar Horarios y Turnos de Empresa
+                        Estructurar Horarios y Turnos
                       </ThemedText>
                       <View style={styles.campoFormulario}>
                         <ThemedText style={styles.labelInput}>
@@ -757,7 +1010,6 @@ export default function EmpresasScreen() {
                           style={styles.inputForm}
                           value={nombreTurno}
                           onChangeText={setNombreTurno}
-                          placeholder="Ej: Mañana Rotativo, Intensivo Verano"
                         />
                       </View>
                       <Row>
@@ -768,24 +1020,22 @@ export default function EmpresasScreen() {
                           ]}
                         >
                           <ThemedText style={styles.labelInput}>
-                            Hora Inicio (HH:MM:SS)
+                            Hora Inicio
                           </ThemedText>
                           <TextInput
                             style={styles.inputForm}
                             value={horaInicio}
                             onChangeText={setHoraInicio}
-                            placeholder="06:00:00"
                           />
                         </View>
                         <View style={[styles.campoFormulario, { flex: 1 }]}>
                           <ThemedText style={styles.labelInput}>
-                            Hora Fin (HH:MM:SS)
+                            Hora Fin
                           </ThemedText>
                           <TextInput
                             style={styles.inputForm}
                             value={horaFin}
                             onChangeText={setHoraFin}
-                            placeholder="14:00:00"
                           />
                         </View>
                       </Row>
@@ -798,7 +1048,6 @@ export default function EmpresasScreen() {
                           value={duracionPausa}
                           onChangeText={setDuracionPausa}
                           keyboardType="numeric"
-                          placeholder="30"
                         />
                       </View>
                       <Pressable
@@ -815,11 +1064,9 @@ export default function EmpresasScreen() {
                       </Pressable>
                     </View>
                   )}
-
                   <ThemedText style={styles.subseccionTitulo}>
                     Turnos Estructurales
                   </ThemedText>
-
                   {turnosEstructurales.length > 0 ? (
                     turnosEstructurales.map((turno: any) => (
                       <View key={turno.id} style={styles.itemListaEstructural}>
@@ -827,8 +1074,7 @@ export default function EmpresasScreen() {
                           {turno.nombre}
                         </ThemedText>
                         <ThemedText style={styles.subtextoElementoLista}>
-                          Horario: {turno.hora_inicio} a {turno.hora_fin} (
-                          {turno.duracion_pausa_minutos} min pausa)
+                          Horario: {turno.hora_inicio} a {turno.hora_fin}
                         </ThemedText>
                       </View>
                     ))
@@ -840,85 +1086,240 @@ export default function EmpresasScreen() {
                 </View>
               )}
 
-              {/* TAB 4: CALENDARIO LABORAL DELEGADO AL COMPONENTE EXTERNO */}
+              {/* ======================================================== */}
+              {/* TAB 4: CALENDARIO LABORAL */}
+              {/* ======================================================== */}
               {tabActiva === "calendario" && (
                 <View>
                   <ThemedText style={styles.formularioTitulo}>
                     Gestión de Calendarios Anuales
                   </ThemedText>
 
-                  {/* SECCIÓN CREAR NUEVO AÑO */}
-                  <View style={styles.contenedorFormDesplegado}>
-                    <ThemedText style={styles.labelInput}>
-                      Crear calendario para el año:
-                    </ThemedText>
-                    <View style={{ alignItems: "center", marginBottom: 0 }}>
-                      <Row>
-                        <TextInput
-                          style={[
-                            styles.inputForm,
-                            { flex: 1, marginRight: 10 },
-                          ]}
-                          placeholder="Ej. 2026"
-                          keyboardType="numeric"
-                          value={anoNuevoCalendario}
-                          onChangeText={setAnoNuevoCalendario}
-                        />
-                        <Pressable
-                          style={[
-                            styles.botonGuardar,
-                            { marginTop: 0, paddingHorizontal: 20, height: 44 },
-                          ]}
-                          onPress={handleCrearCalendarioAnual}
+                  <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                    <Pressable
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "#0284C7", // Color azul cielo profesional
+                        paddingVertical: 12,
+                        borderRadius: 8,
+                        opacity: importandoPdf ? 0.6 : 1,
+                        elevation: 2,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 1.41,
+                      }}
+                      onPress={handleImportarCalendarioPDF}
+                      disabled={importandoPdf}
+                    >
+                      {importandoPdf ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <ThemedText
+                          style={{
+                            color: "#FFFFFF",
+                            fontWeight: "700",
+                            fontSize: 14,
+                          }}
                         >
-                          <ThemedText style={styles.textoBotonGuardar}>
-                            ＋ Inicializar
-                          </ThemedText>
-                        </Pressable>
-                      </Row>
-                    </View>
+                          📄 Autocompletar calendario desde PDF (IA)
+                        </ThemedText>
+                      )}
+                    </Pressable>
                   </View>
 
-                  <ThemedText style={styles.subseccionTitulo}>
-                    Calendarios Disponibles
-                  </ThemedText>
+                  <View style={styles.contenedorFormDesplegado}>
+                    <ThemedText style={styles.labelInput}>
+                      1. Centro de Trabajo Destino *
+                    </ThemedText>
 
-                  {/* LISTADO/SELECTOR DE CALENDARIOS GENERADOS */}
-                  {calendarioFestivos.length > 0 ? (
-                    <View style={styles.contenedorFiltroAnual}>
+                    {!tieneCentrosValidos ? (
+                      <View style={styles.bannerError}>
+                        <ThemedText style={styles.textoBannerError}>
+                          ⚠️ No existen centros de trabajo registrados. Dirígete
+                          primero a la pestaña 'Centros de Trabajo' para añadir
+                          al menos uno antes de continuar.
+                        </ThemedText>
+                      </View>
+                    ) : (
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
+                        style={{ marginBottom: 14, marginTop: 4 }}
                       >
-                        {calendarioFestivos.map((cal) => {
-                          const anioString = cal.anio
-                            ? cal.anio.toString()
-                            : "N/A";
-                          const estaSeleccionado =
-                            calendarioSeleccionado?.id === cal.id;
-
+                        {centrosConfigurados.map((centro) => {
+                          const esEsteCentro =
+                            centroNuevoCalendario === centro.id;
                           return (
                             <Pressable
-                              key={cal.id || anioString}
+                              key={centro.id}
                               style={[
                                 styles.chipAno,
-                                estaSeleccionado && styles.chipAnoSeleccionado,
+                                esEsteCentro && { backgroundColor: "#2563EB" },
                               ]}
-                              onPress={() => setCalendarioSeleccionado(cal)}
+                              onPress={() =>
+                                setCentroNuevoCalendario(centro.id)
+                              }
                             >
                               <ThemedText
-                                style={[
-                                  styles.chipAnoTexto,
-                                  estaSeleccionado &&
-                                    styles.chipAnoTextoSeleccionado,
-                                ]}
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "600",
+                                  color: esEsteCentro ? "#FFFFFF" : "#475569",
+                                }}
                               >
-                                Año {anioString}
+                                {centro.nombre} {esEsteCentro ? "✓" : ""}
                               </ThemedText>
                             </Pressable>
                           );
                         })}
                       </ScrollView>
+                    )}
+
+                    <ThemedText style={styles.labelInput}>
+                      2. Identificación del Calendario
+                    </ThemedText>
+
+                    <TextInput
+                      style={[styles.inputForm, { marginBottom: 10 }]}
+                      placeholder="Nombre (Ej: Sede Madrid 2026)"
+                      value={nombreNuevoCalendario}
+                      onChangeText={setNombreNuevoCalendario}
+                      editable={tieneCentrosValidos}
+                    />
+
+                    <Row>
+                      <TextInput
+                        style={[styles.inputForm, { flex: 1, marginRight: 10 }]}
+                        placeholder="Año (Ej. 2026)"
+                        keyboardType="numeric"
+                        maxLength={4}
+                        value={anoNuevoCalendario}
+                        onChangeText={setAnoNuevoCalendario}
+                        editable={tieneCentrosValidos}
+                      />
+                      <Pressable
+                        style={[
+                          styles.botonGuardar,
+                          {
+                            marginTop: 0,
+                            paddingHorizontal: 20,
+                            height: 44,
+                            backgroundColor: !tieneCentrosValidos
+                              ? "#94A3B8"
+                              : "#2563EB",
+                          },
+                        ]}
+                        onPress={handleCrearCalendarioAnual}
+                        disabled={guardando || !tieneCentrosValidos}
+                      >
+                        <ThemedText style={styles.textoBotonGuardar}>
+                          ＋ Inicializar
+                        </ThemedText>
+                      </Pressable>
+                    </Row>
+                  </View>
+
+                  <ThemedText style={styles.subseccionTitulo}>
+                    Calendarios Disponibles
+                  </ThemedText>
+                  {calendarioFestivos.length > 0 ? (
+                    <View>
+                      {/* Contenedor horizontal para scroll de los chips */}
+                      <View style={styles.contenedorFiltroAnual}>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                        >
+                          <Row>
+                            {calendarioFestivos.map(
+                              (cal: CalendarioFestivo) => {
+                                const idDelCentro = cal.centro_trabajo_id;
+
+                                // Buscamos el centro en el estado de la app
+                                const centroAsociado = centrosConfigurados.find(
+                                  (c) => c.id === idDelCentro,
+                                );
+
+                                // Si encontramos el centro ponemos su nombre, si no, es Global
+                                const nombreCentro = centroAsociado?.nombre
+                                  ? centroAsociado.nombre
+                                  : "Global Empresa";
+
+                                // Construimos la etiqueta final de forma limpia sin usar .concat()
+                                const displayLabel = cal.nombre
+                                  ? `${cal.nombre} (${nombreCentro})`
+                                  : `Año ${cal.anio} (${nombreCentro})`;
+                                const estaSeleccionado =
+                                  calendarioSeleccionado?.id === cal.id;
+
+                                return (
+                                  <Pressable
+                                    key={cal.id || cal.anio.toString()}
+                                    style={[
+                                      styles.chipAno,
+                                      estaSeleccionado &&
+                                        styles.chipAnoSeleccionado,
+                                    ]}
+                                    onPress={() => {
+                                      setCalendarioSeleccionado(cal);
+                                      setMostrarEdicionCampos(false);
+                                    }}
+                                  >
+                                    <ThemedText
+                                      style={[
+                                        styles.chipAnoTexto,
+                                        estaSeleccionado &&
+                                          styles.chipAnoTextoSeleccionado,
+                                      ]}
+                                    >
+                                      {displayLabel}
+                                    </ThemedText>
+                                  </Pressable>
+                                );
+                              },
+                            )}
+                          </Row>
+                        </ScrollView>
+                      </View>
+
+                      {/* Botones de acción para el calendario seleccionado */}
+                      <Row>
+                        <Pressable
+                          style={{
+                            backgroundColor: "#475569",
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: 16,
+                            marginRight: 8,
+                          }}
+                          onPress={() => {
+                            setMostrarEdicionCampos(!mostrarEdicionCampos);
+                          }}
+                        >
+                          <ThemedText style={[styles.textoBotonGuardar]}>
+                            ✏️ {mostrarEdicionCampos ? "Cerrar" : "Cambiar"}
+                          </ThemedText>
+                        </Pressable>
+
+                        <Pressable
+                          style={{
+                            backgroundColor: "#EF4444",
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: 16,
+                            marginRight: 8,
+                          }}
+                          onPress={handleEliminarCalendario}
+                          disabled={guardando}
+                        >
+                          <ThemedText style={[styles.textoBotonGuardar]}>
+                            🗑 Borrar
+                          </ThemedText>
+                        </Pressable>
+                      </Row>
                     </View>
                   ) : (
                     <ThemedText style={styles.textoVacio}>
@@ -926,19 +1327,127 @@ export default function EmpresasScreen() {
                     </ThemedText>
                   )}
 
-                  {/* LLAMADA AL COMPONENTE MODULAR REUTILIZABLE */}
                   {calendarioSeleccionado && (
-                    <View style={{ marginTop: 15 }}>
-                      <ThemedText style={styles.cuadranteTitulo}>
-                        Cuadrante Anual: {calendarioSeleccionado.anio}
-                      </ThemedText>
-                      <ThemedText style={styles.ayudaTexto}>
+                    <View
+                      style={{
+                        marginTop: 15,
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 12,
+                      }}
+                    >
+                      {mostrarEdicionCampos && (
+                        <View
+                          style={[
+                            styles.contenedorFormDesplegado,
+                            {
+                              backgroundColor: "#F1F5F9",
+                              borderColor: "#CBD5E1",
+                              width: "100%",
+                              marginTop: 10,
+                            },
+                          ]}
+                        >
+                          <ThemedText
+                            style={[styles.subseccionTitulo, { marginTop: 0 }]}
+                          >
+                            Modificar Información del Calendario
+                          </ThemedText>
+
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Nombre Descriptivo
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={editNombre}
+                              onChangeText={setEditNombre}
+                            />
+                          </View>
+
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Año del Cuadrante
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={editAnio}
+                              onChangeText={setEditAnio}
+                              keyboardType="numeric"
+                              maxLength={4}
+                            />
+                          </View>
+
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Centro de Trabajo Asignado
+                            </ThemedText>
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              style={{ marginTop: 4 }}
+                            >
+                              {centrosConfigurados.map((centro) => {
+                                const esEsteCentro = editCentroId === centro.id;
+                                return (
+                                  <Pressable
+                                    key={centro.id}
+                                    style={[
+                                      styles.chipAno,
+                                      esEsteCentro && {
+                                        backgroundColor: "#0F172A",
+                                      },
+                                    ]}
+                                    onPress={() => setEditCentroId(centro.id)}
+                                  >
+                                    <ThemedText
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: "600",
+                                        color: esEsteCentro
+                                          ? "#FFFFFF"
+                                          : "#475569",
+                                      }}
+                                    >
+                                      {centro.nombre} {esEsteCentro ? "✓" : ""}
+                                    </ThemedText>
+                                  </Pressable>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+
+                          <Pressable
+                            style={[
+                              styles.botonGuardar,
+                              {
+                                backgroundColor: "#0F172A",
+                                height: 40,
+                                marginTop: 5,
+                              },
+                            ]}
+                            onPress={handleModificarCalendarioExistente}
+                            disabled={guardando}
+                          >
+                            <ThemedText style={styles.textoBotonGuardar}>
+                              Guardar Cambios del Calendario
+                            </ThemedText>
+                          </Pressable>
+                        </View>
+                      )}
+
+                      <ThemedText
+                        style={[
+                          styles.ayudaTexto,
+                          { marginTop: 12, alignSelf: "flex-start" },
+                        ]}
+                      >
                         Presiona sobre cualquier día para asignarlo como
                         Festivo/No Laborable.
                       </ThemedText>
 
                       <CalendarLaboralAnual
-                        year={calendarioSeleccionado.anio}
+                        year={Number(calendarioSeleccionado.anio)}
                         festivos={calendarioSeleccionado.festivos}
                         onDayPress={handleDayPress}
                       />
@@ -951,7 +1460,6 @@ export default function EmpresasScreen() {
         )}
       </ScrollView>
 
-      {/* MODAL CONTEXTUAL */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -966,21 +1474,18 @@ export default function EmpresasScreen() {
             <ThemedText style={styles.modalSubtitulo}>
               Fecha seleccionada: {diaSeleccionadoCtx}
             </ThemedText>
-
             <TextInput
               style={[styles.inputForm, { marginTop: 15, marginBottom: 20 }]}
               placeholder="Descripción del festivo (Ej: Año Nuevo)"
               value={nuevaDescFestivo}
               onChangeText={setNuevaDescFestivo}
             />
-
             <TextInput
-              style={[styles.inputForm, { marginTop: 15, marginBottom: 20 }]}
+              style={[styles.inputForm, { marginBottom: 20 }]}
               placeholder="Tipo de festivo (Ej: Autonómico, Nacional, Local)"
               value={tipoFestivo}
               onChangeText={setNuevoTipoFestivo}
             />
-
             <Row>
               <Pressable
                 style={[styles.botonModal, styles.botonModalCancelar]}
@@ -1009,20 +1514,14 @@ export default function EmpresasScreen() {
 }
 
 const styles = StyleSheet.create({
-  contenedorAlerta: {
-    padding: 16,
-  },
+  contenedorAlerta: { padding: 16 },
   titleAlerta: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#EF4444",
     marginBottom: 8,
   },
-  textAlerta: {
-    fontSize: 14,
-    color: "#64748B",
-    lineHeight: 20,
-  },
+  textAlerta: { fontSize: 14, color: "#64748B", lineHeight: 20 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -1030,39 +1529,22 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
-  tarjetaInteractiva: {
-    marginBottom: 10,
-    borderRadius: 8,
-  },
-  tarjetaSeleccionada: {
-    borderWidth: 1.5,
-    borderColor: "#2563EB",
-  },
+  tarjetaInteractiva: { marginBottom: 10, borderRadius: 8 },
+  tarjetaSeleccionada: { borderWidth: 1.5, borderColor: "#2563EB" },
   headerEmpresa: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 4,
   },
-  nombreComercial: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#0F172A",
-  },
+  nombreComercial: { fontSize: 16, fontWeight: "600", color: "#0F172A" },
   badgeCif: {
     backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
   },
-  cifTexto: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#475569",
-  },
-  contenedorTabs: {
-    marginTop: 15,
-    flexDirection: "row",
-  },
+  cifTexto: { fontSize: 12, fontWeight: "bold", color: "#475569" },
+  contenedorTabs: { marginTop: 15, flexDirection: "row" },
   tabButton: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -1070,26 +1552,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#F1F5F9",
     marginRight: 8,
   },
-  tabButtonActivo: {
-    backgroundColor: "#2563EB",
-  },
-  tabTexto: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  tabTextoActivo: {
-    color: "#FFFFFF",
-  },
+  tabButtonActivo: { backgroundColor: "#2563EB" },
+  tabTexto: { fontSize: 13, fontWeight: "600", color: "#64748B" },
+  tabTextoActivo: { color: "#FFFFFF" },
   formularioTitulo: {
     fontSize: 16,
     fontWeight: "700",
     color: "#1E293B",
     marginBottom: 16,
   },
-  campoFormulario: {
-    marginBottom: 14,
-  },
+  campoFormulario: { marginBottom: 14 },
   labelInput: {
     fontSize: 13,
     fontWeight: "600",
@@ -1114,11 +1586,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  textoBotonGuardar: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  textoBotonGuardar: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
   botonAccionHeader: {
     height: 40,
     borderRadius: 6,
@@ -1146,16 +1614,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
-  nombreElementoLista: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  subtextoElementoLista: {
-    fontSize: 12,
-    color: "#64748B",
-    marginTop: 2,
-  },
+  nombreElementoLista: { fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  subtextoElementoLista: { fontSize: 12, color: "#64748B", marginTop: 2 },
   textoVacio: {
     fontSize: 13,
     color: "#94A3B8",
@@ -1163,10 +1623,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 15,
   },
-  contenedorFiltroAnual: {
-    flexDirection: "row",
-    marginBottom: 15,
-  },
+  contenedorFiltroAnual: { flexDirection: "row", marginBottom: 15 },
   chipAno: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -1174,27 +1631,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
     marginRight: 8,
   },
-  chipAnoSeleccionado: {
-    backgroundColor: "#334155",
-  },
-  chipAnoTexto: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#475569",
-  },
-  chipAnoTextoSeleccionado: {
-    color: "#FFFFFF",
-  },
-  cuadranteTitulo: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-  ayudaTexto: {
-    fontSize: 12,
-    color: "#64748B",
-    marginBottom: 14,
-  },
+  chipAnoSeleccionado: { backgroundColor: "#334155" },
+  chipAnoTexto: { fontSize: 12, fontWeight: "600", color: "#475569" },
+  chipAnoTextoSeleccionado: { color: "#FFFFFF" },
+  cuadranteTitulo: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
+  ayudaTexto: { fontSize: 12, color: "#64748B", marginBottom: 14 },
   fondoModal: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -1213,16 +1654,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  modalTitulo: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-  modalSubtitulo: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 4,
-  },
+  modalTitulo: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+  modalSubtitulo: { fontSize: 13, color: "#64748B", marginTop: 4 },
   botonModal: {
     flex: 1,
     height: 42,
@@ -1230,16 +1663,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  botonModalCancelar: {
-    backgroundColor: "#94A3B8",
-    marginRight: 10,
+  botonModalCancelar: { backgroundColor: "#94A3B8", marginRight: 10 },
+  botonModalGuardar: { backgroundColor: "#2563EB" },
+  textoBotonModal: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
+  bannerError: {
+    backgroundColor: "#FEE2E2",
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
   },
-  botonModalGuardar: {
-    backgroundColor: "#2563EB",
-  },
-  textoBotonModal: {
-    color: "#FFFFFF",
-    fontSize: 14,
+  textoBannerError: {
+    color: "#991B1B",
+    fontSize: 13,
     fontWeight: "600",
+    lineHeight: 18,
   },
 });

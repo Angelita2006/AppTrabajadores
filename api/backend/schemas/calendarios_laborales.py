@@ -7,9 +7,17 @@ from schemas.festivos import FestivoResponse2
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
+
+class CalendarioLaboralUpdate(BaseModel):
+    anio: Optional[int] = None
+    nombre: Optional[str] = None
+    centro_trabajo_id: Optional[UUID] = None
+
 class CalendarioConFestivosResponse(BaseModel):
     id: UUID4
+    nombre: Optional[str]
     anio: int
+    centro_trabajo_id: Optional[UUID]
     festivos: List[FestivoResponse2]
 
     class Config:

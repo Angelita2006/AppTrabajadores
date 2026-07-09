@@ -2,6 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
     "types": ["node"],
     "paths": {
       "@/*": ["./*"]
@@ -14,5 +15,6 @@
     "expo-env.d.ts",
     "declarations.d.ts",
     "src/service/api/api.js"
-  ]
+  ],
+  "exclude": ["node_modules", ".expo", "export"]
 }
