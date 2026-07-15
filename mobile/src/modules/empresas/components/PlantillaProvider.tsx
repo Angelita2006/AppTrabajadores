@@ -25,40 +25,38 @@ export const PlantillaProvider = ({
     setCargando(true);
     try {
       const trabajadores = await obtenerTrabajadores();
-      const plantillaCompleta: Trabajador[] = [];
+      const plantillaCompleta = await Promise.all(
+        trabajadores.map(async (trabajador: Trabajador) => {
+          try {
+            const [contratos, asignaciones] = await Promise.all([
+              obtenerContratosPorTrabajador(trabajador.id).catch(() => []),
+              obtenerAsignacionesPorTrabajador(trabajador.id).catch(() => []),
+            ]);
 
-      // Procesamos uno a uno o en grupos pequeños para no saturar la red
-      for (const trabajador of trabajadores) {
-        try {
-          // Obtenemos contratos y asignaciones
-          const [contratos, asignaciones] = await Promise.all([
-            obtenerContratosPorTrabajador(trabajador.id).catch(() => []),
-            obtenerAsignacionesPorTrabajador(trabajador.id).catch(() => []),
-          ]);
+            const asignacionesConTurno = await Promise.all(
+              asignaciones.map(async (asig: AsignacionTurno) => {
+                const turnoDetalle = await obtenerTurnoPorId(asig.turno_id);
+                return { ...asig, turno: turnoDetalle };
+              }),
+            );
 
-          // Mapeamos los turnos con detalle
-          const asignacionesConTurno = await Promise.all(
-            asignaciones.map(async (asig: AsignacionTurno) => {
-              const turnoDetalle = await obtenerTurnoPorId(asig.turno_id).catch(
-                () => null,
-              );
-              return { ...asig, turno: turnoDetalle };
-            }),
-          );
+            return {
+              ...trabajador,
+              contratos: contratos || [],
+              contratoActivo:
+                contratos?.find((c: Contrato) => c.activo === true) || null,
+              asignacionesTurno: asignacionesConTurno,
+            };
+          } catch (err) {
+            console.error(`Error procesando trabajador ${trabajador.id}:`, err);
+            return null;
+          }
+        }),
+      );
 
-          plantillaCompleta.push({
-            ...trabajador,
-            contratos: contratos || [],
-            contratoActivo:
-              contratos?.find((c: Contrato) => c.activo === true) || null,
-            asignacionesTurno: asignacionesConTurno,
-          });
-        } catch (err) {
-          console.error(`Error procesando trabajador ${trabajador.id}:`, err);
-        }
-      }
-
-      setPlantilla(plantillaCompleta);
+      setPlantilla(
+        plantillaCompleta.filter((t): t is Trabajador => t !== null),
+      );
       setInicializado(true);
     } catch (e) {
       console.error("Error crítico de carga:", e);

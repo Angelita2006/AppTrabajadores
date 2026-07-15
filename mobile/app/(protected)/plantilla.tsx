@@ -61,18 +61,18 @@ export default function PlantillaWrapper() {
 }
 
 function PlantillaScreen() {
-  const { usuarioActual } = useSesion(); // 1. Usamos el contexto del Provider como única fuente de verdad
+  const { usuarioActual } = useSesion();
   const { plantilla, cargando, cargarPlantilla, inicializado } = usePlantilla();
 
   const [procesando, setProcesando] = useState(false);
-  const [filtroEstado] = useState<"todos" | "altas">("todos"); // Listados para selectores
+  const [filtroEstado] = useState<"todos" | "altas">("todos");
 
   const [turnosEmpresa, setTurnosEmpresa] = useState<ItemTurno[]>([]);
-  const [cargandoSelectores, setCargandoSelectores] = useState(false); // Control de Modales
+  const [cargandoSelectores, setCargandoSelectores] = useState(false);
 
   const [modalActivo, setModalActivo] = useState<TipoModal>(null);
   const [trabajadorSeleccionado, setTrabajadorSeleccionado] =
-    useState<Trabajador | null>(null); // Formulario de Trabajador
+    useState<Trabajador | null>(null);
 
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
@@ -102,9 +102,9 @@ function PlantillaScreen() {
   const [turnosSeleccionados, setTurnosSeleccionados] = useState<any[]>([]);
 
   const esGestoria =
-    usuarioActual?.tipo_usuario === ("admin_gestoria" as TipoUsuario);
+    usuarioActual?.tipo_usuario === ("Admin_gestoría" as TipoUsuario);
   const esAdminEmpresa =
-    usuarioActual?.tipo_usuario === ("admin_empresa" as TipoUsuario);
+    usuarioActual?.tipo_usuario === ("Admin_empresa" as TipoUsuario);
   const esAdministrador = esGestoria || esAdminEmpresa;
 
   useEffect(() => {
@@ -207,7 +207,7 @@ function PlantillaScreen() {
           : undefined,
       });
       cerrarModales();
-      await cargarPlantilla(); // El Provider gestiona la actualización
+      await cargarPlantilla();
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -315,13 +315,10 @@ function PlantillaScreen() {
     tipo: TipoModal,
     trabajador: Trabajador | null = null,
   ) => {
-    // 1. Limpieza forzada de todos los estados de formulario
     cerrarModales();
 
-    // 2. Establecer el trabajador si es necesario
     setTrabajadorSeleccionado(trabajador);
 
-    // 3. Abrir modal
     setModalActivo(tipo);
     if (tipo == "editar_contrato") {
       abrirEdicionContrato();
