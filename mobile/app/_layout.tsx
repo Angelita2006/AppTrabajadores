@@ -42,8 +42,8 @@ function TabsNavigation() {
 
   // Escudo de control horario: Evaluamos si el perfil cuenta con rango directivo
   const esAdmin =
-    usuarioActual?.tipo_usuario === ("admin_empresa" as TipoUsuario) ||
-    usuarioActual?.tipo_usuario === ("admin_gestoria" as TipoUsuario);
+    usuarioActual?.tipo_usuario === ("Admin_empresa" as TipoUsuario) ||
+    usuarioActual?.tipo_usuario === ("Admin_gestoría" as TipoUsuario);
 
   return (
     <Tabs

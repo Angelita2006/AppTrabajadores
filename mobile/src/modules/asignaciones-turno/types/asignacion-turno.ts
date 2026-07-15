@@ -1,5 +1,5 @@
 import { Trabajador } from "../../trabajadores/types/trabajador";
-import { Turno } from "../../turnos/types/turno";
+import { ItemTurno } from "../../turnos/types/turno";
 
 /**
  * Representa el cuadrante temporal asignado al empleado (Tabla: asignaciones_turno)
@@ -12,7 +12,6 @@ export interface AsignacionTurno {
   fecha_inicio: string; // Formato AAAA-MM-DD
   fecha_fin?: string | null; // NULL si es indefinido o indefinido temporal
   created_at: string;
-  // Objetos anidados opcionales cargados mediante relaciones (relationship) de SQLAlchemy
-  turno?: Turno | null;
+  turno?: ItemTurno | null;
   trabajador?: Trabajador | null;
 }

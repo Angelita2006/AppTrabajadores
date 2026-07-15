@@ -6,7 +6,7 @@ from uuid import UUID
 from core.database import get_db
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
-from schemas.centros_trabajo import CentroTrabajoCreate, CentroTrabajoResponse
+from schemas.centros_trabajo import CentroTrabajoCreate, CentroTrabajoResponse, CentroTrabajoUpdate
 
 router = APIRouter(prefix="/api/centros-trabajo", tags=["Centros de Trabajo"])
 
@@ -104,6 +104,30 @@ def cambiar_estado_centro(id_centro: UUID, activo: bool, db: Session = Depends(g
     db.refresh(centro)
     return centro
 
+@router.put("/{id_centro}/editar", response_model=CentroTrabajoResponse)
+def editar_centro(id_centro: UUID, nuevos_datos: CentroTrabajoUpdate, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/centros-trabajo/{id_centro}/editar
+    Permite editar los datos del centro de trabajo.
+    """
+    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
+    if not centro:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
+        )
+    
+    setattr(centro, "nombre", nuevos_datos.nombre)
+    setattr(centro, "zona_horaria", nuevos_datos.zona_horaria)
+    setattr(centro, "activo", nuevos_datos.activo)
+    setattr(centro, "codigo_cc", nuevos_datos.codigo_ccc)
+    setattr(centro, "direccion", nuevos_datos.direccion)
+    setattr(centro, "updated_at", datetime.now())
+    
+    db.commit()
+    db.refresh(centro)
+    return centro
+
 @router.delete("/{id_centro}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_centro_trabajo(id_centro: UUID, db: Session = Depends(get_db)):
     """
@@ -120,7 +144,6 @@ def eliminar_centro_trabajo(id_centro: UUID, db: Session = Depends(get_db)):
     try:
         db.delete(centro)
         db.commit()
-        # Al usar 204 NO CONTENT no se devuelve ningún cuerpo (body)
         return
     except Exception as error:
         db.rollback()

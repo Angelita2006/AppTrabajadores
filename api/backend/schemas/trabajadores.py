@@ -44,7 +44,6 @@ class TrabajadorResponse(TrabajadorBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
     
-    # Propiedades complementarias opcionales expuestas en el JSON
     email: Optional[EmailStr] = Field(None)
     telefono: Optional[str] = Field(None)
     numero_seguridad_social: Optional[str] = Field(None)
@@ -52,5 +51,4 @@ class TrabajadorResponse(TrabajadorBase):
     fecha_baja_empresa: Optional[datetime.date] = Field(None, description="Fecha de baja del empleado si aplica")
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

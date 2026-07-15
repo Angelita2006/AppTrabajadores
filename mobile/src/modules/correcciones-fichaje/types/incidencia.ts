@@ -1,9 +1,9 @@
 // ENUMS COMPATIBLES
-export type TipoCorreccion = "alta_manual" | "modificacion" | "anulacion";
+export type TipoCorreccion = "Alta_manual" | "Modificación" | "Anulación";
 export enum EstadoCorreccion {
-  pendiente = "pendiente",
-  aprobada = "aprobada",
-  rechazada = "rechazada",
+  pendiente = "Pendiente",
+  aprobada = "Aprobada",
+  rechazada = "Rechazada",
 }
 
 /** Payload exacto para 'CorreccionFichajeCreate' */

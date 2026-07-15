@@ -4,6 +4,6 @@ export type Vacacion = {
   idEmpresa: number;
   fechaInicio: string;
   fechaFin: string;
-  estado: "pendiente" | "aprobada" | "rechazada";
+  estado: "Pendiente" | "Aprobada" | "Rechazada";
   motivo: string;
 };

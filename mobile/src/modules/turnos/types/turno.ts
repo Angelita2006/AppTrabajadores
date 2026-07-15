@@ -11,8 +11,10 @@ export interface ItemTurno {
   minutos_pausa_obligatoria: number; // Minutos de descanso reglamentarios
   color_hex?: string | null; // Color identificativo para pintar el calendario de la UI
   fecha_real: string;
-  diasSemana: string;
+  dias_semana: number[];
   tipo_jornada: string;
+  fecha_asignacion_inicio: string;
+  fecha_asignacion_fin: string;
 }
 
 export interface TurnoCreate {

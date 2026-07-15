@@ -51,7 +51,7 @@ def solicitar_correccion(obj_in: CorreccionFichajeCreate, db: Session = Depends(
         solicitado_por_usuario_id=obj_in.solicitado_por_usuario_id,
         fichaje_afectado_id=obj_in.fichaje_afectado_id,
         valor_anterior=obj_in.valor_anterior,
-        estado=EstadoCorreccionEnum.PENDIENTE # Forzado por seguridad en la API
+        estado=EstadoCorreccionEnum.PENDIENTE
     )
 
     db.add(nueva_correccion)

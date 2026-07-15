@@ -6,7 +6,7 @@ import {
 } from "@/src/modules/fichajes/types/registrofichaje";
 import {
   obtenerAsignacionesTurnoTrabajador,
-  obtenerFichajesSemanaActual,
+  obtenerFichajesTurnoActual,
 } from "@/src/modules/trabajadores/api/services";
 import { useSesion } from "@/src/modules/trabajadores/store/SesionContext";
 import { obtenerTurno } from "@/src/modules/turnos/services/services";
@@ -23,21 +23,10 @@ import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 // Modifica esta función si tu backend devuelve los días laborables en otro formato.
 const cumpleDiasSemana = (
   fecha: Date,
-  diasPermitidosStr: string = "LMXJV",
+  diasPermitidosStr: number[],
 ): boolean => {
   const diaSemana = fecha.getDay();
-  const mapeo: { [key: number]: string } = {
-    1: "L", // Lunes
-    2: "M", // Martes
-    3: "X", // Miércoles
-    4: "J", // Jueves
-    5: "V", // Viernes
-    6: "S", // Sábado
-    0: "D", // Domingo
-  };
-
-  const letraDia = mapeo[diaSemana];
-  return diasPermitidosStr.toUpperCase().includes(letraDia);
+  return diasPermitidosStr.includes(diaSemana);
 };
 
 export default function HorariosScreen() {
@@ -65,9 +54,23 @@ export default function HorariosScreen() {
           );
 
         // 2. Descargamos el historial de marcajes
-        const todosLosFichajes = await obtenerFichajesSemanaActual(
+        // const todosLosFichajes = await obtenerFichajesSemanaActual(
+        //   usuarioActual!.trabajador_id,
+        // );
+        const todosLosFichajes = await obtenerFichajesTurnoActual(
           usuarioActual!.trabajador_id,
         );
+
+        // todosLosFichajes.forEach((f) => {
+        //   alert(
+        //     "Fichaje: " +
+        //       f.tipo_evento.toString() +
+        //       " Hora: " +
+        //       f.fecha_hora +
+        //       " Turno: " +
+        //       f.turno_nombre,
+        //   );
+        // });
 
         const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
           (f: any) => ({
@@ -83,6 +86,7 @@ export default function HorariosScreen() {
             metodo_fichaje: f.metodo_fichaje ?? "",
           }),
         );
+        // alert(fichajesFormateados.length);
 
         setFichajesRealizados(fichajesFormateados);
 
@@ -106,7 +110,9 @@ export default function HorariosScreen() {
 
             // Asumimos que el turno o asignación puede traer una cadena de días laborables (ej: "LMXJV")
             // Si tu base de datos usa otro campo, reemplaza `turno.dias_semana` por el correcto.
-            const diasLaborables = (turno as ItemTurno).diasSemana || "LMXJV";
+            const diasLaborables = (turno as ItemTurno).dias_semana || [
+              1, 2, 3, 4, 5,
+            ];
 
             let fechaCursor = new Date(fecha_inicio);
 
@@ -128,8 +134,10 @@ export default function HorariosScreen() {
                   minutos_pausa_obligatoria: turno.minutos_pausa_obligatoria,
                   color_hex: turno.color_hex || "#2563EB",
                   fecha_real: fechaInstanteActual.toISOString().split("T")[0],
-                  diasSemana: diasLaborables,
+                  dias_semana: diasLaborables,
                   tipo_jornada: turno.tipo_jornada,
+                  fecha_asignacion_inicio: turno.fecha_asignacion_inicio,
+                  fecha_asignacion_fin: turno.fecha_asignacion_fin,
                 };
 
                 turnos.push(itemTurno);
@@ -141,13 +149,14 @@ export default function HorariosScreen() {
           }
         }
 
-        // Ordenar cuadrante cronológicamente
         turnos.sort((a, b) => {
           if (a.fecha_real !== b.fecha_real) {
             return a.fecha_real.localeCompare(b.fecha_real);
           }
           return a.hora_inicio.localeCompare(b.hora_inicio);
         });
+
+        // alert(turnos.length);
 
         setCuadrante(turnos);
       } catch (error) {
@@ -165,13 +174,11 @@ export default function HorariosScreen() {
     }
   }, [usuarioActual]);
 
-  // ... El resto de tu render (return) y estilos se mantienen exactamente igual
   return (
     <AppScreen
       title="Mi Planificación"
       subtitle={`Calendario oficial asignado por: ${empresaSeleccionada?.nombre_comercial ?? "Tu Organización"}`}
     >
-      {/* Tu JSX actual intacto */}
       <Row>
         <StatCard label="Turnos Vigentes" value={cuadrante.length.toString()} />
         <StatCard
@@ -220,16 +227,41 @@ export default function HorariosScreen() {
               return aMinutos(horaLimpia);
             };
 
+            // fichajesRealizados.forEach((f) => {
+            //   alert(
+            //     "Fichaje: " +
+            //       f.tipo_evento.toString() +
+            //       " Hora: " +
+            //       f.fecha_hora +
+            //       " Turno: " +
+            //       f.turno_nombre,
+            //   );
+            // });
+
             const marcajesDelDia = fichajesRealizados.filter((fichaje) => {
-              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
+              // alert("Estado del fichaje: " + fichaje.estado);
+              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0) {
+                // alert("No pasó");
                 return false;
+              }
               const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
-              if (fechaFichajeStr !== fechaRealStr) return false;
+              if (fechaFichajeStr !== fechaRealStr) {
+                // alert(
+                //   "Fecha fichaje: " +
+                //     fechaFichajeStr +
+                //     " Fecha real: " +
+                //     fechaRealStr +
+                //     " No pasó",
+                // );
+                return false;
+              }
 
               const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
-              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA")
+              // alert("Tipo de fichaje: " + tipoEventoStr);
+              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA") {
+                // alert("No pasó");
                 return false;
-
+              }
               let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
               if (esNocturno && minsFichaje < limiteInferiorMins) {
                 minsFichaje += 24 * 60;
@@ -240,6 +272,8 @@ export default function HorariosScreen() {
                 minsFichaje <= limiteSuperiorMins
               );
             });
+
+            // alert(fichajesRealizados.length);
 
             marcajesDelDia.sort(
               (a, b) =>

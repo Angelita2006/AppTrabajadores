@@ -20,7 +20,7 @@ class PoliticasRetencion(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text('gen_random_uuid()'))
     anios_conservacion: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text('4'))
-    accion_tras_periodo: Mapped[AccionRetencionEnum] = mapped_column(Enum(AccionRetencionEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_retencion_enum'), nullable=False, server_default=text("'archivar'::accion_retencion_enum"))
+    accion_tras_periodo: Mapped[AccionRetencionEnum] = mapped_column(Enum(AccionRetencionEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_retencion_enum'), nullable=False, server_default=text("'Archivar'::accion_retencion_enum"))
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='politicas_retencion') # type: ignore

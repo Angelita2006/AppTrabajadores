@@ -4,7 +4,7 @@ from typing import List
 from uuid import UUID
 from core.database import get_db
 from models.empresas import Empresas
-from schemas.turnos import TurnoCreate, TurnoResponse
+from schemas.turnos import TurnoCreate, TurnoResponse, TurnoUpdate
 from models.turnos import Turnos
 
 router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
@@ -31,7 +31,7 @@ def crear_turno_laboral(obj_in: TurnoCreate, db: Session = Depends(get_db)):
             hora_inicio=obj_in.hora_inicio,
             hora_fin=obj_in.hora_fin,
             duracion_pausa_minutos=obj_in.duracion_pausa_minutos,
-            dias_semana=obj_in.dias_semana  # Se inyecta la lista de enteros directo a la columna ARRAY
+            dias_semana=obj_in.dias_semana 
         )
         
         db.add(nuevo_turno)
@@ -82,10 +82,10 @@ def obtener_turno_laboral(id_turno: UUID, db: Session = Depends(get_db)):
     return turno
 
 @router.put("/{id_turno}/editar", response_model=TurnoResponse)
-def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_duracion_pausa_min = None, db: Session = Depends(get_db)):
+def editar_turno(id_turno: UUID, obj_in: TurnoUpdate, db: Session = Depends(get_db)):
     """
     URI: PUT /api/turnos/{id_turno}/editar
-    Modifica los datos de un turno como el nombre, la duración de pausa en minutos y los días de la semana.
+    Modifica cualquier propiedad de un turno, incluyendo horas y días de la semana.
     """
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     
@@ -95,11 +95,13 @@ def editar_turno(id_turno: UUID, nuevo_nombre = None, nueva_duracion_pausa_min =
             detail=f"No se ha encontrado ningún turno con el ID {id_turno}."
         )
     
-    if nuevo_nombre is not None:
-        setattr(turno, "nombre", nuevo_nombre)
-    if nueva_duracion_pausa_min is not None:
-        setattr(turno, "duracion_pausa_minutos", nueva_duracion_pausa_min)
-    # setattr(empresa, "updated_at", datetime.now())
+    # Obtenemos los datos enviados en el body y los convertimos a diccionario
+    update_data = obj_in.dict(exclude_unset=True)
+    
+    # Actualizamos dinámicamente los campos
+    for key, value in update_data.items():
+        if hasattr(turno, key):
+            setattr(turno, key, value)
     
     db.commit()
     db.refresh(turno)

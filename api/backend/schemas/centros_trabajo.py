@@ -25,6 +25,19 @@ class CentroTrabajoCreate(CentroTrabajoBase):
     codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización a la Seguridad Social")
     direccion: Optional[str] = Field(None, description="Dirección postal o física del centro")
 
+class CentroTrabajoUpdate(BaseModel):
+    """
+    Esquema para la actualización parcial de un centro de trabajo.
+    Todos los campos son opcionales para permitir actualizaciones 'patch'.
+    """
+    nombre: Optional[str] = Field(None, max_length=255, description="Nuevo nombre del centro")
+    zona_horaria: Optional[str] = Field(None, max_length=50, description="Nueva zona horaria")
+    activo: Optional[bool] = Field(None, description="Cambiar estado operativo del centro")
+    codigo_ccc: Optional[str] = Field(None, max_length=20, description="Actualizar código CCC")
+    direccion: Optional[str] = Field(None, description="Actualizar dirección postal")
+
+    class Config:
+        from_attributes = True
 
 class CentroTrabajoResponse(CentroTrabajoBase):
     """

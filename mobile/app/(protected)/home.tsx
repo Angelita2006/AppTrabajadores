@@ -261,7 +261,7 @@ export default function HomeScreen() {
         empresa_id: empresaSeleccionada.id,
         centro_trabajo_id: centroTrabajoActual.id,
         tipo_evento_id: tipoLabel,
-        metodo_fichaje: Platform.OS === "web" ? "web" : "app_movil",
+        metodo_fichaje: Platform.OS === "web" ? "Web" : "App_movil",
         fecha_hora_dispositivo: fechaHoraAjustada,
         observaciones:
           tipoLabel === "ENTRADA"

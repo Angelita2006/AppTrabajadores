@@ -30,7 +30,7 @@ class CorreccionesFichaje(Base):
     valor_nuevo: Mapped[dict] = mapped_column(JSONB, nullable=False)
     motivo: Mapped[str] = mapped_column(Text, nullable=False)
     solicitado_por_usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    estado: Mapped[EstadoCorreccionEnum] = mapped_column(Enum(EstadoCorreccionEnum, values_callable=lambda cls: [member.value for member in cls], name='estado_correccion_enum'), nullable=False, server_default=text("'pendiente'::estado_correccion_enum"))
+    estado: Mapped[EstadoCorreccionEnum] = mapped_column(Enum(EstadoCorreccionEnum, values_callable=lambda cls: [member.value for member in cls], name='estado_correccion_enum'), nullable=False, server_default=text("'Pendiente'::estado_correccion_enum"))
     fecha_solicitud: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     fichaje_afectado_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     valor_anterior: Mapped[Optional[dict]] = mapped_column(JSONB)

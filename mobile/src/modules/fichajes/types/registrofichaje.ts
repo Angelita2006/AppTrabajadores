@@ -7,8 +7,8 @@ export enum TipoFichaje {
 }
 
 export enum EstadoFichaje {
-  VALIDO = "valido",
-  PENDIENTE_REVISION = "pendiente_revision",
+  VALIDO = "Válido",
+  PENDIENTE_REVISION = "Pendiente_revisión",
 }
 
 export interface RegistroFichaje {

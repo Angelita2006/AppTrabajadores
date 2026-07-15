@@ -1,16 +1,16 @@
 // // Enums para limitar los estados válidos y evitar errores tipográficos
 export enum TipoAusencia {
-  vacaciones = "vacaciones",
-  baja_temporal = "baja_temporal",
-  maternidad_paternidad = "maternidad_paternidad",
-  permiso_retribuido = "permiso_retribuido",
-  ausencia_injustificada = "ausencia_injustificada",
+  VACACIONES = "Vacaciones",
+  BAJA_TEMPORAL = "Baja_temporal",
+  MATERNIDAD_PATERNIDAD = "Maternidad_paternidad",
+  PERMISO_RETRIBUIDO = "Permiso_retribuido",
+  AUSENCIA_INJUSTIFICADA = "Ausencia_injustificada",
 }
 
 export enum EstadoAusencia {
-  pendiente = "pendiente",
-  aprobado = "aprobada",
-  rechazado = "rechazada",
+  PENDIENTE = "Pendiente",
+  APROBADA = "Aprobada",
+  RECHAZADA = "Rechazada",
 }
 
 /**
@@ -21,6 +21,7 @@ export interface AusenciaCreateRequest {
   trabajador_id: string;
   empresa_id: string;
   tipo_ausencia: TipoAusencia;
+  estado?: EstadoAusencia;
   fecha_inicio: string;
   fecha_fin: string;
   motivo: string;

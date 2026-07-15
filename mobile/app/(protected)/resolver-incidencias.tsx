@@ -87,7 +87,7 @@ export default function AdminIncidenciasScreen() {
   }, [cargarIncidenciasGlobales]);
 
   const handleResolverIncidencia = useCallback(
-    async (idCorreccion: string, decision: "aprobada" | "rechazada") => {
+    async (idCorreccion: string, decision: "Aprobada" | "Rechazada") => {
       // if (procesandoId) return;
 
       if (!usuarioActual?.id) {
@@ -106,7 +106,7 @@ export default function AdminIncidenciasScreen() {
 
         const nuevoEstado =
           (resuelta?.estado as EstadoCorreccion | undefined) ??
-          (decision === "aprobada"
+          (decision === "Aprobada"
             ? EstadoCorreccion.aprobada
             : EstadoCorreccion.rechazada);
 
@@ -291,7 +291,7 @@ export default function AdminIncidenciasScreen() {
                           isBusy && styles.botonDeshabilitado,
                         ]}
                         onPress={() =>
-                          handleResolverIncidencia(item.id, "rechazada")
+                          handleResolverIncidencia(item.id, "Rechazada")
                         }
                       >
                         <FontAwesome5 name="times" size={12} color="#FFFFFF" />
@@ -310,7 +310,7 @@ export default function AdminIncidenciasScreen() {
                           isBusy && styles.botonDeshabilitado,
                         ]}
                         onPress={() =>
-                          handleResolverIncidencia(item.id, "aprobada")
+                          handleResolverIncidencia(item.id, "Aprobada")
                         }
                       >
                         <FontAwesome5 name="check" size={12} color="#FFFFFF" />

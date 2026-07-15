@@ -5,15 +5,26 @@ import {
   CalendarioLaboralUpdate,
 } from "@/src/modules/calendarios-laborales/types/calendario";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
+import { Departamento } from "@/src/modules/departamentos/types/departamento";
 import { obtenerEmpresas } from "@/src/modules/empresas/api/services";
 import { Festivo } from "@/src/modules/festivos/types/festivo";
 import {
   crearCalendarioLaboral,
+  crearDepartamento,
+  editarCentroTrabajo,
+  editarDepartamento,
+  editarTurno,
   eliminarCalendarioLaboral,
+  eliminarCentroTrabajo,
+  eliminarDepartamento,
+  eliminarTurno,
   importarCalendarioPDF,
   modificarCalendarioLaboral,
+  obtenerDepartamentosEmpresa,
+  obtenerTurnosEmpresa,
 } from "@/src/modules/trabajadores/api/services";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useState } from "react";
 import {
@@ -43,7 +54,12 @@ import { CalendarLaboralAnual } from "../../src/shared/components/calendar";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
-type TabConfig = "fiscal" | "centros" | "turnos" | "calendario";
+type TabConfig =
+  | "fiscal"
+  | "centros"
+  | "turnos"
+  | "departamentos"
+  | "calendario";
 
 export default function EmpresasScreen() {
   const { usuarioActual, empresaSeleccionada, setEmpresaSeleccionada } =
@@ -67,25 +83,37 @@ export default function EmpresasScreen() {
   const [mostrarFormCentro, setMostrarFormCentro] = useState(false);
   const [mostrarFormTurno, setMostrarFormTurno] = useState(false);
 
-  // 1. ESTADOS: Datos Fiscales
+  // ESTADOS: Datos Fiscales
   const [razonSocialInput, setRazonSocialInput] = useState("");
   const [convenioInput, setConvenioInput] = useState("");
   const [cnaeInput, setCnaeInput] = useState("");
   const [direccionInput, setDireccionInput] = useState("");
 
-  // 2. ESTADOS: Centros de Trabajo
+  // ESTADOS: Centros de Trabajo
   const [nombreCentro, setNombreCentro] = useState("");
   const [direccionCentro, setDireccionCentro] = useState("");
   const [zonaHoraria, setZonaHoraria] = useState("Europe/Madrid");
   const [codigoCcc, setCodigoCcc] = useState("");
+  const [centroEnEdicion, setCentroEnEdicion] = useState<CentroTrabajo | null>(
+    null,
+  );
 
-  // 3. ESTADOS: Configuración de Turnos
+  // ESTADOS: Configuración de Turnos
   const [nombreTurno, setNombreTurno] = useState("");
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
   const [duracionPausa, setDuracionPausa] = useState("0");
+  const [turnoEnEdicion, setTurnoEnEdicion] = useState<ItemTurno | null>(null);
 
-  // --- ESTADOS PARA CALENDARIO ---
+  // ESTADOS: Departamentos
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [mostrarFormDepartamento, setMostrarFormDepartamento] = useState(false);
+  const [nombreDepto, setNombreDepto] = useState("");
+  const [departamentoEnEdicion, setDepartamentoEnEdicion] =
+    useState<Departamento | null>(null);
+  const [centroTrabajoId, setCentroTrabajoId] = useState<string | null>(null);
+
+  // ESTADOS PARA CALENDARIO
   const [anoNuevoCalendario, setAnoNuevoCalendario] = useState("");
   const [nombreNuevoCalendario, setNombreNuevoCalendario] = useState("");
   const [centroNuevoCalendario, setCentroNuevoCalendario] =
@@ -109,8 +137,8 @@ export default function EmpresasScreen() {
   const [nuevaDescFestivo, setNuevaDescFestivo] = useState("");
   const [tipoFestivo, setNuevoTipoFestivo] = useState("");
 
-  const esGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
-  const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
+  const esGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
+  const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
   const esAutorizado = esGestoria || esAdminEmpresa;
 
   useEffect(() => {
@@ -151,12 +179,17 @@ export default function EmpresasScreen() {
   const cargarDatosEmpresa = async (empresaId: string) => {
     try {
       setCargando(true);
-      const [datosCentros, datosCalendarios] = await Promise.all([
-        obtenerCentrosPorEmpresa(empresaId),
-        obtenerCalendarioYFestivos(empresaId),
-      ]);
+      const [datosCentros, datosCalendarios, datosTurnos, datosDepartamentos] =
+        await Promise.all([
+          obtenerCentrosPorEmpresa(empresaId),
+          obtenerCalendarioYFestivos(empresaId),
+          obtenerTurnosEmpresa(empresaId),
+          obtenerDepartamentosEmpresa(empresaId),
+        ]);
       setCentrosConfigurados(datosCentros);
       setCalendarioFestivos(datosCalendarios);
+      setTurnosEstructurales(datosTurnos);
+      setDepartamentos(datosDepartamentos);
 
       if (datosCalendarios.length > 0) {
         const primerCalendario: CalendarioFestivo = datosCalendarios[0];
@@ -183,7 +216,7 @@ export default function EmpresasScreen() {
       let empresasPermitidas = esGestoria
         ? todasLasEmpresas
         : todasLasEmpresas.filter(
-            (e: any) => e.id === usuarioActual?.empresa_id,
+            (e: Empresa) => e.id === usuarioActual?.empresa_id,
           );
 
       setEmpresas(empresasPermitidas);
@@ -302,6 +335,25 @@ export default function EmpresasScreen() {
       );
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const handleCrearDepartamento = async () => {
+    if (!nombreDepto.trim() || !empresaSeleccionada?.id) return;
+
+    try {
+      const nuevoDepto = await crearDepartamento({
+        empresa_id: empresaSeleccionada.id,
+        nombre: nombreDepto,
+        centro_trabajo_id: centroTrabajoId,
+      });
+
+      setDepartamentos([...departamentos, nuevoDepto]);
+      setNombreDepto("");
+      setCentroTrabajoId(null);
+      setMostrarFormDepartamento(false);
+    } catch (error) {
+      console.error("Error al crear departamento:", error);
     }
   };
 
@@ -460,7 +512,7 @@ export default function EmpresasScreen() {
               );
               setCalendarioFestivos(restantes);
 
-              // ¡MUY IMPORTANTE!: Limpiamos la selección actual para restablecer la UI
+              // Limpiamos la selección actual para restablecer la UI
               if (restantes.length > 0) {
                 setCalendarioSeleccionado(restantes[0]);
               } else {
@@ -493,14 +545,13 @@ export default function EmpresasScreen() {
       !nuevaDescFestivo.trim() ||
       !empresaSeleccionada ||
       !calendarioSeleccionado ||
-      !calendarioSeleccionado.id // Necesitamos el ID del calendario para la API
+      !calendarioSeleccionado.id
     )
       return;
 
     try {
       setGuardando(true);
 
-      // Mantenemos la tilde obligatoria "autonómico"
       const tipoValido: "Nacional" | "Autonómico" | "Local" =
         tipoFestivo.trim().toLowerCase() === "nacional"
           ? "Nacional"
@@ -612,14 +663,10 @@ export default function EmpresasScreen() {
       const formData = new FormData();
 
       if (Platform.OS === "web") {
-        // SOLUCIÓN PARA ENTORNO WEB:
-        // Convertimos la URI local (blob:http://...) en un archivo real interpretable por el navegador y Axios
         const respuestaBlob = await fetch(archivoPdf.uri);
         const blobReal = await respuestaBlob.blob();
-
         formData.append("file", blobReal, archivoPdf.name || "calendario.pdf");
       } else {
-        // SOLUCIÓN PARA ENTORNO MÓVIL (Android/iOS):
         formData.append("file", {
           uri: archivoPdf.uri,
           name: archivoPdf.name || "calendario.pdf",
@@ -701,6 +748,136 @@ export default function EmpresasScreen() {
   const tieneCentrosValidos =
     centrosConfigurados && centrosConfigurados.length > 0;
 
+  async function handleEditarCentro(centro: CentroTrabajo): Promise<void> {
+    try {
+      setGuardando(true);
+      // Asumiendo que existe un servicio llamado editarCentroTrabajo(id, data)
+      await editarCentroTrabajo(centro.id, {
+        nombre: centro.nombre,
+        direccion: centro.direccion ?? undefined,
+        codigo_ccc: centro.codigo_ccc ?? undefined,
+        zona_horaria: centro.zona_horaria,
+      });
+
+      // Actualizar estado local
+      setCentrosConfigurados((prev) =>
+        prev.map((c) => (c.id === centro.id ? { ...c, ...centro } : c)),
+      );
+
+      Alert.alert("Éxito", "Centro de trabajo actualizado.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo actualizar el centro.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  function handleEliminarCentro(centroId: string): void {
+    Alert.alert("Confirmar", "¿Eliminar este centro?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await eliminarCentroTrabajo(centroId);
+            setCentrosConfigurados((prev) =>
+              prev.filter((c) => c.id !== centroId),
+            );
+          } catch (error) {
+            Alert.alert("Error", "No se pudo eliminar el centro.");
+          }
+        },
+      },
+    ]);
+  }
+
+  const handleEditarTurno = async (turno: ItemTurno) => {
+    try {
+      setGuardando(true);
+      await editarTurno(turno.id, turno);
+      setTurnosEstructurales((prev) =>
+        prev.map((t) => (t.id === turno.id ? turno : t)),
+      );
+      Alert.alert("Éxito", "Turno actualizado correctamente.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo actualizar el turno.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleEliminarTurno = async (turnoId: string) => {
+    Alert.alert("Confirmar", "¿Eliminar este turno?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await eliminarTurno(turnoId);
+            setTurnosEstructurales((prev) =>
+              prev.filter((t) => t.id !== turnoId),
+            );
+          } catch (error) {
+            Alert.alert("Error", "No se pudo eliminar el turno.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEditarDepartamento = async () => {
+    if (!departamentoEnEdicion) return;
+
+    try {
+      setGuardando(true);
+      const payload = {
+        nombre: nombreDepto,
+        centro_trabajo_id: centroTrabajoId || undefined,
+      };
+
+      await editarDepartamento(departamentoEnEdicion.id, payload);
+
+      setDepartamentos((prev) =>
+        prev.map((d) =>
+          d.id === departamentoEnEdicion.id ? { ...d, ...payload } : d,
+        ),
+      );
+
+      Alert.alert("Éxito", "Departamento actualizado.");
+
+      setMostrarFormDepartamento(false);
+      setDepartamentoEnEdicion(null);
+      setNombreDepto("");
+      setCentroTrabajoId(null);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo actualizar el departamento.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleEliminarDepartamento = async (departamentoId: string) => {
+    Alert.alert("Confirmar", "¿Eliminar este departamento?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await eliminarDepartamento(departamentoId);
+            setDepartamentos((prev) =>
+              prev.filter((d) => d.id !== departamentoId),
+            );
+          } catch (error) {
+            Alert.alert("Error", "No se pudo eliminar el departamento.");
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <AppScreen
       title="Organizaciones"
@@ -778,7 +955,13 @@ export default function EmpresasScreen() {
         {empresaSeleccionada && (
           <View style={styles.contenedorTabs}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {["fiscal", "centros", "turnos", "calendario"].map((tab) => (
+              {[
+                "fiscal",
+                "centros",
+                "turnos",
+                "departamentos",
+                "calendario",
+              ].map((tab) => (
                 <Pressable
                   key={tab}
                   style={[
@@ -798,8 +981,10 @@ export default function EmpresasScreen() {
                       : tab === "centros"
                         ? "Centros de Trabajo"
                         : tab === "turnos"
-                          ? "Turnos Maestros"
-                          : "Calendario Laboral"}
+                          ? "Turnos"
+                          : tab === "departamentos"
+                            ? "Departamentos"
+                            : "Calendario Laboral"}
                   </ThemedText>
                 </Pressable>
               ))}
@@ -810,6 +995,9 @@ export default function EmpresasScreen() {
         {empresaSeleccionada && (
           <View style={{ marginTop: 14 }}>
             <Card>
+              {/* ======================================================== */}
+              {/* TAB 1: FISCAL */}
+              {/* ======================================================== */}
               {tabActiva === "fiscal" && (
                 <View>
                   <ThemedText style={styles.formularioTitulo}>
@@ -868,6 +1056,9 @@ export default function EmpresasScreen() {
                 </View>
               )}
 
+              {/* ======================================================== */}
+              {/* TAB 2: CENTROS DE TRABAJO */}
+              {/* ======================================================== */}
               {tabActiva === "centros" && (
                 <View>
                   <Pressable
@@ -879,7 +1070,16 @@ export default function EmpresasScreen() {
                           : "#EA580C",
                       },
                     ]}
-                    onPress={() => setMostrarFormCentro(!mostrarFormCentro)}
+                    onPress={() => {
+                      if (!mostrarFormCentro) {
+                        setNombreCentro("");
+                        setDireccionCentro("");
+                        setZonaHoraria("");
+                        setCodigoCcc("");
+                      }
+                      setMostrarFormCentro(!mostrarFormCentro);
+                      setCentroEnEdicion(null);
+                    }}
                   >
                     <ThemedText style={styles.textoBotonGuardar}>
                       {mostrarFormCentro
@@ -887,6 +1087,7 @@ export default function EmpresasScreen() {
                         : "＋ Añadir Centro de Trabajo"}
                     </ThemedText>
                   </Pressable>
+
                   {mostrarFormCentro && (
                     <View style={styles.contenedorFormDesplegado}>
                       <ThemedText style={styles.formularioTitulo}>
@@ -955,29 +1156,163 @@ export default function EmpresasScreen() {
                       </Pressable>
                     </View>
                   )}
+
                   <ThemedText style={styles.subseccionTitulo}>
                     Centros Registrados
                   </ThemedText>
-                  {centrosConfigurados.length > 0 ? (
-                    centrosConfigurados.map((centro: any) => (
-                      <View key={centro.id} style={styles.itemListaEstructural}>
-                        <ThemedText style={styles.nombreElementoLista}>
-                          {centro.nombre}
-                        </ThemedText>
-                        <ThemedText style={styles.subtextoElementoLista}>
-                          {centro.direccion || "Sin dirección"} •{" "}
-                          {centro.zona_horaria}
-                        </ThemedText>
+
+                  {centrosConfigurados.map((centro: any) => (
+                    <View key={centro.id}>
+                      <View
+                        style={[
+                          styles.itemListaEstructural,
+                          {
+                            marginBottom: 10,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={styles.nombreElementoLista}>
+                            {centro.nombre}
+                          </ThemedText>
+                          <ThemedText style={styles.subtextoElementoLista}>
+                            {centro.direccion || "Sin dirección"} •{" "}
+                            {centro.zona_horaria}
+                          </ThemedText>
+                        </View>
+
+                        <Row>
+                          <Pressable
+                            style={{
+                              backgroundColor: "#475569",
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 16,
+                              marginRight: 8,
+                            }}
+                            onPress={() => {
+                              if (centroEnEdicion?.id === centro.id) {
+                                setCentroEnEdicion(null);
+                              } else {
+                                setCentroEnEdicion(centro);
+                                setNombreCentro(centro.nombre);
+                                setDireccionCentro(centro.direccion || "");
+                                setZonaHoraria(centro.zona_horaria || "");
+                                setCodigoCcc(
+                                  centro.codigo_ccc?.toString() || "",
+                                );
+                                setMostrarFormCentro(false);
+                              }
+                            }}
+                          >
+                            <ThemedText>✏️</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            style={{
+                              backgroundColor: "#fee2e2",
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 16,
+                            }}
+                            onPress={() => handleEliminarCentro(centro.id)}
+                          >
+                            <ThemedText style={{ color: "#ef4444" }}>
+                              🗑
+                            </ThemedText>
+                          </Pressable>
+                        </Row>
                       </View>
-                    ))
-                  ) : (
-                    <ThemedText style={styles.textoVacio}>
-                      No hay centros de trabajo registrados.
-                    </ThemedText>
-                  )}
+
+                      {centroEnEdicion?.id === centro.id && (
+                        <View style={styles.contenedorFormDesplegado}>
+                          <ThemedText style={styles.formularioTitulo}>
+                            Editar Centro
+                          </ThemedText>
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Nombre del Centro
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={nombreCentro}
+                              onChangeText={setNombreCentro}
+                            />
+                          </View>
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Dirección
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={direccionCentro}
+                              onChangeText={setDireccionCentro}
+                            />
+                          </View>
+                          <Row>
+                            <View
+                              style={[
+                                styles.campoFormulario,
+                                { flex: 1, marginRight: 8 },
+                              ]}
+                            >
+                              <ThemedText style={styles.labelInput}>
+                                Zona Horaria
+                              </ThemedText>
+                              <TextInput
+                                style={styles.inputForm}
+                                value={zonaHoraria}
+                                onChangeText={setZonaHoraria}
+                              />
+                            </View>
+                            <View style={[styles.campoFormulario, { flex: 1 }]}>
+                              <ThemedText style={styles.labelInput}>
+                                Código CCC
+                              </ThemedText>
+                              <TextInput
+                                style={styles.inputForm}
+                                value={codigoCcc}
+                                onChangeText={setCodigoCcc}
+                                keyboardType="numeric"
+                              />
+                            </View>
+                          </Row>
+                          <Pressable
+                            style={[
+                              styles.botonGuardar,
+                              { backgroundColor: "#EA580C", marginTop: 10 },
+                            ]}
+                            onPress={() => {
+                              handleEditarCentro(centro);
+                              setCentroEnEdicion(null);
+                            }}
+                          >
+                            <ThemedText style={styles.textoBotonGuardar}>
+                              Actualizar Cambios
+                            </ThemedText>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setCentroEnEdicion(null)}
+                            style={{ marginTop: 15 }}
+                          >
+                            <ThemedText
+                              style={{ textAlign: "center", color: "#64748B" }}
+                            >
+                              Cancelar edición
+                            </ThemedText>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  ))}
                 </View>
               )}
 
+              {/* ======================================================== */}
+              {/* TAB 3: TURNOS */}
+              {/* ======================================================== */}
               {tabActiva === "turnos" && (
                 <View>
                   <Pressable
@@ -989,22 +1324,31 @@ export default function EmpresasScreen() {
                           : "#16A34A",
                       },
                     ]}
-                    onPress={() => setMostrarFormTurno(!mostrarFormTurno)}
+                    onPress={() => {
+                      if (!mostrarFormTurno) {
+                        setNombreTurno("");
+                        setHoraInicio("");
+                        setHoraFin("");
+                        setDuracionPausa("");
+                      }
+                      setMostrarFormTurno(!mostrarFormTurno);
+                      setTurnoEnEdicion(null);
+                    }}
                   >
                     <ThemedText style={styles.textoBotonGuardar}>
-                      {mostrarFormTurno
-                        ? "✕ Cancelar"
-                        : "＋ Crear Turno Estructural"}
+                      {mostrarFormTurno ? "✕ Cancelar" : "＋ Crear Turno"}
                     </ThemedText>
                   </Pressable>
+
                   {mostrarFormTurno && (
                     <View style={styles.contenedorFormDesplegado}>
                       <ThemedText style={styles.formularioTitulo}>
                         Estructurar Horarios y Turnos
                       </ThemedText>
+
                       <View style={styles.campoFormulario}>
                         <ThemedText style={styles.labelInput}>
-                          Identificador / Nombre del Turno
+                          Nombre del Turno
                         </ThemedText>
                         <TextInput
                           style={styles.inputForm}
@@ -1012,6 +1356,7 @@ export default function EmpresasScreen() {
                           onChangeText={setNombreTurno}
                         />
                       </View>
+
                       <Row>
                         <View
                           style={[
@@ -1039,6 +1384,7 @@ export default function EmpresasScreen() {
                           />
                         </View>
                       </Row>
+
                       <View style={styles.campoFormulario}>
                         <ThemedText style={styles.labelInput}>
                           Duración Pausa (Minutos)
@@ -1050,6 +1396,7 @@ export default function EmpresasScreen() {
                           keyboardType="numeric"
                         />
                       </View>
+
                       <Pressable
                         style={[
                           styles.botonGuardar,
@@ -1059,35 +1406,393 @@ export default function EmpresasScreen() {
                         disabled={guardando}
                       >
                         <ThemedText style={styles.textoBotonGuardar}>
-                          Guardar Turno estructural
+                          Guardar Turno
                         </ThemedText>
                       </Pressable>
                     </View>
                   )}
+
                   <ThemedText style={styles.subseccionTitulo}>
-                    Turnos Estructurales
+                    Turnos
                   </ThemedText>
-                  {turnosEstructurales.length > 0 ? (
-                    turnosEstructurales.map((turno: any) => (
-                      <View key={turno.id} style={styles.itemListaEstructural}>
-                        <ThemedText style={styles.nombreElementoLista}>
-                          {turno.nombre}
-                        </ThemedText>
-                        <ThemedText style={styles.subtextoElementoLista}>
-                          Horario: {turno.hora_inicio} a {turno.hora_fin}
-                        </ThemedText>
+
+                  {turnosEstructurales.map((turno: ItemTurno) => (
+                    <View key={turno.id}>
+                      <View
+                        style={[
+                          styles.itemListaEstructural,
+                          {
+                            marginBottom: 10,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={styles.nombreElementoLista}>
+                            {turno.nombre.toUpperCase()}
+                          </ThemedText>
+                          <ThemedText style={styles.subtextoElementoLista}>
+                            Horario: {turno.hora_inicio.substring(0, 5)} a{" "}
+                            {turno.hora_fin.substring(0, 5)}
+                          </ThemedText>
+                        </View>
+
+                        <Row>
+                          <Pressable
+                            style={{
+                              backgroundColor: "#475569",
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 16,
+                              marginRight: 8,
+                            }}
+                            onPress={() => {
+                              if (turnoEnEdicion?.id === turno.id) {
+                                setTurnoEnEdicion(null);
+                              } else {
+                                setTurnoEnEdicion(turno);
+                                setNombreTurno(turno.nombre);
+                                setHoraInicio(turno.hora_inicio);
+                                setHoraFin(turno.hora_fin);
+                                setDuracionPausa(
+                                  turno.minutos_pausa_obligatoria?.toString() ||
+                                    "",
+                                );
+                                setMostrarFormTurno(false);
+                              }
+                            }}
+                          >
+                            <ThemedText>✏️</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            style={{
+                              backgroundColor: "#fee2e2",
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 16,
+                            }}
+                            onPress={() => handleEliminarTurno(turno.id)}
+                          >
+                            <ThemedText style={{ color: "#ef4444" }}>
+                              🗑
+                            </ThemedText>
+                          </Pressable>
+                        </Row>
                       </View>
-                    ))
-                  ) : (
-                    <ThemedText style={styles.textoVacio}>
-                      No hay turnos maestros registrados.
-                    </ThemedText>
-                  )}
+
+                      {turnoEnEdicion?.id === turno.id && (
+                        <View style={styles.contenedorFormDesplegado}>
+                          <ThemedText style={styles.formularioTitulo}>
+                            Editar Turno
+                          </ThemedText>
+
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Nombre del Turno
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={nombreTurno}
+                              onChangeText={setNombreTurno}
+                            />
+                          </View>
+
+                          <Row>
+                            <View
+                              style={[
+                                styles.campoFormulario,
+                                { flex: 1, marginRight: 8 },
+                              ]}
+                            >
+                              <ThemedText style={styles.labelInput}>
+                                Hora Inicio
+                              </ThemedText>
+                              <TextInput
+                                style={styles.inputForm}
+                                value={horaInicio}
+                                onChangeText={setHoraInicio}
+                              />
+                            </View>
+                            <View style={[styles.campoFormulario, { flex: 1 }]}>
+                              <ThemedText style={styles.labelInput}>
+                                Hora Fin
+                              </ThemedText>
+                              <TextInput
+                                style={styles.inputForm}
+                                value={horaFin}
+                                onChangeText={setHoraFin}
+                              />
+                            </View>
+                          </Row>
+
+                          <View style={styles.campoFormulario}>
+                            <ThemedText style={styles.labelInput}>
+                              Duración Pausa (Minutos)
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={duracionPausa}
+                              onChangeText={setDuracionPausa}
+                              keyboardType="numeric"
+                            />
+                          </View>
+
+                          <Pressable
+                            style={[
+                              styles.botonGuardar,
+                              { backgroundColor: "#16A34A", marginTop: 10 },
+                            ]}
+                            onPress={() => {
+                              handleEditarTurno(turno);
+                              setTurnoEnEdicion(null);
+                            }}
+                          >
+                            <ThemedText style={styles.textoBotonGuardar}>
+                              Actualizar Cambios
+                            </ThemedText>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => setTurnoEnEdicion(null)}
+                            style={{ marginTop: 15 }}
+                          >
+                            <ThemedText
+                              style={{ textAlign: "center", color: "#64748B" }}
+                            >
+                              Cancelar edición
+                            </ThemedText>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  ))}
                 </View>
               )}
 
               {/* ======================================================== */}
-              {/* TAB 4: CALENDARIO LABORAL */}
+              {/* TAB 4: DEPARTAMENTOS */}
+              {/* ======================================================== */}
+              {tabActiva === "departamentos" && (
+                <View>
+                  <Pressable
+                    style={[
+                      styles.botonAccionHeader,
+                      {
+                        backgroundColor: mostrarFormDepartamento
+                          ? "#64748B"
+                          : "#7C3AED",
+                      },
+                    ]}
+                    onPress={() => {
+                      if (!mostrarFormDepartamento) {
+                        setNombreDepto("");
+                        setCentroTrabajoId(null);
+                      }
+                      setMostrarFormDepartamento(!mostrarFormDepartamento);
+                      setDepartamentoEnEdicion(null); // Cierra cualquier edición activa
+                    }}
+                  >
+                    <ThemedText style={styles.textoBotonGuardar}>
+                      {mostrarFormDepartamento
+                        ? "✕ Cancelar"
+                        : "＋ Añadir Departamento"}
+                    </ThemedText>
+                  </Pressable>
+
+                  {mostrarFormDepartamento && (
+                    <View style={styles.contenedorFormDesplegado}>
+                      <ThemedText style={styles.formularioTitulo}>
+                        Nuevo Departamento
+                      </ThemedText>
+                      <View style={styles.campoFormulario}>
+                        <ThemedText style={styles.labelInput}>
+                          Nombre del Departamento *
+                        </ThemedText>
+                        <TextInput
+                          style={styles.inputForm}
+                          value={nombreDepto}
+                          onChangeText={setNombreDepto}
+                          placeholder="Ej. Recursos Humanos"
+                        />
+                      </View>
+                      <View style={styles.campoFormulario}>
+                        <ThemedText style={styles.labelInput}>
+                          Centro de Trabajo
+                        </ThemedText>
+                        <Picker
+                          selectedValue={centroTrabajoId}
+                          onValueChange={setCentroTrabajoId}
+                        >
+                          <Picker.Item
+                            label="Seleccionar centro..."
+                            value={null}
+                          />
+                          {centrosConfigurados.map((ct: any) => (
+                            <Picker.Item
+                              key={ct.id}
+                              label={ct.nombre}
+                              value={ct.id}
+                            />
+                          ))}
+                        </Picker>
+                      </View>
+                      <Pressable
+                        style={[
+                          styles.botonGuardar,
+                          { backgroundColor: "#7C3AED" },
+                        ]}
+                        onPress={handleCrearDepartamento}
+                      >
+                        <ThemedText style={styles.textoBotonGuardar}>
+                          Guardar Departamento
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  <ThemedText style={styles.subseccionTitulo}>
+                    Departamentos Activos
+                  </ThemedText>
+
+                  {departamentos.map((dept: any) => {
+                    const centro = centrosConfigurados.find(
+                      (c: any) => c.id === dept.centro_trabajo_id,
+                    );
+
+                    return (
+                      <View key={dept.id}>
+                        <View
+                          style={[
+                            styles.itemListaEstructural,
+                            {
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: 10,
+                            },
+                          ]}
+                        >
+                          <View>
+                            <ThemedText style={styles.nombreElementoLista}>
+                              {dept.nombre}
+                            </ThemedText>
+                            <ThemedText
+                              style={{ fontSize: 12, color: "#64748B" }}
+                            >
+                              {centro
+                                ? `📍 ${centro.nombre}`
+                                : "Sin centro asignado"}
+                            </ThemedText>
+                          </View>
+
+                          <Row>
+                            <Pressable
+                              style={{
+                                backgroundColor: "#475569",
+                                paddingHorizontal: 14,
+                                paddingVertical: 8,
+                                borderRadius: 16,
+                                marginRight: 8,
+                              }}
+                              onPress={() => {
+                                if (departamentoEnEdicion?.id === dept.id) {
+                                  setDepartamentoEnEdicion(null);
+                                } else {
+                                  setDepartamentoEnEdicion(dept);
+                                  setNombreDepto(dept.nombre);
+                                  setCentroTrabajoId(
+                                    dept.centro_trabajo_id || null,
+                                  );
+                                  setMostrarFormDepartamento(false);
+                                }
+                              }}
+                            >
+                              <ThemedText>✏️</ThemedText>
+                            </Pressable>
+                            <Pressable
+                              style={{
+                                backgroundColor: "#fee2e2",
+                                paddingHorizontal: 14,
+                                paddingVertical: 8,
+                                borderRadius: 16,
+                              }}
+                              onPress={() =>
+                                handleEliminarDepartamento(dept.id)
+                              }
+                            >
+                              <ThemedText style={{ color: "#ef4444" }}>
+                                🗑
+                              </ThemedText>
+                            </Pressable>
+                          </Row>
+                        </View>
+
+                        {/* Formulario de EDICIÓN */}
+                        {departamentoEnEdicion?.id === dept.id && (
+                          <View style={styles.contenedorFormDesplegado}>
+                            <ThemedText style={styles.formularioTitulo}>
+                              Editar: {dept.nombre}
+                            </ThemedText>
+                            <TextInput
+                              style={styles.inputForm}
+                              value={nombreDepto}
+                              onChangeText={setNombreDepto}
+                            />
+                            <Picker
+                              selectedValue={centroTrabajoId}
+                              onValueChange={setCentroTrabajoId}
+                            >
+                              <Picker.Item
+                                label="Seleccionar centro..."
+                                value={null}
+                              />
+                              {centrosConfigurados.map((ct: any) => (
+                                <Picker.Item
+                                  key={ct.id}
+                                  label={ct.nombre}
+                                  value={ct.id}
+                                />
+                              ))}
+                            </Picker>
+                            <Pressable
+                              style={[
+                                styles.botonGuardar,
+                                { backgroundColor: "#7C3AED", marginTop: 10 },
+                              ]}
+                              onPress={() => {
+                                handleEditarDepartamento();
+                                setDepartamentoEnEdicion(null);
+                              }}
+                            >
+                              <ThemedText style={styles.textoBotonGuardar}>
+                                Actualizar Cambios
+                              </ThemedText>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => setDepartamentoEnEdicion(null)}
+                              style={{ marginTop: 10 }}
+                            >
+                              <ThemedText
+                                style={{
+                                  textAlign: "center",
+                                  color: "#525153",
+                                }}
+                              >
+                                Cancelar
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* ======================================================== */}
+              {/* TAB 5: CALENDARIO LABORAL */}
               {/* ======================================================== */}
               {tabActiva === "calendario" && (
                 <View>
@@ -1101,15 +1806,12 @@ export default function EmpresasScreen() {
                         flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        backgroundColor: "#0284C7", // Color azul cielo profesional
+                        backgroundColor: "#0284C7",
                         paddingVertical: 12,
                         borderRadius: 8,
                         opacity: importandoPdf ? 0.6 : 1,
+                        boxShadow: "0px 1px 1.41px rgba(0, 0, 0, 0.2)",
                         elevation: 2,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 1.41,
                       }}
                       onPress={handleImportarCalendarioPDF}
                       disabled={importandoPdf}
@@ -1648,10 +2350,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.25)",
     elevation: 5,
   },
   modalTitulo: { fontSize: 16, fontWeight: "700", color: "#0F172A" },

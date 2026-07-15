@@ -167,10 +167,6 @@ def asignar_turnos_trabajador(
         )
 
     try:
-        # 2. Opcional (Reasignación): Si tu lógica de "Reasignar" implica limpiar 
-        # las asignaciones previas del trabajador antes de salvar las nuevas, descomenta esto:
-        # db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == id_trabajador).delete()
-
         # 3. Registrar de forma independiente cada turno del array recibido
         nuevas_asignaciones = []
         for turno_id in obj_in.turnos:
@@ -183,7 +179,6 @@ def asignar_turnos_trabajador(
                 )
             
             # Crear el registro independiente de la asignación
-            # Nota: Cambia 'AsignacionesTurno' por el nombre real de tu modelo relacional
             nueva_asignacion = AsignacionesTurno(
                 trabajador_id=id_trabajador,
                 turno_id=turno_id,

@@ -33,7 +33,7 @@ export default function VacacionesScreen() {
   const [fechaFin, setFechaFin] = useState("2026-07-15");
   const [motivo, setMotivo] = useState("");
   const [tipoAusencia, setTipoAusencia] = useState<TipoAusencia>(
-    "vacaciones" as TipoAusencia,
+    "Vacaciones" as TipoAusencia,
   );
 
   // Carga histórica de ausencias
@@ -112,6 +112,7 @@ export default function VacacionesScreen() {
 
       const nueva: ItemAusencia = {
         id: respuestaBackend.id,
+        trabajador_id: respuestaBackend.trabajador_id,
         tipo_ausencia: respuestaBackend.tipo_ausencia,
         estado: respuestaBackend.estado,
         fecha_inicio: respuestaBackend.fecha_inicio,
@@ -145,14 +146,14 @@ export default function VacacionesScreen() {
         <StatCard
           label="Aprobadas"
           value={solicitudes
-            .filter((s) => s.estado === EstadoAusencia.aprobado)
+            .filter((s) => s.estado === EstadoAusencia.APROBADA)
             .length.toString()}
           tone="success"
         />
         <StatCard
           label="Pendientes"
           value={solicitudes
-            .filter((s) => s.estado === EstadoAusencia.pendiente)
+            .filter((s) => s.estado === EstadoAusencia.PENDIENTE)
             .length.toString()}
           tone="warning"
         />
@@ -165,11 +166,11 @@ export default function VacacionesScreen() {
           <View style={styles.selectorTipos}>
             {(
               [
-                "vacaciones",
-                "baja_temporal",
-                "maternidad_paternidad",
-                "permiso_retribuido",
-                "ausencia_justificada",
+                "Vacaciones",
+                "Baja_temporal",
+                "Maternidad_paternidad",
+                "Permiso_retribuido",
+                "Ausencia_justificada",
               ] as TipoAusencia[]
             ).map((tipo) => (
               <Pressable
@@ -264,9 +265,9 @@ export default function VacacionesScreen() {
                   <View
                     style={[
                       styles.badge,
-                      item.estado === EstadoAusencia.aprobado
+                      item.estado === EstadoAusencia.APROBADA
                         ? styles.badgeAprobado
-                        : item.estado === EstadoAusencia.pendiente
+                        : item.estado === EstadoAusencia.PENDIENTE
                           ? styles.badgePendiente
                           : styles.badgeRechazado,
                     ]}

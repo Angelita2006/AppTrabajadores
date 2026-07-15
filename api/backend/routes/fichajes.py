@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import List
 from uuid import UUID
+from models.asignaciones_turno import AsignacionesTurno
 from models.contratos import Contratos
 from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 from core.database import get_db
@@ -106,7 +107,7 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
     
     try:
         db.add(nuevo_fichaje)
-        db.commit() # La transacción se consolida sin lanzar violaciones de nulos
+        db.commit() 
         db.refresh(nuevo_fichaje)
         return nuevo_fichaje
     except Exception as e:
@@ -207,13 +208,11 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
             detail="Trabajador no localizado."
         )
 
-    # Cálculo del rango de la semana en curso (Solo la fecha, sin horas)
     hoy = date.today()
     dia_semana = hoy.weekday() 
     lunes_esta_semana = hoy - timedelta(days=dia_semana)
     domingo_esta_semana = lunes_esta_semana + timedelta(days=6)
 
-    # Consulta directa a PostgreSQL
     fichajes_semana = (
         db.query(Fichajes)
         .filter(
@@ -225,19 +224,77 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
         .all()
     )
 
-    respuesta_homologada = []
+    respuesta = []
     for f in fichajes_semana:
-        respuesta_homologada.append({
+        respuesta.append({
             "id": str(f.id),
-            # Aseguramos el formato ISO con la "T" que tus filtros móviles necesitan
             "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
             "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
             "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje),
             "estado": f.estado.value if hasattr(f.estado, "value") else str(f.estado),
         })
 
-    return respuesta_homologada
+    return respuesta
 
+
+@router.get("/trabajador/{id_trabajador}/turno")
+def obtener_fichajes_turno_actual(id_trabajador: UUID, db: Session = Depends(get_db)):
+    """
+    URI: GET /api/fichajes/trabajador/{id_trabajador}/turno
+    Recupera el historial del fichajes dentro del turno formateando las fechas a ISO 
+    string y mapeando los IDs a strings de eventos legibles para el frontend.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trabajador no localizado."
+        )
+    
+    turno = db.query(Turnos).filter(Turnos.empresa_id == trabajador.empresa_id).first()
+    if not turno:
+        return ({
+            "id": None,
+            "fecha_hora": None,
+            "tipo_evento": None, 
+            "metodo_fichaje": None,
+            "estado": None,
+        })
+    asignacion_turno = db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == id_trabajador, AsignacionesTurno.turno_id == turno.id).where(AsignacionesTurno.created_at <= datetime.now()).order_by(AsignacionesTurno.created_at.desc()).first()
+    if not asignacion_turno:
+        return ({
+            "id": None,
+            "fecha_hora": None,
+            "tipo_evento": None, 
+            "metodo_fichaje": None,
+            "estado": None,
+        })
+    
+    fecha_inicio = asignacion_turno.fecha_inicio
+    fecha_fin = asignacion_turno.fecha_fin
+
+    fichajes_semana = (
+        db.query(Fichajes)
+        .filter(
+            Fichajes.trabajador_id == id_trabajador,
+            func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio,
+            func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
+        )
+        .order_by(Fichajes.fecha_hora_dispositivo.asc())
+        .all()
+    )
+
+    respuesta = []
+    for f in fichajes_semana:
+        respuesta.append({
+            "id": str(f.id),
+            "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
+            "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
+            "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje),
+            "estado": f.estado.value if hasattr(f.estado, "value") else str(f.estado),
+        })
+
+    return respuesta
 
 @router.get("/trabajador/{trabajador_id}/ultimo")
 def obtener_ultimo_fichaje_trabajador(trabajador_id: UUID, db: Session = Depends(get_db)):
@@ -316,7 +373,7 @@ def listar_fichajes_empresa_por_fecha(
                 "trabajador_id": str(fichaje.trabajador_id),
                 "trabajador_nombre": nombre_completo,
                 "turno_nombre": nombre_turno,
-                "fecha_hora": fecha_hora_str,  # 👈 Usamos la variable validada e inmutable
+                "fecha_hora": fecha_hora_str, 
                 "tipo_evento": fichaje.tipo_evento_id,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
                 "observaciones": fichaje.observaciones,

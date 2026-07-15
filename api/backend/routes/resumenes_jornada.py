@@ -27,13 +27,6 @@ def crear_o_actualizar_resumen(obj_in: ResumenJornadaCreate, db: Session = Depen
     if not trabajador:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
-    # 2. Comprobación de la restricción de unicidad compuesta (trabajador_id + fecha)
-    # resumen = db.query(ResumenesJornada).filter_by(
-    #     db=db, 
-    #     trabajador_id=obj_in.trabajador_id, 
-    #     fecha_dia=obj_in.fecha
-    # )
-
     resumen = db.query(ResumenesJornada).filter(
         ResumenesJornada.trabajador_id == obj_in.trabajador_id,
         ResumenesJornada.fecha == obj_in.fecha

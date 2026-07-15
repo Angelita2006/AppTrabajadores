@@ -44,6 +44,7 @@ class AsignacionTurnoResponse(AsignacionTurnoBase):
     
     # Propiedades complementarias opcionales expuestas en el JSON
     fecha_fin: Optional[datetime.date] = Field(None)
+    created_at: Optional[datetime.date] = Field(None)
 
     class Config:
         # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0

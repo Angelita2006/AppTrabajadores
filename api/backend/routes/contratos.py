@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 from core.database import get_db
 from models.empresas import Empresas
-from schemas.contratos import ContratoCreate, ContratoResponse
+from schemas.contratos import ContratoCreate, ContratoResponse, ContratoUpdate
 from models.trabajadores import Trabajadores
 from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
@@ -38,7 +38,6 @@ def crear_contrato(obj_in: ContratoCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento no encontrado.")
 
     # 2. Mapeo y volcado directo al modelo físico de la base de datos de producción
-    # Nota: Si el esquema Pydantic interceptó un contrato indefinido, obj_in.fecha_fin es None de fábrica
     nuevo_contrato = Contratos(
         trabajador_id=obj_in.trabajador_id,
         empresa_id=obj_in.empresa_id,
@@ -93,6 +92,69 @@ def obtener_contratos_por_empresa(id_empresa: UUID, db: Session = Depends(get_db
     """
     return db.query(Contratos).filter(Contratos.empresa_id == id_empresa).all()
 
+@router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}/activo", response_model=ContratoResponse)
+def obtener_contrato_activo_trabajador_empresa(
+    id_trabajador: UUID, 
+    id_empresa: UUID, 
+    db: Session = Depends(get_db)
+):
+    """
+    URI: GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo
+    Busca el contrato vigente real de un trabajador asegurando el aislamiento por Empresa (Tenant).
+    """
+    hoy = date.today()
+    
+    contrato_activo = db.query(Contratos).filter(
+        Contratos.trabajador_id == id_trabajador,
+        Contratos.empresa_id == id_empresa,  
+        Contratos.activo == True,
+        Contratos.fecha_inicio <= hoy
+    ).filter(
+        (Contratos.fecha_fin == None) | (Contratos.fecha_fin >= hoy)
+    ).order_by(Contratos.fecha_inicio.desc()).first()
+
+    if not contrato_activo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se ha encontrado ningún contrato activo para este trabajador en la empresa seleccionada."
+        )
+        
+    return contrato_activo
+
+@router.put("/{id_contrato}", response_model=ContratoResponse)
+def actualizar_contrato(
+    id_contrato: UUID, 
+    obj_in: ContratoUpdate, 
+    db: Session = Depends(get_db)
+):
+    """
+    URI: PUT /api/contratos/{id_contrato}
+    Actualiza los datos de un contrato existente mediante un modelo de parcheo (Patch).
+    """
+    contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
+    if not contrato:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato no encontrado.")
+
+    # Convertir el modelo Pydantic a diccionario y excluir campos None
+    update_data = obj_in.dict(exclude_unset=True)
+
+    # Validar existencia de departamento si se intenta cambiar
+    if "departamento_id" in update_data and update_data["departamento_id"]:
+        depto = db.query(Departamentos).filter(Departamentos.id == update_data["departamento_id"]).first()
+        if not depto:
+            raise HTTPException(status_code=404, detail="Departamento destino no encontrado.")
+
+    # Aplicar cambios al modelo
+    for field, value in update_data.items():
+        setattr(contrato, field, value)
+
+    try:
+        db.commit()
+        db.refresh(contrato)
+        return contrato
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error al actualizar el contrato: {str(e)}")
 
 @router.put("/{id_contrato}/dar-baja", response_model=ContratoResponse)
 def rescindir_contrato(id_contrato: UUID, fecha_fin: date, db: Session = Depends(get_db)):
@@ -118,3 +180,4 @@ def rescindir_contrato(id_contrato: UUID, fecha_fin: date, db: Session = Depends
     db.commit()
     db.refresh(contrato)
     return contrato
+

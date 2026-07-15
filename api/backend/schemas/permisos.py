@@ -28,9 +28,7 @@ class PermisoResponse(PermisoBase):
     """
     id: int = Field(..., description="Identificador numérico único del permiso (SmallInteger)")
     
-    # Propiedades complementarias opcionales expuestas en el JSON
     descripcion: Optional[str] = Field(None)
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

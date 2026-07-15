@@ -43,7 +43,7 @@ export default function IncidenciasScreen() {
 
   // Estados locales del formulario
   const [tipoCorreccion, setTipoCorreccion] =
-    useState<TipoCorreccion>("alta_manual");
+    useState<TipoCorreccion>("Alta_manual");
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
   const [fechaAfectada, setFechaAfectada] = useState("2026-06-29");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
@@ -55,8 +55,8 @@ export default function IncidenciasScreen() {
 
   const esAdmin = useMemo(() => {
     return (
-      usuarioActual?.tipo_usuario === "admin_empresa" ||
-      usuarioActual?.tipo_usuario === "admin_gestoria"
+      usuarioActual?.tipo_usuario === "Admin_empresa" ||
+      usuarioActual?.tipo_usuario === "Admin_gestoría"
     );
   }, [usuarioActual?.tipo_usuario]);
 
@@ -96,12 +96,9 @@ export default function IncidenciasScreen() {
         const fichajesFiltrados = listaFichajesRaw.filter((fichaje) => {
           if (!fichaje || !fichaje.estado) return false;
 
-          const estadoFichajeApi = fichaje.estado
-            .toString()
-            .trim()
-            .toLowerCase();
+          const estadoFichajeApi = fichaje.estado.toString();
 
-          const esValido = estadoFichajeApi === "valido";
+          const esValido = estadoFichajeApi === "Válido";
           if (!esValido) return false;
 
           const tipoEventoStr = fichaje.tipo_evento?.toString().toUpperCase();
@@ -123,7 +120,6 @@ export default function IncidenciasScreen() {
               id: fichaje.id,
               fecha: fecha,
               hora: horaMinutos,
-              // CORRECCIÓN 2: Guardamos siempre en mayúsculas limpias como string
               tipo_evento: fichaje.tipo_evento.toString().toUpperCase(),
             };
           },
@@ -173,7 +169,7 @@ export default function IncidenciasScreen() {
       return;
     }
 
-    if (tipoCorreccion !== "alta_manual" && !fichajeAfectadoId.trim()) {
+    if (tipoCorreccion !== "Alta_manual" && !fichajeAfectadoId.trim()) {
       Alert.alert(
         "Campos obligatorios",
         "Debes seleccionar un fichaje de la lista desplegable.",
@@ -199,17 +195,17 @@ export default function IncidenciasScreen() {
         solicitado_por_usuario_id: usuarioActual.id,
         motivo: comentario.trim(),
         fichaje_afectado_id:
-          tipoCorreccion !== "alta_manual" ? fichajeAfectadoId.trim() : null,
+          tipoCorreccion !== "Alta_manual" ? fichajeAfectadoId.trim() : null,
         valor_nuevo:
-          tipoCorreccion !== "anulacion"
+          tipoCorreccion !== "Anulación"
             ? {
                 fecha_descuadre: fechaAfectada.trim(),
                 hora_propuesta: horaRealPropuesta.trim(),
-                evento_solicitado: eventoSolitado, // Se envía "ENTRADA" o "SALIDA" limpios
+                evento_solicitado: eventoSolitado,
               }
             : {},
         valor_anterior:
-          tipoCorreccion === "modificacion" || tipoCorreccion === "anulacion"
+          tipoCorreccion === "Modificación" || tipoCorreccion === "Anulación"
             ? { hora_anterior: horaAnterior.trim() }
             : null,
       };
@@ -243,7 +239,7 @@ export default function IncidenciasScreen() {
   ]);
 
   const handleResolverIncidencia = useCallback(
-    async (idCorreccion: string, decision: "aprobada" | "rechazada") => {
+    async (idCorreccion: string, decision: "Aprobada" | "Rechazada") => {
       try {
         setCargando(true);
         if (!usuarioActual?.id) return;
@@ -317,9 +313,9 @@ export default function IncidenciasScreen() {
               <View style={styles.selectorTipos}>
                 {(
                   [
-                    "alta_manual",
-                    "modificacion",
-                    "anulacion",
+                    "Alta_manual",
+                    "Modificación",
+                    "Anulación",
                   ] as TipoCorreccion[]
                 ).map((tipo) => (
                   <Pressable
@@ -339,13 +335,13 @@ export default function IncidenciasScreen() {
                         tipoCorreccion === tipo && styles.textoOpcionActiva,
                       ]}
                     >
-                      {tipo.replace("_", " ").replace("on", "ón")}
+                      {(tipo || "").replace("_", " ")}
                     </ThemedText>
                   </Pressable>
                 ))}
               </View>
 
-              {tipoCorreccion !== "alta_manual" && (
+              {tipoCorreccion !== "Alta_manual" && (
                 <View style={{ marginBottom: 12 }}>
                   <ThemedText style={styles.label}>
                     Seleccionar Fichaje Original Afectado (Semana Actual)
@@ -376,7 +372,7 @@ export default function IncidenciasScreen() {
                 </View>
               )}
 
-              {tipoCorreccion !== "anulacion" && (
+              {tipoCorreccion !== "Anulación" && (
                 <>
                   <View style={styles.filaCampos}>
                     <View style={{ flex: 1 }}>
@@ -430,7 +426,7 @@ export default function IncidenciasScreen() {
                 </>
               )}
 
-              {tipoCorreccion === "modificacion" && horaAnterior !== "" && (
+              {tipoCorreccion === "Modificación" && horaAnterior !== "" && (
                 <View>
                   <ThemedText style={styles.label}>
                     Hora Anterior Detectada (Original)
@@ -510,7 +506,9 @@ export default function IncidenciasScreen() {
                 <View style={styles.itemCard}>
                   <View style={styles.headerCard}>
                     <ThemedText style={styles.itemFecha}>
-                      {item.tipo_correccion.replace("_", " ").toUpperCase()}
+                      {(item.tipo_correccion || "")
+                        .replace("_", " ")
+                        .toUpperCase()}
                     </ThemedText>
                     <View
                       style={[styles.badge, { backgroundColor: colores.bg }]}
@@ -518,7 +516,7 @@ export default function IncidenciasScreen() {
                       <ThemedText
                         style={[styles.badgeText, { color: colores.texto }]}
                       >
-                        {item.estado.toUpperCase()}
+                        {(item.estado || "").toUpperCase()}
                       </ThemedText>
                     </View>
                   </View>
@@ -545,7 +543,7 @@ export default function IncidenciasScreen() {
                       <Pressable
                         style={[styles.botonResolutor, styles.botonRechazar]}
                         onPress={() =>
-                          handleResolverIncidencia(item.id, "rechazada")
+                          handleResolverIncidencia(item.id, "Rechazada")
                         }
                       >
                         <FontAwesome5 name="times" size={12} color="#FFFFFF" />
@@ -556,7 +554,7 @@ export default function IncidenciasScreen() {
                       <Pressable
                         style={[styles.botonResolutor, styles.botonAprobar]}
                         onPress={() =>
-                          handleResolverIncidencia(item.id, "aprobada")
+                          handleResolverIncidencia(item.id, "Aprobada")
                         }
                       >
                         <FontAwesome5 name="check" size={12} color="#FFFFFF" />

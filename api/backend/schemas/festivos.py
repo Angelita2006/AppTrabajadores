@@ -9,12 +9,12 @@ from uuid import UUID
 
 class FestivoResponse2(BaseModel):
     id: UUID4
-    fecha: date          # Pydantic lo convertirá automáticamente a String "YYYY-MM-DD"
+    fecha: date          
     descripcion: str
     tipo: str
 
     class Config:
-        from_attributes = True  # Permite leer objetos de SQLAlchemy
+        from_attributes = True  
 
 
 class FestivoBase(BaseModel):
@@ -40,9 +40,7 @@ class FestivoResponse(FestivoBase):
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
     
-    # Propiedades complementarias opcionales expuestas en el JSON
     descripcion: Optional[str] = Field(None)
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

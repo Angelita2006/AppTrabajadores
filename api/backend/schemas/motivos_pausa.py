@@ -30,10 +30,8 @@ class MotivoPausaResponse(MotivoPausaBase):
     """
     id: int = Field(..., description="Identificador numérico único de la pausa (SmallInteger)")
     
-    # Propiedades complementarias opcionales expuestas en el JSON
     empresa_id: Optional[UUID] = Field(None)
     duracion_max_minutos: Optional[int] = Field(None)
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

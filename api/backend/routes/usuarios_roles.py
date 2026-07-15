@@ -31,8 +31,7 @@ def asignar_rol_usuario(obj_in: UsuarioRolCreate, db: Session = Depends(get_db))
         if not empresa:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa no encontrada.")
 
-    # 2. Comprobación de la restricción de unicidad compuesta (usuario_id + role_id + empresa_id)
-    # Evita que se duplique exactamente el mismo rol para la misma empresa
+    # 2. Comprobación de la restricción de unicidad compuesta 
     asignacion_existente = db.query(UsuariosRoles).filter(
         UsuariosRoles.usuario_id == obj_in.usuario_id,
         UsuariosRoles.role_id == obj_in.role_id,

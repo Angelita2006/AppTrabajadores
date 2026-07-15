@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
@@ -90,6 +90,34 @@ def editar_asignacion_turno(id_asignacion: UUID, fecha_fin: date, fecha_inicio =
     db.commit()
     db.refresh(asignacion)
     return asignacion
+
+
+@router.patch("/{id_asignacion}/created-at", response_model=AsignacionTurnoResponse, status_code=status.HTTP_200_OK)
+def poner_fecha_creacion_asignacion_turno(id_asignacion: UUID, fecha_creacion: datetime, db: Session = Depends(get_db)):
+    """
+    URI: PATCH /api/asignaciones-turno/{id_asignacion}/created-at
+    Da a la asignación de turno un fecha de creación.
+    """
+    asignacion = db.query(AsignacionesTurno).filter(AsignacionesTurno.id == id_asignacion).first()
+    if not asignacion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró la asignación de turno con ID {id_asignacion}."
+        )
+
+    # Actualizamos la fecha de creación 
+    asignacion.created_at = fecha_creacion
+
+    try:
+        db.commit()
+        db.refresh(asignacion)
+        return asignacion
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al guardar la fecha de creación: {str(e)}"
+        )
 
 @router.put("/{id_asignacion}/finalizar", response_model=AsignacionTurnoResponse)
 def finalizar_vigencia_turno(id_asignacion: UUID, fecha_fin: date, db: Session = Depends(get_db)):

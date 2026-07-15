@@ -4,12 +4,12 @@ import {
   TipoFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import {
-  getUsuarioByIdTrabajador,
   obtenerAsignacionesTurnoTrabajador,
+  obtenerContratoActivoTrabajador,
   obtenerFichajesEmpresaPorFecha,
+  obtenerTrabajador,
   obtenerTurno,
 } from "@/src/modules/trabajadores/api/services";
-import { UsuarioSesion } from "@/src/modules/trabajadores/types/trabajador";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Print from "expo-print";
@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -76,8 +77,13 @@ const obtenerConfiguracionEvento = (tipo: string | number) => {
   return {
     icono: "clock-outline",
     color: "#475569",
-    text: tipoStr || "OTRO",
+    texto: tipoStr || "OTRO",
   };
+};
+
+const capitalizar = (texto: string) => {
+  if (!texto) return "N/A";
+  return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
 };
 
 export default function FichajesHistorialScreen() {
@@ -85,10 +91,11 @@ export default function FichajesHistorialScreen() {
   const [fichajesSemanales, setFichajesSemanales] = useState<RegistroFichaje[]>(
     [],
   );
+  const [mapaDatosFiscales, setMapaDatosFiscales] = useState<any>({});
   const [cargando, setCargando] = useState<boolean>(true);
   const [fechaReferencia, setFechaReferencia] = useState<Date>(new Date());
   const [mapaTurnosObjetos, setMapaTurnosObjetos] = useState<{
-    [key: string]: ItemTurno[];
+    [key: string]: any[];
   }>({});
 
   const lunesSemanaActual = useMemo(() => {
@@ -98,7 +105,6 @@ export default function FichajesHistorialScreen() {
     return new Date(d.setDate(diff));
   }, [fechaReferencia]);
 
-  // CAMBIO 1: El rango de texto ahora muestra de Lunes a Sábado (+5 días en vez de +6)
   const rangoSemanaStr = useMemo(() => {
     const lunes = new Date(lunesSemanaActual);
     const sabado = new Date(lunes);
@@ -119,7 +125,7 @@ export default function FichajesHistorialScreen() {
       setCargando(true);
       const promesasFichajes = [];
 
-      // CAMBIO 2: Solo pedir a la API los 6 días de la semana laboral (i < 6 -> Lunes a Sábado)
+      // 1. Obtener fichajes de la semana
       for (let i = 0; i < 6; i++) {
         const diaConsultar = new Date(lunesSemanaActual);
         diaConsultar.setDate(lunesSemanaActual.getDate() + i);
@@ -142,63 +148,104 @@ export default function FichajesHistorialScreen() {
       const todosLosFichajes: RegistroFichaje[] = resultadosDias.flat();
 
       const fichajesValidos = todosLosFichajes.filter(
-        (f) => f.estado?.toLowerCase() === "valido",
+        (f) => !f.estado?.localeCompare("Válido"),
       );
       setFichajesSemanales(fichajesValidos);
 
       const idTrabajadoresUnicos = Array.from(
         new Set(fichajesValidos.map((f) => f.trabajador_id)),
       );
-      const nuevoMapaObjetosTurnos: { [key: string]: ItemTurno[] } = {};
 
+      // 2. Objetos acumuladores locales
+      const nuevoMapaObjetosTurnos: { [key: string]: ItemTurno[] } = {};
+      const nuevoMapaDatosFiscales: { [key: string]: any } = {};
+
+      // 3. Procesar cada trabajador una sola vez
       for (const idTrabajador of idTrabajadoresUnicos) {
         try {
-          const usuario: UsuarioSesion =
-            await getUsuarioByIdTrabajador(idTrabajador);
-          if (usuario.tipo_usuario !== "trabajador") continue;
+          // Obtener datos fiscales del trabajador
+          const trabajador = await obtenerTrabajador(idTrabajador);
 
+          // Obtener contrato (usando ID empresa y trabajador)
+          const contratoActivo = await obtenerContratoActivoTrabajador(
+            idTrabajador,
+            empresaSeleccionada?.id || "",
+          );
+
+          const asignacionesTurno: AsignacionTurno[] =
+            await obtenerAsignacionesTurnoTrabajador(idTrabajador);
+          const conjuntoDias = new Set<string>();
+
+          if (Array.isArray(asignacionesTurno)) {
+            for (const asig of asignacionesTurno) {
+              const tInfo: ItemTurno = await obtenerTurno(asig.turno_id);
+              if (tInfo && tInfo.dias_semana) {
+                tInfo.dias_semana.forEach((diaNum: number) => {
+                  const nombreDia = DIAS_SEMANA[diaNum];
+                  if (nombreDia) {
+                    conjuntoDias.add(nombreDia);
+                  }
+                });
+              }
+            }
+          }
+
+          const diasOrdenados = DIAS_SEMANA.filter((dia) =>
+            conjuntoDias.has(dia),
+          );
+          const diasPlanificadosTexto =
+            diasOrdenados.length > 0
+              ? diasOrdenados.join(", ")
+              : "Sin días asignados";
+
+          nuevoMapaDatosFiscales[idTrabajador] = {
+            jornada: capitalizar(contratoActivo?.tipo_jornada || ""),
+            tipo_contrato: capitalizar(contratoActivo?.tipo_contrato || ""),
+            dias_planificados: diasPlanificadosTexto,
+            horas_semana: capitalizar(
+              contratoActivo?.horas_semana.toString().substring(0, 2) || "0",
+            ),
+            nif_nie: trabajador.nif_nie || "",
+            numero_seguridad_social: trabajador.numero_seguridad_social || "",
+          };
+
+          // Obtener asignaciones de turnos
           const asignaciones: AsignacionTurno[] =
             await obtenerAsignacionesTurnoTrabajador(idTrabajador);
-          if (
-            asignaciones &&
-            Array.isArray(asignaciones) &&
-            asignaciones.length > 0
-          ) {
+
+          if (Array.isArray(asignaciones) && asignaciones.length > 0) {
             const turnosTrabajador: ItemTurno[] = [];
             for (const asig of asignaciones) {
-              const idBuscar = asig.turno_id;
-              if (idBuscar) {
-                const tInfo: ItemTurno = await obtenerTurno(asig.turno_id);
-                if (tInfo) {
-                  turnosTrabajador.push({
-                    id: asig.id,
-                    turno_id: idBuscar,
-                    empresa_id:
-                      tInfo.empresa_id || empresaSeleccionada?.id || "",
-                    nombre: tInfo.nombre || "Sin Nombre",
-                    hora_inicio: tInfo.hora_inicio || "00:00:00",
-                    hora_fin: tInfo.hora_fin || "00:00:00",
-                    minutos_pausa_obligatoria:
-                      tInfo.minutos_pausa_obligatoria || 0,
-                    color_hex: tInfo.color_hex || null,
-                    fecha_real:
-                      asig.fecha_inicio ||
-                      new Date().toISOString().split("T")[0],
-                    diasSemana: tInfo.diasSemana || "",
-                    tipo_jornada: tInfo.tipo_jornada || "Completa",
-                  });
-                }
+              const tInfo: ItemTurno = await obtenerTurno(asig.turno_id);
+              if (tInfo) {
+                turnosTrabajador.push({
+                  id: asig.id,
+                  turno_id: asig.turno_id,
+                  empresa_id: tInfo.empresa_id || empresaSeleccionada?.id || "",
+                  nombre: capitalizar(tInfo.nombre || "Sin Nombre"),
+                  hora_inicio: tInfo.hora_inicio || "00:00:00",
+                  hora_fin: tInfo.hora_fin || "00:00:00",
+                  minutos_pausa_obligatoria:
+                    tInfo.minutos_pausa_obligatoria || 0,
+                  color_hex: tInfo.color_hex || null,
+                  fecha_real:
+                    asig.fecha_inicio || new Date().toISOString().split("T")[0],
+                  dias_semana: tInfo.dias_semana || "",
+                  tipo_jornada: tInfo.tipo_jornada || "Completa",
+                  fecha_asignacion_inicio: asig.fecha_inicio,
+                  fecha_asignacion_fin: asig.fecha_fin || "",
+                });
               }
             }
             nuevoMapaObjetosTurnos[idTrabajador] = turnosTrabajador;
           }
         } catch (err) {
-          console.error(
-            `Error procesando turnos del trabajador ${idTrabajador}:`,
-            err,
-          );
+          console.error(`Error procesando trabajador ${idTrabajador}:`, err);
         }
       }
+
+      // 4. Actualizar estados finales (único render)
+      setMapaDatosFiscales(nuevoMapaDatosFiscales);
       setMapaTurnosObjetos(nuevoMapaObjetosTurnos);
     } catch (error) {
       console.error("Error al auditar el cuadrante semanal:", error);
@@ -212,9 +259,22 @@ export default function FichajesHistorialScreen() {
   }, [lunesSemanaActual, empresaSeleccionada?.id]);
 
   const mapearTurnoUIString = (trabajadorId: string) => {
-    const lista = mapaTurnosObjetos[trabajadorId];
-    if (!lista || lista.length === 0) return "Sin turno asignado";
-    return lista
+    const lista = mapaTurnosObjetos[trabajadorId] || [];
+    const inicioSemana = new Date(lunesSemanaActual);
+    const finSemana = new Date(lunesSemanaActual);
+    finSemana.setDate(finSemana.getDate() + 6);
+    const listaFiltrada = lista.filter((t: ItemTurno) => {
+      const inicioTurno = new Date(
+        t.fecha_asignacion_inicio.replace(/-/g, "/"),
+      );
+      const finTurno = t.fecha_asignacion_fin
+        ? new Date(t.fecha_asignacion_fin.replace(/-/g, "/"))
+        : Date.now();
+      return inicioTurno <= finSemana && finTurno >= inicioSemana;
+    });
+    if (!listaFiltrada || listaFiltrada.length === 0)
+      return "Sin turno asignado esta semana";
+    return listaFiltrada
       .map((t) => {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
         const fin = t.hora_fin ? t.hora_fin.substring(0, 5) : "00:00";
@@ -232,9 +292,19 @@ export default function FichajesHistorialScreen() {
 
     fichajesSemanales.forEach((f) => {
       if (!mapa[f.trabajador_id]) {
+        const fiscal = mapaDatosFiscales[f.trabajador_id] || [];
+        const turnosTrabajador = mapaTurnosObjetos[f.trabajador_id] || [];
+        const turnoActivo = turnosTrabajador[0];
+
         mapa[f.trabajador_id] = {
           id: f.trabajador_id,
           nombre: f.trabajador_nombre,
+          tipoJornada: fiscal?.jornada,
+          tipoContrato: fiscal?.tipo_contrato,
+          diasAsignados: turnoActivo?.diasSemana,
+          horasContrato: fiscal?.horas_semana,
+          nif_nie: fiscal?.nif_nie || "N/A",
+          numero_seguridad_social: fiscal?.numero_seguridad_social || "-",
           turnoResumen: mapearTurnoUIString(f.trabajador_id),
           dias: {},
         };
@@ -251,6 +321,7 @@ export default function FichajesHistorialScreen() {
         const fechaFichajeLimpia = f.fecha_hora.includes("T")
           ? f.fecha_hora.split("T")[0]
           : f.fecha_hora.split(" ")[0];
+
         const objetoFecha = new Date(fechaFichajeLimpia.replace(/-/g, "/"));
         const nombreDia =
           DIAS_SEMANA[
@@ -258,8 +329,6 @@ export default function FichajesHistorialScreen() {
               ? new Date().getDay()
               : objetoFecha.getDay()
           ];
-
-        // Medida de seguridad adicional: Si por alguna razón llega un fichaje del domingo, no procesarlo
         if (nombreDia === "Domingo") return;
 
         if (!mapa[trabajadorId].dias[fechaFichajeLimpia]) {
@@ -274,6 +343,7 @@ export default function FichajesHistorialScreen() {
         );
         let turnoAsignadoKey = "Turno General";
 
+        // 2. Lógica de búsqueda mejorada
         for (const turno of turnosDelTrabajador) {
           const inicioMinutos = horaAMinutos(turno.hora_inicio) - 60;
           const finMinutos = horaAMinutos(turno.hora_fin) + 60;
@@ -323,10 +393,10 @@ export default function FichajesHistorialScreen() {
     }
 
     const bloquesTrabajadoresHtml = trabajadoresAgrupadosSemanales
-      .map((t) => {
+      .map((t: any) => {
         let filasCalendarioHtml = "";
+        let totalMinutosSemanales = 0;
 
-        // CAMBIO 3: Compilar la tabla del documento PDF únicamente de Lunes a Sábado (i < 6)
         for (let i = 0; i < 6; i++) {
           const diaActual = new Date(lunesSemanaActual);
           diaActual.setDate(lunesSemanaActual.getDate() + i);
@@ -339,6 +409,8 @@ export default function FichajesHistorialScreen() {
               ([nombreTurno, marcas]: [string, any]) => {
                 let entrada = "-";
                 let salida = "-";
+                let entradaMinutos = 0;
+                let salidaMinutos = 0;
                 let aPausaInicio: Date | null = null;
                 let tiempoPausasMinutos = 0;
 
@@ -347,13 +419,17 @@ export default function FichajesHistorialScreen() {
                   if (
                     m.tipo_evento === TipoFichaje.ENTRADA ||
                     m.tipo_evento_id === 1
-                  )
+                  ) {
                     entrada = hora;
+                    entradaMinutos = horaAMinutos(hora);
+                  }
                   if (
                     m.tipo_evento === TipoFichaje.SALIDA ||
                     m.tipo_evento_id === 2
-                  )
+                  ) {
                     salida = hora;
+                    salidaMinutos = horaAMinutos(hora);
+                  }
                   if (
                     m.tipo_evento === TipoFichaje.INICIO_PAUSA ||
                     m.tipo_evento_id === 3
@@ -372,6 +448,29 @@ export default function FichajesHistorialScreen() {
                   }
                 });
 
+                let minutesTrabajadosHoy = 0;
+                let estadoLinea = "Incompleto";
+                let colorEstado = "#EA580C";
+
+                if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
+                  minutesTrabajadosHoy =
+                    salidaMinutos - entradaMinutos - tiempoPausasMinutos;
+                  if (minutesTrabajadosHoy < 0) minutesTrabajadosHoy = 0;
+                  totalMinutosSemanales += minutesTrabajadosHoy;
+                  estadoLinea =
+                    nombreDiaUI === "Sábado" ? "Horas extra" : "Efectuado";
+                  colorEstado = "#16A34A";
+                } else if (entrada === "-" && salida === "-") {
+                  estadoLinea =
+                    nombreDiaUI === "Sábado" ? "Sin horas extra" : "Sin marcas";
+                  colorEstado = "#94A3B8";
+                }
+
+                const horasHoyTexto =
+                  minutesTrabajadosHoy > 0
+                    ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
+                    : "-";
+
                 const pausasTexto =
                   tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
 
@@ -381,20 +480,26 @@ export default function FichajesHistorialScreen() {
               <td>${entrada}</td>
               <td>${salida}</td>
               <td>${pausasTexto}</td>
-              <td style="font-weight: bold; font-size:10px; color:#16A34A;">Efectuado</td>
+              <td style="font-weight: bold;">${horasHoyTexto}</td>
+              <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
               <td class="celda-firma"></td>
             </tr>
           `;
               },
             );
           } else {
+            // Aplicamos la misma lógica: si es sábado, etiqueta especial, si no, el nombre del día
+            const esSabado = nombreDiaUI === "Sábado";
+            const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
+
             filasCalendarioHtml += `
           <tr>
             <td><strong>${nombreDiaUI}</strong></td>
             <td>-</td>
             <td>-</td>
             <td>-</td>
-            <td style="color:#94A3B8;">Sin marcas</td>
+            <td>-</td>
+            <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td>
             <td class="celda-firma"></td>
           </tr>
         `;
@@ -402,31 +507,52 @@ export default function FichajesHistorialScreen() {
         }
 
         const rSocial =
-          empresaSeleccionada?.razon_social ||
-          empresaSeleccionada?.nombre_comercial ||
-          "Sin Identificar";
+          empresaSeleccionada?.nombre_comercial +
+            " " +
+            empresaSeleccionada?.razon_social || "Sin Identificar";
         const cifEmpresa = empresaSeleccionada?.cif || "-";
         const cnaeEmpresa = empresaSeleccionada?.codigo_cnae
           ? ` / CNAE: ${empresaSeleccionada.codigo_cnae}`
           : "";
 
+        const fiscal = mapaDatosFiscales[t.id];
+        const dniTrabajador = fiscal?.nif_nie || "N/A";
+        const nssTrabajador = fiscal?.numero_seguridad_social || "-";
+
+        const relacionLaboralTexto = `${t.tipoContrato} (${t.tipoJornada} - ${t.horasContrato}/sem)`;
+        const diasAsignadosTexto = `${fiscal?.dias_planificados}`;
+        const horarioVigenteTexto =
+          t.turnoResumen && t.turnoResumen !== "Sin turno asignado"
+            ? t.turnoResumen
+            : "Sin cuadrante de turnos activo en estas fechas";
+
+        const totalHorasCalculadas = `${Math.floor(totalMinutosSemanales / 60)} horas y ${totalMinutosSemanales % 60} minutos`;
+
         return `
       <div class="hoja-trabajador">
         <div class="caja-legal">
-          <strong>DOCUMENTO DE REGISTRO DE JORNADA SEMANAL</strong><br/>
-          <span>De conformidad con el Art. 34.9 del Estatuto de los Trabajadores (RDL 8/2019)</span>
+          <strong>REGISTRO COMPLEMENTARIO DE JORNADA LABORAL SEMANAL</strong><br/>
+          <span style="font-size: 10px;">Cumplimiento obligatorio de control horario según Real Decreto-ley 8/2019 de 8 de marzo (Art. 34.9 ET)</span>
         </div>
         <table class="tabla-datos">
           <tr>
             <td><strong>Empresa / Razón Social:</strong> ${rSocial}</td>
-            <td><strong>CIF/NIF:</strong> ${cifEmpresa}${cnaeEmpresa}</td>
+            <td><strong>CIF / NIF Empresa:</strong> ${cifEmpresa}${cnaeEmpresa}</td>
           </tr>
           <tr>
-            <td><strong>Trabajador:</strong> ${t.nombre}</td>
-            <td><strong>Turnos Asignados:</strong> ${t.turnoResumen}</td>
+            <td><strong>Nombre del Trabajador:</strong> ${t.nombre}</td>
+            <td><strong>NIF / DNI / NIE Trabajador:</strong> <span style="font-size:12px; font-weight:bold;">${dniTrabajador}</span></td>
           </tr>
           <tr>
-            <td colspan="2"><strong>Período de Liquidación / Registro:</strong> ${rangoSemanaStr}</td>
+            <td><strong>Nº Afiliación Seguridad Social (NSS):</strong> ${nssTrabajador}</td>
+            <td><strong>Contrato / Tipo Jornada:</strong> <span style="color:#1E3A8A; font-weight:bold;">${relacionLaboralTexto}</span></td>
+          </tr>
+          <tr>
+            <td><strong>Horario Asignado en la Semana:</strong> <span style="font-weight: 600; color: #334155;">${horarioVigenteTexto}</span></td>
+            <td><strong>Días Planificados:</strong> ${diasAsignadosTexto}</td>
+          </tr>
+          <tr>
+            <td colspan="2"><strong>Período de Liquidación / Registro Evaluado:</strong> <strong>${rangoSemanaStr}</strong></td>
           </tr>
         </table>
         <table class="tabla-registro">
@@ -436,6 +562,7 @@ export default function FichajesHistorialScreen() {
               <th>Hora Entrada</th>
               <th>Hora Salida</th>
               <th>Interrupciones / Pausas</th>
+              <th>Horas Computadas</th>
               <th>Estado</th>
               <th>Firma Trabajador</th>
             </tr>
@@ -443,10 +570,22 @@ export default function FichajesHistorialScreen() {
           <tbody>
             ${filasCalendarioHtml}
           </tbody>
+          <tfoot>
+            <tr style="background-color: #F1F5F9; font-weight: bold;">
+              <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS ORDINARIAS COMPUTADAS EN LA SEMANA:</td>
+              <td colspan="3" style="text-align: left; padding: 8px; font-size: 12px; color: #1E3A8A;">${totalHorasCalculadas}</td>
+            </tr>
+          </tfoot>
         </table>
+        
+        <p style="font-size: 9px; color: #555; margin-top: 15px; font-style: italic;">
+          * El trabajador firma este documento en señal de conformidad con los horarios reflejados en el presente cuadrante de control de presencia.
+        </p>
+
         <div class="firmas-bloque">
-          <div class="firma-caja">Firma de la Empresa / Sello</div>
-          <div class="firma-caja">Firma del Trabajador</div>
+          <div class="firma-caja" style="float: left;">Firma de la Empresa / Sello Autorizado</div>
+          <div class="firma-caja" style="float: right;">Firma de Conformidad del Trabajador</div>
+          <div style="clear: both;"></div>
         </div>
         <div class="page-break"></div>
       </div>
@@ -467,8 +606,8 @@ export default function FichajesHistorialScreen() {
           .tabla-registro th, .tabla-registro td { border: 1px solid #000; padding: 6px; text-align: center; }
           .tabla-registro th { background-color: #EAEAEA; font-size: 10px; text-transform: uppercase; }
           .celda-firma { width: 110px; height: 30px; }
-          .firmas-bloque { margin-top: 30px; display: flex; justify-content: space-between; }
-          .firma-caja { width: 40%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 40px; font-weight: bold; }
+          .firmas-bloque { margin-top: 20px; width: 100%; }
+          .firma-caja { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 50px; font-weight: bold; }
           .page-break { page-break-after: always; }
         </style>
       </head>
@@ -540,6 +679,7 @@ export default function FichajesHistorialScreen() {
     rangoSemanaStr,
     lunesSemanaActual,
     fichajesSemanales,
+    mapaDatosFiscales,
   ]);
 
   return (
@@ -551,13 +691,6 @@ export default function FichajesHistorialScreen() {
         <View style={styles.cajaInfoEmpresa}>
           <View style={styles.filaInfoEmpresa}>
             <FontAwesome5 name="building" size={13} color="#475569" />
-            <ThemedText style={styles.textoInfoEmpresa}>
-              <ThemedText style={styles.negrita}>Razón Social:</ThemedText>{" "}
-              {empresaSeleccionada.razon_social}
-            </ThemedText>
-          </View>
-          <View style={[styles.filaInfoEmpresa, { marginTop: 4 }]}>
-            <FontAwesome5 name="id-card" size={12} color="#475569" />
             <ThemedText style={styles.textoInfoEmpresa}>
               <ThemedText style={styles.negrita}>CIF:</ThemedText>{" "}
               {empresaSeleccionada.cif}
@@ -695,7 +828,12 @@ export default function FichajesHistorialScreen() {
                                           { color: config.color },
                                         ]}
                                       >
-                                        {config.texto} {horaLimpia} hs
+                                        {config.texto}{" "}
+                                        {config.texto.includes("PAUSA") &&
+                                        Platform.OS !== "web"
+                                          ? "\n" + horaLimpia
+                                          : horaLimpia}{" "}
+                                        hs
                                       </ThemedText>
                                     </View>
                                   </View>
@@ -866,7 +1004,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 1,
   },
-  textoEvento: { fontSize: 10, fontWeight: "700" },
+  textoEvento: {
+    fontSize: Platform.OS === "web" ? 10 : 8.5,
+    fontWeight: "700",
+  },
   empty: {
     textAlign: "center",
     color: "#64748B",

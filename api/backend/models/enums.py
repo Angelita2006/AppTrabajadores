@@ -1,73 +1,73 @@
 import enum
 
 class AccionAuditoriaEnum(str, enum.Enum):
-    CONSULTA = 'consulta'
-    EXPORTACION = 'exportacion'
-    DESCARGA = 'descarga'
-    MODIFICACION = 'modificacion'
-    ACCESO_DENEGADO = 'acceso_denegado'
+    CONSULTA = 'Consulta'
+    EXPORTACION = 'Exportación'
+    DESCARGA = 'Descarga'
+    MODIFICACION = 'Modificación'
+    ACCESO_DENEGADO = 'Acceso_denegado'
 
 class AccionRetencionEnum(str, enum.Enum):
-    ARCHIVAR = 'archivar'
-    ANONIMIZAR = 'anonimizar'
-    ELIMINAR = 'eliminar'
+    ARCHIVAR = 'Archivar'
+    ANONIMIZAR = 'Anonimizar'
+    ELIMINAR = 'Eliminar'
 
 class EstadoCorreccionEnum(str, enum.Enum):
-    PENDIENTE = 'pendiente'
-    APROBADA = 'aprobada'
-    RECHAZADA = 'rechazada'
+    PENDIENTE = 'Pendiente'
+    APROBADA = 'Aprobada'
+    RECHAZADA = 'Rechazada'
 
 class EstadoFichajeEnum(str, enum.Enum):
-    VALIDO = 'valido'
-    PENDIENTE_REVISION = 'pendiente_revision'
+    VALIDO = 'Válido'
+    PENDIENTE_REVISION = 'Pendiente_revisión'
 
 class MetodoFichajeEnum(str, enum.Enum):
-    APP_MOVIL = 'app_movil'
-    TERMINAL_RFID = 'terminal_rfid'
-    TERMINAL_PIN = 'terminal_pin'
-    LECTOR_QR = 'lector_qr'
-    WEB = 'web'
-    GEOLOCALIZACION = 'geolocalizacion'
-    MANUAL = 'manual'
+    APP_MOVIL = 'App_móvil'
+    TERMINAL_RFID = 'Terminal_rfid'
+    TERMINAL_PIN = 'Terminal_pin'
+    LECTOR_QR = 'Lector_qr'
+    WEB = 'Web'
+    GEOLOCALIZACION = 'Geolocalización'
+    MANUAL = 'Manual'
 
 class OrigenFichajeEnum(str, enum.Enum):
-    TRABAJADOR = 'trabajador'
-    CORRECCION_RRHH = 'correccion_rrhh'
-    SISTEMA = 'sistema'
+    TRABAJADOR = 'Trabajador'
+    CORRECCION_RRHH = 'Corrección_rrhh'
+    SISTEMA = 'Sistema'
 
 class TipoContratoEnum(str, enum.Enum):
-    INDEFINIDO = 'indefinido'
-    TEMPORAL = 'temporal'
-    FORMACION = 'formacion'
-    PRACTICAS = 'practicas'
-    FIJO_DISCONTINUO = 'fijo_discontinuo'
-    OTRO = 'otro'
+    INDEFINIDO = 'Indefinido'
+    TEMPORAL = 'Temporal'
+    FORMACION = 'Formación'
+    PRACTICAS = 'Prácticas'
+    FIJO_DISCONTINUO = 'Fijo_discontinuo'
+    OTRO = 'Otro'
 
 class TipoCorreccionEnum(str, enum.Enum):
-    ALTA_MANUAL = 'alta_manual'
-    MODIFICACION = 'modificacion'
-    ANULACION = 'anulacion'
+    ALTA_MANUAL = 'Alta_manual'
+    MODIFICACION = 'Modificación'
+    ANULACION = 'Anulación'
 
 class TipoJornadaEnum(str, enum.Enum):
-    COMPLETA = 'completa'
-    PARCIAL = 'parcial'
+    COMPLETA = 'Completa'
+    PARCIAL = 'Parcial'
 
 class TipoUsuarioEnum(str, enum.Enum):
-    ADMIN_GESTORIA = 'admin_gestoria'
-    ADMIN_EMPRESA = 'admin_empresa'
-    RRHH = 'rrhh'
-    REPRESENTANTE_LEGAL = 'representante_legal'
-    TRABAJADOR = 'trabajador'
-    AUDITOR_ITSS = 'auditor_itss'
+    ADMIN_GESTORIA = 'Admin_gestoría'
+    ADMIN_EMPRESA = 'Admin_empresa'
+    RRHH = 'Rrhh'
+    REPRESENTANTE_LEGAL = 'Representante_legal'
+    TRABAJADOR = 'Trabajador'
+    AUDITOR_ITSS = 'Auditor_itss'
 
 class TipoAusenciaEnum(str, enum.Enum):
-    vacaciones = "vacaciones"
-    baja_temporal = "baja_temporal"
-    maternidad_paternidad = "maternidad_paternidad"
-    permiso_retribuido = "permiso_retribuido"
-    ausencia_injustificada = "ausencia_injustificada"
+    VACACIONES = "Vacaciones"
+    BAJA_TEMPORAL = "Baja_temporal"
+    MATERNIDAD_PATERNIDAD = "Maternidad_paternidad"
+    PERMISO_RETRIBUIDO = "Permiso_retribuido"
+    AUSENCIA_INJUSTIFICADA = "Ausencia_injustificada"
 
 class EstadoAusenciaEnum(str, enum.Enum):
-    pendiente = "pendiente"
-    aprobada = "aprobada"
-    rechazada = "rechazada"
+    PENDIENTE = "Pendiente"
+    APROBADA = "Aprobada"
+    RECHAZADA = "Rechazada"

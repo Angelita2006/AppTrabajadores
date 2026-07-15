@@ -22,8 +22,10 @@ class Ausencias(Base):
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     
-    tipo_ausencia: Mapped[TipoAusenciaEnum] = mapped_column(Enum(TipoAusenciaEnum, name='tipo_ausencia_enum'), nullable=False)
-    estado: Mapped[EstadoAusenciaEnum] = mapped_column(Enum(EstadoAusenciaEnum, name='estado_ausencia_enum'), nullable=False, server_default=text("'pendiente'::estado_ausencia_enum"))
+    # tipo_ausencia: Mapped[TipoAusenciaEnum] = mapped_column(Enum(TipoAusenciaEnum, name='tipo_ausencia_enum'), nullable=False)
+    tipo_ausencia: Mapped[str] = mapped_column(Text, nullable=False)
+    # estado: Mapped[EstadoAusenciaEnum] = mapped_column(Enum(EstadoAusenciaEnum, name='estado_ausencia_enum'), nullable=False, server_default=text("'Pendiente'::estado_ausencia_enum"))
+    estado: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'Pendiente'::estado"))
     
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[datetime.date] = mapped_column(Date, nullable=False)

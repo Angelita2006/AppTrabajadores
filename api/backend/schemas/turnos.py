@@ -1,12 +1,19 @@
 import datetime
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
+
+class TurnoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    hora_inicio: Optional[datetime.time] = None
+    hora_fin: Optional[datetime.time] = None
+    duracion_pausa_minutos: Optional[int] = None
+    dias_semana: Optional[List[int]] = None
 
 class TurnoBase(BaseModel):
     """
@@ -52,5 +59,4 @@ class TurnoResponse(TurnoBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la creación del cuadrante (now)")
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True

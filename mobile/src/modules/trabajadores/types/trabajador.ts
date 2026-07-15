@@ -9,7 +9,7 @@ export enum Estado {
 }
 
 // Roles de control de acceso definidos por el RBAC del servidor
-export type TipoUsuario = "admin_gestoria" | "admin_empresa" | "trabajador";
+export type TipoUsuario = "Admin_gestoría" | "Admin_empresa" | "Trabajador";
 
 /**
  * Interfaz oficial del Expediente Laboral (Tabla: trabajadores)

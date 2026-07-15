@@ -19,7 +19,7 @@ class TipoEventoFichajeCreate(TipoEventoFichajeBase):
     Esquema utilizado para recibir los datos desde el cliente o scripts de migración
     al dar de alta una nueva categoría de marcaje horario en el servidor.
     """
-    pass  # Hereda todos los campos obligatorios de TipoEventoFichajeBase sin añadir nuevos
+    pass 
 
 
 class TipoEventoFichajeResponse(TipoEventoFichajeBase):
@@ -30,5 +30,4 @@ class TipoEventoFichajeResponse(TipoEventoFichajeBase):
     id: int = Field(..., description="Identificador numérico único del tipo de evento (SmallInteger)")
 
     class Config:
-        # Habilita el modo de conversión directa para los modelos tipados de SQLAlchemy 2.0
         from_attributes = True

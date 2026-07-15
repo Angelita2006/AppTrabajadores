@@ -1,6 +1,4 @@
-import {
-  UsuarioSesion
-} from "../../trabajadores/types/trabajador";
+import { UsuarioSesion } from "../../trabajadores/types/trabajador";
 
 /**
  * Representa el modelo de una Empresa cliente (Tenant) en el frontend,
@@ -62,6 +60,6 @@ export interface RegistroOrganizacionDTO {
 
 export interface RespuestaRegistroCompleto {
   empresa: Empresa;
-  trabajador: "trabajador";
+  trabajador: "Trabajador";
   usuario: UsuarioSesion;
 }

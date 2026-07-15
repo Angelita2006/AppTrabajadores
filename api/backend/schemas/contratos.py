@@ -9,6 +9,16 @@ from models.enums import TipoContratoEnum, TipoJornadaEnum
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC)
 # ==========================================
 
+class ContratoUpdate(BaseModel):
+    tipo_contrato: Optional[str] = None
+    tipo_jornada: Optional[str] = None
+    horas_semana: Optional[float] = None
+    fecha_inicio: Optional[datetime.date] = None
+    fecha_fin: Optional[datetime.date] = None
+    departamento_id: Optional[UUID] = None
+    puesto_trabajo: Optional[str] = None
+    categoria_profesional: Optional[str] = None
+
 class ContratoBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de un contrato laboral

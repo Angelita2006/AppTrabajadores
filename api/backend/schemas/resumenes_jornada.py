@@ -44,10 +44,8 @@ class ResumenJornadaResponse(ResumenJornadaBase):
     cerrado: bool = Field(..., description="Estado de cierre diario")
     actualizado_en: datetime.datetime = Field(..., description="Marca de tiempo del último recálculo automático efectuado (now)")
     
-    # Propiedades cronológicas opcionales expuestas en el JSON
     hora_entrada: Optional[datetime.datetime] = Field(None)
     hora_salida: Optional[datetime.datetime] = Field(None)
 
     class Config:
-        # Habilita el modo de conversión directa para los modelos tipados de SQLAlchemy 2.0
         from_attributes = True

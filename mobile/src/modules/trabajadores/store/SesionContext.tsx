@@ -148,14 +148,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       if (!usuario) return;
 
       try {
-        if (usuario.tipo_usuario === "admin_empresa" && usuario.empresa_id) {
+        if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
           const empresa = await obtenerEmpresa(usuario.empresa_id);
           setEmpresas([empresa]);
           setEmpresaSeleccionada(empresa);
           return;
         }
 
-        if (usuario.tipo_usuario === "admin_gestoria") {
+        if (usuario.tipo_usuario === "Admin_gestoría") {
           const todasLasEmpresas = await obtenerEmpresas();
           setEmpresas(todasLasEmpresas);
           if (todasLasEmpresas.length > 0) {

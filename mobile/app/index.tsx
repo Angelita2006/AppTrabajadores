@@ -1,4 +1,5 @@
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
+import { NotificationService } from "@/src/notifications/NotificationService";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -43,8 +44,8 @@ export default function RootIndexScreen() {
     setCentroTrabajoActual,
   } = useSesion();
 
-  const esAdminGestoria = usuarioActual?.tipo_usuario === "admin_gestoria";
-  const esAdminEmpresa = usuarioActual?.tipo_usuario === "admin_empresa";
+  const esAdminGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
+  const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
   const esAdmin = esAdminGestoria || esAdminEmpresa;
 
   const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
@@ -101,6 +102,21 @@ export default function RootIndexScreen() {
     cargarCentrosDeLaEmpresa();
   }, [empresaSeleccionada?.id]);
 
+  useEffect(() => {
+    const configurarNotificaciones = async () => {
+      // Solo ejecutamos si el usuario está logueado
+      if (Platform.OS === "web") return;
+      if (usuarioActual) {
+        const permitido = await NotificationService.requestPermissions();
+        if (permitido) {
+          await NotificationService.programarAlarmasTurno(usuarioActual.id);
+        }
+      }
+    };
+
+    configurarNotificaciones();
+  }, [usuarioActual]);
+
   const validarFormulario = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const esEmailValido = emailRegex.test(email);
@@ -120,7 +136,7 @@ export default function RootIndexScreen() {
       setUsuarioActual(usuarioSesion);
 
       if (
-        usuarioSesion.tipo_usuario === "admin_empresa" &&
+        usuarioSesion.tipo_usuario === "Admin_empresa" &&
         usuarioSesion.empresa_id
       ) {
         const empresa = await obtenerEmpresa(usuarioSesion.empresa_id);
@@ -311,8 +327,8 @@ export default function RootIndexScreen() {
       <AppScreen title="Mi Perfil">
         <Row>
           <StatCard
-            label="Estado Alta"
-            value={usuarioActual?.activo ? "Activo" : "Inactivo"}
+            label="Estado"
+            value={usuarioActual.activo ? "Activo" : "Inactivo"}
             tone={usuarioActual?.activo ? "success" : "danger"}
           />
           <StatCard
@@ -546,7 +562,7 @@ export default function RootIndexScreen() {
                   usuarioActual.ultimo_acceso
                     ? usuarioActual.ultimo_acceso
                         .replace("T", " a las ")
-                        .substring(0, 32)
+                        .substring(0, 22)
                         .concat(" hs")
                     : "Sesión Actual"
                 }

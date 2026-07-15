@@ -17,3 +17,11 @@ export interface CentroTrabajoCreate {
   codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
   direccion?: string | null; // Dirección física (opcional)
 }
+
+export interface CentroTrabajoUpdate {
+  nombre?: string;
+  zona_horaria?: string;
+  activo?: boolean;
+  codigo_ccc?: string;
+  direccion?: string;
+}

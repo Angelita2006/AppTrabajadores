@@ -7,7 +7,7 @@ from core.database import get_db
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
-from schemas.departamentos import DepartamentoCreate, DepartamentoResponse
+from schemas.departamentos import DepartamentoCreate, DepartamentoResponse, DepartamentoUpdate
 
 router = APIRouter(prefix="/api/departamentos", tags=["Departamentos"])
 
@@ -110,3 +110,51 @@ def actualizar_departamento(id_departamento: UUID, nuevo_nombre: str, db: Sessio
     db.commit()
     db.refresh(departamento)
     return departamento
+
+@router.put("/{id_departamento}/editar", response_model=DepartamentoResponse)
+def editar_departamento(id_departamento: UUID, obj_in: DepartamentoUpdate, db: Session = Depends(get_db)):
+    """
+    URI: PUT /api/departamentos/{id_departamento}/editar
+    Actualiza los campos permitidos de un departamento.
+    """
+    departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
+    if not departamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Departamento con ID {id_departamento} no encontrado."
+        )
+
+    # Actualización dinámica
+    update_data = obj_in.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(departamento, key, value)
+    
+    departamento.updated_at = datetime.now()
+    
+    db.commit()
+    db.refresh(departamento)
+    return departamento
+
+@router.delete("/{id_departamento}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_departamento(id_departamento: UUID, db: Session = Depends(get_db)):
+    """
+    URI: DELETE /api/departamentos/{id_departamento}
+    Elimina físicamente un departamento.
+    """
+    departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
+    if not departamento:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Departamento con ID {id_departamento} no encontrado."
+        )
+    
+    try:
+        db.delete(departamento)
+        db.commit()
+        return
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se puede eliminar el departamento porque tiene registros asociados (contratos/empleados). Error: {str(error)}"
+        )

@@ -160,10 +160,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   contenedorMes: {
-    // Responsive: Ocupa el 100% en móviles y se divide en columnas en pantallas Web grandes
     width: "100%",
-    // Para entornos Web grandes (min-width), puedes usar clases dinámicas,
-    // pero con flexWrap y flexGrow se reacomoda de forma nativa:
     minWidth: 280,
     flexGrow: 1,
     flexShrink: 1,
@@ -173,12 +170,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-
-    // Sombra sutil y elegante
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    boxShadow: "0px 1px 2px rgba(0, 0, 0, 0.05)",
     elevation: 2,
   },
   nombreMesHeader: {

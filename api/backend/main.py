@@ -9,15 +9,12 @@ load_dotenv()
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-    version="1.0.0",
-    # docs_url=None,
-    # redoc_url=None
+    version="1.0.0"
 )
 
 # Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
 Base.metadata.create_all(bind=engine)
 
-# Configuración del Middleware CORS para habilitar la comunicación con dispositivos móviles
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Permite peticiones desde emuladores Android/iOS y dispositivos reales

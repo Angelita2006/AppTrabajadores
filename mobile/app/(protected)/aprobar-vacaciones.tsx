@@ -8,10 +8,10 @@ import {
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import {
   actualizarEstadoAusencia,
+  asignarAusenciaOVacaciones,
   getUsuarioByIdTrabajador,
   obtenerAusenciasYVacacionesEmpresa,
-  obtenerTrabajador,
-  solicitarAusenciaOVacaciones,
+  obtenerTrabajador
 } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import React, { useEffect, useMemo, useState } from "react";
@@ -45,7 +45,7 @@ export default function AdminVacacionesScreen() {
   const [fechaFin, setFechaFin] = useState("2026-07-15");
   const [motivo, setMotivo] = useState("");
   const [tipoAusencia, setTipoAusencia] = useState<TipoAusencia>(
-    TipoAusencia.vacaciones,
+    TipoAusencia.VACACIONES,
   );
 
   const cargarDatosAdmin = async () => {
@@ -66,7 +66,7 @@ export default function AdminVacacionesScreen() {
         empresaSeleccionada.id,
       );
 
-      // 3. Cruzar los datos de las ausencias con sus nombres (Para la sección inferior)
+      // 3. Cruzar los datos de las ausencias con sus nombres
       const solicitudesConEmpleado = await Promise.all(
         ausenciasEnCrudo.map(async (item: any) => {
           try {
@@ -90,9 +90,7 @@ export default function AdminVacacionesScreen() {
             // Obtenemos los detalles extendidos del trabajador (o de su usuario vinculado)
             const detallesUsuario = await getUsuarioByIdTrabajador(t.id);
 
-            // Adaptación de la condición según tu backend:
-            // Opción A: Si tu backend devuelve 'roles' dentro del usuario:
-            const esAdmin = detallesUsuario.tipo_usuario !== "trabajador";
+            const esAdmin = detallesUsuario.tipo_usuario !== "Trabajador";
 
             if (esAdmin) {
               return null; // Si es admin lo marcamos como null para descartarlo
@@ -125,12 +123,12 @@ export default function AdminVacacionesScreen() {
   const metricas = useMemo(() => {
     return {
       pendientes: solicitudes.filter(
-        (s) => s.estado === EstadoAusencia.pendiente,
+        (s) => s.estado === EstadoAusencia.PENDIENTE,
       ).length,
-      aprobadas: solicitudes.filter((s) => s.estado === EstadoAusencia.aprobado)
+      aprobadas: solicitudes.filter((s) => s.estado === EstadoAusencia.APROBADA)
         .length,
       rechazadas: solicitudes.filter(
-        (s) => s.estado === EstadoAusencia.rechazado,
+        (s) => s.estado === EstadoAusencia.RECHAZADA,
       ).length,
     };
   }, [solicitudes]);
@@ -154,7 +152,7 @@ export default function AdminVacacionesScreen() {
 
       Alert.alert(
         "Éxito",
-        `Solicitud ${nuevoEstado === EstadoAusencia.aprobado ? "aprobada" : "rechazada"} correctamente.`,
+        `Solicitud ${nuevoEstado === EstadoAusencia.APROBADA ? "Aprobada" : "Rechazada"} correctamente.`,
       );
     } catch {
       Alert.alert("Error", "No se pudo actualizar el estado de la solicitud.");
@@ -187,6 +185,7 @@ export default function AdminVacacionesScreen() {
         trabajador_id: trabajadorSeleccionadoId,
         empresa_id: empresaSeleccionada!.id,
         tipo_ausencia: tipoAusencia,
+        estado: EstadoAusencia.APROBADA,
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
         motivo: `[Asignado por Admin] ${motivo}`,
@@ -194,7 +193,7 @@ export default function AdminVacacionesScreen() {
       };
 
       const respuestaBackend: AusenciaResponse =
-        await solicitarAusenciaOVacaciones(payload);
+        await asignarAusenciaOVacaciones(payload);
 
       // Buscamos el nombre en local para no tener que hacer otra llamada a la API
       const empleadoLocal = trabajadores.find(
@@ -209,11 +208,11 @@ export default function AdminVacacionesScreen() {
         id: respuestaBackend.id,
         trabajador_id: trabajadorSeleccionadoId,
         tipo_ausencia: respuestaBackend.tipo_ausencia,
-        estado: EstadoAusencia.aprobado,
+        estado: respuestaBackend.estado,
         fecha_inicio: respuestaBackend.fecha_inicio,
         fecha_fin: respuestaBackend.fecha_fin,
         motivo: respuestaBackend.motivo,
-        nombre_trabajador: nombreCompleto, // Añadido para que no rompa TypeScript ni la UI
+        nombre_trabajador: nombreCompleto,
       };
 
       setSolicitudes([nueva, ...solicitudes]);
@@ -232,11 +231,11 @@ export default function AdminVacacionesScreen() {
   };
 
   const listaTiposAusencia: TipoAusencia[] = [
-    TipoAusencia.vacaciones,
-    TipoAusencia.baja_temporal,
-    TipoAusencia.maternidad_paternidad,
-    TipoAusencia.permiso_retribuido,
-    TipoAusencia.ausencia_injustificada,
+    TipoAusencia.VACACIONES,
+    TipoAusencia.BAJA_TEMPORAL,
+    TipoAusencia.MATERNIDAD_PATERNIDAD,
+    TipoAusencia.PERMISO_RETRIBUIDO,
+    TipoAusencia.AUSENCIA_INJUSTIFICADA,
   ];
 
   return (
@@ -406,9 +405,9 @@ export default function AdminVacacionesScreen() {
                   <View
                     style={[
                       styles.badge,
-                      item.estado === EstadoAusencia.aprobado
+                      item.estado === EstadoAusencia.APROBADA
                         ? styles.badgeAprobado
-                        : item.estado === EstadoAusencia.pendiente
+                        : item.estado === EstadoAusencia.PENDIENTE
                           ? styles.badgePendiente
                           : styles.badgeRechazado,
                     ]}
@@ -427,12 +426,12 @@ export default function AdminVacacionesScreen() {
                   {item.motivo}
                 </ThemedText>
 
-                {item.estado === EstadoAusencia.pendiente && (
+                {item.estado === EstadoAusencia.PENDIENTE && (
                   <View style={styles.contenedorAcciones}>
                     <Pressable
                       style={[styles.botonAccion, styles.botonRechazar]}
                       onPress={() =>
-                        manejarResolucion(item.id, EstadoAusencia.rechazado)
+                        manejarResolucion(item.id, EstadoAusencia.RECHAZADA)
                       }
                       disabled={cargando}
                     >
@@ -444,7 +443,7 @@ export default function AdminVacacionesScreen() {
                     <Pressable
                       style={[styles.botonAccion, styles.botonAprobar]}
                       onPress={() =>
-                        manejarResolucion(item.id, EstadoAusencia.aprobado)
+                        manejarResolucion(item.id, EstadoAusencia.APROBADA)
                       }
                       disabled={cargando}
                     >

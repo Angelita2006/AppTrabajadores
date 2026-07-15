@@ -25,7 +25,6 @@ class UsuarioCreate(UsuarioBase):
     """
     password_raw: str = Field(..., min_length=6, max_length=255, description="Contraseña en texto plano antes del hash")
     
-    # NULL para usuarios globales de la gestoría según diseño de base de datos
     empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa cliente asignada")
     trabajador_id: Optional[UUID] = Field(None, description="ID único UUID del expediente de trabajador vinculado")
 
@@ -41,13 +40,11 @@ class UsuarioResponse(UsuarioBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de creación de la cuenta (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación (now)")
     
-    # Propiedades complementarias opcionales expuestas en el JSON
     empresa_id: Optional[UUID] = Field(None)
     trabajador_id: Optional[UUID] = Field(None)
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
 
     class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
         from_attributes = True
 
 

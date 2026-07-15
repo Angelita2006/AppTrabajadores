@@ -13,11 +13,14 @@ import {
 import {
   CentroTrabajo,
   CentroTrabajoCreate,
+  CentroTrabajoUpdate,
 } from "../../centros-trabajo/types/centro-trabajo";
+import { Contrato } from "../../contratos/types/contrato";
 import {
   IncidenciaCreateRequest,
   IncidenciaResponse,
 } from "../../correcciones-fichaje/types/incidencia";
+import { Departamento } from "../../departamentos/types/departamento";
 import {
   Empresa,
   RegistroOrganizacionDTO,
@@ -61,6 +64,17 @@ export const getUsuarioByIdTrabajador = async (
   idTrabajador: string,
 ): Promise<UsuarioSesion> => {
   const respuesta = await api.get(`/api/usuarios/trabajador/${idTrabajador}`);
+  return respuesta.data;
+};
+
+/**
+ * Recupera la información del usuario asociado a un trabajador específico.
+ * @param idTrabajador Identificador único de tipo UUID (string)
+ */
+export const getUsuarioById = async (
+  idUsuario: string,
+): Promise<UsuarioSesion> => {
+  const respuesta = await api.get(`/api/usuarios/${idUsuario}`);
   return respuesta.data;
 };
 
@@ -211,7 +225,7 @@ export const registrarFichaje = async (data: {
   trabajador_id: string;
   centro_trabajo_id: string;
   tipo_evento_id: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
-  metodo_fichaje: "app_movil" | "web";
+  metodo_fichaje: "App_movil" | "Web";
   fecha_hora_dispositivo: string;
   observaciones?: string | null;
 }) => {
@@ -235,6 +249,15 @@ export const obtenerFichajesSemanaActual = async (
 ): Promise<RegistroFichaje[]> => {
   const respuesta = await api.get(
     `/api/fichajes/trabajador/${idTrabajador}/semana`,
+  );
+  return respuesta.data;
+};
+
+export const obtenerFichajesTurnoActual = async (
+  idTrabajador: string,
+): Promise<RegistroFichaje[]> => {
+  const respuesta = await api.get(
+    `/api/fichajes/trabajador/${idTrabajador}/turno`,
   );
   return respuesta.data;
 };
@@ -288,6 +311,17 @@ export const solicitarAusenciaOVacaciones = async (
 };
 
 /**
+ * Transmite una nueva petición de días libres o baja hacia la tabla 'ausencias' de PostgreSQL.
+ * URI: POST /api/ausencias
+ */
+export const asignarAusenciaOVacaciones = async (
+  data: AusenciaCreateRequest,
+): Promise<AusenciaResponse> => {
+  const respuesta = await api.post<AusenciaResponse>("/api/ausencias", data);
+  return respuesta.data;
+};
+
+/**
  * [VISTA DE INCIDENCIAS] Envía una solicitud de rectificación horaria a Recursos Humanos.
  * URI: POST /api/correcciones
  */
@@ -320,7 +354,7 @@ export const obtenerIncidenciasTrabajador = async (
  */
 export const resolverSolicitudCorreccion = async (
   idCorreccion: string,
-  nuevoEstado: "aprobada" | "rechazada", // Coincide exactamente con EstadoCorreccionEnum
+  nuevoEstado: "Aprobada" | "Rechazada",
   resolutorUsuarioId: string,
 ): Promise<IncidenciaResponse> => {
   const respuesta = await api.put<IncidenciaResponse>(
@@ -428,7 +462,7 @@ export const registrarOrganizacionCompleta = async (
       nombre: `${trabajadorCreado.nombre} ${trabajadorCreado.apellidos}`,
       email: datos.email,
       password_raw: datos.password_raw,
-      tipo_usuario: "admin_empresa", // Rol específico de tu RBAC
+      tipo_usuario: "Admin_empresa",
       empresa_id: empresaCreada.id,
       trabajador_id: trabajadorCreado.id,
     });
@@ -640,7 +674,7 @@ export const asignarTurnosTrabajador = async (
     });
     return response.data;
   } catch (error) {
-    console.error("Error en turnosService.asignarTurnosTrabajador:", error);
+    console.error("Error en asignarTurnosTrabajador:", error);
     throw error; // Re-lanzamos el error para que el componente pueda manejarlo (ej. mostrar alerta)
   }
 };
@@ -659,9 +693,6 @@ export const actualizarEstadoAusencia = async (
   ausenciaId: string,
   nuevoEstado: EstadoAusencia,
 ): Promise<AusenciaResponse> => {
-  // Nota: Reemplaza 'clienteApi' o 'fetch' por la instancia de axios/fetch que use tu proyecto
-  // Si usas una URL base global configurada, solo necesitas la ruta relativa.
-
   const url = `/api/ausencias/${ausenciaId}/estado?nuevo_estado=${nuevoEstado}`;
 
   try {
@@ -836,6 +867,225 @@ export const importarCalendarioPDF = async (
     return respuesta.data;
   } catch (error) {
     console.error(`Error en servicio importarCalendarioPDF con Axios:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Recupera el contrato activo de un empleado blindado por el ID de la empresa seleccionada.
+ * URI: GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo
+ * * @param idTrabajador UUID del empleado
+ * @param idEmpresa UUID de la empresa activa en la sesión (Tenant)
+ */
+export const obtenerContratoActivoTrabajador = async (
+  idTrabajador: string,
+  idEmpresa: string,
+): Promise<Contrato | null> => {
+  try {
+    const respuesta = await api.get<Contrato>(
+      `/api/contratos/trabajador/${idTrabajador}/empresa/${idEmpresa}/activo`,
+    );
+    return respuesta.data || null;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn(
+        `El trabajador no tiene un contrato activo hoy en esta empresa.`,
+      );
+      return null;
+    }
+    console.error(
+      `Error al obtener contrato activo (Trabajador: ${idTrabajador}, Empresa: ${idEmpresa}):`,
+      error,
+    );
+    throw error;
+  }
+};
+
+// Obtener departamentos de una empresa específica
+export const obtenerDepartamentosEmpresa = async (
+  idEmpresa: string,
+): Promise<Departamento[]> => {
+  const response = await api.get(`/api/departamentos/empresa/${idEmpresa}`);
+  return response.data;
+};
+
+// Crear un nuevo departamento
+export const crearDepartamento = async (data: {
+  empresa_id: string;
+  nombre: string;
+  centro_trabajo_id?: string | null;
+}): Promise<Departamento> => {
+  const response = await api.post(`/api/departamentos`, data);
+  return response.data;
+};
+
+// Obtener un departamento por su ID
+export const obtenerDepartamentoPorId = async (
+  idDepartamento: string,
+): Promise<Departamento> => {
+  const response = await api.get(`/api/departamentos/${idDepartamento}`);
+  return response.data;
+};
+
+// Actualizar un departamento
+export const actualizarDepartamento = async (
+  idDepartamento: string,
+  nuevoNombre: string,
+): Promise<Departamento> => {
+  // Nota: Tu API espera el nuevo_nombre como query param o body,
+  // basándome en tu código: /api/departamentos/{id}?nuevo_nombre=...
+  const response = await api.put(
+    `/api/departamentos/${idDepartamento}?nuevo_nombre=${encodeURIComponent(nuevoNombre)}`,
+  );
+  return response.data;
+};
+
+/**
+ * [VISTA DE CONTROL] Actualiza los datos de un contrato existente.
+ * URI: PUT /api/contratos/{id_contrato}
+ * @param idContrato UUID del contrato a editar
+ * @param datos Objeto con los campos a modificar (parcial o total)
+ */
+export const actualizarContratoActivoTrabajador = async (
+  idContrato: string,
+  datos: {
+    tipo_contrato?: string;
+    tipo_jornada?: string;
+    horas_semana?: number;
+    fecha_inicio?: string;
+    fecha_fin?: string | null;
+    departamento_id?: string | null;
+    puesto_trabajo?: string;
+    categoria_profesional?: string;
+  },
+): Promise<Contrato> => {
+  try {
+    const respuesta = await api.put<Contrato>(
+      `/api/contratos/${idContrato}`,
+      datos,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    console.error(`Error al actualizar el contrato ${idContrato}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza los datos de un centro de trabajo existente.
+ * URI: PUT /api/centros-trabajo/{id_centro}/editar
+ * @param idCentro UUID del centro de trabajo a modificar
+ * @param datos Objeto parcial con los campos a actualizar
+ */
+export const editarCentroTrabajo = async (
+  idCentro: string,
+  datos: CentroTrabajoUpdate,
+): Promise<CentroTrabajo> => {
+  try {
+    const respuesta = await api.put<CentroTrabajo>(
+      `/api/centros-trabajo/${idCentro}/editar`,
+      datos,
+    );
+    return respuesta.data;
+  } catch (error) {
+    console.error(`Error al editar el centro de trabajo ${idCentro}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un centro de trabajo de la base de datos.
+ * @param centroId - UUID del centro a eliminar.
+ * @throws Error si el centro no existe o tiene restricciones de integridad.
+ */
+export const eliminarCentroTrabajo = async (
+  centroId: string,
+): Promise<void> => {
+  try {
+    // La ruta coincide con la definición de tu endpoint en FastAPI
+    await api.delete(`/centros-trabajo/${centroId}`);
+
+    return;
+  } catch (error: any) {
+    console.error(`Error al eliminar el centro ${centroId}:`, error);
+
+    throw error;
+  }
+};
+
+/**
+ * Modifica las propiedades de un turno existente.
+ * URI: PUT /api/turnos/{id_turno}/editar
+ */
+export const editarTurno = async (
+  id_turno: string,
+  data: any,
+): Promise<any> => {
+  try {
+    const response = await api.put(`/turnos/${id_turno}/editar`, data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error al editar el turno ${id_turno}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un turno físicamente de la base de datos (con efecto cascada).
+ * URI: DELETE /api/turnos/{id_turno}
+ */
+export const eliminarTurno = async (
+  id_turno: string,
+): Promise<{ detail: string }> => {
+  try {
+    const response = await api.delete(`/turnos/${id_turno}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error al eliminar el turno ${id_turno}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Modifica las propiedades de un departamento existente.
+ * URI: PUT /api/departamentos/{id_departamento}/editar
+ * @param id_departamento - El ID del departamento a modificar.
+ * @param data - Objeto con los campos a actualizar (nombre, centro_trabajo_id).
+ */
+export const editarDepartamento = async (
+  id_departamento: string,
+  data: { nombre?: string; centro_trabajo_id?: string },
+): Promise<any> => {
+  try {
+    // La ruta coincide con la definición del endpoint en FastAPI
+    const response = await api.put(
+      `/departamentos/${id_departamento}/editar`,
+      data,
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error al editar el departamento ${id_departamento}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un departamento de la base de datos.
+ * URI: DELETE /api/departamentos/{id_departamento}
+ * @param id_departamento - El ID del departamento a eliminar.
+ */
+export const eliminarDepartamento = async (
+  id_departamento: string,
+): Promise<void> => {
+  try {
+    // Al ser un 204 No Content, no se espera un cuerpo de respuesta
+    await api.delete(`/departamentos/${id_departamento}`);
+    return;
+  } catch (error) {
+    console.error(
+      `Error al eliminar el departamento ${id_departamento}:`,
+      error,
+    );
     throw error;
   }
 };

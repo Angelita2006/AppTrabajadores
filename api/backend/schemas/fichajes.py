@@ -30,15 +30,12 @@ class FichajeCreate(BaseModel):
     trabajador_id: UUID = Field(..., description="ID UUID del expediente del empleado")
     centro_trabajo_id: UUID = Field(..., description="ID UUID del centro de trabajo asignado")
     
-    # Recibe la palabra clave string ("ENTRADA", "SALIDA") y se procesa a int en la ruta
     tipo_evento_id: str = Field(..., description="Etiqueta textual del evento horario")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Canal: app_movil, web, qr, etc.")
     
-    # Campos por defecto mapeados según el diseño de tu base de datos
     origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR)
     estado: EstadoFichajeEnum = Field(default=EstadoFichajeEnum.VALIDO)
     
-    # Parámetros hardware y geolocalización opcionales
     latitud: Optional[Decimal] = Field(None, ge=Decimal('-90'), le=Decimal('90'))
     longitud: Optional[Decimal] = Field(None, ge=Decimal('-180'), le=Decimal('180'))
     ip_address: Optional[IPvAnyAddress] = Field(None, description="IP resuelta por la red")
@@ -60,7 +57,6 @@ class FichajeResponse(FichajeBase):
     hash_integridad: str = Field(..., max_length=64, description="Firma SHA-256 de seguridad de la fila")
     created_at: datetime = Field(..., description="Fecha de inserción real e inmutable calculada por el servidor (now)")
     
-    # Propiedades de relación opcionales de corrección o sustitución horaria
     motivo_pausa_id: Optional[int] = Field(None)
     fecha_hora_dispositivo: Optional[datetime] = Field(None)
     dispositivo_id: Optional[UUID] = Field(None)
@@ -70,5 +66,4 @@ class FichajeResponse(FichajeBase):
     observaciones: Optional[str] = Field(None)
 
     class Config:
-        # Permite a Pydantic interactuar de forma nativa con los modelos tipados de SQLAlchemy 2.0
         from_attributes = True

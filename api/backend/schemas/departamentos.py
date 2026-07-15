@@ -23,6 +23,10 @@ class DepartamentoCreate(DepartamentoBase):
     """
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo asociado")
 
+class DepartamentoUpdate(BaseModel):
+    """Esquema para actualizar datos de un departamento."""
+    nombre: Optional[str] = Field(None, max_length=255)
+    centro_trabajo_id: Optional[UUID] = None
 
 class DepartamentoResponse(DepartamentoBase):
     """
