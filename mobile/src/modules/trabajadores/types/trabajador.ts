@@ -1,3 +1,6 @@
+import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
+import { Contrato } from "../../contratos/types/contrato";
+
 export enum Estado {
   Inactivo = 0,
   Activo = 1,
@@ -45,7 +48,9 @@ export interface UsuarioSesion {
   ultimo_acceso?: string | null;
   empresa_id: string | null; // NULL para personal global de la gestoría
   trabajador_id: string | null; // NULL si es un usuario administrador puro sin expediente
+}
 
-  // Relación uno a uno mapeada por el backend de producción
-  // trabajador?: Trabajador | null;
+export interface TrabajadorPlantilla extends Trabajador {
+  contratoActivo: Contrato | null;
+  turnoAsignadoVigente: AsignacionTurno | null;
 }

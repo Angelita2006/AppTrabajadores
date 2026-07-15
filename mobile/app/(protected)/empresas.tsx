@@ -751,15 +751,13 @@ export default function EmpresasScreen() {
   async function handleEditarCentro(centro: CentroTrabajo): Promise<void> {
     try {
       setGuardando(true);
-      // Asumiendo que existe un servicio llamado editarCentroTrabajo(id, data)
       await editarCentroTrabajo(centro.id, {
-        nombre: centro.nombre,
-        direccion: centro.direccion ?? undefined,
-        codigo_ccc: centro.codigo_ccc ?? undefined,
-        zona_horaria: centro.zona_horaria,
+        nombre: nombreCentro,
+        direccion: direccionCentro,
+        codigo_ccc: codigoCcc,
+        zona_horaria: zonaHoraria,
       });
 
-      // Actualizar estado local
       setCentrosConfigurados((prev) =>
         prev.map((c) => (c.id === centro.id ? { ...c, ...centro } : c)),
       );

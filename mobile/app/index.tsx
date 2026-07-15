@@ -1,4 +1,5 @@
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
+import { Empresa } from "@/src/modules/empresas/types/empresa";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -202,7 +203,7 @@ export default function RootIndexScreen() {
         </ThemedText>
         <View style={styles.pickerWrapper}>
           {puedeCambiarEmpresa ? (
-            empresas.map((emp) => {
+            empresas.map((emp: Empresa) => {
               const estaSeleccionada = empresaSeleccionada?.id === emp.id;
               return (
                 <Pressable
@@ -435,7 +436,7 @@ export default function RootIndexScreen() {
                 </ThemedText>
                 {empresas.length > 1 ? (
                   <View style={styles.pickerWrapper}>
-                    {empresas.map((emp) => (
+                    {empresas.map((emp: Empresa) => (
                       <Pressable
                         key={emp.id}
                         style={[
@@ -485,7 +486,7 @@ export default function RootIndexScreen() {
                 ) : (
                   <View style={styles.pickerWrapperHorizontal}>
                     {centrosDisponibles.length > 0 ? (
-                      centrosDisponibles.map((centro) => (
+                      centrosDisponibles.map((centro: CentroTrabajo) => (
                         <Pressable
                           key={centro.id}
                           style={[
@@ -641,7 +642,7 @@ export default function RootIndexScreen() {
               </ThemedText>
             )}
           </View>
-          {/* CAMPO CONTRASEÑA */}
+
           <View style={styles.field}>
             <ThemedText style={styles.label}>Contraseña</ThemedText>
             <View

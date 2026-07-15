@@ -225,7 +225,7 @@ export const registrarFichaje = async (data: {
   trabajador_id: string;
   centro_trabajo_id: string;
   tipo_evento_id: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
-  metodo_fichaje: "App_movil" | "Web";
+  metodo_fichaje: "App_móvil" | "Web";
   fecha_hora_dispositivo: string;
   observaciones?: string | null;
 }) => {
@@ -949,14 +949,14 @@ export const actualizarDepartamento = async (
 export const actualizarContratoActivoTrabajador = async (
   idContrato: string,
   datos: {
-    tipo_contrato?: string;
-    tipo_jornada?: string;
-    horas_semana?: number;
-    fecha_inicio?: string;
-    fecha_fin?: string | null;
-    departamento_id?: string | null;
-    puesto_trabajo?: string;
-    categoria_profesional?: string;
+    tipo_contrato: string;
+    tipo_jornada: string;
+    horas_semana: number;
+    fecha_inicio: string;
+    fecha_fin: string;
+    departamento_id: string;
+    puesto_trabajo: string;
+    categoria_profesional: string;
   },
 ): Promise<Contrato> => {
   try {
