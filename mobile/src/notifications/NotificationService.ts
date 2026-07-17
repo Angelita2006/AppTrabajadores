@@ -10,7 +10,6 @@ import { UsuarioSesion } from "../modules/trabajadores/types/trabajador";
 // Configuración global (se ejecuta una sola vez al cargar la app)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,

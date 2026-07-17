@@ -1,6 +1,6 @@
 import datetime
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 # ==========================================
@@ -33,7 +33,11 @@ class AsignacionTurnoCreate(AsignacionTurnoBase):
         if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
             raise ValueError("La fecha de finalización de la asignación no puede ser anterior a la fecha de inicio.")
         return self
-
+class AsignacionTurnoMasivaCreate(BaseModel):
+    trabajador_id: UUID
+    turnos_ids: List[UUID]
+    fecha_inicio: datetime.date
+    fecha_fin: Optional[datetime.date] = None
 
 class AsignacionTurnoResponse(AsignacionTurnoBase):
     """

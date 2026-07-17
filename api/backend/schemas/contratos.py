@@ -10,14 +10,17 @@ from models.enums import TipoContratoEnum, TipoJornadaEnum
 # ==========================================
 
 class ContratoUpdate(BaseModel):
+    empresa_id: Optional[str]
+    centro_trabajo_id: Optional[str]
     tipo_contrato: Optional[str] = None
     tipo_jornada: Optional[str] = None
     horas_semana: Optional[float] = None
     fecha_inicio: Optional[datetime.date] = None
     fecha_fin: Optional[datetime.date] = None
-    departamento_id: Optional[UUID] = None
+    departamento_id: Optional[str] = None
     puesto_trabajo: Optional[str] = None
     categoria_profesional: Optional[str] = None
+    trabajador_id: Optional[str]
 
 class ContratoBase(BaseModel):
     """

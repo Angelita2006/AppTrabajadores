@@ -76,6 +76,25 @@ export default function VacacionesScreen() {
     }, 0);
   }, [solicitudes]);
 
+  const totalDiasAprobados = useMemo(() => {
+    return solicitudes.reduce((acumulador, item) => {
+      if (item.estado !== EstadoAusencia.APROBADA) {
+        return acumulador;
+      }
+
+      const inicio = new Date(item.fecha_inicio);
+      const fin = new Date(item.fecha_fin);
+
+      const diferenciaTiempo = fin.getTime() - inicio.getTime();
+      const dias = Math.max(
+        0,
+        Math.floor(diferenciaTiempo / (1000 * 60 * 60 * 24)) + 1,
+      );
+
+      return acumulador + (isNaN(dias) ? 0 : dias);
+    }, 0);
+  }, [solicitudes]);
+
   const enviarSolicitud = async () => {
     if (!tipoAusencia) {
       Alert.alert(
@@ -142,6 +161,18 @@ export default function VacacionesScreen() {
         <StatCard
           label="Días Solicitados"
           value={totalDiasSolicitados.toString()}
+        />
+        <StatCard
+          label="Días Aprobados"
+          value={totalDiasAprobados.toString()}
+          tone="success"
+        />
+        <StatCard
+          label="Rechazadas"
+          value={solicitudes
+            .filter((s) => s.estado === EstadoAusencia.RECHAZADA)
+            .length.toString()}
+          tone="danger"
         />
         <StatCard
           label="Aprobadas"

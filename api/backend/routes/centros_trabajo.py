@@ -120,7 +120,7 @@ def editar_centro(id_centro: UUID, nuevos_datos: CentroTrabajoUpdate, db: Sessio
     setattr(centro, "nombre", nuevos_datos.nombre)
     setattr(centro, "zona_horaria", nuevos_datos.zona_horaria)
     setattr(centro, "activo", nuevos_datos.activo)
-    setattr(centro, "codigo_cc", nuevos_datos.codigo_ccc)
+    setattr(centro, "codigo_ccc", nuevos_datos.codigo_ccc)
     setattr(centro, "direccion", nuevos_datos.direccion)
     setattr(centro, "updated_at", datetime.now())
     

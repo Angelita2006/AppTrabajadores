@@ -181,3 +181,35 @@ def rescindir_contrato(id_contrato: UUID, fecha_fin: date, db: Session = Depends
     db.refresh(contrato)
     return contrato
 
+@router.delete("/api/contratos/empresa/{empresa_id}/trabajador/{trabajador_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_todos_los_contratos_trabajador(
+    empresa_id: UUID, 
+    trabajador_id: UUID, 
+    db: Session = Depends(get_db)
+):
+    """
+    Elimina TODOS los registros de contratos asociados a un trabajador 
+    dentro de una empresa específica.
+    """
+    
+    # 1. Verificar si existen contratos antes de intentar eliminar
+    contratos = db.query(Contratos).filter(
+        Contratos.trabajador_id == trabajador_id,
+        Contratos.empresa_id == empresa_id
+    ).all()
+    
+    if not contratos:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se encontraron contratos para este trabajador en esta empresa."
+        )
+
+    # 2. Ejecutar la eliminación
+    db.query(Contratos).filter(
+        Contratos.trabajador_id == trabajador_id,
+        Contratos.empresa_id == empresa_id
+    ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    return None

@@ -33,7 +33,7 @@ import {
 } from "../../festivos/types/festivo";
 import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
 import { TurnoCreate } from "../../turnos/types/turno";
-import { UsuarioSesion } from "../types/trabajador";
+import { Trabajador, UsuarioSesion } from "../types/trabajador";
 
 // ====================================================================
 // 1. ENDPOINTS DE AUTENTICACIÓN Y EXPENDIENTE (TABLA TRABAJADORES)
@@ -659,29 +659,54 @@ export const obtenerTurnoPorId = async (idTurno: string) => {
 };
 
 /**
- * Asigna o reasigna múltiples turnos a un trabajador específico.
- * @param trabajadorId ID del trabajador al que se le asignan los turnos
+ * Asigna múltiples turnos a un trabajador específico de forma masiva.
+ * @param trabajadorId ID del trabajador
  * @param idsTurnos Arreglo con los IDs de los turnos seleccionados
+ * @param fechaInicio Fecha de inicio de la asignación (formato AAAA-MM-DD)
+ * @param fechaFin Fecha de fin opcional (formato AAAA-MM-DD o null)
  */
 export const asignarTurnosTrabajador = async (
-  trabajadorId: string | number,
+  trabajadorId: string,
   idsTurnos: string[],
+  fechaInicio: string,
+  fechaFin: string | null = null,
 ): Promise<any> => {
   try {
-    // Ajusta la URL de tu endpoint según tu API de backend
-    const response = await api.post(`/trabajadores/${trabajadorId}/turnos`, {
-      turnos: idsTurnos,
+    const response = await api.post("/api/asignaciones-turno/masiva", {
+      trabajador_id: trabajadorId,
+      turnos_ids: idsTurnos,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
     });
+
     return response.data;
   } catch (error) {
-    console.error("Error en asignarTurnosTrabajador:", error);
-    throw error; // Re-lanzamos el error para que el componente pueda manejarlo (ej. mostrar alerta)
+    console.error("Error en asignarTurnosTrabajador (Masiva):", error);
+    throw error;
   }
 };
 
 export const obtenerAusenciasYVacacionesEmpresa = async (idEmpresa: string) => {
   const respuesta = await api.get(`/api/ausencias/empresa/${idEmpresa}`);
   return respuesta.data;
+};
+
+/**
+ * Elimina todas las asignaciones de turno de un trabajador.
+ * @param trabajadorId ID del trabajador
+ */
+export const eliminarTodasAsignacionesTrabajador = async (
+  trabajadorId: string | number,
+): Promise<any> => {
+  try {
+    const response = await api.delete(
+      `/api/asignaciones-turno/trabajador/${trabajadorId}/eliminar-todas`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error en eliminarTodasAsignacionesTrabajador:", error);
+    throw error;
+  }
 };
 
 /**
@@ -901,6 +926,43 @@ export const obtenerContratoActivoTrabajador = async (
   }
 };
 
+/**
+ * Elimina el contrato activo de un empleado blindado por el ID de la empresa seleccionada.
+ * URI: GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo
+ * * @param idTrabajador UUID del empleado
+ * @param idEmpresa UUID de la empresa activa en la sesión (Tenant)
+ */
+export const rescindirContratoActivoTrabajador = async (
+  idTrabajador: string,
+  idEmpresa: string,
+) => {
+  try {
+    const contrato: Contrato | null = await obtenerContratoActivoTrabajador(
+      idTrabajador,
+      idEmpresa,
+    );
+    let respuesta = null;
+    if (contrato !== null)
+      respuesta = await api.put(
+        `/api/contratos/${contrato.id}/dar-baja?fecha_fin=${new Date().toISOString().split("T")[0]}`,
+      );
+    if (respuesta !== null) return respuesta.data;
+    return null;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      console.warn(
+        `El trabajador no tiene un contrato activo hoy en esta empresa.`,
+      );
+      return null;
+    }
+    console.error(
+      `Error al obtener contrato activo (Trabajador: ${idTrabajador}, Empresa: ${idEmpresa}):`,
+      error,
+    );
+    throw error;
+  }
+};
+
 // Obtener departamentos de una empresa específica
 export const obtenerDepartamentosEmpresa = async (
   idEmpresa: string,
@@ -949,6 +1011,8 @@ export const actualizarDepartamento = async (
 export const actualizarContratoActivoTrabajador = async (
   idContrato: string,
   datos: {
+    empresa_id: string;
+    centro_trabajo_id: string;
     tipo_contrato: string;
     tipo_jornada: string;
     horas_semana: number;
@@ -957,6 +1021,7 @@ export const actualizarContratoActivoTrabajador = async (
     departamento_id: string;
     puesto_trabajo: string;
     categoria_profesional: string;
+    trabajador_id: string;
   },
 ): Promise<Contrato> => {
   try {
@@ -1003,7 +1068,7 @@ export const eliminarCentroTrabajo = async (
 ): Promise<void> => {
   try {
     // La ruta coincide con la definición de tu endpoint en FastAPI
-    await api.delete(`/centros-trabajo/${centroId}`);
+    await api.delete(`/api/centros-trabajo/${centroId}`);
 
     return;
   } catch (error: any) {
@@ -1022,7 +1087,7 @@ export const editarTurno = async (
   data: any,
 ): Promise<any> => {
   try {
-    const response = await api.put(`/turnos/${id_turno}/editar`, data);
+    const response = await api.put(`/api/turnos/${id_turno}/editar`, data);
     return response.data;
   } catch (error) {
     console.error(`Error al editar el turno ${id_turno}:`, error);
@@ -1038,7 +1103,7 @@ export const eliminarTurno = async (
   id_turno: string,
 ): Promise<{ detail: string }> => {
   try {
-    const response = await api.delete(`/turnos/${id_turno}`);
+    const response = await api.delete(`/api/turnos/${id_turno}`);
     return response.data;
   } catch (error) {
     console.error(`Error al eliminar el turno ${id_turno}:`, error);
@@ -1059,7 +1124,7 @@ export const editarDepartamento = async (
   try {
     // La ruta coincide con la definición del endpoint en FastAPI
     const response = await api.put(
-      `/departamentos/${id_departamento}/editar`,
+      `/api/departamentos/${id_departamento}/editar`,
       data,
     );
     return response.data;
@@ -1078,14 +1143,29 @@ export const eliminarDepartamento = async (
   id_departamento: string,
 ): Promise<void> => {
   try {
-    // Al ser un 204 No Content, no se espera un cuerpo de respuesta
-    await api.delete(`/departamentos/${id_departamento}`);
+    await api.delete(`/api/departamentos/${id_departamento}`);
     return;
   } catch (error) {
     console.error(
       `Error al eliminar el departamento ${id_departamento}:`,
       error,
     );
+    throw error;
+  }
+};
+
+export const actualizarTrabajador = async (
+  idTrabajador: string,
+  datos: Partial<Trabajador>,
+) => {
+  try {
+    const response = await api.patch(
+      `/api/trabajadores/${idTrabajador}`,
+      datos,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al actualizar el trabajador:", error);
     throw error;
   }
 };

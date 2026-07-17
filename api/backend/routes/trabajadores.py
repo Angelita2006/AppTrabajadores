@@ -58,6 +58,25 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
     db.refresh(nuevo_trabajador)
     return nuevo_trabajador
 
+@router.patch("/{id_trabajador}", response_model=TrabajadorResponse)
+def actualizar_trabajador(
+    id_trabajador: UUID, 
+    obj_in: dict, 
+    db: Session = Depends(get_db)
+):
+    print(f"Datos recibidos: {obj_in}")
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
+    
+    # Actualizar campos dinámicamente
+    for field, value in obj_in.items():
+        setattr(trabajador, field, value)
+    
+    db.commit()
+    db.refresh(trabajador)
+    return trabajador
+
 @router.post("/login", response_model=TrabajadorResponse)
 def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
     """

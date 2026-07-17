@@ -67,7 +67,10 @@ export default function IncidenciasScreen() {
     const aprobadas = incidencias.filter(
       (i) => i.estado === EstadoCorreccion.aprobada,
     ).length;
-    return { pendientes, aprobadas };
+    const rechazadas = incidencias.filter(
+      (i) => i.estado === EstadoCorreccion.rechazada,
+    ).length;
+    return { pendientes, aprobadas, rechazadas };
   }, [incidencias]);
 
   // Carga inicial sincronizada de datos
@@ -291,14 +294,19 @@ export default function IncidenciasScreen() {
     >
       <Row>
         <StatCard
-          label="Pendientes"
-          value={conteoEstados.pendientes.toString()}
-          tone="warning"
+          label="Rechazadas"
+          value={conteoEstados.rechazadas.toString()}
+          tone="danger"
         />
         <StatCard
           label="Aprobadas"
           value={conteoEstados.aprobadas.toString()}
           tone="success"
+        />
+        <StatCard
+          label="Pendientes"
+          value={conteoEstados.pendientes.toString()}
+          tone="warning"
         />
       </Row>
 

@@ -36,6 +36,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from "react-native";
@@ -92,6 +93,7 @@ export default function EmpresasScreen() {
   // ESTADOS: Centros de Trabajo
   const [nombreCentro, setNombreCentro] = useState("");
   const [direccionCentro, setDireccionCentro] = useState("");
+  const [activoCentro, setActivoCentro] = useState(false);
   const [zonaHoraria, setZonaHoraria] = useState("Europe/Madrid");
   const [codigoCcc, setCodigoCcc] = useState("");
   const [centroEnEdicion, setCentroEnEdicion] = useState<CentroTrabajo | null>(
@@ -273,6 +275,7 @@ export default function EmpresasScreen() {
       await crearCentroTrabajo({
         empresa_id: empresaSeleccionada.id,
         nombre: nombreCentro.trim(),
+        activo: activoCentro,
         zona_horaria: zonaHoraria.trim(),
         direccion: direccionCentro.trim() || null,
         codigo_ccc: codigoCcc.trim() || null,
@@ -313,7 +316,7 @@ export default function EmpresasScreen() {
         nombre: nombreTurno.trim(),
         hora_inicio: horaInicio.trim(),
         hora_fin: horaFin.trim(),
-        duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
+        duracion_pausa_minutos: parseInt(duracionPausa, 10),
         dias_semana: [1, 2, 3, 4, 5],
       });
 
@@ -324,7 +327,7 @@ export default function EmpresasScreen() {
       setNombreTurno("");
       setHoraInicio("");
       setHoraFin("");
-      setDuracionPausa("0");
+      setDuracionPausa("");
       setMostrarFormTurno(false);
       await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
@@ -487,56 +490,64 @@ export default function EmpresasScreen() {
   };
 
   const handleEliminarCalendario = async () => {
-    if (!calendarioSeleccionado || !calendarioSeleccionado.id) return;
+    const ejecutarEliminacion = async () => {
+      if (!calendarioSeleccionado || !calendarioSeleccionado.id) return;
+      try {
+        setGuardando(true);
 
-    Alert.alert(
-      "Confirmar eliminación",
-      "¿Estás seguro de que deseas eliminar por completo este calendario laboral y todos sus días festivos asociados?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setGuardando(true);
+        if (!calendarioSeleccionado.id) return;
 
-              if (!calendarioSeleccionado.id) return;
+        await eliminarCalendarioLaboral(calendarioSeleccionado.id);
 
-              // Ejecutamos la petición de borrado en la API externa
-              await eliminarCalendarioLaboral(calendarioSeleccionado.id);
+        // Removemos el elemento eliminado del estado local de React
+        const restantes = calendarioFestivos.filter(
+          (c) => c.id !== calendarioSeleccionado.id,
+        );
+        setCalendarioFestivos(restantes);
 
-              // Removemos el elemento eliminado del estado local de React
-              const restantes = calendarioFestivos.filter(
-                (c) => c.id !== calendarioSeleccionado.id,
-              );
-              setCalendarioFestivos(restantes);
+        // Limpiamos la selección actual para restablecer la UI
+        if (restantes.length > 0) {
+          setCalendarioSeleccionado(restantes[0]);
+        } else {
+          setCalendarioSeleccionado(null);
+        }
 
-              // Limpiamos la selección actual para restablecer la UI
-              if (restantes.length > 0) {
-                setCalendarioSeleccionado(restantes[0]);
-              } else {
-                setCalendarioSeleccionado(null);
-              }
+        setMostrarEdicionCampos(false);
+        Alert.alert("Éxito", "Calendario laboral eliminado correctamente.");
+      } catch (error) {
+        console.error("Error al eliminar calendario:", error);
+        Alert.alert(
+          "Error",
+          "No se pudo eliminar el calendario laboral de la base de datos.",
+        );
+      } finally {
+        setGuardando(false);
+      }
+    };
 
-              setMostrarEdicionCampos(false);
-              Alert.alert(
-                "Éxito",
-                "Calendario laboral eliminado correctamente.",
-              );
-            } catch (error) {
-              console.error("Error al eliminar calendario:", error);
-              Alert.alert(
-                "Error",
-                "No se pudo eliminar el calendario laboral de la base de datos.",
-              );
-            } finally {
-              setGuardando(false);
-            }
+    if (Platform.OS === "web") {
+      const confirmado = window.confirm(
+        "¿Estás seguro de que deseas eliminar por completo este calendario laboral y todos sus días festivos asociados?",
+      );
+      if (confirmado) {
+        ejecutarEliminacion();
+      }
+    } else {
+      Alert.alert(
+        "Confirmar eliminación",
+        "¿Estás seguro de que deseas eliminar por completo este calendario laboral y todos sus días festivos asociados?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Eliminar",
+            style: "destructive",
+            onPress: async () => {
+              ejecutarEliminacion();
+            },
           },
-        },
-      ],
-    );
+        ],
+      );
+    }
   };
 
   const handleGuardarFestivoContextual = async () => {
@@ -748,46 +759,66 @@ export default function EmpresasScreen() {
   const tieneCentrosValidos =
     centrosConfigurados && centrosConfigurados.length > 0;
 
-  async function handleEditarCentro(centro: CentroTrabajo): Promise<void> {
+  const handleEditarCentro = async (centro: CentroTrabajo) => {
     try {
       setGuardando(true);
       await editarCentroTrabajo(centro.id, {
         nombre: nombreCentro,
+        activo: activoCentro,
         direccion: direccionCentro,
         codigo_ccc: codigoCcc,
         zona_horaria: zonaHoraria,
       });
 
       setCentrosConfigurados((prev) =>
-        prev.map((c) => (c.id === centro.id ? { ...c, ...centro } : c)),
+        prev.map((c) =>
+          c.id === centro.id
+            ? {
+                ...c,
+                nombre: nombreCentro,
+                activo: activoCentro,
+                direccion: direccionCentro,
+                codigo_ccc: codigoCcc,
+                zona_horaria: zonaHoraria,
+              }
+            : c,
+        ),
       );
 
       Alert.alert("Éxito", "Centro de trabajo actualizado.");
-    } catch (error) {
+    } catch (error: any) {
+      alert("Error: " + error);
       Alert.alert("Error", "No se pudo actualizar el centro.");
     } finally {
       setGuardando(false);
     }
-  }
+  };
 
   function handleEliminarCentro(centroId: string): void {
-    Alert.alert("Confirmar", "¿Eliminar este centro?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await eliminarCentroTrabajo(centroId);
-            setCentrosConfigurados((prev) =>
-              prev.filter((c) => c.id !== centroId),
-            );
-          } catch (error) {
-            Alert.alert("Error", "No se pudo eliminar el centro.");
-          }
+    const ejecutarEliminacion = async () => {
+      try {
+        await eliminarCentroTrabajo(centroId);
+        setCentrosConfigurados((prev) => prev.filter((c) => c.id !== centroId));
+      } catch (error: any) {
+        alert("Error: No se pudo eliminar el centro.");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmado = window.confirm("¿Eliminar este centro?");
+      if (confirmado) {
+        ejecutarEliminacion();
+      }
+    } else {
+      Alert.alert("Confirmar", "¿Eliminar este centro?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: ejecutarEliminacion,
         },
-      },
-    ]);
+      ]);
+    }
   }
 
   const handleEditarTurno = async (turno: ItemTurno) => {
@@ -806,23 +837,30 @@ export default function EmpresasScreen() {
   };
 
   const handleEliminarTurno = async (turnoId: string) => {
-    Alert.alert("Confirmar", "¿Eliminar este turno?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await eliminarTurno(turnoId);
-            setTurnosEstructurales((prev) =>
-              prev.filter((t) => t.id !== turnoId),
-            );
-          } catch (error) {
-            Alert.alert("Error", "No se pudo eliminar el turno.");
-          }
+    const ejecutarEliminacion = async () => {
+      try {
+        await eliminarTurno(turnoId);
+        setTurnosEstructurales((prev) => prev.filter((t) => t.id !== turnoId));
+      } catch (error: any) {
+        alert("Error: No se pudo eliminar el turno.");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmado = window.confirm("¿Eliminar este turno?");
+      if (confirmado) {
+        ejecutarEliminacion();
+      }
+    } else {
+      Alert.alert("Confirmar", "¿Eliminar este turno?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: ejecutarEliminacion,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const handleEditarDepartamento = async () => {
@@ -857,23 +895,30 @@ export default function EmpresasScreen() {
   };
 
   const handleEliminarDepartamento = async (departamentoId: string) => {
-    Alert.alert("Confirmar", "¿Eliminar este departamento?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await eliminarDepartamento(departamentoId);
-            setDepartamentos((prev) =>
-              prev.filter((d) => d.id !== departamentoId),
-            );
-          } catch (error) {
-            Alert.alert("Error", "No se pudo eliminar el departamento.");
-          }
+    const ejecutarEliminacion = async () => {
+      try {
+        await eliminarDepartamento(departamentoId);
+        setDepartamentos((prev) => prev.filter((d) => d.id !== departamentoId));
+      } catch (error: any) {
+        alert("Error: No se pudo eliminar el departamento." + departamentoId);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmado = window.confirm("¿Eliminar este departamento?");
+      if (confirmado) {
+        ejecutarEliminacion();
+      }
+    } else {
+      Alert.alert("Confirmar", "¿Eliminar este departamento?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: ejecutarEliminacion,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   return (
@@ -1140,6 +1185,25 @@ export default function EmpresasScreen() {
                           />
                         </View>
                       </Row>
+                      <View
+                        style={[
+                          styles.campoFormulario,
+                          {
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          },
+                        ]}
+                      >
+                        <ThemedText style={styles.labelInput}>
+                          ¿Centro Activo?
+                        </ThemedText>
+                        <Switch
+                          value={activoCentro}
+                          onValueChange={setActivoCentro}
+                          trackColor={{ false: "#767577", true: "#EA580C" }}
+                        />
+                      </View>
                       <Pressable
                         style={[
                           styles.botonGuardar,
@@ -1159,7 +1223,7 @@ export default function EmpresasScreen() {
                     Centros Registrados
                   </ThemedText>
 
-                  {centrosConfigurados.map((centro: any) => (
+                  {centrosConfigurados.map((centro: CentroTrabajo) => (
                     <View key={centro.id}>
                       <View
                         style={[
@@ -1197,6 +1261,7 @@ export default function EmpresasScreen() {
                               } else {
                                 setCentroEnEdicion(centro);
                                 setNombreCentro(centro.nombre);
+                                setActivoCentro(centro.activo);
                                 setDireccionCentro(centro.direccion || "");
                                 setZonaHoraria(centro.zona_horaria || "");
                                 setCodigoCcc(
@@ -1215,7 +1280,9 @@ export default function EmpresasScreen() {
                               paddingVertical: 8,
                               borderRadius: 16,
                             }}
-                            onPress={() => handleEliminarCentro(centro.id)}
+                            onPress={() => {
+                              handleEliminarCentro(centro.id);
+                            }}
                           >
                             <ThemedText style={{ color: "#ef4444" }}>
                               🗑
@@ -1277,6 +1344,25 @@ export default function EmpresasScreen() {
                               />
                             </View>
                           </Row>
+                          <View
+                            style={[
+                              styles.campoFormulario,
+                              {
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                              },
+                            ]}
+                          >
+                            <ThemedText style={styles.labelInput}>
+                              ¿Centro Activo?
+                            </ThemedText>
+                            <Switch
+                              value={activoCentro}
+                              onValueChange={setActivoCentro}
+                              trackColor={{ false: "#767577", true: "#EA580C" }}
+                            />
+                          </View>
                           <Pressable
                             style={[
                               styles.botonGuardar,
@@ -1455,8 +1541,7 @@ export default function EmpresasScreen() {
                                 setHoraInicio(turno.hora_inicio);
                                 setHoraFin(turno.hora_fin);
                                 setDuracionPausa(
-                                  turno.minutos_pausa_obligatoria?.toString() ||
-                                    "",
+                                  turno.duracion_pausa_minutos.toString(),
                                 );
                                 setMostrarFormTurno(false);
                               }
@@ -1559,7 +1644,7 @@ export default function EmpresasScreen() {
                             <ThemedText
                               style={{ textAlign: "center", color: "#64748B" }}
                             >
-                              Cancelar edición
+                              Cancelar
                             </ThemedText>
                           </Pressable>
                         </View>

@@ -13,6 +13,7 @@ export interface CentroTrabajo {
 export interface CentroTrabajoCreate {
   empresa_id: string; // Identificador UUID de la empresa (tenant)
   nombre: string; // Nombre de la sede física
+  activo: boolean;
   zona_horaria: string; // Zona horaria (ej. "Europe/Madrid")
   codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
   direccion?: string | null; // Dirección física (opcional)

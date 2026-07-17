@@ -7,8 +7,8 @@ import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno
 import { Contrato } from "../../contratos/types/contrato";
 import { ItemTurno } from "../../turnos/types/turno";
 import {
-    obtenerAsignacionesTurnoTrabajador,
-    obtenerTurno,
+  obtenerAsignacionesTurnoTrabajador,
+  obtenerTurno,
 } from "../api/services";
 
 export const FichaTrabajador = ({
@@ -19,7 +19,7 @@ export const FichaTrabajador = ({
   styles,
   abrirEdicionContrato,
   handleGuardarContrato,
-  prepararAsignarTurno,
+  handleAsignarTurnoTrabajador,
 }: any) => {
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
     [],
@@ -34,7 +34,7 @@ export const FichaTrabajador = ({
       try {
         const asignaciones: AsignacionTurno[] =
           await obtenerAsignacionesTurnoTrabajador(trabajadorId);
-        setAsignacionesTurno(asignaciones);
+
         const hoyTime = new Date().getTime();
 
         // Filtramos las asignaciones para sacar sólo las vigentes
@@ -47,6 +47,8 @@ export const FichaTrabajador = ({
 
           return hoyTime >= fechaInicio && hoyTime <= fechaFin;
         });
+
+        setAsignacionesTurno(asignacionesFiltradas);
 
         const promesasTurnos = asignacionesFiltradas.map(
           (at: AsignacionTurno) => obtenerTurno(at.turno_id),
@@ -75,7 +77,6 @@ export const FichaTrabajador = ({
 
   return (
     <Card>
-      {/* CABECERA */}
       <View style={styles.cardHeader}>
         <View style={styles.avatarCirculo}>
           <ThemedText style={styles.avatarTexto}>
@@ -223,7 +224,10 @@ export const FichaTrabajador = ({
                     styles.botonAccionSecundario,
                     { backgroundColor: "#2563EB" },
                   ]}
-                  onPress={handleGuardarContrato}
+                  onPress={() => {
+                    handleAccion("nuevo_contrato");
+                    handleGuardarContrato();
+                  }}
                 >
                   <FontAwesome5 name="plus" size={10} color="#FFFFFF" />
                   <ThemedText
@@ -249,21 +253,21 @@ export const FichaTrabajador = ({
           <MaterialCommunityIcons
             name="calendar-clock"
             size={15}
-            color={asignacionesTurno ? "#16803D" : "#EA580C"}
+            color={asignacionesTurno.length > 0 ? "#16803D" : "#EA580C"}
           />
           <View style={{ flex: 1, marginLeft: 6 }}>
             <ThemedText
               style={[
                 styles.textoAuditoria,
-                { color: asignacionesTurno ? "#16803D" : "#EA580C" },
+                { color: asignacionesTurno.length > 0 ? "#16803D" : "#EA580C" },
               ]}
             >
-              {asignacionesTurno
+              {asignacionesTurno.length > 0
                 ? "Turno asignado en cuadrante"
                 : "⚠️ Sin asignación horaria de turnos en este mes"}
             </ThemedText>
 
-            {asignacionesTurno && (
+            {asignacionesTurno.length > 0 && (
               <ThemedText
                 style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}
               >
@@ -272,7 +276,7 @@ export const FichaTrabajador = ({
             )}
 
             <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
-              {asignacionesTurno ? (
+              {asignacionesTurno.length > 0 ? (
                 <>
                   <Pressable
                     style={[
@@ -327,7 +331,9 @@ export const FichaTrabajador = ({
                     styles.botonAccionSecundario,
                     { backgroundColor: "#16A34A" },
                   ]}
-                  onPress={() => prepararAsignarTurno(item)}
+                  onPress={() => {
+                    handleAsignarTurnoTrabajador();
+                  }}
                 >
                   <MaterialCommunityIcons
                     name="calendar-plus"
@@ -364,11 +370,38 @@ export const FichaTrabajador = ({
         >
           <Pressable
             style={styles.botonBajaEmpresa}
-            onPress={() => handleAccion("baja_trabajador")}
+            onPress={() => {
+              handleAccion("baja_trabajador");
+            }}
           >
             <FontAwesome5 name="user-slash" size={11} color="#991B1B" />
             <ThemedText style={styles.textoBotonBajaEmpresa}>
               Tramitar Baja del Trabajador en Empresa
+            </ThemedText>
+          </Pressable>
+        </View>
+      )}
+
+      {/* REACTIVACIÓN */}
+      {!item.activo && (
+        <View
+          style={{
+            marginTop: 4,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: "#E2E8F0",
+            borderStyle: "dashed",
+          }}
+        >
+          <Pressable
+            style={styles.botonReactivarEmpresa}
+            onPress={() => {
+              handleAccion("reactivar_trabajador");
+            }}
+          >
+            <FontAwesome5 name="user-slash" size={11} color="#117937" />
+            <ThemedText style={styles.textoBotonReactivarEmpresa}>
+              Reactivar Trabajador en Empresa
             </ThemedText>
           </Pressable>
         </View>

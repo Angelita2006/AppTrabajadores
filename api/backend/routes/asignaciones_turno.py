@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import List
 from uuid import UUID
 from core.database import get_db
-from schemas.asignaciones_turno import AsignacionTurnoCreate, AsignacionTurnoResponse
+from schemas.asignaciones_turno import AsignacionTurnoCreate, AsignacionTurnoMasivaCreate, AsignacionTurnoResponse
 from models.trabajadores import Trabajadores
 from models.turnos import Turnos
 from models.asignaciones_turno import AsignacionesTurno
@@ -46,6 +46,49 @@ def asignar_turno_trabajador(obj_in: AsignacionTurnoCreate, db: Session = Depend
             detail=f"Error al consolidar la asignación en la base de datos: {str(error)}"
         )
 
+@router.post("/masiva", response_model=List[AsignacionTurnoResponse], status_code=status.HTTP_201_CREATED)
+def asignar_turnos_masivamente(obj_in: AsignacionTurnoMasivaCreate, db: Session = Depends(get_db)):
+    """
+    URI: POST /api/asignaciones-turno/masiva
+    Vincula a un trabajador con múltiples turnos de forma atómica.
+    """
+    # 1. Validar existencia del trabajador
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
+    if not trabajador:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    nuevas_asignaciones = []
+    
+    try:
+        for turno_id in obj_in.turnos_ids:
+            # Validar que cada turno exista
+            turno = db.query(Turnos).filter(Turnos.id == turno_id).first()
+            if not turno:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Turno {turno_id} no encontrado.")
+            
+            nueva_asignacion = AsignacionesTurno(
+                trabajador_id=obj_in.trabajador_id,
+                turno_id=turno_id,
+                fecha_inicio=obj_in.fecha_inicio,
+                fecha_fin=obj_in.fecha_fin
+            )
+            nuevas_asignaciones.append(nueva_asignacion)
+            db.add(nueva_asignacion)
+
+        db.commit()
+        for asignacion in nuevas_asignaciones:
+            db.refresh(asignacion)
+            
+        return nuevas_asignaciones
+    except HTTPException as he:
+        db.rollback()
+        raise he
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al procesar la asignación masiva: {str(error)}"
+        )
 
 @router.get("", response_model=List[AsignacionTurnoResponse])
 def obtener_todas_las_asignaciones(db: Session = Depends(get_db)):
@@ -158,3 +201,32 @@ def eliminar_asignacion_turno(id_asignacion: UUID, db: Session = Depends(get_db)
     db.delete(asignacion)
     db.commit()
     return {"detail": f"Asignación ({id_asignacion}) eliminada correctamente del cuadrante."}
+
+@router.delete("/trabajador/{trabajador_id}/eliminar-todas", status_code=status.HTTP_200_OK)
+def eliminar_todas_asignaciones_trabajador(trabajador_id: UUID, db: Session = Depends(get_db)):
+    """
+    URI: DELETE /api/asignaciones-turno/trabajador/{trabajador_id}/eliminar-todas
+    Elimina todas las asignaciones de turno vinculadas a un trabajador específico.
+    """
+    try:
+        # Buscamos todas las asignaciones del trabajador
+        asignaciones = db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == trabajador_id).all()
+        
+        if not asignaciones:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="No se encontraron asignaciones para este trabajador."
+            )
+
+        for asignacion in asignaciones:
+            db.delete(asignacion)
+            
+        db.commit()
+        return {"detail": f"Se han eliminado {len(asignaciones)} asignaciones del trabajador."}
+    
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar las asignaciones: {str(error)}"
+        )
