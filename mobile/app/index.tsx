@@ -106,7 +106,6 @@ export default function RootIndexScreen() {
 
   useEffect(() => {
     const configurarNotificaciones = async () => {
-      // Solo ejecutamos si el usuario está logueado
       if (Platform.OS === "web") return;
       if (usuarioActual) {
         const permitido = await NotificationService.requestPermissions();
@@ -196,7 +195,7 @@ export default function RootIndexScreen() {
   const puedeCambiarEmpresa =
     esAdminGestoria && empresas.length > 1 && !!empresaSeleccionada;
 
-  const renderEmpresaSelection = (usuario: typeof usuarioActual) => {
+  const renderEmpresaSelection = () => {
     return (
       <View style={styles.selectorContainer}>
         <ThemedText style={styles.detailLabel}>
@@ -269,7 +268,7 @@ export default function RootIndexScreen() {
             </View>
             <View style={styles.separadorPerfil} />
             <View style={styles.detailGrid}>
-              {renderEmpresaSelection(usuario)}
+              {renderEmpresaSelection()}
               <Detail
                 label="CIF / NIF"
                 value={empresaSeleccionada?.cif ?? "No disponible"}
@@ -602,6 +601,7 @@ export default function RootIndexScreen() {
               Portal de Control Horario
             </ThemedText>
           </View>
+
           {/* CAMPO CORREO ELECTRÓNICO */}
           <View style={styles.field}>
             <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
@@ -668,18 +668,25 @@ export default function RootIndexScreen() {
                 editable={!cargando}
                 returnKeyType="go"
                 onSubmitEditing={handleLogin}
+                autoComplete="off"
+                {...(Platform.OS === "web" && {
+                  // @ts-ignore
+                  dataSet: { lpignore: "true" }, // Desactiva LastPass / gestores comunes
+                })}
               />
-              <Pressable
-                onPress={() => setIsObscured(!isObscured)}
-                style={styles.eyeButton}
-                disabled={cargando}
-              >
-                <IconSymbol
-                  name={isObscured ? "visibility-off" : "visibility"}
-                  size={22}
-                  color="#64748B"
-                />
-              </Pressable>
+              {Platform.OS !== "web" && (
+                <Pressable
+                  onPress={() => setIsObscured(!isObscured)}
+                  style={styles.eyeButton}
+                  disabled={cargando}
+                >
+                  <IconSymbol
+                    name={isObscured ? "visibility-off" : "visibility"}
+                    size={22}
+                    color="#64748B"
+                  />
+                </Pressable>
+              )}
             </View>
             <Pressable
               onPress={() =>
@@ -699,6 +706,7 @@ export default function RootIndexScreen() {
               </ThemedText>
             )}
           </View>
+
           <Pressable
             style={[
               styles.primaryButton,
@@ -713,6 +721,7 @@ export default function RootIndexScreen() {
               <ThemedText style={styles.buttonText}>Iniciar Sesión</ThemedText>
             )}
           </Pressable>
+
           <Pressable
             onPress={() => router.replace("/(authentication)/registro")}
             style={{ alignSelf: "center", marginVertical: 16 }}
@@ -723,6 +732,7 @@ export default function RootIndexScreen() {
               ¿No tienes una cuenta? Regístrate
             </ThemedText>
           </Pressable>
+
           <Pressable
             onPress={() =>
               router.replace("/(authentication)/registro-organizacion")
@@ -735,7 +745,6 @@ export default function RootIndexScreen() {
               color="#1E293B"
               style={{ marginRight: 6 }}
             />
-
             <ThemedText style={styles.organizationRegisterText}>
               Quiero registrar mi organización / empresa
             </ThemedText>
@@ -816,6 +825,11 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 15,
     fontWeight: "500",
+    ...Platform.select({
+      web: {
+        outlineStyle: "none" as any,
+      },
+    }),
   },
   eyeButton: { padding: 8 },
   primaryButton: {
@@ -879,12 +893,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 15,
     fontWeight: "600",
-  },
-  selectorNote: {
-    color: "#475569",
-    fontSize: 13,
-    marginTop: 6,
-    lineHeight: 20,
   },
   pickerWrapperHorizontal: {
     flexDirection: "row",

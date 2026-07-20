@@ -17,7 +17,6 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import { Directory, File, Paths } from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -422,7 +421,21 @@ export default function FichajesHistorialScreen() {
       return;
     }
 
-    const bloquesTrabajadoresHtml = trabajadoresAgrupadosSemanales
+    const trabajadoresAIncluir = trabajadoresAgrupadosSemanales.filter(
+      (t: any) =>
+        trabajadoresSeleccionadosParaPdf.some(
+          (idSeleccionado) => String(idSeleccionado) === String(t.id),
+        ),
+    );
+
+    if (trabajadoresAIncluir.length === 0) {
+      alert(
+        "Por favor, selecciona al menos un trabajador para generar el informe.",
+      );
+      return;
+    }
+
+    const bloquesTrabajadoresHtml = trabajadoresAIncluir
       .map((t: any) => {
         let filasCalendarioHtml = "";
         let totalMinutosSemanales = 0;
@@ -690,27 +703,9 @@ export default function FichajesHistorialScreen() {
         }
       } else {
         const { uri } = await Print.printToFileAsync({ html: plantillaHtml });
-
-        const nombreArchivoDeseado = `Libro_Registro_Semanal_${rangoSemanaStr.replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
-
-        // Crear instancia del archivo temporal y moverlo con la nueva API
-        const archivoTemporal = new File(uri);
-        const directorioDestino = new Directory(Paths.document);
-        const archivoDestino = new File(
-          directorioDestino,
-          nombreArchivoDeseado,
-        );
-
-        // Si ya existe uno previo con el mismo nombre, lo limpiamos
-        if (archivoDestino.exists) {
-          archivoDestino.delete();
-        }
-
-        archivoTemporal.move(archivoDestino);
-
-        await Sharing.shareAsync(archivoDestino.uri, {
+        await Sharing.shareAsync(uri, {
           mimeType: "application/pdf",
-          dialogTitle: `Libro de Registro Semanal`,
+          dialogTitle: `Libro_Registro_Semanal_${rangoSemanaStr.replace(/ /g, "_")}`,
         });
       }
     } catch (error: any) {
@@ -718,6 +713,7 @@ export default function FichajesHistorialScreen() {
     }
   }, [
     trabajadoresAgrupadosSemanales,
+    trabajadoresSeleccionadosParaPdf,
     empresaSeleccionada,
     rangoSemanaStr,
     lunesSemanaActual,
