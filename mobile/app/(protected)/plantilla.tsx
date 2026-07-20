@@ -7,8 +7,9 @@ import {
 } from "@/src/modules/empresas/components/PlantillaProvider";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -113,6 +114,35 @@ function PlantillaScreen() {
     usuarioActual?.tipo_usuario === ("Admin_empresa" as TipoUsuario);
   const esAdministrador = esGestoria || esAdminEmpresa;
 
+  // Formulario: Alta de Trabajador
+  const inputNombreRef = useRef<any>(null);
+  const inputApellidosRef = useRef<any>(null);
+  const inputNifRef = useRef<any>(null);
+  const inputEmailRef = useRef<any>(null);
+  const inputTelefonoRef = useRef<any>(null);
+  const inputNssRef = useRef<any>(null);
+  const inputFechaNacRef = useRef<any>(null);
+  const botonGuardarAltaRef = useRef<any>(null);
+
+  // Formulario: Alta / Edición de Contrato
+  const inputTipoContratoRef = useRef<any>(null);
+  const inputTipoJornadaRef = useRef<any>(null);
+  const inputHorasSemanaRef = useRef<any>(null);
+  const inputFechaInicioRef = useRef<any>(null);
+  const inputFechaFinRef = useRef<any>(null);
+  const inputPuestoRef = useRef<any>(null);
+  const inputCategoriaRef = useRef<any>(null);
+  const botonGuardarContratoRef = useRef<any>(null);
+
+  // Formulario: Asignación de Turnos
+  const inputTurnoInicioRef = useRef<any>(null);
+  const inputTurnoFinRef = useRef<any>(null);
+  const botonActualizarRef = useRef<any>(null);
+
+  const botonConfirmarBajaRef = useRef<any>(null);
+  const botonConfirmarEliminarTurnoRef = useRef<any>(null);
+  const botonRescindirContratoRef = useRef<any>(null);
+
   useEffect(() => {
     if (usuarioActual?.empresa_id) {
       obtenerCentrosPorEmpresa(usuarioActual.empresa_id).then(setListaCentros);
@@ -169,7 +199,6 @@ function PlantillaScreen() {
       setCentroTrabajoId("");
     }
   }, [modalActivo, contratoAEditar]);
-
   const plantillaFiltrada = useMemo(() => {
     return plantilla.filter((item: TrabajadorPlantilla) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
@@ -197,7 +226,12 @@ function PlantillaScreen() {
   };
 
   const handleAltaTrabajadorCompleta = async () => {
-    if (!nombre || !apellidos || !nifNie || !usuarioActual?.empresa_id) return;
+    if (!nombre || !apellidos || !nifNie || !usuarioActual?.empresa_id) {
+      alert(
+        "Por favor, rellena los campos obligatorios para dar de alta al trabajador.",
+      );
+      return;
+    }
     try {
       setProcesando(true);
       await crearTrabajador({
@@ -215,18 +249,13 @@ function PlantillaScreen() {
       cerrarModales();
       await cargarPlantilla();
     } catch (err: any) {
-      console.error(err);
+      alert(obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
   };
 
   const handleGuardarContrato = async () => {
-    if (!tipoContrato || !centroTrabajoId) {
-      console.error("Campos obligatorios incompletos");
-      return;
-    }
-
     try {
       setProcesando(true);
       const datosContrato = {
@@ -247,8 +276,8 @@ function PlantillaScreen() {
 
       await cargarPlantilla();
       cerrarModales();
-    } catch (err) {
-      console.error("Error al guardar contrato:", err);
+    } catch (err: any) {
+      alert("Error al guardar contrato: " + obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
@@ -279,42 +308,37 @@ function PlantillaScreen() {
 
       await actualizarContratoActivoTrabajador(contratoAEditar.id, cambios);
 
-      // Refrescamos los datos para ver los cambios aplicados
       await cargarPlantilla();
       cerrarModales();
-
-      // Opcional: mostrar mensaje de éxito
-      console.log("Contrato actualizado con éxito");
-    } catch (err) {
-      console.error("Error al actualizar contrato:", err);
+    } catch (err: any) {
+      alert(
+        "Error al actualizar contrato: " + obtenerMensajeAmigableError(err),
+      );
     } finally {
       setProcesando(false);
     }
   };
 
   const handleAsignarTurnoTrabajador = async () => {
-    // 1. Validación básica
     if (!trabajadorSeleccionado || turnosSeleccionados.length === 0) return;
 
-    // 2. Extraer IDs de forma eficiente
     const idsTurnos = turnosSeleccionados.map((t) => t.id);
 
     try {
       setProcesando(true);
 
-      // 3. Llamada al servicio con las fechas necesarias
       await asignarTurnosTrabajador(
         trabajadorSeleccionado.id,
         idsTurnos,
-        fechaInicio, // Debe ser string YYYY-MM-DD
-        fechaFin || null, // Puede ser string o null
+        fechaInicio,
+        fechaFin || null,
       );
 
       await cargarPlantilla();
       cerrarModales();
-      setTurnosSeleccionados([]); // Limpiar selección tras éxito
-    } catch (err) {
-      console.error("Error al asignar turnos:", err);
+      setTurnosSeleccionados([]);
+    } catch (err: any) {
+      alert("Error al asignar turnos: " + obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
@@ -328,7 +352,7 @@ function PlantillaScreen() {
       cerrarModales();
       await cargarPlantilla();
     } catch (err: any) {
-      console.error(err);
+      alert("Error al eliminar turnos: " + obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
@@ -338,7 +362,7 @@ function PlantillaScreen() {
     try {
       setCargandoSelectores(true);
       if (!usuarioActual?.empresa_id) {
-        console.error("No se pudo obtener el ID de la empresa.");
+        alert("No se pudo obtener el ID de la empresa.");
         return;
       }
 
@@ -347,15 +371,15 @@ function PlantillaScreen() {
       );
 
       if (datosTurnos.length === 0) {
-        console.warn("La empresa no tiene turnos estructurales creados.");
+        alert("La empresa no tiene turnos estructurales creados.");
         return;
       }
 
       setTurnosEmpresa(datosTurnos);
       setTrabajadorSeleccionado(trabajador);
       setModalActivo("asignar_turno");
-    } catch (error) {
-      console.error("Error al preparar asignación de turnos:", error);
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setCargandoSelectores(false);
     }
@@ -401,8 +425,8 @@ function PlantillaScreen() {
         setCentroTrabajoId(contratoActivoDelTrabajador.centro_trabajo_id);
         setDepartamentoId(contratoActivoDelTrabajador.departamento_id);
       }
-    } catch (error) {
-      console.error("Error al obtener el contrato:", error);
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setModalActivo("editar_contrato");
     }
@@ -416,19 +440,16 @@ function PlantillaScreen() {
   const manejarClicReasignar = async (trabajador: Trabajador) => {
     setProcesando(true);
     try {
-      // 1. Obtener asignaciones del servicio
       const asignaciones = await obtenerAsignacionesTurnoTrabajador(
         trabajador.id,
       );
       const hoy = new Date().toISOString().split("T")[0];
 
-      // 2. Filtrar vigente
       const vigente = asignaciones.find(
         (a: AsignacionTurno) =>
           a.fecha_inicio <= hoy && (!a.fecha_fin || a.fecha_fin >= hoy),
       );
 
-      // 3. Setear estados del formulario
       if (vigente) {
         setFechaInicio(vigente.fecha_inicio);
         setFechaFin(vigente.fecha_fin || "");
@@ -438,7 +459,6 @@ function PlantillaScreen() {
         );
         setTurnosSeleccionados(turnosVigentes);
       } else {
-        // Limpiar por si no hay asignación vigente
         setFechaInicio("");
         setFechaFin("");
         setTurnosSeleccionados([]);
@@ -446,8 +466,8 @@ function PlantillaScreen() {
 
       setTrabajadorSeleccionado(trabajador);
       setModalActivo("reasignar_turno");
-    } catch (error) {
-      console.error("Error al preparar reasignación:", error);
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setProcesando(false);
     }
@@ -460,24 +480,20 @@ function PlantillaScreen() {
       setProcesando(true);
       const fechaBaja = new Date().toISOString().split("T")[0];
 
-      // 1. Primero, cerramos su contrato activo
       await rescindirContratoActivoTrabajador(
         trabajadorSeleccionado.id,
         trabajadorSeleccionado.empresa_id,
       );
 
-      // 2. Actualizamos el trabajador para marcarlo como inactivo
-      const respuesta = await actualizarTrabajador(trabajadorSeleccionado.id, {
+      await actualizarTrabajador(trabajadorSeleccionado.id, {
         activo: false,
         fecha_baja_empresa: fechaBaja,
       });
 
-      // 3. Recargamos la plantilla para que el badge cambie automáticamente
       await cargarPlantilla();
       cerrarModales();
-    } catch (err) {
-      console.error("Error al tramitar la baja:", err);
-      alert("No se pudo completar la baja. Inténtalo de nuevo.");
+    } catch (err: any) {
+      alert(obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
@@ -489,16 +505,15 @@ function PlantillaScreen() {
     try {
       setProcesando(true);
 
-      // 1. Actualizamos el trabajador para marcarlo como activo
       await actualizarTrabajador(trabajadorSeleccionado.id, {
         activo: true,
-        fecha_baja_empresa: null, // Limpiamos la fecha de baja
+        fecha_baja_empresa: null,
       });
 
       await cargarPlantilla();
-    } catch (err) {
-      console.error("Error al reactivar trabajador:", err);
-      alert("No se pudo reactivar al trabajador.");
+      cerrarModales();
+    } catch (err: any) {
+      alert(obtenerMensajeAmigableError(err));
     } finally {
       setProcesando(false);
     }
@@ -596,10 +611,13 @@ function PlantillaScreen() {
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>Nombre *</ThemedText>
                     <TextInput
+                      ref={inputNombreRef}
                       style={styles.inputForm}
                       value={nombre}
                       onChangeText={setNombre}
                       placeholder="Nombre de pila"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputApellidosRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -607,10 +625,13 @@ function PlantillaScreen() {
                       Apellidos *
                     </ThemedText>
                     <TextInput
+                      ref={inputApellidosRef}
                       style={styles.inputForm}
                       value={apellidos}
                       onChangeText={setApellidos}
                       placeholder="Apellidos completos"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputNifRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -618,11 +639,14 @@ function PlantillaScreen() {
                       NIF / NIE *
                     </ThemedText>
                     <TextInput
+                      ref={inputNifRef}
                       style={styles.inputForm}
                       value={nifNie}
                       onChangeText={setNifNie}
                       autoCapitalize="characters"
                       placeholder="Ej: 12345678Z"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputEmailRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -630,12 +654,15 @@ function PlantillaScreen() {
                       Email Opcional
                     </ThemedText>
                     <TextInput
+                      ref={inputEmailRef}
                       style={styles.inputForm}
                       value={email}
                       onChangeText={setEmail}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       placeholder="correo@empresa.com"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputTelefonoRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -643,11 +670,14 @@ function PlantillaScreen() {
                       Teléfono Móvil
                     </ThemedText>
                     <TextInput
+                      ref={inputTelefonoRef}
                       style={styles.inputForm}
                       value={telefono}
                       onChangeText={setTelefono}
                       keyboardType="phone-pad"
                       placeholder="Ej: +34600111222"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputNssRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -655,11 +685,14 @@ function PlantillaScreen() {
                       Número Seguridad Social
                     </ThemedText>
                     <TextInput
+                      ref={inputNssRef}
                       style={styles.inputForm}
                       value={nss}
                       onChangeText={setNss}
                       keyboardType="numeric"
                       placeholder="Ej: 281234567890"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputFechaNacRef.current?.focus()}
                     />
                   </View>
                   <View style={styles.campoForm}>
@@ -667,16 +700,24 @@ function PlantillaScreen() {
                       Fecha Nacimiento (AAAA-MM-DD)
                     </ThemedText>
                     <TextInput
+                      ref={inputFechaNacRef}
                       style={styles.inputForm}
                       value={fechaNacimiento}
                       onChangeText={setFechaNacimiento}
                       placeholder="Ej: 1995-04-25"
+                      returnKeyType="next"
+                      onSubmitEditing={() =>
+                        botonGuardarAltaRef.current?.focus()
+                      }
                     />
                   </View>
                   <Pressable
+                    ref={botonGuardarAltaRef}
                     style={styles.btnGuardarModal}
                     onPress={handleAltaTrabajadorCompleta}
                     disabled={procesando}
+                    accessible={true}
+                    accessibilityRole="button"
                   >
                     {procesando ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
@@ -704,10 +745,15 @@ function PlantillaScreen() {
                       Tipo de Contrato *
                     </ThemedText>
                     <TextInput
+                      ref={inputTipoContratoRef}
                       style={styles.inputForm}
                       value={tipoContrato}
                       onChangeText={setTipoContrato}
-                      placeholder="Ej: INDEFINIDO"
+                      placeholder="Ej: Indefinido, Temporal, ... "
+                      returnKeyType="next"
+                      onSubmitEditing={() =>
+                        inputTipoJornadaRef.current?.focus()
+                      }
                     />
                   </View>
 
@@ -716,10 +762,15 @@ function PlantillaScreen() {
                       Tipo Jornada
                     </ThemedText>
                     <TextInput
+                      ref={inputTipoJornadaRef}
                       style={styles.inputForm}
                       value={tipoJornada}
                       onChangeText={setTipoJornada}
                       placeholder="Completa / Parcial"
+                      returnKeyType="next"
+                      onSubmitEditing={() =>
+                        inputHorasSemanaRef.current?.focus()
+                      }
                     />
                   </View>
 
@@ -728,10 +779,15 @@ function PlantillaScreen() {
                       Horas por Semana
                     </ThemedText>
                     <TextInput
+                      ref={inputHorasSemanaRef}
                       style={styles.inputForm}
                       value={horasSemana}
                       onChangeText={setHorasSemana}
                       keyboardType="numeric"
+                      returnKeyType="next"
+                      onSubmitEditing={() =>
+                        inputFechaInicioRef.current?.focus()
+                      }
                     />
                   </View>
 
@@ -741,9 +797,12 @@ function PlantillaScreen() {
                       Fecha Inicio (AAAA-MM-DD)
                     </ThemedText>
                     <TextInput
+                      ref={inputFechaInicioRef}
                       style={styles.inputForm}
                       value={fechaInicio}
                       onChangeText={setFechaInicio}
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputFechaFinRef.current?.focus()}
                     />
                   </View>
 
@@ -752,10 +811,13 @@ function PlantillaScreen() {
                       Fecha Fin (Opcional)
                     </ThemedText>
                     <TextInput
+                      ref={inputFechaFinRef}
                       style={styles.inputForm}
                       value={fechaFin}
                       onChangeText={setFechaFin}
                       placeholder="AAAA-MM-DD"
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputPuestoRef.current?.focus()}
                     />
                   </View>
 
@@ -764,9 +826,12 @@ function PlantillaScreen() {
                       Puesto de Trabajo
                     </ThemedText>
                     <TextInput
+                      ref={inputPuestoRef}
                       style={styles.inputForm}
                       value={puestoTrabajo}
                       onChangeText={setPuestoTrabajo}
+                      returnKeyType="next"
+                      onSubmitEditing={() => inputCategoriaRef.current?.focus()}
                     />
                   </View>
 
@@ -775,9 +840,14 @@ function PlantillaScreen() {
                       Categoría Profesional
                     </ThemedText>
                     <TextInput
+                      ref={inputCategoriaRef}
                       style={styles.inputForm}
                       value={categoriaProfesional ?? ""}
                       onChangeText={setCategoriaProfesional}
+                      returnKeyType="next"
+                      onSubmitEditing={() =>
+                        botonGuardarContratoRef.current?.focus()
+                      }
                     />
                   </View>
 
@@ -850,9 +920,16 @@ function PlantillaScreen() {
                   </View>
 
                   <Pressable
+                    ref={botonGuardarContratoRef}
                     style={styles.btnGuardarModal}
-                    onPress={handleEditarContrato}
+                    onPress={
+                      modalActivo == "editar_contrato"
+                        ? handleEditarContrato
+                        : handleGuardarContrato
+                    }
                     disabled={procesando}
+                    accessible={true}
+                    accessibilityRole="button"
                   >
                     <ThemedText style={styles.btnGuardarModalTexto}>
                       {procesando
@@ -885,7 +962,13 @@ function PlantillaScreen() {
                       ? `¿Está seguro de que desea proceder con esta operación para ${trabajadorSeleccionado?.nombre}? Ésta acción modificará su estado laboral inmediato.`
                       : "¿Desea reactivar a este trabajador en la empresa?"}
                   </ThemedText>
+
                   <Pressable
+                    ref={
+                      modalActivo === "rescindir_contrato"
+                        ? botonRescindirContratoRef
+                        : botonConfirmarBajaRef
+                    }
                     style={[
                       styles.btnGuardarModal,
                       {
@@ -894,12 +977,30 @@ function PlantillaScreen() {
                           : "#059669",
                       },
                     ]}
-                    onPress={
-                      trabajadorSeleccionado?.activo
-                        ? handleTramitarBajaTotal
-                        : handleReactivarTrabajador
-                    }
+                    onPress={() => {
+                      if (trabajadorSeleccionado?.activo) {
+                        if (modalActivo === "rescindir_contrato") {
+                          handleTramitarBajaTotal();
+                        } else {
+                          handleTramitarBajaTotal();
+                        }
+                      } else {
+                        handleReactivarTrabajador();
+                      }
+                    }}
+                    onLayout={() => {
+                      // Enfocar automáticamente el botón según corresponda al abrir el modal
+                      setTimeout(() => {
+                        if (modalActivo === "rescindir_contrato") {
+                          botonRescindirContratoRef.current?.focus?.();
+                        } else {
+                          botonConfirmarBajaRef.current?.focus?.();
+                        }
+                      }, 100);
+                    }}
                     disabled={procesando}
+                    accessible={true}
+                    accessibilityRole="button"
                   >
                     {procesando ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
@@ -907,9 +1008,11 @@ function PlantillaScreen() {
                       <ThemedText style={styles.btnGuardarModalTexto}>
                         {procesando
                           ? "Procesando..."
-                          : trabajadorSeleccionado?.activo
-                            ? "Confirmar Operación"
-                            : "Confirmar Reactivación"}
+                          : modalActivo === "rescindir_contrato"
+                            ? "Confirmar Rescisión"
+                            : trabajadorSeleccionado?.activo
+                              ? "Confirmar Baja"
+                              : "Confirmar Reactivación"}
                       </ThemedText>
                     )}
                   </Pressable>
@@ -926,10 +1029,15 @@ function PlantillaScreen() {
                     <View style={{ flex: 1 }}>
                       <ThemedText style={styles.labelForm}>Inicio *</ThemedText>
                       <TextInput
+                        ref={inputTurnoInicioRef}
                         style={styles.inputForm}
                         placeholder="AAAA-MM-DD"
                         value={fechaInicio}
                         onChangeText={setFechaInicio}
+                        returnKeyType="next"
+                        onSubmitEditing={() =>
+                          inputTurnoFinRef.current?.focus()
+                        }
                       />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -937,10 +1045,15 @@ function PlantillaScreen() {
                         Fin (Opcional)
                       </ThemedText>
                       <TextInput
+                        ref={inputTurnoFinRef}
                         style={styles.inputForm}
                         placeholder="AAAA-MM-DD"
                         value={fechaFin || ""}
                         onChangeText={setFechaFin}
+                        returnKeyType="next"
+                        onSubmitEditing={() =>
+                          botonActualizarRef.current?.focus()
+                        }
                       />
                     </View>
                   </View>
@@ -982,7 +1095,7 @@ function PlantillaScreen() {
                             >
                               <ThemedText style={{ color: "#222222" }}>
                                 {turno.nombre}
-                              </ThemedText>{" "}
+                              </ThemedText>
                               {estaSeleccionado && (
                                 <FontAwesome5
                                   name="check-square"
@@ -1009,6 +1122,7 @@ function PlantillaScreen() {
                     </Pressable>
 
                     <Pressable
+                      ref={botonActualizarRef}
                       style={[
                         styles.btnGuardarModal,
                         {
@@ -1027,6 +1141,8 @@ function PlantillaScreen() {
                         turnosSeleccionados.length === 0 ||
                         !fechaInicio
                       }
+                      accessible={true}
+                      accessibilityRole="button"
                     >
                       {procesando ? (
                         <ActivityIndicator color="#FFFFFF" />
@@ -1052,12 +1168,21 @@ function PlantillaScreen() {
                     {trabajadorSeleccionado?.nombre} para el mes actual?
                   </ThemedText>
                   <Pressable
+                    ref={botonConfirmarEliminarTurnoRef}
                     style={[
                       styles.btnGuardarModal,
                       { backgroundColor: "#EA580C" },
                     ]}
                     onPress={handleEliminarTurnos}
+                    onLayout={() => {
+                      // Enfocar automáticamente al abrir el modal de eliminar turnos
+                      setTimeout(() => {
+                        botonConfirmarEliminarTurnoRef.current?.focus?.();
+                      }, 100);
+                    }}
                     disabled={procesando}
+                    accessible={true}
+                    accessibilityRole="button"
                   >
                     {procesando ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />

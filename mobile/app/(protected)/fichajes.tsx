@@ -11,13 +11,18 @@ import {
   obtenerTurno,
 } from "@/src/modules/trabajadores/api/services";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
-import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import {
+  FontAwesome5,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { Directory, File, Paths } from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -97,6 +102,12 @@ export default function FichajesHistorialScreen() {
   const [mapaTurnosObjetos, setMapaTurnosObjetos] = useState<{
     [key: string]: any[];
   }>({});
+
+  const [
+    trabajadoresSeleccionadosParaPdf,
+    setTrabajadoresSeleccionadosParaPdf,
+  ] = useState<string[]>([]);
+  const [cargandoPdf, setCargandoPdf] = useState(false);
 
   const lunesSemanaActual = useMemo(() => {
     const d = new Date(fechaReferencia);
@@ -209,7 +220,6 @@ export default function FichajesHistorialScreen() {
             numero_seguridad_social: trabajador.numero_seguridad_social || "",
           };
 
-          // Obtener asignaciones de turnos
           const asignaciones: AsignacionTurno[] =
             await obtenerAsignacionesTurnoTrabajador(idTrabajador);
 
@@ -225,8 +235,7 @@ export default function FichajesHistorialScreen() {
                   nombre: capitalizar(tInfo.nombre || "Sin Nombre"),
                   hora_inicio: tInfo.hora_inicio || "00:00:00",
                   hora_fin: tInfo.hora_fin || "00:00:00",
-                  minutos_pausa_obligatoria:
-                    tInfo.minutos_pausa_obligatoria || 0,
+                  duracion_pausa_minutos: tInfo.duracion_pausa_minutos || 0,
                   color_hex: tInfo.color_hex || null,
                   fecha_real:
                     asig.fecha_inicio || new Date().toISOString().split("T")[0],
@@ -239,16 +248,13 @@ export default function FichajesHistorialScreen() {
             }
             nuevoMapaObjetosTurnos[idTrabajador] = turnosTrabajador;
           }
-        } catch (err) {
-          console.error(`Error procesando trabajador ${idTrabajador}:`, err);
-        }
+        } catch (_: any) {}
       }
 
-      // 4. Actualizar estados finales (único render)
       setMapaDatosFiscales(nuevoMapaDatosFiscales);
       setMapaTurnosObjetos(nuevoMapaObjetosTurnos);
-    } catch (error) {
-      console.error("Error al auditar el cuadrante semanal:", error);
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setCargando(false);
     }
@@ -260,20 +266,46 @@ export default function FichajesHistorialScreen() {
 
   const mapearTurnoUIString = (trabajadorId: string) => {
     const lista = mapaTurnosObjetos[trabajadorId] || [];
-    const inicioSemana = new Date(lunesSemanaActual);
-    const finSemana = new Date(lunesSemanaActual);
-    finSemana.setDate(finSemana.getDate() + 6);
+    const inicioSemana = new Date(
+      lunesSemanaActual.getFullYear(),
+      lunesSemanaActual.getMonth(),
+      lunesSemanaActual.getDate(),
+    );
+    const finSemana = new Date(
+      lunesSemanaActual.getFullYear(),
+      lunesSemanaActual.getMonth(),
+      lunesSemanaActual.getDate() + 6,
+    );
+
     const listaFiltrada = lista.filter((t: ItemTurno) => {
+      if (!t.fecha_asignacion_inicio) return false;
+
+      const partesInicio = t.fecha_asignacion_inicio.split("T")[0].split("-");
       const inicioTurno = new Date(
-        t.fecha_asignacion_inicio.replace(/-/g, "/"),
+        parseInt(partesInicio[0], 10),
+        parseInt(partesInicio[1], 10) - 1,
+        parseInt(partesInicio[2], 10),
       );
-      const finTurno = t.fecha_asignacion_fin
-        ? new Date(t.fecha_asignacion_fin.replace(/-/g, "/"))
-        : Date.now();
-      return inicioTurno <= finSemana && finTurno >= inicioSemana;
+
+      let finTurno = finSemana.getTime();
+      if (t.fecha_asignacion_fin) {
+        const partesFin = t.fecha_asignacion_fin.split("T")[0].split("-");
+        finTurno = new Date(
+          parseInt(partesFin[0], 10),
+          parseInt(partesFin[1], 10) - 1,
+          parseInt(partesFin[2], 10),
+        ).getTime();
+      }
+
+      return (
+        inicioTurno.getTime() <= finSemana.getTime() &&
+        finTurno >= inicioSemana.getTime()
+      );
     });
+
     if (!listaFiltrada || listaFiltrada.length === 0)
       return "Sin turno asignado esta semana";
+
     return listaFiltrada
       .map((t) => {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
@@ -343,7 +375,6 @@ export default function FichajesHistorialScreen() {
         );
         let turnoAsignadoKey = "Turno General";
 
-        // 2. Lógica de búsqueda mejorada
         for (const turno of turnosDelTrabajador) {
           const inicioMinutos = horaAMinutos(turno.hora_inicio) - 60;
           const finMinutos = horaAMinutos(turno.hora_fin) + 60;
@@ -381,12 +412,11 @@ export default function FichajesHistorialScreen() {
     });
 
     return Object.values(mapa);
-  }, [fichajesSemanales, mapaTurnosObjetos]);
+  }, [fichajesSemanales, mapaTurnosObjetos, mapaDatosFiscales]);
 
   const handleExportarPDF = useCallback(async () => {
     if (fichajesSemanales.length === 0) {
-      Alert.alert(
-        "Aviso",
+      alert(
         "No constan registros horarios en esta semana para compilar el documento legal.",
       );
       return;
@@ -488,7 +518,6 @@ export default function FichajesHistorialScreen() {
               },
             );
           } else {
-            // Aplicamos la misma lógica: si es sábado, etiqueta especial, si no, el nombre del día
             const esSabado = nombreDiaUI === "Sábado";
             const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
 
@@ -541,7 +570,7 @@ export default function FichajesHistorialScreen() {
           </tr>
           <tr>
             <td><strong>Nombre del Trabajador:</strong> ${t.nombre}</td>
-            <td><strong>NIF / DNI / NIE Trabajador:</strong> <span style="font-size:12px; font-weight:bold;">${dniTrabajador}</span></td>
+            <td><strong>NIF / DNI / NIE Trabajador:</strong> ${dniTrabajador}</td>
           </tr>
           <tr>
             <td><strong>Nº Afiliación Seguridad Social (NSS):</strong> ${nssTrabajador}</td>
@@ -572,7 +601,7 @@ export default function FichajesHistorialScreen() {
           </tbody>
           <tfoot>
             <tr style="background-color: #F1F5F9; font-weight: bold;">
-              <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS ORDINARIAS COMPUTADAS EN LA SEMANA:</td>
+              <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS COMPUTADAS EN LA SEMANA:</td>
               <td colspan="3" style="text-align: left; padding: 8px; font-size: 12px; color: #1E3A8A;">${totalHorasCalculadas}</td>
             </tr>
           </tfoot>
@@ -661,17 +690,31 @@ export default function FichajesHistorialScreen() {
         }
       } else {
         const { uri } = await Print.printToFileAsync({ html: plantillaHtml });
-        await Sharing.shareAsync(uri, {
+
+        const nombreArchivoDeseado = `Libro_Registro_Semanal_${rangoSemanaStr.replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
+
+        // Crear instancia del archivo temporal y moverlo con la nueva API
+        const archivoTemporal = new File(uri);
+        const directorioDestino = new Directory(Paths.document);
+        const archivoDestino = new File(
+          directorioDestino,
+          nombreArchivoDeseado,
+        );
+
+        // Si ya existe uno previo con el mismo nombre, lo limpiamos
+        if (archivoDestino.exists) {
+          archivoDestino.delete();
+        }
+
+        archivoTemporal.move(archivoDestino);
+
+        await Sharing.shareAsync(archivoDestino.uri, {
           mimeType: "application/pdf",
-          dialogTitle: `Libro_Registro_Semanal_${rangoSemanaStr.replace(/ /g, "_")}`,
+          dialogTitle: `Libro de Registro Semanal`,
         });
       }
-    } catch (error) {
-      console.error("Error al exportar PDF:", error);
-      Alert.alert(
-        "Error Técnico",
-        "No se pudo procesar la solicitud de impresión.",
-      );
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     }
   }, [
     trabajadoresAgrupadosSemanales,
@@ -729,7 +772,9 @@ export default function FichajesHistorialScreen() {
       >
         <FontAwesome5 name="file-pdf" size={14} color="#FFFFFF" />
         <ThemedText style={styles.textoBotonPDF}>
-          Exportar Registro Semanal en PDF
+          {cargandoPdf
+            ? "Generando documento..."
+            : "Exportar Registro Semanal en PDF"}
         </ThemedText>
       </Pressable>
 
@@ -757,98 +802,149 @@ export default function FichajesHistorialScreen() {
         />
       ) : (
         <View style={styles.contenedorEstructura}>
-          {trabajadoresAgrupadosSemanales.map((trabajador: any) => (
-            <Card key={trabajador.id}>
-              <View style={styles.headerTrabajador}>
-                <View style={styles.avatarCirculo}>
-                  <ThemedText style={styles.avatarTexto}>
-                    {trabajador.nombre.charAt(0)}
-                  </ThemedText>
+          {trabajadoresAgrupadosSemanales.map((trabajador: any) => {
+            const estaSeleccionado = trabajadoresSeleccionadosParaPdf.includes(
+              trabajador.id,
+            );
+
+            return (
+              <Card key={trabajador.id}>
+                <View style={styles.headerTrabajador}>
+                  <View style={styles.avatarCirculo}>
+                    <ThemedText style={styles.avatarTexto}>
+                      {trabajador.nombre.charAt(0)}
+                    </ThemedText>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.nombreTrabajador}>
+                      {trabajador.nombre}
+                    </ThemedText>
+                    <ThemedText
+                      style={styles.turnoTrabajador}
+                      numberOfLines={2}
+                    >
+                      Horario: {trabajador.turnoResumen}
+                    </ThemedText>
+                  </View>
+
+                  {/* CHECKBOX DE SELECCIÓN PARA EL PDF */}
+                  <Pressable
+                    onPress={() => {
+                      if (estaSeleccionado) {
+                        setTrabajadoresSeleccionadosParaPdf((prev) =>
+                          prev.filter((id) => id !== trabajador.id),
+                        );
+                      } else {
+                        setTrabajadoresSeleccionadosParaPdf((prev) => [
+                          ...prev,
+                          trabajador.id,
+                        ]);
+                      }
+                    }}
+                    style={{ padding: 6 }}
+                  >
+                    <Ionicons
+                      name={estaSeleccionado ? "checkbox" : "square-outline"}
+                      size={24}
+                      color="#2563EB"
+                    />
+                  </Pressable>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.nombreTrabajador}>
-                    {trabajador.nombre}
-                  </ThemedText>
-                  <ThemedText style={styles.turnoTrabajador} numberOfLines={2}>
-                    Horario: {trabajador.turnoResumen}
-                  </ThemedText>
-                </View>
-              </View>
 
-              <View style={styles.gridDias}>
-                {Object.entries(trabajador.dias).map(
-                  ([fechaKey, datosDia]: [string, any]) => (
-                    <View key={fechaKey} style={styles.contenedorDia}>
-                      <ThemedText style={styles.tituloDia}>
-                        {datosDia.nombreDia}
-                      </ThemedText>
+                <View style={styles.gridDias}>
+                  {Object.entries(trabajador.dias).map(
+                    ([fechaKey, datosDia]: [string, any]) => {
+                      const [anio, mes, dia] = fechaKey.split("-").map(Number);
+                      const fechaObjeto = new Date(anio, mes - 1, dia);
 
-                      {Object.entries(datosDia.turnos).map(
-                        ([nombreTurno, eventos]: [string, any]) => (
-                          <View
-                            key={nombreTurno}
-                            style={styles.bloqueTurnoEspecial}
-                          >
-                            <View style={styles.badgeTurno}>
-                              <FontAwesome5
-                                name="clock"
-                                size={9}
-                                color="#475569"
-                                style={{ marginRight: 3 }}
-                              />
-                              <ThemedText style={styles.textoBadgeTurno}>
-                                {nombreTurno}
-                              </ThemedText>
-                            </View>
+                      const nombresDiasSemana = [
+                        "Domingo",
+                        "Lunes",
+                        "Martes",
+                        "Miércoles",
+                        "Jueves",
+                        "Viernes",
+                        "Sábado",
+                      ];
+                      const nombreDiaReal =
+                        nombresDiasSemana[fechaObjeto.getDay()];
 
-                            <View style={{ gap: 4, marginTop: 2 }}>
-                              {eventos.map((item: any) => {
-                                const config = obtenerConfiguracionEvento(
-                                  item.tipo_evento_id || item.tipo_evento,
-                                );
-                                const horaLimpia = extraerHora(
-                                  item.fecha_hora,
-                                  false,
-                                );
+                      const fechaFormateada = `${dia}/${mes}`;
 
-                                return (
-                                  <View
-                                    key={item.id}
-                                    style={styles.filaFichaje}
-                                  >
-                                    <MaterialCommunityIcons
-                                      name={config.icono as any}
-                                      size={13}
-                                      color={config.color}
-                                    />
-                                    <View style={{ flex: 1 }}>
-                                      <ThemedText
-                                        style={[
-                                          styles.textoEvento,
-                                          { color: config.color },
-                                        ]}
+                      return (
+                        <View key={fechaKey} style={styles.contenedorDia}>
+                          <ThemedText style={styles.tituloDia}>
+                            {nombreDiaReal} ({fechaFormateada})
+                          </ThemedText>
+
+                          {Object.entries(datosDia.turnos).map(
+                            ([nombreTurno, eventos]: [string, any]) => (
+                              <View
+                                key={nombreTurno}
+                                style={styles.bloqueTurnoEspecial}
+                              >
+                                <View style={styles.badgeTurno}>
+                                  <FontAwesome5
+                                    name="clock"
+                                    size={9}
+                                    color="#475569"
+                                    style={{ marginRight: 3 }}
+                                  />
+                                  <ThemedText style={styles.textoBadgeTurno}>
+                                    {nombreTurno}
+                                  </ThemedText>
+                                </View>
+
+                                <View style={{ gap: 4, marginTop: 2 }}>
+                                  {eventos.map((item: any) => {
+                                    const config = obtenerConfiguracionEvento(
+                                      item.tipo_evento_id || item.tipo_evento,
+                                    );
+                                    const horaLimpia = extraerHora(
+                                      item.fecha_hora,
+                                      false,
+                                    );
+
+                                    return (
+                                      <View
+                                        key={item.id}
+                                        style={styles.filaFichaje}
                                       >
-                                        {config.texto}{" "}
-                                        {config.texto.includes("PAUSA") &&
-                                        Platform.OS !== "web"
-                                          ? "\n" + horaLimpia
-                                          : horaLimpia}{" "}
-                                        hs
-                                      </ThemedText>
-                                    </View>
-                                  </View>
-                                );
-                              })}
-                            </View>
-                          </View>
-                        ),
-                      )}
-                    </View>
-                  ),
-                )}
-              </View>
-            </Card>
-          ))}
+                                        <MaterialCommunityIcons
+                                          name={config.icono as any}
+                                          size={13}
+                                          color={config.color}
+                                        />
+                                        <View style={{ flex: 1 }}>
+                                          <ThemedText
+                                            style={[
+                                              styles.textoEvento,
+                                              { color: config.color },
+                                            ]}
+                                          >
+                                            {config.texto}{" "}
+                                            {config.texto.includes("PAUSA") &&
+                                            Platform.OS !== "web"
+                                              ? "\n" + horaLimpia
+                                              : horaLimpia}{" "}
+                                            hs
+                                          </ThemedText>
+                                        </View>
+                                      </View>
+                                    );
+                                  })}
+                                </View>
+                              </View>
+                            ),
+                          )}
+                        </View>
+                      );
+                    },
+                  )}
+                </View>
+              </Card>
+            );
+          })}
 
           {trabajadoresAgrupadosSemanales.length === 0 && (
             <ThemedText style={styles.empty}>

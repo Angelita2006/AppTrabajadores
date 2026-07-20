@@ -1,3 +1,4 @@
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -186,8 +187,14 @@ export default function HomeScreen() {
           setTimestampBaseActual(null);
           setTiempoFormateado(formatearSegundos(segundosCalculados));
         }
-      } catch (error) {
+      } catch (error: any) {
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
         console.error("Fallo de sincronización horaria:", error);
+        if (Platform.OS === "web") {
+          alert(`Fallo de sincronización horaria: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error de Sincronización", mensajeAmigable);
+        }
       } finally {
         setCargando(false);
       }
@@ -244,10 +251,16 @@ export default function HomeScreen() {
       !empresaSeleccionada?.id ||
       !centroTrabajoActual?.id
     ) {
-      Alert.alert(
-        "Expediente Incompleto",
-        "Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Expediente Incompleto: Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
+        );
+      } else {
+        Alert.alert(
+          "Expediente Incompleto",
+          "Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
+        );
+      }
       return;
     }
 
@@ -288,11 +301,13 @@ export default function HomeScreen() {
       }
 
       setEstadoActual(nuevoEstado);
-    } catch (error) {
-      Alert.alert(
-        "Error de Fichaje",
-        "La base de datos denegó el marcaje: " + error,
-      );
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error de Fichaje: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Fichaje", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }

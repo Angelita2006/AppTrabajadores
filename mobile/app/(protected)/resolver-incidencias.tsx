@@ -1,9 +1,11 @@
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -71,12 +73,13 @@ export default function AdminIncidenciasScreen() {
       );
 
       setIncidencias(incidenciasConTrabajador);
-    } catch (error) {
-      console.error("Error al cargar incidencias globales:", error);
-      Alert.alert(
-        "Error",
-        "No se pudieron obtener las incidencias de la empresa.",
-      );
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error al cargar incidencias globales: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Carga", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -91,7 +94,11 @@ export default function AdminIncidenciasScreen() {
       // if (procesandoId) return;
 
       if (!usuarioActual?.id) {
-        alert("Sesión inválida" + " No se pudo identificar al usuario.");
+        if (Platform.OS === "web") {
+          alert("Sesión inválida: No se pudo identificar al usuario.");
+        } else {
+          Alert.alert("Sesión inválida", "No se pudo identificar al usuario.");
+        }
         return;
       }
 
@@ -122,15 +129,23 @@ export default function AdminIncidenciasScreen() {
           ),
         );
 
-        Alert.alert(
-          "Acción procesada",
-          `La incidencia ha sido marcada como ${decision} con éxito.`,
-        );
+        if (Platform.OS === "web") {
+          alert(
+            `Acción procesada: La incidencia ha sido marcada como ${decision} con éxito.`,
+          );
+        } else {
+          Alert.alert(
+            "Acción procesada",
+            `La incidencia ha sido marcada como ${decision} con éxito.`,
+          );
+        }
       } catch (error: any) {
-        const msg =
-          error?.response?.data?.detail ||
-          "Fallo al interactuar con el servidor corporativo.";
-        Alert.alert("Error de red", msg);
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error de red: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error de red", mensajeAmigable);
+        }
       } finally {
         setProcesandoId(null);
       }

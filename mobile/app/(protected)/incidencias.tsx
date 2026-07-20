@@ -1,13 +1,13 @@
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   TextInput,
-  View,
+  View
 } from "react-native";
 import {
   EstadoCorreccion,
@@ -52,7 +52,6 @@ export default function IncidenciasScreen() {
   const [eventoSolitado, setEventoSolicitado] = useState<string>("ENTRADA");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
-
   const esAdmin = useMemo(() => {
     return (
       usuarioActual?.tipo_usuario === "Admin_empresa" ||
@@ -131,11 +130,8 @@ export default function IncidenciasScreen() {
         setIncidencias(datosPersonales);
         setFichajesDisponibles(fichajesProcesados);
       }
-    } catch (error) {
-      console.error(
-        "Error en la sincronización de incidencias/fichajes:",
-        error,
-      );
+    } catch (error: any) {
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setCargando(false);
     }
@@ -153,7 +149,6 @@ export default function IncidenciasScreen() {
       setFechaAfectada(fichaje.fecha);
       setHoraAnterior(fichaje.hora);
 
-      // CORRECCIÓN 3: Validación directa por texto plano string
       const tipoUpper = fichaje.tipo_evento.toUpperCase();
       if (tipoUpper === "ENTRADA" || tipoUpper === "SALIDA") {
         setEventoSolicitado(tipoUpper);
@@ -165,18 +160,12 @@ export default function IncidenciasScreen() {
 
   const reportarIncidencia = useCallback(async () => {
     if (!comentario.trim()) {
-      Alert.alert(
-        "Campos obligatorios",
-        "Por favor, especifica el motivo o explicación.",
-      );
+      alert("Por favor, especifica el motivo o explicación.");
       return;
     }
 
     if (tipoCorreccion !== "Alta_manual" && !fichajeAfectadoId.trim()) {
-      Alert.alert(
-        "Campos obligatorios",
-        "Debes seleccionar un fichaje de la lista desplegable.",
-      );
+      alert("Debes seleccionar un fichaje de la lista desplegable.");
       return;
     }
 
@@ -187,7 +176,7 @@ export default function IncidenciasScreen() {
         !usuarioActual?.trabajador_id ||
         !empresaSeleccionada?.id
       ) {
-        Alert.alert("Error de sesión", "Expediente corporativo incompleto.");
+        alert("Expediente corporativo incompleto.");
         return;
       }
 
@@ -218,14 +207,9 @@ export default function IncidenciasScreen() {
       setComentario("");
       setFichajeAfectadoId("");
       setHoraAnterior("");
-      Alert.alert(
-        "Reporte Enviado",
-        "La solicitud ha sido registrada correctamente.",
-      );
+      alert("La solicitud ha sido registrada correctamente.");
     } catch (error: any) {
-      const msg =
-        error.response?.data?.detail || "No se pudo transmitir la solicitud.";
-      Alert.alert("Error de Validación", msg);
+      alert(obtenerMensajeAmigableError(error));
     } finally {
       setCargando(false);
     }
@@ -256,15 +240,9 @@ export default function IncidenciasScreen() {
           prev.map((item) => (item.id === idCorreccion ? resuelta : item)),
         );
 
-        Alert.alert(
-          "Acción Procesada",
-          `La incidencia ha sido marcada como ${decision}.`,
-        );
+        alert(`La incidencia ha sido marcada como ${decision}.`);
       } catch (error: any) {
-        const msg =
-          error.response?.data?.detail ||
-          "Fallo al interactuar con el servidor.";
-        Alert.alert("Error de Red", msg);
+        alert(obtenerMensajeAmigableError(error));
       } finally {
         setCargando(false);
       }

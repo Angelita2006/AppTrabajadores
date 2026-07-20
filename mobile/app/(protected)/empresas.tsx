@@ -24,6 +24,7 @@ import {
   obtenerTurnosEmpresa,
 } from "@/src/modules/trabajadores/api/services";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useState } from "react";
@@ -200,12 +201,14 @@ export default function EmpresasScreen() {
         setEditNombre(primerCalendario.nombre || "");
         setEditCentroId(primerCalendario.centro_trabajo_id || "");
       }
-    } catch (error) {
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
       console.error("Error al cargar datos de empresa:", error);
-      Alert.alert(
-        "Error",
-        "No se pudieron obtener los datos completos de la empresa.",
-      );
+      if (Platform.OS === "web") {
+        alert(`Error al cargar datos de empresa: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Carga", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -229,11 +232,13 @@ export default function EmpresasScreen() {
       ) {
         setEmpresaSeleccionada(empresasPermitidas[0]);
       }
-    } catch {
-      Alert.alert(
-        "Error Saas",
-        "No se pudo sincronizar la información corporativa.",
-      );
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error Saas: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error Saas", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -253,10 +258,12 @@ export default function EmpresasScreen() {
       Alert.alert("Éxito", "Parámetros fiscales actualizados correctamente.");
       await cargarCatalogoEmpresas();
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.detail || "Error al actualizar.",
-      );
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -264,10 +271,16 @@ export default function EmpresasScreen() {
 
   const handleCrearCentroTrabajo = async () => {
     if (!nombreCentro || !zonaHoraria || !empresaSeleccionada) {
-      Alert.alert(
-        "Campos incompletos",
-        "Por favor introduce el nombre y la zona horaria del centro.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Campos incompletos: Por favor introduce el nombre y la zona horaria del centro.",
+        );
+      } else {
+        Alert.alert(
+          "Campos incompletos",
+          "Por favor introduce el nombre y la zona horaria del centro.",
+        );
+      }
       return;
     }
     try {
@@ -291,11 +304,12 @@ export default function EmpresasScreen() {
       setMostrarFormCentro(false);
       await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.detail ||
-          "No se pudo registrar el centro de trabajo.",
-      );
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -303,10 +317,16 @@ export default function EmpresasScreen() {
 
   const handleCrearTurnoMaestro = async () => {
     if (!nombreTurno || !horaInicio || !horaFin || !empresaSeleccionada) {
-      Alert.alert(
-        "Campos de Turno Vacíos",
-        "Especifica nombre, hora de inicio y fin (HH:MM:SS).",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Campos de Turno Vacíos: Especifica nombre, hora de inicio y fin (HH:MM:SS).",
+        );
+      } else {
+        Alert.alert(
+          "Campos de Turno Vacíos",
+          "Especifica nombre, hora de inicio y fin (HH:MM:SS).",
+        );
+      }
       return;
     }
     try {
@@ -331,11 +351,12 @@ export default function EmpresasScreen() {
       setMostrarFormTurno(false);
       await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.detail ||
-          "Error al actualizar el guardado del turno maestro.",
-      );
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -355,17 +376,29 @@ export default function EmpresasScreen() {
       setNombreDepto("");
       setCentroTrabajoId(null);
       setMostrarFormDepartamento(false);
-    } catch (error) {
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
       console.error("Error al crear departamento:", error);
+      if (Platform.OS === "web") {
+        alert(`Error al crear departamento: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     }
   };
 
   const handleCrearCalendarioAnual = async () => {
     if (!centrosConfigurados || centrosConfigurados.length === 0) {
-      Alert.alert(
-        "Acción Bloqueada",
-        "No se puede crear un calendario si la empresa no tiene centros de trabajo.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Acción Bloqueada: No se puede crear un calendario si la empresa no tiene centros de trabajo.",
+        );
+      } else {
+        Alert.alert(
+          "Acción Bloqueada",
+          "No se puede crear un calendario si la empresa no tiene centros de trabajo.",
+        );
+      }
       return;
     }
 
@@ -377,7 +410,11 @@ export default function EmpresasScreen() {
       ano > 2100 ||
       !empresaSeleccionada
     ) {
-      Alert.alert("Error", "Introduce un año válido entre 2020 y 2100.");
+      if (Platform.OS === "web") {
+        alert("Error: Introduce un año válido entre 2020 y 2100.");
+      } else {
+        Alert.alert("Error", "Introduce un año válido entre 2020 y 2100.");
+      }
       return;
     }
     try {
@@ -416,12 +453,14 @@ export default function EmpresasScreen() {
         "Éxito",
         `Calendario "${nuevoCalendarioUI.nombre}" registrado en la BD.`,
       );
-    } catch (error) {
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
       console.error(error);
-      Alert.alert(
-        "Error",
-        "No se pudo crear el calendario en la base de datos.",
-      );
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -432,7 +471,11 @@ export default function EmpresasScreen() {
     const anioNum = parseInt(editAnio, 10);
 
     if (!anioNum || isNaN(anioNum) || anioNum < 2020 || anioNum > 2100) {
-      Alert.alert("Error", "Por favor, introduce un año válido (2020-2100).");
+      if (Platform.OS === "web") {
+        alert("Error: Por favor, introduce un año válido (2020-2100).");
+      } else {
+        Alert.alert("Error", "Por favor, introduce un año válido (2020-2100).");
+      }
       return;
     }
 
@@ -478,12 +521,14 @@ export default function EmpresasScreen() {
 
       setMostrarEdicionCampos(false);
       Alert.alert("Éxito", "Calendario laboral actualizado de forma correcta.");
-    } catch (error) {
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
       console.error("Error al modificar calendario:", error);
-      Alert.alert(
-        "Error",
-        "No se pudieron guardar los cambios del calendario.",
-      );
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -514,12 +559,14 @@ export default function EmpresasScreen() {
 
         setMostrarEdicionCampos(false);
         Alert.alert("Éxito", "Calendario laboral eliminado correctamente.");
-      } catch (error) {
+      } catch (error: any) {
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
         console.error("Error al eliminar calendario:", error);
-        Alert.alert(
-          "Error",
-          "No se pudo eliminar el calendario laboral de la base de datos.",
-        );
+        if (Platform.OS === "web") {
+          alert(`Error: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error", mensajeAmigable);
+        }
       } finally {
         setGuardando(false);
       }
@@ -633,10 +680,12 @@ export default function EmpresasScreen() {
       setDiaSeleccionadoCtx(null);
     } catch (error: any) {
       // Capturamos el detalle del HTTP HTTPException enviado desde FastAPI si ocurre un error
-      const msgError =
-        error.response?.data?.detail ||
-        "No se pudo sincronizar el festivo en el servidor.";
-      Alert.alert("Error de Sincronización", msgError);
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error de Sincronización: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Sincronización", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -644,10 +693,16 @@ export default function EmpresasScreen() {
 
   const handleImportarCalendarioPDF = async () => {
     if (!calendarioSeleccionado || !calendarioSeleccionado.id) {
-      Alert.alert(
-        "Aviso",
-        "Primero debes seleccionar un calendario laboral para poder importarle los festivos.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Aviso: Primero debes seleccionar un calendario laboral para poder importarle los festivos.",
+        );
+      } else {
+        Alert.alert(
+          "Aviso",
+          "Primero debes seleccionar un calendario laboral para poder importarle los festivos.",
+        );
+      }
       return;
     }
 
@@ -720,12 +775,12 @@ export default function EmpresasScreen() {
       );
 
       // Capturamos el detalle enviado de forma controlada por tu Exception Handler de FastAPI
-      const msgError =
-        error.response?.data?.detail ||
-        error.message ||
-        "No se pudo procesar o extraer el archivo PDF.";
-
-      Alert.alert("Error de Importación", msgError);
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error de Importación: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Importación", mensajeAmigable);
+      }
     } finally {
       setImportandoPdf(false);
     }
@@ -787,8 +842,12 @@ export default function EmpresasScreen() {
 
       Alert.alert("Éxito", "Centro de trabajo actualizado.");
     } catch (error: any) {
-      alert("Error: " + error);
-      Alert.alert("Error", "No se pudo actualizar el centro.");
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -800,7 +859,12 @@ export default function EmpresasScreen() {
         await eliminarCentroTrabajo(centroId);
         setCentrosConfigurados((prev) => prev.filter((c) => c.id !== centroId));
       } catch (error: any) {
-        alert("Error: No se pudo eliminar el centro.");
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error", mensajeAmigable);
+        }
       }
     };
 
@@ -829,8 +893,13 @@ export default function EmpresasScreen() {
         prev.map((t) => (t.id === turno.id ? turno : t)),
       );
       Alert.alert("Éxito", "Turno actualizado correctamente.");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo actualizar el turno.");
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -842,7 +911,12 @@ export default function EmpresasScreen() {
         await eliminarTurno(turnoId);
         setTurnosEstructurales((prev) => prev.filter((t) => t.id !== turnoId));
       } catch (error: any) {
-        alert("Error: No se pudo eliminar el turno.");
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error", mensajeAmigable);
+        }
       }
     };
 
@@ -887,8 +961,13 @@ export default function EmpresasScreen() {
       setDepartamentoEnEdicion(null);
       setNombreDepto("");
       setCentroTrabajoId(null);
-    } catch (error) {
-      Alert.alert("Error", "No se pudo actualizar el departamento.");
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setGuardando(false);
     }
@@ -900,7 +979,12 @@ export default function EmpresasScreen() {
         await eliminarDepartamento(departamentoId);
         setDepartamentos((prev) => prev.filter((d) => d.id !== departamentoId));
       } catch (error: any) {
-        alert("Error: No se pudo eliminar el departamento." + departamentoId);
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error", mensajeAmigable);
+        }
       }
     };
 
@@ -1093,7 +1177,7 @@ export default function EmpresasScreen() {
                     disabled={guardando}
                   >
                     <ThemedText style={styles.textoBotonGuardar}>
-                      Actualizar Configuración Fiscal
+                      Actualizar Información Fiscal
                     </ThemedText>
                   </Pressable>
                 </View>

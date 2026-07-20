@@ -31,7 +31,7 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
 
     # 2. Comprobación de seguridad: Valida la restricción única compuesta (empresa_id + nif_nie)
     identidad_existente = db.query(Trabajadores).filter(
-        Trabajadores.empresa_id == obj_in.empresa_id,
+        Trabajadores.empresa_id == obj_in.empresa_cif,
         Trabajadores.nif_nie == obj_in.nif_nie
     ).first()
     
@@ -43,14 +43,11 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
 
     # 3. Mapeo de datos directo al modelo físico de SQLAlchemy (el ID lo genera la base de datos)
     nuevo_trabajador = Trabajadores(
-        empresa_id=obj_in.empresa_id,
+        empresa_cif=obj_in.empresa_cif,
         nif_nie=obj_in.nif_nie,
         nombre=obj_in.nombre,
         apellidos=obj_in.apellidos,
         email=obj_in.email,
-        telefono=obj_in.telefono,
-        numero_seguridad_social=obj_in.numero_seguridad_social,
-        fecha_nacimiento=obj_in.fecha_nacimiento
     )
     
     db.add(nuevo_trabajador)

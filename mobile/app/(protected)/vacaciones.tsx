@@ -9,10 +9,12 @@ import {
   obtenerAusenciasYVacacionesTrabajador,
   solicitarAusenciaOVacaciones,
 } from "@/src/modules/trabajadores/api/services";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -48,8 +50,12 @@ export default function VacacionesScreen() {
       const ausenciasTrabajador: ItemAusencia[] =
         await obtenerAusenciasYVacacionesTrabajador(trabajadorActual.id);
       setSolicitudes(ausenciasTrabajador || []);
-    } catch (error) {
-      console.error("Error cargando ausencias:", error);
+    } catch (error: any) {
+      if (Platform.OS === "web") {
+        alert(obtenerMensajeAmigableError(error));
+      } else {
+        Alert.alert("Error de Carga", obtenerMensajeAmigableError(error));
+      }
     } finally {
       setBuscandoInicial(false);
     }
@@ -97,17 +103,29 @@ export default function VacacionesScreen() {
 
   const enviarSolicitud = async () => {
     if (!tipoAusencia) {
-      Alert.alert(
-        "Formulario incompleto",
-        "Por favor, selecciona un tipo de ausencia.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Formulario incompleto: Por favor, selecciona un tipo de ausencia.",
+        );
+      } else {
+        Alert.alert(
+          "Formulario incompleto",
+          "Por favor, selecciona un tipo de ausencia.",
+        );
+      }
       return;
     }
     if (!motivo.trim()) {
-      Alert.alert(
-        "Formulario incompleto",
-        "Por favor, escribe el motivo o causa legal de la ausencia.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Formulario incompleto: Por favor, escribe el motivo o causa legal de la ausencia.",
+        );
+      } else {
+        Alert.alert(
+          "Formulario incompleto",
+          "Por favor, escribe el motivo o causa legal de la ausencia.",
+        );
+      }
       return;
     }
 
@@ -141,12 +159,24 @@ export default function VacacionesScreen() {
 
       setSolicitudes([nueva, ...solicitudes]);
       setMotivo("");
-      Alert.alert(
-        "Solicitud Tramitada",
-        "Tu petición ha sido enviada al departamento de recursos humanos.",
-      );
-    } catch {
-      Alert.alert("Error", "No se pudo conectar con el servidor central.");
+
+      if (Platform.OS === "web") {
+        alert(
+          "Solicitud Tramitada: Tu petición ha sido enviada al departamento de recursos humanos.",
+        );
+      } else {
+        Alert.alert(
+          "Solicitud Tramitada",
+          "Tu petición ha sido enviada al departamento de recursos humanos.",
+        );
+      }
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error al enviar solicitud: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error de Envío", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }

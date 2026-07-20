@@ -7,7 +7,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { UsuarioSesion } from "../modules/trabajadores/types/trabajador";
 
-// Configuración global (se ejecuta una sola vez al cargar la app)
+// 1. Configuración global
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -17,11 +17,48 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// 2. Registro del canal (Obligatorio para Android antes de enviar nada)
+if (Platform.OS === "android") {
+  Notifications.setNotificationChannelAsync("fichapp_canal_v2", {
+    name: "Turnos",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: "#FF231F",
+  });
+}
+
 export const NotificationService = {
   requestPermissions: async () => {
     if (Platform.OS === "web") return false;
     const { status } = await Notifications.requestPermissionsAsync();
     return status === "granted";
+  },
+
+  probarNotificacionEnUnMinuto: async () => {
+    const triggerDePrueba = new Date(new Date().getTime() + 45 * 1000);
+    const formatoHora = new Intl.DateTimeFormat("es-ES", {
+      timeZone: "Europe/Madrid",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(triggerDePrueba);
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🧪 Prueba de Notificación",
+        body: "Si ves esto, el sistema de notificaciones funciona correctamente.",
+        android: {
+          channelId: "fichapp_canal_v2",
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        },
+      } as any,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDePrueba,
+      },
+    });
+
+    console.log("Prueba programada para:", formatoHora);
   },
 
   programarAlarmasTurno: async (usuarioId: string) => {
@@ -30,7 +67,6 @@ export const NotificationService = {
       await Notifications.cancelAllScheduledNotificationsAsync();
 
       const usuario: UsuarioSesion = await getUsuarioById(usuarioId);
-
       const asignaciones = await obtenerAsignacionesTurnoTrabajador(
         usuario.trabajador_id,
       );
@@ -48,40 +84,39 @@ export const NotificationService = {
         const triggerEntrada = new Date();
         triggerEntrada.setHours(parseInt(hE), parseInt(mE), 0, 0);
 
-        // Si ya pasó la hora hoy, programar para mañana
         if (triggerEntrada <= ahora)
           triggerEntrada.setDate(triggerEntrada.getDate() + 1);
 
         await Notifications.scheduleNotificationAsync({
           content: {
             title: "⏰ ¡Hora de fichar!",
-            body: `Tu turno "${tInfo.nombre}" comienza ahora. ¡Registra tu entrada!`,
+            body: `Tu turno "${tInfo.nombre}" comienza ahora.`,
             sound: "default",
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: triggerEntrada,
-          } as Notifications.NotificationTriggerInput,
+          },
         });
 
+        // --- 2. NOTIFICACIÓN DE SALIDA ---
         const [hS, mS] = tInfo.hora_fin.split(":");
         const triggerSalida = new Date();
         triggerSalida.setHours(parseInt(hS), parseInt(mS), 0, 0);
 
-        // Si ya pasó la hora hoy, programar para mañana
         if (triggerSalida <= ahora)
           triggerSalida.setDate(triggerSalida.getDate() + 1);
 
         await Notifications.scheduleNotificationAsync({
           content: {
             title: "🏁 Fin de turno",
-            body: `Tu turno "${tInfo.nombre}" ha terminado. ¡No olvides marcar tu salida!`,
+            body: `Tu turno "${tInfo.nombre}" ha terminado.`,
             sound: "default",
           },
           trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE, // Esto es lo que faltaba
-            date: triggerEntrada,
-          } as Notifications.NotificationTriggerInput,
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: triggerSalida,
+          },
         });
       }
     } catch (error) {

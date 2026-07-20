@@ -28,6 +28,15 @@ class UsuarioCreate(UsuarioBase):
     empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa cliente asignada")
     trabajador_id: Optional[UUID] = Field(None, description="ID único UUID del expediente de trabajador vinculado")
 
+class UsuarioRegisterCreate(BaseModel):
+    """
+    Esquema utilizado para validar los datos enviados desde la app móvil
+    al registrar un nuevo usuario vinculándolo a un trabajador existente.
+    """
+    empresa_cif: str = Field(..., description="CIF de la empresa cliente para localizar el tenant")
+    nif_nie: str = Field(..., max_length=15, description="Número de identificación fiscal del trabajador")
+    email: EmailStr = Field(..., description="Correo electrónico único de acceso")
+    password: str = Field(..., min_length=6, description="Contraseña de acceso del usuario")
 
 class UsuarioResponse(UsuarioBase):
     """

@@ -1169,3 +1169,13 @@ export const actualizarTrabajador = async (
     throw error;
   }
 };
+
+export const registrarUsuarioAcceso = async (data: {
+  empresa_cif: string;
+  nif_nie: string;
+  email: string;
+  password: string;
+}) => {
+  const respuesta = await api.post("/api/usuarios/registro", data);
+  return respuesta.data;
+};

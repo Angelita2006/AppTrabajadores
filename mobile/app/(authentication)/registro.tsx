@@ -1,6 +1,7 @@
 // app/mobile/app/(authentication)/registro.tsx
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,9 +14,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { obtenerEmpresaPorCif } from "../../src/modules/empresas/api/services";
-import { Empresa } from "../../src/modules/empresas/types/empresa";
-import { crearTrabajador } from "../../src/modules/trabajadores/api/services";
+import {
+  registrarUsuarioAcceso
+} from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import VideoBackground from "../../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
@@ -37,6 +38,12 @@ export default function RegistroScreen() {
   const [errorEmail, setErrorEmail] = useState(false);
   const [errorPassword, setErrorPassword] = useState(false);
 
+  const nombreRef = useRef<TextInput>(null);
+  const apellidosRef = useRef<TextInput>(null);
+  const nifNieRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+
   const validarCampos = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const esEmailValido = emailRegex.test(email);
@@ -48,10 +55,16 @@ export default function RegistroScreen() {
     setErrorPassword(!esPasswordValido);
 
     if (!camposCompletos) {
-      Alert.alert(
-        "Campos Vacíos",
-        "Por favor, rellena todos los parámetros obligatorios de tu contrato.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Campos Vacíos: Por favor, rellena todos los parámetros obligatorios de tu contrato.",
+        );
+      } else {
+        Alert.alert(
+          "Campos Vacíos",
+          "Por favor, rellena todos los parámetros obligatorios de tu contrato.",
+        );
+      }
       return false;
     }
 
@@ -63,29 +76,27 @@ export default function RegistroScreen() {
 
     try {
       setCargando(true);
-      const empresa: Empresa = await obtenerEmpresaPorCif(
-        Number.parseInt(empresaCif),
-      );
-      // Dispara la petición hacia el endpoint POST /api/trabajadores de tu FastAPI
-      await crearTrabajador({
-        empresa_id: empresa.id.toString(),
+
+      // Llama al endpoint de registro de usuario vinculando el expediente existente
+      await registrarUsuarioAcceso({
+        empresa_cif: empresaCif.trim(),
         nif_nie: nifNie.trim().toUpperCase(),
-        nombre: nombre.trim(),
-        apellidos: apellidos.trim(),
         email: email.trim().toLowerCase(),
+        password: password,
       });
 
       Alert.alert(
         "Alta Consolidada",
-        "Tu cuenta y tu expediente han sido registrados correctamente en PostgreSQL.",
+        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.",
         [{ text: "Ir al Acceso", onPress: () => router.replace("/") }],
       );
     } catch (error: any) {
-      Alert.alert(
-        "Fallo de Integridad",
-        "El NIF/NIE o el Correo ya constan registrados, o el código UUID de la empresa es inválido.\n" +
-          error,
-      );
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Fallo de Integridad: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Fallo de Integridad", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -115,7 +126,7 @@ export default function RegistroScreen() {
           <View style={styles.formulario}>
             {/* Campo: Código de Empresa (Tenant) */}
             <View style={styles.field}>
-              <ThemedText style={styles.label}>CIF Único de Empresa</ThemedText>
+              <ThemedText style={styles.label}>CIF de Empresa</ThemedText>
               <View style={styles.inputWrapper}>
                 <IconSymbol
                   name="briefcase.fill"
@@ -131,6 +142,9 @@ export default function RegistroScreen() {
                   placeholder="Introduce el CIF de tu corporación"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => nombreRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -140,23 +154,31 @@ export default function RegistroScreen() {
               <View style={[styles.field, { flex: 1 }]}>
                 <ThemedText style={styles.label}>Nombre</ThemedText>
                 <TextInput
+                  ref={nombreRef}
                   value={nombre}
                   onChangeText={setNombre}
                   style={styles.inputPlano}
                   placeholder="Tu nombre"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => apellidosRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
               <View style={[styles.field, { flex: 1 }]}>
                 <ThemedText style={styles.label}>Apellidos</ThemedText>
                 <TextInput
+                  ref={apellidosRef}
                   value={apellidos}
                   onChangeText={setApellidos}
                   style={styles.inputPlano}
                   placeholder="Tus apellidos"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => nifNieRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -174,6 +196,7 @@ export default function RegistroScreen() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={nifNieRef}
                   value={nifNie}
                   onChangeText={setNifNie}
                   style={styles.inputContainer}
@@ -181,6 +204,9 @@ export default function RegistroScreen() {
                   placeholder="Ej: 12345678X"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -201,6 +227,7 @@ export default function RegistroScreen() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={emailRef}
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
@@ -212,6 +239,9 @@ export default function RegistroScreen() {
                   placeholder="tuemail@empresa.com"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -232,6 +262,7 @@ export default function RegistroScreen() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={passwordRef}
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -242,6 +273,8 @@ export default function RegistroScreen() {
                   placeholder="Mínimo 6 caracteres"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegistro}
                 />
                 <Pressable
                   onPress={() => setIsObscured(!isObscured)}

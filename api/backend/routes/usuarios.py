@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from core.security import verify_password
+from core.security import get_password_hash, verify_password
 from models.empresas import Empresas
-from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioResponse
+from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioRegisterCreate, UsuarioResponse
 from models.usuarios import Usuarios
 from models.trabajadores import Trabajadores
 from core.database import get_db
@@ -68,6 +68,64 @@ def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ha ocurrido un error de integridad al guardar el usuario: {str(error)}"
         )
+
+@router.post("/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
+def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_db)):
+    """
+    URI: POST /api/usuarios/registro
+    Busca al trabajador existente mediante la empresa y el NIF, 
+    y crea credenciales de usuario vinculadas a ese trabajador_id.
+    """
+    # 1. Validar que el correo no esté duplicado globalmente
+    email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
+    if email_existente:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya se encuentra registrado en el sistema."
+        )
+
+    # 2. Buscar a qué empresa pertenece el CIF proporcionado
+    empresa = db.query(Empresas).filter(Empresas.cif == obj_in.empresa_cif).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La empresa especificada no existe en el sistema."
+        )
+
+    # 3. Buscar el trabajador existente usando el ID de la empresa y el NIF/NIE
+    trabajador = db.query(Trabajadores).filter(
+        Trabajadores.empresa_id == empresa.id,
+        Trabajadores.nif_nie == obj_in.nif_nie
+    ).first()
+
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encuentra ningún trabajador dado de alta con este NIF en la empresa indicada. Contacta con tu administrador."
+        )
+
+    # 4. Validar que el trabajador no tenga ya un usuario vinculado
+    usuario_existente = db.query(Usuarios).filter(Usuarios.trabajador_id == trabajador.id).first()
+    if usuario_existente:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este trabajador ya dispone de una cuenta de usuario registrada."
+        )
+
+    # 5. Crear el registro del usuario vinculando al trabajador_id
+    nuevo_usuario = Usuarios(
+        trabajador_id=trabajador.id,
+        nombre=trabajador.nombre,
+        email=obj_in.email,
+        password_hash=get_password_hash(obj_in.password),
+        tipo_usuario="Trabajador"
+    )
+
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+    
+    return nuevo_usuario
 
 @router.post("/login", response_model=UsuarioResponse)
 def login_plataforma(credenciales: LoginRequest, db: Session = Depends(get_db)):

@@ -14,10 +14,17 @@ import { ItemTurno } from "@/src/modules/turnos/types/turno";
 import { ThemedText } from "@/src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  View,
+} from "react-native";
 
 // Helper para comprobar si un día de la semana (0-6) entra en un patrón string como "LMXJV"
 // Modifica esta función si tu backend devuelve los días laborables en otro formato.
@@ -47,30 +54,14 @@ export default function HorariosScreen() {
       try {
         setCargando(true);
 
-        // 1. Descargamos las asignaciones de turnos
         const asignaciones: AsignacionTurno[] =
           await obtenerAsignacionesTurnoTrabajador(
             usuarioActual!.trabajador_id,
           );
 
-        // 2. Descargamos el historial de marcajes
-        // const todosLosFichajes = await obtenerFichajesSemanaActual(
-        //   usuarioActual!.trabajador_id,
-        // );
         const todosLosFichajes = await obtenerFichajesTurnoActual(
           usuarioActual!.trabajador_id,
         );
-
-        // todosLosFichajes.forEach((f) => {
-        //   alert(
-        //     "Fichaje: " +
-        //       f.tipo_evento.toString() +
-        //       " Hora: " +
-        //       f.fecha_hora +
-        //       " Turno: " +
-        //       f.turno_nombre,
-        //   );
-        // });
 
         const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
           (f: any) => ({
@@ -86,7 +77,6 @@ export default function HorariosScreen() {
             metodo_fichaje: f.metodo_fichaje ?? "",
           }),
         );
-        // alert(fichajesFormateados.length);
 
         setFichajesRealizados(fichajesFormateados);
 
@@ -109,7 +99,6 @@ export default function HorariosScreen() {
             );
 
             // Asumimos que el turno o asignación puede traer una cadena de días laborables (ej: "LMXJV")
-            // Si tu base de datos usa otro campo, reemplaza `turno.dias_semana` por el correcto.
             const diasLaborables = (turno as ItemTurno).dias_semana || [
               1, 2, 3, 4, 5,
             ];
@@ -131,7 +120,7 @@ export default function HorariosScreen() {
                   }),
                   hora_inicio: turno.hora_inicio,
                   hora_fin: turno.hora_fin,
-                  minutos_pausa_obligatoria: turno.minutos_pausa_obligatoria,
+                  duracion_pausa_minutos: turno.duracion_pausa_minutos,
                   color_hex: turno.color_hex || "#2563EB",
                   fecha_real: fechaInstanteActual.toISOString().split("T")[0],
                   dias_semana: diasLaborables,
@@ -156,14 +145,14 @@ export default function HorariosScreen() {
           return a.hora_inicio.localeCompare(b.hora_inicio);
         });
 
-        // alert(turnos.length);
-
         setCuadrante(turnos);
-      } catch (error) {
-        Alert.alert(
-          "Error de Sincronización",
-          "No se ha podido descargar tu calendario de turnos o marcajes.",
-        );
+      } catch (error: any) {
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error de Sincronización: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error de Sincronización", mensajeAmigable);
+        }
       } finally {
         setCargando(false);
       }
@@ -362,7 +351,7 @@ export default function HorariosScreen() {
             const minutosTeoricosTotales = minFin - minInicio;
             const minutosTeoricosNetos = Math.max(
               0,
-              minutosTeoricosTotales - (item?.minutos_pausa_obligatoria ?? 0),
+              minutosTeoricosTotales - (item?.duracion_pausa_minutos ?? 0),
             );
 
             const formatearAHorasYMinutos = (
@@ -416,7 +405,7 @@ export default function HorariosScreen() {
                       </View>
                       <ThemedText style={styles.textoPausa}>
                         Descanso: {minutosConsumidos} /{" "}
-                        {item?.minutos_pausa_obligatoria ?? 0} min.
+                        {item?.duracion_pausa_minutos ?? 0} min.
                       </ThemedText>
                     </View>
 

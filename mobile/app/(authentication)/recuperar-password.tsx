@@ -1,3 +1,4 @@
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -45,10 +46,16 @@ export default function RecuperarPasswordScreen() {
 
   const handleSolicitarToken = async () => {
     if (!email.includes("@")) {
-      Alert.alert(
-        "Formato Inválido",
-        "Por favor, introduce una dirección de correo electrónico válida.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Formato Inválido: Por favor, introduce una dirección de correo electrónico válida.",
+        );
+      } else {
+        Alert.alert(
+          "Formato Inválido",
+          "Por favor, introduce una dirección de correo electrónico válida.",
+        );
+      }
       return;
     }
 
@@ -66,8 +73,13 @@ export default function RecuperarPasswordScreen() {
         "Código Despachado",
         "Usa el token '123456' que hemos impreso de forma segura en la consola de tu servidor.",
       );
-    } catch {
-      Alert.alert("Error", "No se pudo procesar la solicitud de recuperación.");
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -75,10 +87,16 @@ export default function RecuperarPasswordScreen() {
 
   const handleRestablecerClave = async () => {
     if (token.length !== 6 || nuevoPassword.length < 6) {
-      Alert.alert(
-        "Datos Incorrectos",
-        "El token requiere 6 dígitos y la contraseña al menos 6 caracteres.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Datos Incorrectos: El token requiere 6 dígitos y la contraseña al menos 6 caracteres.",
+        );
+      } else {
+        Alert.alert(
+          "Datos Incorrectos",
+          "El token requiere 6 dígitos y la contraseña al menos 6 caracteres.",
+        );
+      }
       return;
     }
 
@@ -96,10 +114,12 @@ export default function RecuperarPasswordScreen() {
         [{ text: "Ir al Login", onPress: () => router.replace("/") }],
       );
     } catch (error: any) {
-      Alert.alert(
-        "Fallo de Validación",
-        "El token de 6 dígitos introducido es incorrecto.\n" + error,
-      );
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Fallo de Validación: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Fallo de Validación", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }

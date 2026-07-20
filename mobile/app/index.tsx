@@ -1,6 +1,7 @@
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { Empresa } from "@/src/modules/empresas/types/empresa";
 import { NotificationService } from "@/src/notifications/NotificationService";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -110,6 +111,7 @@ export default function RootIndexScreen() {
       if (usuarioActual) {
         const permitido = await NotificationService.requestPermissions();
         if (permitido) {
+          await NotificationService.probarNotificacionEnUnMinuto();
           await NotificationService.programarAlarmasTurno(usuarioActual.id);
         }
       }
@@ -157,14 +159,13 @@ export default function RootIndexScreen() {
         }
       }
     } catch (error: any) {
-      const mensajeErrorApi =
-        error.response?.data?.detail ||
-        "No se pudo conectar con el servidor. Revisa tu conexión.";
-
       if (Platform.OS === "web") {
-        alert(`Fallo de Autenticación: ${mensajeErrorApi}`);
+        alert(`Fallo de Autenticación: ${obtenerMensajeAmigableError(error)}`);
       } else {
-        Alert.alert("Fallo de Autenticación", mensajeErrorApi);
+        Alert.alert(
+          "Fallo de Autenticación",
+          obtenerMensajeAmigableError(error),
+        );
       }
     } finally {
       setCargando(false);
@@ -253,10 +254,6 @@ export default function RootIndexScreen() {
               .toString()
               .replace("_", " ")
               .toUpperCase()}
-          />
-          <StatCard
-            label="Empresas visibles"
-            value={empresas.length.toString()}
           />
         </Row>
 
@@ -409,7 +406,7 @@ export default function RootIndexScreen() {
                 label="Jornada Semanal"
                 value={
                   contratoActual?.horas_semana
-                    ? `${contratoActual.horas_semana} hs/semana`
+                    ? `${contratoActual.horas_semana.toString().substring(0, 2)} hs/semana`
                     : "Según Convenio Colectivo"
                 }
               />

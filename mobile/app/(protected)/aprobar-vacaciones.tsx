@@ -11,13 +11,15 @@ import {
   asignarAusenciaOVacaciones,
   getUsuarioByIdTrabajador,
   obtenerAusenciasYVacacionesEmpresa,
-  obtenerTrabajador
+  obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -103,13 +105,22 @@ export default function AdminVacacionesScreen() {
       );
 
       // Limpiamos los nulos del array filtrado y los asignamos al selector superior
-      setTrabajadores(
-        soloTrabajadoresOperativos.filter((t): t is Trabajador => t !== null),
+      const trabajadoresFiltrados = soloTrabajadoresOperativos.filter(
+        (t): t is Trabajador => t !== null,
       );
+      setTrabajadores(trabajadoresFiltrados);
 
-      setTrabajadorSeleccionadoId(trabajadores[0].id);
-    } catch (error) {
+      if (trabajadoresFiltrados.length > 0) {
+        setTrabajadorSeleccionadoId(trabajadoresFiltrados[0].id);
+      }
+    } catch (error: any) {
       console.error("Error cargando datos de administración:", error);
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setBuscandoInicial(false);
     }
@@ -154,8 +165,13 @@ export default function AdminVacacionesScreen() {
         "Éxito",
         `Solicitud ${nuevoEstado === EstadoAusencia.APROBADA ? "Aprobada" : "Rechazada"} correctamente.`,
       );
-    } catch {
-      Alert.alert("Error", "No se pudo actualizar el estado de la solicitud.");
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }
@@ -164,17 +180,27 @@ export default function AdminVacacionesScreen() {
   // Acción 2: Asignar directamente vacaciones/ausencias a un empleado
   const asignarAusenciaDirecta = async () => {
     if (!trabajadorSeleccionadoId) {
-      Alert.alert(
-        "Formulario incompleto",
-        "Por favor, selecciona un trabajador.",
-      );
+      if (Platform.OS === "web") {
+        alert("Formulario incompleto: Por favor, selecciona un trabajador.");
+      } else {
+        Alert.alert(
+          "Formulario incompleto",
+          "Por favor, selecciona un trabajador.",
+        );
+      }
       return;
     }
     if (!motivo.trim()) {
-      Alert.alert(
-        "Formulario incompleto",
-        "Por favor, escribe el motivo de la asignación.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Formulario incompleto: Por favor, escribe el motivo de la asignación.",
+        );
+      } else {
+        Alert.alert(
+          "Formulario incompleto",
+          "Por favor, escribe el motivo de la asignación.",
+        );
+      }
       return;
     }
 
@@ -223,8 +249,13 @@ export default function AdminVacacionesScreen() {
         "Asignación Correcta",
         "El periodo se ha registrado y aprobado automáticamente.",
       );
-    } catch {
-      Alert.alert("Error", "No se pudo guardar la asignación directa.");
+    } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
+      if (Platform.OS === "web") {
+        alert(`Error: ${mensajeAmigable}`);
+      } else {
+        Alert.alert("Error", mensajeAmigable);
+      }
     } finally {
       setCargando(false);
     }

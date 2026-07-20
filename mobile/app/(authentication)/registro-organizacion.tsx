@@ -2,23 +2,24 @@ import { registrarOrganizacionCompleta } from "@/src/modules/trabajadores/api/se
 import { ThemedText } from "@/src/shared/components/themed-text";
 import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 
 export default function RegistroOrganizacionScreen() {
@@ -87,10 +88,11 @@ export default function RegistroOrganizacionScreen() {
 
       router.replace("/");
     } catch (error: any) {
+      const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
-        alert(error.message);
+        alert(`Error de Registro: ${mensajeAmigable}`);
       } else {
-        Alert.alert("Error de Registro", error.message);
+        Alert.alert("Error de Registro", mensajeAmigable);
       }
     } finally {
       setCargando(false);
