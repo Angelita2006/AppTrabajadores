@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.database import Base, engine
@@ -6,22 +8,50 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# app = FastAPI(
+#     title="API de Registro horario trabajadores",
+#     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
+#     version="1.0.0"
+# )
+
+# # Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
+# Base.metadata.create_all(bind=engine)
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # Permite peticiones desde emuladores Android/iOS y dispositivos reales
+#     allow_credentials=True,
+#     allow_methods=["*"],  # Habilita todos los métodos HTTP de tus rutas (GET, POST, PUT, DELETE)
+#     allow_headers=["*"],  # Habilita todas las cabeceras estándar de control de peticiones
+# )
+
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-    version="1.0.0"
+    version="1.0.0",
+    # Opcional en producción: deshabilitar la documentación automática si no deseas que sea pública
+    # docs_url=None, 
+    # redoc_url=None
 )
 
-# Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
-Base.metadata.create_all(bind=engine)
+# 1. GESTIÓN DE CORS SEGURA PARA PRODUCCIÓN
+# En lugar de permitir todo ("*"), se cargan los orígenes permitidos desde una variable de entorno.
+# Ejemplo en .env: ALLOWED_ORIGINS="https://tuweb.com,app://fichapp"
+origins_env = os.getenv("ALLOWED_ORIGINS", "")
+origins = [origin.strip() for origin in origins_env.split(",")] if origins_env else []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite peticiones desde emuladores Android/iOS y dispositivos reales
+    allow_origins=origins if origins else [],  # Si está vacío, no abre brechas innecesarias
     allow_credentials=True,
-    allow_methods=["*"],  # Habilita todos los métodos HTTP de tus rutas (GET, POST, PUT, DELETE)
-    allow_headers=["*"],  # Habilita todas las cabeceras estándar de control de peticiones
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Limitar solo a los métodos necesarios
+    allow_headers=["Authorization", "Content-Type", "Accept"],  # Limitar a las cabeceras estándar requeridas
 )
+
+# NOTA DE PRODUCCIÓN: 
+# La línea `Base.metadata.create_all(bind=engine)` ha sido eliminada. 
+# En producción, las tablas y cambios de esquema deben gestionarse estrictamente 
+# mediante las migraciones de Alembic ejecutadas en el despliegue.
 
 # Registro de las URIs y enrutadores modulares en el núcleo de la aplicación FastAPI
 app.include_router(asignaciones_turno.router)
@@ -48,6 +78,10 @@ app.include_router(usuarios_roles.router)
 app.include_router(usuarios.router)
 app.include_router(auth.router)
 
+# @app.get("/")
+# def read_root():
+#     return {"mensaje": "¡Conexión exitosa desde React Native!"}
+
 @app.get("/")
 def read_root():
-    return {"mensaje": "¡Conexión exitosa desde React Native!"}
+    return {"mensaje": "¡API de FICHAPP funcionando en producción!"}
