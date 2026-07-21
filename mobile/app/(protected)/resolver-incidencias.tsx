@@ -129,16 +129,16 @@ export default function AdminIncidenciasScreen() {
           ),
         );
 
-        if (Platform.OS === "web") {
-          alert(
-            `Acción procesada: La incidencia ha sido marcada como ${decision} con éxito.`,
-          );
-        } else {
-          Alert.alert(
-            "Acción procesada",
-            `La incidencia ha sido marcada como ${decision} con éxito.`,
-          );
-        }
+        // if (Platform.OS === "web") {
+        //   alert(
+        //     `Acción procesada: La incidencia ha sido marcada como ${decision} con éxito.`,
+        //   );
+        // } else {
+        //   Alert.alert(
+        //     "Acción procesada",
+        //     `La incidencia ha sido marcada como ${decision} con éxito.`,
+        //   );
+        // }
       } catch (error: any) {
         const mensajeAmigable = obtenerMensajeAmigableError(error);
         if (Platform.OS === "web") {

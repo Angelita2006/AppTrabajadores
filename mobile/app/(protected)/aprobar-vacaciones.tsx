@@ -161,10 +161,10 @@ export default function AdminVacacionesScreen() {
         ),
       );
 
-      Alert.alert(
-        "Éxito",
-        `Solicitud ${nuevoEstado === EstadoAusencia.APROBADA ? "Aprobada" : "Rechazada"} correctamente.`,
-      );
+      // Alert.alert(
+      //   "Éxito",
+      //   `Solicitud ${nuevoEstado === EstadoAusencia.APROBADA ? "Aprobada" : "Rechazada"} correctamente.`,
+      // );
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {

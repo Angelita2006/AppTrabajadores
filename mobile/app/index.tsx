@@ -668,11 +668,6 @@ export default function RootIndexScreen() {
                 editable={!cargando}
                 returnKeyType="go"
                 onSubmitEditing={handleLogin}
-                autoComplete="off"
-                {...(Platform.OS === "web" && {
-                  // @ts-ignore
-                  dataSet: { lpignore: "true" }, // Desactiva LastPass / gestores comunes
-                })}
               />
               {Platform.OS !== "web" && (
                 <Pressable
@@ -825,11 +820,6 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 15,
     fontWeight: "500",
-    ...Platform.select({
-      web: {
-        outlineStyle: "none" as any,
-      },
-    }),
   },
   eyeButton: { padding: 8 },
   primaryButton: {
