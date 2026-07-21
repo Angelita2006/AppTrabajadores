@@ -1,9 +1,25 @@
+import sys
+import os
+
+# Forzamos la ruta de backend para que Python resuelva 'from core.database' correctamente
+_backend_path = r"C:\AppTrabajadores\api\backend"
+if _backend_path not in sys.path:
+    sys.path.insert(0, _backend_path)
+
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+from alembic import context
+
+# Eliminamos la instanciación local de Base que tenías aquí para que no de conflicto 
+# e importamos la Base real que ahora sí va a encontrar gracias al parche:
+from core.database import Base
+
 import datetime
 from typing import Optional
 import uuid
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, Uuid, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.database import Base
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 class AsignacionesTurno(Base):
     __tablename__ = 'asignaciones_turno'

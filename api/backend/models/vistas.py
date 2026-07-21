@@ -33,5 +33,6 @@ t_roles_permisos = Table(
     Column('permiso_id', SmallInteger, primary_key=True),
     ForeignKeyConstraint(['permiso_id'], ['permisos.id'], ondelete='CASCADE', name='roles_permisos_permiso_id_fkey'),
     ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE', name='roles_permisos_role_id_fkey'),
-    PrimaryKeyConstraint('role_id', 'permiso_id', name='roles_permisos_pkey')
+    PrimaryKeyConstraint('role_id', 'permiso_id', name='roles_permisos_pkey'),
+    extend_existing=True
 )
