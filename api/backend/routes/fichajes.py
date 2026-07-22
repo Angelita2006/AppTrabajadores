@@ -1,25 +1,35 @@
 import hashlib
 import ipaddress
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import List
 from uuid import UUID
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from models.asignaciones_turno import AsignacionesTurno
 from models.contratos import Contratos
 from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.empresas import Empresas
 from models.fichajes import Fichajes
 from schemas.fichajes import FichajeCreate, FichajeResponse
 from models.trabajadores import Trabajadores
 from models.turnos import Turnos
+from models.usuarios import Usuarios
 
 router = APIRouter(prefix="/api/fichajes", tags=["Fichajes"])
 
-def mapear_evento_a_id(label_frontend: str) -> int:
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
+def mapear_evento_id(label_frontend: str) -> int:
     """
     Traduce los strings enviados por la app móvil ("ENTRADA", "SALIDA")
     a los enteros numéricos 'tipo_evento_id' que exige tu base de datos.
@@ -33,7 +43,7 @@ def mapear_evento_a_id(label_frontend: str) -> int:
     }
     return mapeo.get(label_frontend, 1)
 
-def mapear_id_a_evento(id_backend: int) -> str:
+def mapear_id_evento(id_backend: int) -> str:
     """
     Traduce de vuelta los IDs numéricos de la base de datos a los strings
     que espera el cronómetro de la app móvil para calcular el tiempo.
@@ -46,8 +56,15 @@ def mapear_id_a_evento(id_backend: int) -> str:
     }
     return mapeo.get(id_backend, "ENTRADA")
 
+
 @router.post("", response_model=FichajeResponse, status_code=status.HTTP_201_CREATED)
-def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")  # Protegido frente a saturación de marcajes masivos desde dispositivos móviles
+def crear_fichaje(
+    request: Request,
+    obj_in: FichajeCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/fichajes
     Registra un evento de jornada inmutable calculando el tiempo oficial en el servidor
@@ -67,6 +84,12 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
             detail=f"Empresa ({obj_in.empresa_id}) no encontrada."
         )
 
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para registrar fichajes en esta empresa."
+        )
+
     ip_int = None
     if hasattr(obj_in, 'ip_address') and obj_in.ip_address:
         try:
@@ -76,7 +99,7 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
 
     id_real_evento = obj_in.tipo_evento_id
     if isinstance(id_real_evento, str):
-        id_real_evento = mapear_evento_a_id(id_real_evento)
+        id_real_evento = mapear_evento_id(id_real_evento)
 
     ahora = datetime.now()
 
@@ -117,21 +140,46 @@ def crear_fichaje(obj_in: FichajeCreate, db: Session = Depends(get_db)):
             detail=f"Fallo en la transacción inmutable de PostgreSQL: {str(e)}"
         )
 
+
 @router.get("", response_model=List[FichajeResponse])
-def obtener_fichajes(db: Session = Depends(get_db)):
+def obtener_fichajes(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes
-    Devuelve el historial global absoluto de todos los fichajes de la plataforma.
+    Devuelve el historial global aplicando aislamiento multi-tenant.
     """
-    return db.query(Fichajes).all()
+    query = db.query(Fichajes)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(Fichajes.empresa_id == usuario_actual.empresa_id)
+
+    return query.all()
 
 
 @router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}", response_model=List[FichajeResponse])
-def obtener_fichajes_trabajador_empresa(id_trabajador: UUID, id_empresa: UUID, db: Session = Depends(get_db)):
+def obtener_fichajes_trabajador_empresa(
+    id_trabajador: UUID, 
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/trabajador/{id_trabajador}/empresa/{id_empresa}
     Recupera el historial completo de marcajes para un usuario y organización particulares.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver los fichajes de esta empresa."
+        )
+
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
@@ -153,7 +201,11 @@ def obtener_fichajes_trabajador_empresa(id_trabajador: UUID, id_empresa: UUID, d
 
 
 @router.get("/{id_fichaje}", response_model=FichajeResponse)
-def obtener_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
+def obtener_fichaje(
+    id_fichaje: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/{id_fichaje}
     Busca un evento de fichaje específico mediante su identificador único UUID.
@@ -164,38 +216,65 @@ def obtener_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Fichaje ({id_fichaje}) no encontrado."
         )
+    
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != fichaje.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver este fichaje."
+        )
+
     return fichaje
 
+
 @router.get("/trabajador/{id_trabajador}/hoy")
-def obtener_fichajes_hoy(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_fichajes_hoy(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/trabajador/{id_trabajador}/hoy
     Descarga los marcajes del día de hoy del empleado y traduce los IDs relacionales 
     a las palabras clave ("ENTRADA", "SALIDA") que usa tu cronómetro acumulativo.
     """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador ({id_trabajador}) no encontrado."
+        )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver los fichajes de este trabajador."
+        )
+
     hoy = date.today()
     
-    # Consultamos los fichajes filtrando por el ID del trabajador y truncando la fecha a hoy
     fichajes_db = db.query(Fichajes).filter(
         Fichajes.trabajador_id == id_trabajador
     ).all()
     
-    # Filtramos en Python por comodidad para asegurar la compatibilidad con campos de fecha estructurados
     fichajes_filtrados = [f for f in fichajes_db if f.fecha_hora.date() == hoy]
     
-    # Formateamos la respuesta para que encaje perfectamente con lo que espera tu app/home.tsx
     respuesta = []
     for f in fichajes_filtrados:
         respuesta.append({
           "id": str(f.id),
           "fecha_hora": f.fecha_hora.isoformat(),
-          "tipo_evento": mapear_id_a_evento(f.tipo_evento_id)
+          "tipo_evento": mapear_id_evento(f.tipo_evento_id)
         })
         
     return respuesta
 
+
 @router.get("/trabajador/{id_trabajador}/semana")
-def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_fichajes_semana_actual(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/trabajador/{id_trabajador}/semana
     Recupera el historial de la semana formateando las fechas a ISO string 
@@ -206,6 +285,12 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Trabajador no localizado."
+        )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver los fichajes de este trabajador."
         )
 
     hoy = date.today()
@@ -229,7 +314,7 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
         respuesta.append({
             "id": str(f.id),
             "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
-            "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
+            "tipo_evento": mapear_id_evento(f.tipo_evento_id), 
             "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje),
             "estado": f.estado.value if hasattr(f.estado, "value") else str(f.estado),
         })
@@ -238,10 +323,14 @@ def obtener_fichajes_semana_actual(id_trabajador: UUID, db: Session = Depends(ge
 
 
 @router.get("/trabajador/{id_trabajador}/turno")
-def obtener_fichajes_turno_actual(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_fichajes_turno_actual(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/trabajador/{id_trabajador}/turno
-    Recupera el historial del fichajes dentro del turno formateando las fechas a ISO 
+    Recupera el historial de fichajes dentro del turno formateando las fechas a ISO 
     string y mapeando los IDs a strings de eventos legibles para el frontend.
     """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
@@ -251,6 +340,12 @@ def obtener_fichajes_turno_actual(id_trabajador: UUID, db: Session = Depends(get
             detail="Trabajador no localizado."
         )
     
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver los fichajes de este trabajador."
+        )
+
     turno = db.query(Turnos).filter(Turnos.empresa_id == trabajador.empresa_id).first()
     if not turno:
         return ({
@@ -289,26 +384,42 @@ def obtener_fichajes_turno_actual(id_trabajador: UUID, db: Session = Depends(get
         respuesta.append({
             "id": str(f.id),
             "fecha_hora": f.fecha_hora_dispositivo.isoformat() if f.fecha_hora_dispositivo else datetime.now().isoformat(),
-            "tipo_evento": mapear_id_a_evento(f.tipo_evento_id), 
+            "tipo_evento": mapear_id_evento(f.tipo_evento_id), 
             "metodo_fichaje": str(f.metodo_fichaje.value) if hasattr(f.metodo_fichaje, "value") else str(f.metodo_fichaje),
             "estado": f.estado.value if hasattr(f.estado, "value") else str(f.estado),
         })
 
     return respuesta
 
+
 @router.get("/trabajador/{trabajador_id}/ultimo")
-def obtener_ultimo_fichaje_trabajador(trabajador_id: UUID, db: Session = Depends(get_db)):
+def obtener_ultimo_fichaje_trabajador(
+    trabajador_id: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/fichajes/trabajador/{trabajador_id}/ultimo
     Busca de forma eficiente el marcaje más reciente del empleado en PostgreSQL 
     para coordinar los botones de la interfaz de usuario.
     """
-    # Ordenamos de más reciente a más antiguo y tomamos el primero
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == trabajador_id).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador ({trabajador_id}) no encontrado."
+        )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver los fichajes de este trabajador."
+        )
+
     ultimo_fichaje = db.query(Fichajes).filter(
         Fichajes.trabajador_id == trabajador_id
     ).order_by(Fichajes.fecha_hora.desc()).first()
     
-    # Si el empleado nunca ha fichado en el sistema, devolvemos un objeto plano neutro
     if not ultimo_fichaje:
         return {
             "id": None,
@@ -319,37 +430,38 @@ def obtener_ultimo_fichaje_trabajador(trabajador_id: UUID, db: Session = Depends
     return {
         "id": str(ultimo_fichaje.id),
         "fecha_hora": ultimo_fichaje.fecha_hora.isoformat(),
-        "tipo_evento": mapear_id_a_evento(ultimo_fichaje.tipo_evento_id)
+        "tipo_evento": mapear_id_evento(ultimo_fichaje.tipo_evento_id)
     }
+
 
 @router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK)
 def listar_fichajes_empresa_por_fecha(
     empresa_id: UUID, 
     fecha: datetime, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: GET /api/fichajes/empresa/{empresa_id}
     Devuelve los marcajes de la plantilla filtrados por fecha.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para listar los fichajes de esta empresa."
+        )
+
     try:
-        # Si tu tabla de Fichajes ya tiene una relación directa con el modelo de trabajadores/usuarios,
-        # la recorremos de forma segura para evitar fallos de JOIN en la importación.
         resultados = (
             db.query(Fichajes)
             .filter(
                 Fichajes.empresa_id == empresa_id,
-                # Comparamos la fecha de forma segura contra tu columna de timestamp de dispositivo
                 func.date(Fichajes.fecha_hora_dispositivo) == fecha
             )
             .all()
         )
 
         payload_respuesta = []
-        for fichaje in resultados:
-            # RESOLUCIÓN DIRECTA MEDIANTE LAS PROPIEDADES DEL OBJETO (Evita romper por los import de tablas)
-            # SQLAlchemy resuelve automáticamente fichaje.trabajador si está configurada la relación
-                    payload_respuesta = []
         for fichaje in resultados:
             nombre_completo = "Operario de Planta"
             if hasattr(fichaje, "trabajador") and fichaje.trabajador:
@@ -361,11 +473,9 @@ def listar_fichajes_empresa_por_fecha(
             if hasattr(fichaje, "turno") and fichaje.turno:
                 nombre_turno = fichaje.turno.nombre
 
-            # Si el timestamp existe, lo formateamos; si es None, inyectamos la fecha actual o un texto plano
             if fichaje.fecha_hora_dispositivo:
                 fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
             else:
-                # Fallback de emergencia por si la tupla de PostgreSQL carece de estampa de tiempo
                 fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             payload_respuesta.append({
@@ -382,26 +492,35 @@ def listar_fichajes_empresa_por_fecha(
 
         return payload_respuesta
 
-
     except Exception as e:
         db.rollback()
-        # Esto imprimirá el error exacto en tu consola de Uvicorn si vuelve a fallar por alguna columna
         print(f"[FICHAPP ERROR]: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en la auditoría de fichajes en PostgreSQL: {str(e)}"
         )
 
+
 @router.delete("/fichajes/{id_fichaje}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
+def eliminar_fichaje(
+    id_fichaje: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
     if not fichaje:
         raise HTTPException(status_code=404, detail="Fichaje no encontrado.")
     
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != fichaje.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para eliminar este fichaje."
+        )
+    
     try:
         db.delete(fichaje)
         db.commit()
-        return None  # Al ser 204 No Content, no se devuelve cuerpo
+        return None 
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -409,13 +528,21 @@ def eliminar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
             detail=f"Error al eliminar el fichaje: {str(e)}"
         )
 
+
 def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento_id: int, fecha_iso: str) -> str:
     """Genera el hash inmutable SHA-256 para auditoría legal"""
     datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento_id}-{fecha_iso}"
     return hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
 
+
 @router.patch("/{id_fichaje}/validar", response_model=FichajeResponse, status_code=status.HTTP_200_OK)
-def validar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")  # Protegido frente a peticiones masivas en la validación de registros de jornada
+def validar_fichaje(
+    request: Request,
+    id_fichaje: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: PATCH /api/fichajes/{id_fichaje}/validar
     Modifica el estado de un marcaje a 'VALIDO' y recalcula de forma segura el hash criptográfico.
@@ -427,11 +554,14 @@ def validar_fichaje(id_fichaje: UUID, db: Session = Depends(get_db)):
             detail=f"No se encontró el registro de fichaje con ID {id_fichaje}."
         )
 
-    # Actualizamos el estado usando el Enum que tienes importado
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != fichaje.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para validar este fichaje."
+        )
+
     fichaje.estado = EstadoFichajeEnum.VALIDO
     
-    # Recalculamos el hash de integridad al actualizar los datos mutables por control de auditoría
-    # Usamos la fecha_hora original o la actual según las políticas de tu sistema
     fecha_iso = fichaje.fecha_hora.isoformat() if fichaje.fecha_hora else datetime.now().isoformat()
     fichaje.hash_integridad = calcular_hash_fichaje(
         str(fichaje.trabajador_id), 

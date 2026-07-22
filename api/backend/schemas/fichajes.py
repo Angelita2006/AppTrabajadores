@@ -1,12 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, IPvAnyAddress
+from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
 from models.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - FICHAJES
 # ==========================================
 
 class FichajeBase(BaseModel):
@@ -30,20 +30,21 @@ class FichajeCreate(BaseModel):
     trabajador_id: UUID = Field(..., description="ID UUID del expediente del empleado")
     centro_trabajo_id: UUID = Field(..., description="ID UUID del centro de trabajo asignado")
     
-    tipo_evento_id: str = Field(..., description="Etiqueta textual del evento horario")
+    tipo_evento_id: int = Field(..., description="ID numérico del tipo de evento horario")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Canal: app_movil, web, qr, etc.")
     
-    origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR)
-    estado: EstadoFichajeEnum = Field(default=EstadoFichajeEnum.VALIDO)
+    origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR, description="Origen del fichaje")
+    estado: EstadoFichajeEnum = Field(default=EstadoFichajeEnum.VALIDO, description="Estado de validez")
     
-    latitud: Optional[Decimal] = Field(None, ge=Decimal('-90'), le=Decimal('90'))
-    longitud: Optional[Decimal] = Field(None, ge=Decimal('-180'), le=Decimal('180'))
+    latitud: Optional[Decimal] = Field(None, ge=Decimal('-90'), le=Decimal('90'), description="Coordenada de latitud")
+    longitud: Optional[Decimal] = Field(None, ge=Decimal('-180'), le=Decimal('180'), description="Coordenada de longitud")
     ip_address: Optional[IPvAnyAddress] = Field(None, description="IP resuelta por la red")
     
-    motivo_pausa_id: Optional[int] = Field(None)
-    dispositivo_id: Optional[UUID] = Field(None)
-    fecha_hora_dispositivo: Optional[datetime] = Field(None)
-    observaciones: Optional[str] = Field(None)
+    motivo_pausa_id: Optional[int] = Field(None, description="ID del motivo de pausa si aplica")
+    dispositivo_id: Optional[UUID] = Field(None, description="ID del dispositivo de fichaje")
+    fecha_hora_dispositivo: Optional[datetime] = Field(None, description="Fecha y hora reportada por el dispositivo")
+    observaciones: Optional[str] = Field(None, max_length=500, description="Observaciones adicionales")
+
 
 class FichajeResponse(FichajeBase):
     """
@@ -52,18 +53,17 @@ class FichajeResponse(FichajeBase):
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
     fecha_hora: datetime = Field(..., description="Instante oficial del fichaje con zona horaria (referencia legal)")
-    origen: OrigenFichajeEnum = Field(..., description="Origen del registro (servidor por defecto: 'trabajador')")
-    estado: EstadoFichajeEnum = Field(..., description="Estado de validez del fichaje (servidor por defecto: 'valido')")
+    origen: OrigenFichajeEnum = Field(..., description="Origen del registro")
+    estado: EstadoFichajeEnum = Field(..., description="Estado de validez del fichaje")
     hash_integridad: str = Field(..., max_length=64, description="Firma SHA-256 de seguridad de la fila")
     created_at: datetime = Field(..., description="Fecha de inserción real e inmutable calculada por el servidor (now)")
     
-    motivo_pausa_id: Optional[int] = Field(None)
-    fecha_hora_dispositivo: Optional[datetime] = Field(None)
-    dispositivo_id: Optional[UUID] = Field(None)
-    latitud: Optional[Decimal] = Field(None)
-    longitud: Optional[Decimal] = Field(None)
+    motivo_pausa_id: Optional[int] = Field(None, description="ID del motivo de pausa")
+    fecha_hora_dispositivo: Optional[datetime] = Field(None, description="Fecha y hora reportada por el dispositivo")
+    dispositivo_id: Optional[UUID] = Field(None, description="ID del dispositivo de fichaje")
+    latitud: Optional[Decimal] = Field(None, description="Latitud")
+    longitud: Optional[Decimal] = Field(None, description="Longitud")
     fichaje_sustituido_id: Optional[UUID] = Field(None, description="ID del fichaje anterior al que reemplaza este registro")
-    observaciones: Optional[str] = Field(None)
+    observaciones: Optional[str] = Field(None, description="Observaciones adicionales")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

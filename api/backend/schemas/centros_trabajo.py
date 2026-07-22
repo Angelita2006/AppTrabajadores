@@ -1,10 +1,10 @@
 import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CENTROS DE TRABAJO
 # ==========================================
 
 class CentroTrabajoBase(BaseModel):
@@ -13,8 +13,8 @@ class CentroTrabajoBase(BaseModel):
     basado en el modelo relacional mapeado por sqlacodegen.
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    nombre: str = Field(..., max_length=255, description="Nombre identificativo del centro de trabajo")
-    zona_horaria: str = Field("Europe/Madrid", max_length=50, description="Zona horaria específica del centro de trabajo")
+    nombre: str = Field(..., min_length=2, max_length=255, description="Nombre identificativo del centro de trabajo")
+    zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria específica del centro de trabajo")
 
 
 class CentroTrabajoCreate(CentroTrabajoBase):
@@ -23,21 +23,22 @@ class CentroTrabajoCreate(CentroTrabajoBase):
     Contiene campos de localización y registro de cotización opcionales.
     """
     codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización a la Seguridad Social")
-    direccion: Optional[str] = Field(None, description="Dirección postal o física del centro")
+    direccion: Optional[str] = Field(None, max_length=500, description="Dirección postal o física del centro")
+
 
 class CentroTrabajoUpdate(BaseModel):
     """
     Esquema para la actualización parcial de un centro de trabajo.
     Todos los campos son opcionales para permitir actualizaciones 'patch'.
     """
-    nombre: Optional[str] = Field(None, max_length=255, description="Nuevo nombre del centro")
-    zona_horaria: Optional[str] = Field(None, max_length=50, description="Nueva zona horaria")
+    nombre: Optional[str] = Field(None, min_length=2, max_length=255, description="Nuevo nombre del centro")
+    zona_horaria: Optional[str] = Field(None, min_length=2, max_length=50, description="Nueva zona horaria")
     activo: Optional[bool] = Field(None, description="Cambiar estado operativo del centro")
     codigo_ccc: Optional[str] = Field(None, max_length=20, description="Actualizar código CCC")
-    direccion: Optional[str] = Field(None, description="Actualizar dirección postal")
+    direccion: Optional[str] = Field(None, max_length=500, description="Actualizar dirección postal")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class CentroTrabajoResponse(CentroTrabajoBase):
     """
@@ -48,11 +49,7 @@ class CentroTrabajoResponse(CentroTrabajoBase):
     activo: bool = Field(..., description="Determina si el centro de trabajo se encuentra operativo")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
-    
-    # Propiedades complementarias opcionales expuestas en el JSON
-    codigo_ccc: Optional[str] = Field(None)
-    direccion: Optional[str] = Field(None)
+    codigo_ccc: Optional[str] = Field(None, description="Código de Cuenta de Cotización")
+    direccion: Optional[str] = Field(None, description="Dirección postal")
 
-    class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

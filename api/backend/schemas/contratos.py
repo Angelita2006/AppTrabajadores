@@ -1,26 +1,32 @@
 import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import Any, Optional
 from uuid import UUID
 from models.enums import TipoContratoEnum, TipoJornadaEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CONTRATOS
 # ==========================================
 
 class ContratoUpdate(BaseModel):
-    empresa_id: Optional[str]
-    centro_trabajo_id: Optional[str]
-    tipo_contrato: Optional[str] = None
-    tipo_jornada: Optional[str] = None
-    horas_semana: Optional[float] = None
-    fecha_inicio: Optional[datetime.date] = None
-    fecha_fin: Optional[datetime.date] = None
-    departamento_id: Optional[str] = None
-    puesto_trabajo: Optional[str] = None
-    categoria_profesional: Optional[str] = None
-    trabajador_id: Optional[str]
+    """
+    Esquema para la actualización parcial de un contrato laboral.
+    """
+    empresa_id: Optional[UUID] = Field(None, description="ID de la empresa")
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo")
+    tipo_contrato: Optional[TipoContratoEnum] = Field(None, description="Modalidad del contrato")
+    tipo_jornada: Optional[TipoJornadaEnum] = Field(None, description="Tipo de jornada pactada")
+    horas_semana: Optional[Decimal] = Field(None, gt=Decimal('0'), max_digits=5, decimal_places=2, description="Horas semanales")
+    fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
+    departamento_id: Optional[UUID] = Field(None, description="ID del departamento")
+    puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Puesto de trabajo")
+    categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría profesional")
+    trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador")
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ContratoBase(BaseModel):
     """
@@ -52,30 +58,29 @@ class ContratoCreate(ContratoBase):
     @classmethod
     def limpiar_fecha_vacancia(cls, v: Any) -> Optional[datetime.date]:
         """
-        Intercepta el valor antes del parseo de Pydantic.
+        Intercepta el valor antes del parseo de Pydantic para cadenas vacías.
         """
         if v == "" or v is None:
             return None
         return v
 
-@model_validator(mode='after')
-def validar_fechas_coherentes(self) -> 'ContratoCreate':
-    """
-    Adapta dinámicamente la validez de la fecha de fin según la modalidad contractual,
-    impidiendo bloqueos de inserción y asegurando la integridad de PostgreSQL.
-    """
-    # Si el contrato es de tipo indefinido, forzamos la fecha de fin a None de forma segura
-    if self.tipo_contrato == TipoContratoEnum.INDEFINIDO:
-        self.fecha_fin = None
+    @model_validator(mode='after')
+    def validar_fechas_coherentes(self) -> 'ContratoCreate':
+        """
+        Adapta dinámicamente la validez de la fecha de fin según la modalidad contractual,
+        impidiendo bloqueos de inserción y asegurando la integridad de PostgreSQL.
+        """
+        if self.tipo_contrato == TipoContratoEnum.INDEFINIDO:
+            self.fecha_fin = None
+            return self
+
+        if self.tipo_contrato == TipoContratoEnum.TEMPORAL and not self.fecha_fin:
+            raise ValueError("Los contratos temporales requieren especificar obligatoriamente una fecha de finalización.")
+
+        if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio del contrato.")
+            
         return self
-
-    if self.tipo_contrato == TipoContratoEnum.TEMPORAL and not self.fecha_fin:
-        raise ValueError("Los contratos temporales requieren especificar obligatoriamente una fecha de finalización.")
-
-    if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
-        raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio del contrato.")
-        
-    return self
 
 
 class ContratoResponse(ContratoBase):
@@ -87,10 +92,9 @@ class ContratoResponse(ContratoBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
     
-    departamento_id: Optional[UUID] = Field(None)
-    puesto_trabajo: Optional[str] = Field(None)
-    categoria_profesional: Optional[str] = Field(None)
-    fecha_fin: Optional[datetime.date] = Field(None)
+    departamento_id: Optional[UUID] = Field(None, description="ID del departamento")
+    puesto_trabajo: Optional[str] = Field(None, description="Puesto de trabajo")
+    categoria_profesional: Optional[str] = Field(None, description="Categoría profesional")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

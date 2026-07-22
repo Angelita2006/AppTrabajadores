@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - ROLES
 # ==========================================
 
 class RolBase(BaseModel):
@@ -10,7 +10,7 @@ class RolBase(BaseModel):
     Propiedades comunes compartidas para la validación de un rol del sistema (RBAC)
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    nombre: str = Field(..., max_length=100, description="Nombre único del rol (Ej: 'admin_empresa', 'trabajador')")
+    nombre: str = Field(..., min_length=2, max_length=100, description="Nombre único del rol (Ej: 'admin_empresa', 'trabajador')")
 
 
 class RolCreate(RolBase):
@@ -26,8 +26,6 @@ class RolResponse(RolBase):
     para mapear los perfiles de usuario.
     """
     id: int = Field(..., description="Identificador numérico único del rol (SmallInteger)")
-    
-    descripcion: Optional[str] = Field(None)
+    descripcion: Optional[str] = Field(None, description="Explicación detallada de las funciones de este rol")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

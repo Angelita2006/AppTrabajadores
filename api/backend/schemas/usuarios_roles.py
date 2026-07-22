@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - USUARIOS ROLES
 # ==========================================
 
 class UsuarioRolBase(BaseModel):
@@ -31,8 +31,6 @@ class UsuarioRolResponse(UsuarioRolBase):
     Esquema utilizado para estructurar las respuestas JSON hacia los módulos de control de permisos.
     """
     id: UUID = Field(..., description="Identificador único UUID de la asignación (gen_random_uuid)")
-    
-    empresa_id: Optional[UUID] = Field(None)
+    empresa_id: Optional[UUID] = Field(None, description="Ámbito de la empresa si aplica")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

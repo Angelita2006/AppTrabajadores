@@ -74,7 +74,7 @@ export default function RootIndexScreen() {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
   }, [opacidadTarjeta, setUsuarioActual, usuarioActual]);
 
-  // CARGA REACTIVA DE CENTROS AL CAMBIAR DE EMPRESA EN EL PERFIL
+  // CARGA REACTIVA DE CENTROS AL CAMBIAR DE EMPRESA
   useEffect(() => {
     const cargarCentrosDeLaEmpresa = async () => {
       if (!empresaSeleccionada?.id) return;
@@ -172,11 +172,11 @@ export default function RootIndexScreen() {
   };
 
   const handleLogout = () => {
-    setUsuarioActual(null);
-    setEmpresas([]);
     setEmpresaSeleccionada(null);
     setCentroTrabajoActual(null);
     setCentrosDisponibles([]);
+    setEmpresas([]);
+    setUsuarioActual(null);
   };
 
   const estiloTarjetaAnimada = useAnimatedStyle(() => {
@@ -423,7 +423,6 @@ export default function RootIndexScreen() {
             <View style={styles.separadorPerfil} />
 
             <View style={styles.detailGrid}>
-              {/* SELECTOR DE EMPRESAS DISPONIBLES */}
               <View style={styles.selectorContainer}>
                 <ThemedText style={styles.detailLabel}>
                   {empresas.length > 1
@@ -468,7 +467,6 @@ export default function RootIndexScreen() {
                 )}
               </View>
 
-              {/* SELECTOR EN CASCADA DE CENTROS DE TRABAJO */}
               <View style={styles.selectorContainer}>
                 <ThemedText style={styles.detailLabel}>
                   Seleccionar Sede / Centro
@@ -516,7 +514,6 @@ export default function RootIndexScreen() {
                 )}
               </View>
 
-              {/* CONTENEDOR DE LA ZONA HORARIA DINÁMICA */}
               <View style={styles.zonaHorariaCard}>
                 <IconSymbol name="schedule" size={16} color="#475569" />
                 <ThemedText style={styles.zonaHorariaTexto}>
@@ -776,9 +773,12 @@ const styles = StyleSheet.create({
     padding: 28,
     alignItems: "center",
     ...Platform.select({
-      web: { boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)" },
+      web: { boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)" } as any,
       default: {
-        boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
         elevation: 8,
       },
     }),

@@ -1,11 +1,11 @@
 import datetime
-from pydantic import BaseModel, Field, IPvAnyAddress
+from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
 from models.enums import AccionAuditoriaEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUDITORÍA DE ACCESOS
 # ==========================================
 
 class AuditoriaAccesoBase(BaseModel):
@@ -37,11 +37,9 @@ class AuditoriaAccesoResponse(AuditoriaAccesoBase):
     fecha_hora: datetime.datetime = Field(..., description="Marca de tiempo real e inmutable del acceso (now)")
     
     # Propiedades complementarias de trazabilidad relacional
-    usuario_id: Optional[UUID] = Field(None)
-    trabajador_id: Optional[UUID] = Field(None)
-    detalle: Optional[dict] = Field(None)
-    ip_address: Optional[IPvAnyAddress] = Field(None)
+    usuario_id: Optional[UUID] = Field(None, description="ID UUID del usuario que realizó el acceso")
+    trabajador_id: Optional[UUID] = Field(None, description="ID UUID del trabajador consultado")
+    detalle: Optional[dict] = Field(None, description="Metadatos técnicos almacenados")
+    ip_address: Optional[IPvAnyAddress] = Field(None, description="Dirección IP registrada")
 
-    class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

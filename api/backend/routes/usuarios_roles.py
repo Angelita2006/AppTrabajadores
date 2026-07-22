@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.empresas import Empresas
 from models.roles import Roles
 from schemas.usuarios_roles import UsuarioRolCreate, UsuarioRolResponse
@@ -11,12 +16,29 @@ from models.usuarios_roles import UsuariosRoles
 
 router = APIRouter(prefix="/api/usuarios-roles", tags=["Roles de Usuarios"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
 @router.post("", response_model=UsuarioRolResponse, status_code=status.HTTP_201_CREATED)
-def asignar_rol_usuario(obj_in: UsuarioRolCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")  # Protegido contra asignaciones masivas de privilegios
+def asignar_rol_usuario(
+    request: Request,
+    obj_in: UsuarioRolCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/usuarios-roles
-    Vincula un rol específico a una cuenta de usuario, delimitando su ámbito de actuación (tenant).
+    Vincula un rol específico a una cuenta de usuario dentro de un ámbito (tenant).
+    Requiere permisos de Administrador.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes privilegios de administrador para asignar roles."
+        )
+
     # 1. Validaciones estructurales básicas de existencia
     usuario = db.query(Usuarios).filter(Usuarios.id == obj_in.usuario_id).first()
     if not usuario:
@@ -44,7 +66,7 @@ def asignar_rol_usuario(obj_in: UsuarioRolCreate, db: Session = Depends(get_db))
             detail="Este usuario ya cuenta con ese rol asignado dentro del ámbito especificado."
         )
 
-    # 3. Mapeo y volcado directo al modelo físico (el ID lo genera la base de datos de forma nativa)
+    # 3. Mapeo y volcado directo al modelo físico
     nueva_asignacion = UsuariosRoles(
         usuario_id=obj_in.usuario_id,
         role_id=obj_in.role_id,
@@ -65,28 +87,61 @@ def asignar_rol_usuario(obj_in: UsuarioRolCreate, db: Session = Depends(get_db))
 
 
 @router.get("", response_model=List[UsuarioRolResponse])
-def obtener_todas_las_asignaciones_de_roles(db: Session = Depends(get_db)):
+def obtener_todas_las_asignaciones_de_roles(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/usuarios-roles
-    Devuelve la matriz global de asignaciones de roles y alcances del sistema Saas.
+    Devuelve la matriz global de asignaciones de roles. Exclusivo para administradores.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requieren permisos de administrador para ver la matriz global."
+        )
+        
     return db.query(UsuariosRoles).join(UsuariosRoles.usuario).order_by(Usuarios.nombre.asc()).all()
 
 
 @router.get("/usuario/{id_usuario}", response_model=List[UsuarioRolResponse])
-def obtener_roles_por_usuario(id_usuario: UUID, db: Session = Depends(get_db)):
+def obtener_roles_por_usuario(
+    id_usuario: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/usuarios-roles/usuario/{id_usuario}
-    Recupera la lista de perfiles y empresas vinculadas a una cuenta de usuario específica.
+    Recupera los roles de un usuario. Permite al propio usuario consultar sus permisos o a un admin consultar cualquiera.
     """
+    if usuario_actual.id != id_usuario and usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No estás autorizado para consultar los roles de otro usuario."
+        )
+
     return db.query(UsuariosRoles).filter(UsuariosRoles.usuario_id == id_usuario).all()
 
+
 @router.put("/{id_usuario}/rol", response_model=UsuarioRolResponse)
-def cambiar_rol_asignado_usuario(id_usuario: UUID, nuevo_rol: int, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")  # Protegido frente a modificaciones abusivas de permisos
+def cambiar_rol_asignado_usuario(
+    request: Request,
+    id_usuario: UUID, 
+    nuevo_rol: int, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: PUT /api/usuarios-roles/{id_usuario}/rol
-    Modifica el rol asignado a un usuario existente.
+    Modifica el rol asignado a un usuario existente. Exclusivo para administradores.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador para modificar roles."
+        )
+
     usuariorol = db.query(UsuariosRoles).filter(UsuariosRoles.usuario_id == id_usuario).first()
     
     if not usuariorol:
@@ -96,18 +151,28 @@ def cambiar_rol_asignado_usuario(id_usuario: UUID, nuevo_rol: int, db: Session =
         )
     
     setattr(usuariorol, "role_id", nuevo_rol)
-    # setattr(usuariorol, "updated_at", datetime.now())
     
     db.commit()
     db.refresh(usuariorol)
     return usuariorol
 
+
 @router.delete("/{id_asignacion}", status_code=status.HTTP_200_OK)
-def revocar_rol_usuario(id_asignacion: UUID, db: Session = Depends(get_db)):
+def revocar_rol_usuario(
+    id_asignacion: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: DELETE /api/usuarios-roles/{id_asignacion}
-    Elimina físicamente una asignación de rol, revocando el permiso específico del usuario.
+    Elimina físicamente una asignación de rol. Exclusivo para administradores.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador para revocar roles."
+        )
+
     asignacion = db.query(UsuariosRoles).filter(UsuariosRoles.id == id_asignacion).first()
     if not asignacion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación de rol no encontrada.")

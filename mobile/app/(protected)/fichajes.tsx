@@ -10,6 +10,7 @@ import {
   obtenerTrabajador,
   obtenerTurno,
 } from "@/src/modules/trabajadores/api/services";
+import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { ItemTurno } from "@/src/modules/turnos/types/turno";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
@@ -422,7 +423,7 @@ export default function FichajesHistorialScreen() {
     }
 
     const trabajadoresAIncluir = trabajadoresAgrupadosSemanales.filter(
-      (t: any) =>
+      (t: Trabajador) =>
         trabajadoresSeleccionadosParaPdf.some(
           (idSeleccionado) => String(idSeleccionado) === String(t.id),
         ),
@@ -457,32 +458,19 @@ export default function FichajesHistorialScreen() {
                 let aPausaInicio: Date | null = null;
                 let tiempoPausasMinutos = 0;
 
-                marcas.forEach((m: any) => {
+                marcas.forEach((m: RegistroFichaje) => {
                   const hora = extraerHora(m.fecha_hora, false);
-                  if (
-                    m.tipo_evento === TipoFichaje.ENTRADA ||
-                    m.tipo_evento_id === 1
-                  ) {
+                  if (m.tipo_evento === TipoFichaje.ENTRADA) {
                     entrada = hora;
                     entradaMinutos = horaAMinutos(hora);
                   }
-                  if (
-                    m.tipo_evento === TipoFichaje.SALIDA ||
-                    m.tipo_evento_id === 2
-                  ) {
+                  if (m.tipo_evento === TipoFichaje.SALIDA) {
                     salida = hora;
                     salidaMinutos = horaAMinutos(hora);
                   }
-                  if (
-                    m.tipo_evento === TipoFichaje.INICIO_PAUSA ||
-                    m.tipo_evento_id === 3
-                  )
+                  if (m.tipo_evento === TipoFichaje.INICIO_PAUSA)
                     aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
-                  if (
-                    (m.tipo_evento === TipoFichaje.FIN_PAUSA ||
-                      m.tipo_evento_id === 4) &&
-                    aPausaInicio
-                  ) {
+                  if (m.tipo_evento === TipoFichaje.FIN_PAUSA && aPausaInicio) {
                     const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
                     tiempoPausasMinutos += Math.round(
                       (fin.getTime() - aPausaInicio.getTime()) / 60000,

@@ -1,9 +1,13 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-from core.security import get_password_hash, verify_password
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from core.security import get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual
 from models.empresas import Empresas
 from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioRegisterCreate, UsuarioResponse
 from models.usuarios import Usuarios
@@ -12,13 +16,26 @@ from core.database import get_db
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios y Autenticación"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
 @router.post("", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
+def crear_usuario_cuenta(
+    obj_in: UsuarioCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/usuarios
-    Registra una nueva cuenta de usuario en el sistema calculando el hash de seguridad.
+    Registra una nueva cuenta de usuario en el sistema aplicando hash seguro a la contraseña.
+    Requiere autenticación previa de administrador.
     """
-    # 1. Comprobación de seguridad: El email debe ser único global
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para crear cuentas de usuario directamente."
+        )
+
     email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
     if email_existente:
         raise HTTPException(
@@ -26,7 +43,6 @@ def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
             detail="El correo electrónico ya se encuentra registrado en la plataforma."
         )
 
-    # 2. Comprobación de seguridad: El expediente de trabajador debe ser único si se asocia
     if obj_in.trabajador_id:
         trabajador_vinculado = db.query(Usuarios).filter(Usuarios.trabajador_id == obj_in.trabajador_id).first()
         if trabajador_vinculado:
@@ -37,19 +53,17 @@ def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
             
         trabajador_existe = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
         if not trabajador_existe:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El expediente de trabajador no existe.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El expediente de trabajador não existe.")
 
-    # 3. Validación de la empresa si se proporciona
     if obj_in.empresa_id:
         empresa_existe = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
         if not empresa_existe:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La empresa especificada no existe.")
 
-    # 4. Mapeo y guardado (Almacenamiento directo temporal para pruebas)
     nuevo_usuario = Usuarios(
         nombre=obj_in.nombre,
         email=obj_in.email,
-        password_hash=str(obj_in.password_raw),  
+        password_hash=get_password_hash(obj_in.password_raw),  
         tipo_usuario=obj_in.tipo_usuario,
         empresa_id=obj_in.empresa_id,
         trabajador_id=obj_in.trabajador_id,
@@ -69,14 +83,15 @@ def crear_usuario_cuenta(obj_in: UsuarioCreate, db: Session = Depends(get_db)):
             detail=f"Ha ocurrido un error de integridad al guardar el usuario: {str(error)}"
         )
 
+
 @router.post("/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Protegido contra spam de registros y bots
+def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Session = Depends(get_db)):
     """
     URI: POST /api/usuarios/registro
     Busca al trabajador existente mediante la empresa y el NIF, 
-    y crea credenciales de usuario vinculadas a ese trabajador_id.
+    y crea credenciales de usuario vinculadas con contraseña hasheada.
     """
-    # 1. Validar que el correo no esté duplicado globalmente
     email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
     if email_existente:
         raise HTTPException(
@@ -84,7 +99,6 @@ def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_d
             detail="El correo electrónico ya se encuentra registrado en el sistema."
         )
 
-    # 2. Buscar a qué empresa pertenece el CIF proporcionado
     empresa = db.query(Empresas).filter(Empresas.cif == obj_in.empresa_cif).first()
     if not empresa:
         raise HTTPException(
@@ -92,7 +106,6 @@ def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_d
             detail="La empresa especificada no existe en el sistema."
         )
 
-    # 3. Buscar el trabajador existente usando el ID de la empresa y el NIF/NIE
     trabajador = db.query(Trabajadores).filter(
         Trabajadores.empresa_id == empresa.id,
         Trabajadores.nif_nie == obj_in.nif_nie
@@ -104,7 +117,6 @@ def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_d
             detail="No se encuentra ningún trabajador dado de alta con este NIF en la empresa indicada. Contacta con tu administrador."
         )
 
-    # 4. Validar que el trabajador no tenga ya un usuario vinculado
     usuario_existente = db.query(Usuarios).filter(Usuarios.trabajador_id == trabajador.id).first()
     if usuario_existente:
         raise HTTPException(
@@ -112,7 +124,6 @@ def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_d
             detail="Este trabajador ya dispone de una cuenta de usuario registrada."
         )
 
-    # 5. Crear el registro del usuario vinculando al trabajador_id
     nuevo_usuario = Usuarios(
         trabajador_id=trabajador.id,
         nombre=trabajador.nombre,
@@ -127,26 +138,18 @@ def registrar_usuario(obj_in: UsuarioRegisterCreate, db: Session = Depends(get_d
     
     return nuevo_usuario
 
-@router.post("/login", response_model=UsuarioResponse)
-def login_plataforma(credenciales: LoginRequest, db: Session = Depends(get_db)):
+
+@router.post("/login")
+@limiter.limit("5/minute")  # Protegido estrictamente contra ataques de fuerza bruta
+def login_plataforma(request: Request, credenciales: LoginRequest, db: Session = Depends(get_db)):
     """
     URI: POST /api/usuarios/login
-    Valida el correo y la contraseña (soporta texto plano y hash seguro), 
-    actualizando el hito de último acceso.
+    Valida el correo y la contraseña exclusivamente mediante hash seguro, 
+    actualiza el último acceso y emite un token JWT Bearer.
     """
     usuario = db.query(Usuarios).filter(Usuarios.email == credenciales.email).first()
 
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El correo electrónico o la contraseña introducidos son incorrectos."
-        )
-
-    es_hash_valido = verify_password(credenciales.password, str(usuario.password_hash))
-    es_texto_plano_valido = str(usuario.password_hash) == credenciales.password
-
-    # Si no pasa ninguna de las dos verificaciones, rechazamos el acceso
-    if not (es_hash_valido or es_texto_plano_valido):
+    if not usuario or not verify_password(credenciales.password, str(usuario.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El correo electrónico o la contraseña introducidos son incorrectos."
@@ -162,24 +165,48 @@ def login_plataforma(credenciales: LoginRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(usuario)
 
-    return usuario
+    access_token = crear_token_acceso(data={"sub": str(usuario.id), "email": usuario.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "usuario": usuario
+    }
 
 
 @router.get("", response_model=List[UsuarioResponse])
-def obtener_todos_los_usuarios(db: Session = Depends(get_db)):
+def obtener_todos_los_usuarios(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/usuarios
-    Devuelve el listado completo de cuentas de usuario dadas de alta en el Saas.
+    Devuelve el listado completo de cuentas de usuario. Solo accesible por administradores.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos suficientes para listar todos los usuarios."
+        )
     return db.query(Usuarios).order_by(Usuarios.nombre.asc()).all()
 
 
 @router.get("/{id_usuario}", response_model=UsuarioResponse)
-def obtener_usuario_por_id(id_usuario: UUID, db: Session = Depends(get_db)):
+def obtener_usuario_por_id(
+    id_usuario: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/usuarios/{id_usuario}
-    Busca los detalles de una cuenta mediante su identificador único UUID.
+    Busca los detalles de una cuenta mediante su identificador único UUID de forma protegida.
     """
+    if usuario_actual.id != id_usuario and usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para ver los datos de otro usuario."
+        )
+
     usuario = db.query(Usuarios).filter(Usuarios.id == id_usuario).first()
     if not usuario:
         raise HTTPException(
@@ -190,11 +217,22 @@ def obtener_usuario_por_id(id_usuario: UUID, db: Session = Depends(get_db)):
 
 
 @router.put("/{id_usuario}/estado", response_model=UsuarioResponse)
-def cambiar_estado_usuario(id_usuario: UUID, activo: bool, db: Session = Depends(get_db)):
+def cambiar_estado_usuario(
+    id_usuario: UUID, 
+    activo: bool, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: PUT /api/usuarios/{id_usuario}/estado?activo=false
     Permite activar o desactivar una cuenta bloqueando su capacidad de login.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador para modificar el estado de las cuentas."
+        )
+
     usuario = db.query(Usuarios).filter(Usuarios.id == id_usuario).first()
     if not usuario:
         raise HTTPException(
@@ -208,12 +246,27 @@ def cambiar_estado_usuario(id_usuario: UUID, activo: bool, db: Session = Depends
     db.refresh(usuario)
     return usuario
 
+
 @router.put("/{id_usuario}/password", response_model=UsuarioResponse)
-def cambiar_password_usuario(id_usuario: UUID, antigua_password: str, nueva_password: str, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Protegido para evitar ataques de adivinación de contraseñas antiguas
+def cambiar_password_usuario(
+    request: Request,
+    id_usuario: UUID, 
+    antigua_password: str, 
+    nueva_password: str, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: PUT /api/usuarios/{id_usuario}/password
-    Permite cambiar la contraseña de la cuenta de usuario.
+    Permite cambiar la contraseña validando que el usuario modifique su propia cuenta o sea admin.
     """
+    if usuario_actual.id != id_usuario and usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No estás autorizado para modificar la contraseña de otro usuario."
+        )
+        
     usuario = db.query(Usuarios).filter(Usuarios.id == id_usuario).first()
     if not usuario:
         raise HTTPException(
@@ -221,20 +274,35 @@ def cambiar_password_usuario(id_usuario: UUID, antigua_password: str, nueva_pass
             detail=f"Cuenta de usuario con ID {id_usuario} no encontrada."
         )
 
-    if usuario.password_hash.__str__()  == antigua_password:
-        setattr(usuario, "password_hash", str(nueva_password))
-    
+    if not verify_password(antigua_password, str(usuario.password_hash)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña antigua introducida no es correcta."
+        )
+
+    setattr(usuario, "password_hash", get_password_hash(nueva_password))
     setattr(usuario, "updated_at", datetime.datetime.now())
     db.commit()
     db.refresh(usuario)
     return usuario
 
+
 @router.get("/trabajador/{id_trabajador}", response_model=UsuarioResponse)
-def get_usuario_por_id_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)) -> UsuarioResponse:
+def get_usuario_por_id_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+) -> UsuarioResponse:
     """
-    URI: GET /api/usuarios/{id_trabajador}
-    Devuelve la cuenta de usuario asociada a un expediente de trabajador.
+    URI: GET /api/usuarios/trabajador/{id_trabajador}
+    Devuelve la cuenta de usuario asociada a un expediente de trabajador bajo autenticación.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.trabajador_id != id_trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para consultar este expediente."
+        )
+
     usuario = db.query(Usuarios).filter(Usuarios.trabajador_id == id_trabajador).first()
     if not usuario:
         raise HTTPException(

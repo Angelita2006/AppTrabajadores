@@ -1,11 +1,11 @@
 import datetime
-from pydantic import BaseModel, Field, IPvAnyAddress, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Optional
 from uuid import UUID
 from models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUSENCIAS
 # ==========================================
 
 class AusenciaBase(BaseModel):
@@ -17,7 +17,7 @@ class AusenciaBase(BaseModel):
     tipo_ausencia: TipoAusenciaEnum = Field(..., description="Categoría legal de la ausencia")
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la ausencia (AAAA-MM-DD)")
     fecha_fin: datetime.date = Field(..., description="Fecha de finalización de la ausencia (AAAA-MM-DD)")
-    motivo: str = Field(..., description="Justificación detallada de la solicitud")
+    motivo: str = Field(..., min_length=2, max_length=1000, description="Justificación detallada de la solicitud")
 
 
 class AusenciaCreate(AusenciaBase):
@@ -47,11 +47,9 @@ class AusenciaResponse(AusenciaBase):
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación")
     
     # Campos opcionales que se rellenan en la resolución de RRHH
-    justificante_metadata: Optional[dict] = Field(None)
-    validado_por_usuario_id: Optional[UUID] = Field(None)
-    fecha_resolucion: Optional[datetime.datetime] = Field(None)
-    observaciones_admin: Optional[str] = Field(None)
+    justificante_metadata: Optional[dict] = Field(None, description="Metadatos o enlaces del justificante")
+    validado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que validó la ausencia")
+    fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha de resolución de la solicitud")
+    observaciones_admin: Optional[str] = Field(None, max_length=1000, description="Notas añadidas por el validador")
 
-    class Config:
-        # Habilita la conversión automática desde los objetos de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

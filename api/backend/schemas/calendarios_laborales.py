@@ -1,27 +1,12 @@
 import datetime
-from pydantic import UUID4, BaseModel, Field
+from pydantic import UUID4, BaseModel, Field, ConfigDict
 from typing import List, Optional
 from uuid import UUID
 from schemas.festivos import FestivoResponse2
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CALENDARIOS LABORALES
 # ==========================================
-
-class CalendarioLaboralUpdate(BaseModel):
-    anio: Optional[int] = None
-    nombre: Optional[str] = None
-    centro_trabajo_id: Optional[UUID] = None
-
-class CalendarioConFestivosResponse(BaseModel):
-    id: UUID4
-    nombre: Optional[str]
-    anio: int
-    centro_trabajo_id: Optional[UUID]
-    festivos: List[FestivoResponse2]
-
-    class Config:
-        from_attributes = True
 
 class CalendarioLaboralBase(BaseModel):
     """
@@ -30,7 +15,7 @@ class CalendarioLaboralBase(BaseModel):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     anio: int = Field(..., ge=2000, le=2100, description="Año numérico correspondiente al calendario (SmallInteger)")
-    nombre: str = Field(..., max_length=150, description="Nombre descriptivo del calendario (Ej: 'Calendario de Oficinas 2026')")
+    nombre: str = Field(..., min_length=2, max_length=150, description="Nombre descriptivo del calendario (Ej: 'Calendario de Oficinas 2026')")
 
 
 class CalendarioLaboralCreate(CalendarioLaboralBase):
@@ -41,16 +26,34 @@ class CalendarioLaboralCreate(CalendarioLaboralBase):
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo si es un calendario específico")
 
 
+class CalendarioLaboralUpdate(BaseModel):
+    """
+    Esquema para la actualización parcial o total de un calendario laboral.
+    """
+    anio: Optional[int] = Field(None, ge=2000, le=2100, description="Año numérico")
+    nombre: Optional[str] = Field(None, min_length=2, max_length=150, description="Nombre descriptivo del calendario")
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo")
+
+
 class CalendarioLaboralResponse(CalendarioLaboralBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la interfaz móvil o web.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
-    
-    # Propiedades complementarias opcionales expuestas en el JSON
-    centro_trabajo_id: Optional[UUID] = Field(None)
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo asociado")
 
-    class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CalendarioConFestivosResponse(BaseModel):
+    """
+    Esquema compuesto que devuelve los datos del calendario junto con su lista de días festivos.
+    """
+    id: UUID4 = Field(..., description="Identificador único UUID del calendario")
+    nombre: Optional[str] = Field(None, description="Nombre del calendario")
+    anio: int = Field(..., description="Año del calendario")
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo asociado si aplica")
+    festivos: List[FestivoResponse2] = Field(..., description="Lista de festivos vinculados al calendario")
+
+    model_config = ConfigDict(from_attributes=True)

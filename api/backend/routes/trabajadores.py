@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from models.asignaciones_turno import AsignacionesTurno
 from core.database import get_db
+from core.security import obtener_usuario_actual, verify_password
 from schemas.empresas import EmpresaResponse
 from schemas.trabajadores import AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse
 from schemas.usuarios import LoginRequest
@@ -11,16 +16,30 @@ from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.turnos import Turnos
 
-# Inicialización del enrutador modular para el personal y autenticación
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
 @router.post("", response_model=TrabajadorResponse, status_code=status.HTTP_201_CREATED)
-def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)):
+@limiter.limit("15/minute")  # Protegido contra altas masivas de empleados
+def registrar_trabajador(
+    request: Request,
+    obj_in: TrabajadorCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/trabajadores
-    Registra un nuevo empleado en la base de datos comprobando el aislamiento de identidad por empresa.
+    Registra un nuevo empleado validando el aislamiento por empresa y privilegios de administrador.
     """
-    # 1. Comprobación de seguridad: Valida el correo electrónico único global en la tabla de usuarios
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para registrar trabajadores en esta empresa."
+        )
+
     if obj_in.email:
         email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
         if email_existente:
@@ -29,9 +48,8 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
                 detail="El correo electrónico ya se encuentra registrado en el sistema."
             )
 
-    # 2. Comprobación de seguridad: Valida la restricción única compuesta (empresa_id + nif_nie)
     identidad_existente = db.query(Trabajadores).filter(
-        Trabajadores.empresa_id == obj_in.empresa_cif,
+        Trabajadores.empresa_id == obj_in.empresa_id,
         Trabajadores.nif_nie == obj_in.nif_nie
     ).first()
     
@@ -41,9 +59,8 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
             detail="Ya existe un trabajador registrado con este NIF/NIE dentro de la misma empresa."
         )
 
-    # 3. Mapeo de datos directo al modelo físico de SQLAlchemy (el ID lo genera la base de datos)
     nuevo_trabajador = Trabajadores(
-        empresa_cif=obj_in.empresa_cif,
+        empresa_id=obj_in.empresa_id,
         nif_nie=obj_in.nif_nie,
         nombre=obj_in.nombre,
         apellidos=obj_in.apellidos,
@@ -55,18 +72,28 @@ def registrar_trabajador(obj_in: TrabajadorCreate, db: Session = Depends(get_db)
     db.refresh(nuevo_trabajador)
     return nuevo_trabajador
 
+
 @router.patch("/{id_trabajador}", response_model=TrabajadorResponse)
 def actualizar_trabajador(
     id_trabajador: UUID, 
     obj_in: dict, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
-    print(f"Datos recibidos: {obj_in}")
+    """
+    URI: PATCH /api/trabajadores/{id_trabajador}
+    Actualiza datos de un trabajador validando pertenencia a la empresa o rol de administrador.
+    """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(status_code=404, detail="Trabajador no encontrado")
     
-    # Actualizar campos dinámicamente
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar este trabajador."
+        )
+    
     for field, value in obj_in.items():
         setattr(trabajador, field, value)
     
@@ -74,17 +101,17 @@ def actualizar_trabajador(
     db.refresh(trabajador)
     return trabajador
 
+
 @router.post("/login", response_model=TrabajadorResponse)
-def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Protegido estrictamente contra ataques de fuerza bruta en accesos de empleados
+def login_trabajador(request: Request, credenciales: LoginRequest, db: Session = Depends(get_db)):
     """
     URI: POST /api/trabajadores/login
-    Valida las credenciales contra la tabla central de cuentas de usuario de la plataforma.
+    Valida las credenciales utilizando verificación segura de hash contra la tabla central de usuarios.
     """
-    # Busca la cuenta del usuario en la tabla central de accesos por su email
     usuario_cuenta = db.query(Usuarios).filter(Usuarios.email == credenciales.email).first()
 
-    # Validación de seguridad: Comprueba el hash y la vigencia operativa de la cuenta
-    if not usuario_cuenta or str(usuario_cuenta.password_hash) != credenciales.password:
+    if not usuario_cuenta or not verify_password(credenciales.password, str(usuario_cuenta.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El correo electrónico o la contraseña introducidos son incorrectos."
@@ -96,29 +123,46 @@ def login_trabajador(credenciales: LoginRequest, db: Session = Depends(get_db)):
             detail="La cuenta de usuario se encuentra desactivada."
         )
 
-    # Verifica que el usuario cuente con un expediente de trabajador asociado
     if not usuario_cuenta.trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Esta cuenta de acceso no tiene un expediente de empleado vinculado."
         )
 
-    # Devuelve el objeto del trabajador asociado para cargar el perfil en React Native
     return usuario_cuenta.trabajador
 
+
 @router.get("", response_model=List[TrabajadorResponse])
-def obtener_trabajadores(db: Session = Depends(get_db)):
+def obtener_trabajadores(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/trabajadores
-    Devuelve la plantilla completa de todos los empleados del sistema.
+    Devuelve la plantilla de empleados aplicando aislamiento multi-tenant.
     """
-    return db.query(Trabajadores).order_by(Trabajadores.nombre.asc()).all()
+    query = db.query(Trabajadores)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(Trabajadores.empresa_id == usuario_actual.empresa_id)
+
+    return query.order_by(Trabajadores.nombre.asc()).all()
+
 
 @router.get("/{id_trabajador}", response_model=TrabajadorResponse)
-def obtener_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/trabajadores/{id_trabajador}
-    Busca los detalles de un empleado mediante su identificador único UUID.
+    Busca los detalles de un empleado validando el acceso a su tenant.
     """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
@@ -126,13 +170,26 @@ def obtener_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador con ID {id_trabajador} no encontrado."
         )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para consultar este expediente."
+            )
+
     return trabajador
 
+
 @router.get("/{id_trabajador}/empresas", response_model=List[EmpresaResponse])
-def obtener_empresas_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_empresas_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/trabajadores/{id_trabajador}/empresas
-    Recupera la empresa principal asignada al expediente del empleado.
+    Recupera la empresa vinculada al expediente validando permisos.
     """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
@@ -141,16 +198,27 @@ def obtener_empresas_trabajador(id_trabajador: UUID, db: Session = Depends(get_d
             detail=f"Trabajador con ID {id_trabajador} no encontrado."
         )
     
-    # Devuelve la empresa vinculada en una lista para mantener la compatibilidad con el frontend
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes autorización para ver las empresas de este trabajador."
+            )
+
     if trabajador.empresa:
         return [trabajador.empresa]
     return []
 
+
 @router.delete("/{id_trabajador}", status_code=status.HTTP_200_OK)
-def eliminar_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
+def eliminar_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: DELETE /api/trabajadores/{id_trabajador}
-    Elimina físicamente un trabajador. Si se borra, las asignaciones ligadas se eliminan automáticamente (CASCADE).
+    Elimina un trabajador validando privilegios de administración o empresa.
     """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
@@ -158,23 +226,31 @@ def eliminar_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador con ID {id_trabajador} no localizado."
         )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para eliminar este trabajador."
+        )
     
     db.delete(trabajador)
     db.commit()
     return {"detail": f"Trabajador ({id_trabajador}) eliminado correctamente junto con su planificación en cascada."}
 
+
 @router.post("/{id_trabajador}/turnos", status_code=status.HTTP_200_OK)
+@limiter.limit("15/minute")  # Protegido frente a asignaciones masivas concurrentes abusivas
 def asignar_turnos_trabajador(
+    request: Request,
     id_trabajador: UUID, 
     obj_in: AsignarTurnosRequest, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: POST /api/trabajadores/{id_trabajador}/turnos
-    Procesa de manera masiva la asignación o reasignación de múltiples turnos independientes 
-    para un expediente de trabajador específico.
+    Asigna turnos masivamente a un trabajador validando el ámbito de la empresa.
     """
-    # 1. Validación de seguridad: Verificar que el trabajador exista
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
@@ -182,11 +258,15 @@ def asignar_turnos_trabajador(
             detail=f"Trabajador con ID {id_trabajador} no encontrado."
         )
 
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para asignar turnos a este trabajador."
+        )
+
     try:
-        # 3. Registrar de forma independiente cada turno del array recibido
         nuevas_asignaciones = []
         for turno_id in obj_in.turnos:
-            # Validar que el turno maestro realmente exista en el catálogo general
             turno_existe = db.query(Turnos).filter(Turnos.id == turno_id).first()
             if not turno_existe:
                 raise HTTPException(
@@ -194,16 +274,13 @@ def asignar_turnos_trabajador(
                     detail=f"El turno con ID {turno_id} no existe en el catálogo."
                 )
             
-            # Crear el registro independiente de la asignación
             nueva_asignacion = AsignacionesTurno(
                 trabajador_id=id_trabajador,
                 turno_id=turno_id,
-                # Aquí puedes añadir campos adicionales si tu tabla los requiere (ej: fecha_inicio, semana, etc.)
             )
             db.add(nueva_asignacion)
             nuevas_asignaciones.append(nueva_asignacion)
 
-        # 4. Consolidar los cambios en la base de datos
         db.commit()
 
         return {

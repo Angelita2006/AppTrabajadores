@@ -1,57 +1,105 @@
 import os
-
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from core.database import Base, engine
-from routes import auth, asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
-from dotenv import load_dotenv
+from core.config import settings
+from core.database import SessionLocal, engine
+from routes import (
+    auth, asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, 
+    centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, 
+    empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
+    resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
+)
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-load_dotenv()
-
-# app = FastAPI(
-#     title="API de Registro horario trabajadores",
-#     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-#     version="1.0.0"
-# )
-
-# # Construcción automática de las tablas físicas en la base de datos al arrancar el servidor
-# Base.metadata.create_all(bind=engine)
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],  # Permite peticiones desde emuladores Android/iOS y dispositivos reales
-#     allow_credentials=True,
-#     allow_methods=["*"],  # Habilita todos los métodos HTTP de tus rutas (GET, POST, PUT, DELETE)
-#     allow_headers=["*"],  # Habilita todas las cabeceras estándar de control de peticiones
-# )
+# 1. Configurar el sistema de logs del servidor
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-    version="1.0.0",
-    # Opcional en producción: deshabilitar la documentación automática si no deseas que sea pública
-    # docs_url=None, 
-    # redoc_url=None
+    version="1.0.0"
 )
 
-# 1. GESTIÓN DE CORS SEGURA PARA PRODUCCIÓN
-# En lugar de permitir todo ("*"), se cargan los orígenes permitidos desde una variable de entorno.
-# Ejemplo en .env: ALLOWED_ORIGINS="https://tuweb.com,app://fichapp"
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+# rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+# Manejador personalizado para RateLimitExceeded (Seguro para Pylance y limpio para el frontend)
+@app.exception_handler(RateLimitExceeded)
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    limite_info = str(exc.detail) if hasattr(exc, "detail") else "Límite de velocidad excedido"
+    
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "message": f"Demasiadas solicitudes. Límite superado: {limite_info}.",
+            "error_code": "RATE_LIMIT_EXCEEDED"
+        }
+    )
+    
+    retry_after = getattr(exc, "retry_after", None)
+    if retry_after:
+        response.headers["Retry-After"] = str(retry_after)
+        
+    return response
+
+# 2. Manejador global para excepciones HTTP controladas (ej. 400, 404, 403)
+@app.exception_handler(FastAPIHTTPException)
+async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
+    logger.warning(f"HTTP Error {exc.status_code} en {request.url.path}: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "message": exc.detail,
+        },
+    )
+
+# 3. Manejador global para errores internos inesperados (Evita fugar trazas técnicas y devuelve error 500 limpio)
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Error crítico no controlado en {request.url.path}: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "message": "Hubo un fallo en los servidores. Por favor, inténtalo de nuevo más tarde.",
+        },
+    )
+
+# GESTIÓN DE CORS SEGURA PARA PRODUCCIÓN
 origins_env = os.getenv("ALLOWED_ORIGINS", "")
 origins = [origin.strip() for origin in origins_env.split(",")] if origins_env else []
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else [],  # Si está vacío, no abre brechas innecesarias
+    allow_origins=origins if origins else ["*"],  # Si hay variable definida usa esa, de lo contrario flexible para desarrollo local
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Limitar solo a los métodos necesarios
-    allow_headers=["Authorization", "Content-Type", "Accept"],  # Limitar a las cabeceras estándar requeridas
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # NOTA DE PRODUCCIÓN: 
-# La línea `Base.metadata.create_all(bind=engine)` ha sido eliminada. 
-# En producción, las tablas y cambios de esquema deben gestionarse estrictamente 
-# mediante las migraciones de Alembic ejecutadas en el despliegue.
+# La línea `Base.metadata.create_all(bind=engine)` y el script de migración automática de 
+# contraseñas han sido excluidos para mantener un arranque limpio y seguro en producción (manejado por Alembic).
 
 # Registro de las URIs y enrutadores modulares en el núcleo de la aplicación FastAPI
 app.include_router(asignaciones_turno.router)
@@ -75,12 +123,8 @@ app.include_router(tipos_evento_fichaje.router)
 app.include_router(trabajadores.router)
 app.include_router(turnos.router)
 app.include_router(usuarios_roles.router)
-app.include_router(usuarios.router)
+app.include_router(usuarios.router) 
 app.include_router(auth.router)
-
-# @app.get("/")
-# def read_root():
-#     return {"mensaje": "¡Conexión exitosa desde React Native!"}
 
 @app.get("/")
 def read_root():

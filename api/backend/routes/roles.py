@@ -1,20 +1,42 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.roles import Roles
+from models.usuarios import Usuarios
 from schemas.roles import RolCreate, RolResponse
 
 router = APIRouter(prefix="/api/roles", tags=["Roles del Sistema"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
 @router.post("", response_model=RolResponse, status_code=status.HTTP_201_CREATED)
-def crear_rol_seguridad(obj_in: RolCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")  # Protegido frente a la creación masiva no deseada de roles de seguridad
+def crear_rol_seguridad(
+    request: Request,
+    obj_in: RolCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/roles
     Registra un nuevo rol dentro del catálogo maestro de la plataforma Saas.
+    Exclusivo para administradores.
     """
+    if usuario_actual.tipo_usuario != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador para registrar nuevos roles en el sistema."
+        )
+
     try:
-        # 1. Comprobación de la restricción de unicidad del nombre para evitar duplicidades
         rol_existente = db.query(Roles).filter(Roles.nombre == obj_in.nombre).first()
         if rol_existente:
             raise HTTPException(
@@ -22,7 +44,6 @@ def crear_rol_seguridad(obj_in: RolCreate, db: Session = Depends(get_db)):
                 detail=f"Ya existe un rol registrado con el nombre '{obj_in.nombre}'."
             )
 
-        # 2. Mapea los datos del esquema directamente al modelo físico de la base de datos (SmallInteger)
         nuevo_rol = Roles(
             nombre=obj_in.nombre,
             descripcion=obj_in.descripcion
@@ -44,20 +65,39 @@ def crear_rol_seguridad(obj_in: RolCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=List[RolResponse])
-def obtener_todos_los_roles(db: Session = Depends(get_db)):
+def obtener_todos_los_roles(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/roles
-    Devuelve el catálogo completo de roles de seguridad definidos en el sistema.
+    Devuelve el catálogo completo de roles de seguridad definidos bajo autenticación obligatoria.
     """
+    if not usuario_actual.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta de usuario se encuentra inactiva."
+        )
+
     return db.query(Roles).order_by(Roles.id.asc()).all()
 
 
 @router.get("/{id_rol}", response_model=RolResponse)
-def obtener_rol_por_id(id_rol: int, db: Session = Depends(get_db)):
+def obtener_rol_por_id(
+    id_rol: int, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/roles/{id_rol}
-    Busca las características de un rol específico utilizando su identificador numérico entero (SmallInteger).
+    Busca las características de un rol específico utilizando su identificador numérico de forma protegida.
     """
+    if not usuario_actual.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta de usuario se encuentra inactiva."
+        )
+
     rol = db.query(Roles).filter(Roles.id == id_rol).first()
     if not rol:
         raise HTTPException(

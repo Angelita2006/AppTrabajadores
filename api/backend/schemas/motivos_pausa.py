@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - MOTIVOS DE PAUSA
 # ==========================================
 
 class MotivoPausaBase(BaseModel):
@@ -11,7 +11,7 @@ class MotivoPausaBase(BaseModel):
     Propiedades comunes compartidas para la validación de un motivo de pausa
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    nombre: str = Field(..., max_length=100, description="Nombre o descripción corta del tipo de descanso (Ej: 'Comida')")
+    nombre: str = Field(..., min_length=2, max_length=100, description="Nombre o descripción corta del tipo de descanso (Ej: 'Comida')")
     computa_como_trabajo: bool = Field(False, description="Determina si el tiempo de esta pausa cuenta como jornada efectiva")
 
 
@@ -29,9 +29,7 @@ class MotivoPausaResponse(MotivoPausaBase):
     Esquema utilizado para estructurar las respuestas JSON hacia la interfaz móvil o web.
     """
     id: int = Field(..., description="Identificador numérico único de la pausa (SmallInteger)")
-    
-    empresa_id: Optional[UUID] = Field(None)
-    duracion_max_minutos: Optional[int] = Field(None)
+    empresa_id: Optional[UUID] = Field(None, description="ID de la empresa si es personalizado o global si es nulo")
+    duracion_max_minutos: Optional[int] = Field(None, description="Duración máxima en minutos")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

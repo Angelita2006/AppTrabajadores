@@ -1,11 +1,11 @@
 import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 from models.enums import MetodoFichajeEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - DISPOSITIVOS DE FICHAJE
 # ==========================================
 
 class DispositivoFichajeBase(BaseModel):
@@ -15,7 +15,7 @@ class DispositivoFichajeBase(BaseModel):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     tipo_dispositivo: MetodoFichajeEnum = Field(..., description="Método o tipo de dispositivo (RFID, app, QR, etc.)")
-    identificador: str = Field(..., max_length=100, description="Código único, MAC o número de serie del terminal")
+    identificador: str = Field(..., min_length=2, max_length=100, description="Código único, MAC o número de serie del terminal")
 
 
 class DispositivoFichajeCreate(DispositivoFichajeBase):
@@ -37,9 +37,7 @@ class DispositivoFichajeResponse(DispositivoFichajeBase):
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última actualización de datos")
     
     # Propiedades complementarias opcionales
-    centro_trabajo_id: Optional[UUID] = Field(None)
-    ubicacion: Optional[str] = Field(None)
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo físico asignado")
+    ubicacion: Optional[str] = Field(None, description="Descripción física de la ubicación")
 
-    class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

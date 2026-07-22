@@ -1,10 +1,10 @@
-import datetime
-from pydantic import BaseModel, Field, model_validator
+from datetime import date
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import List, Optional
 from uuid import UUID
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - ASIGNACIONES DE TURNO
 # ==========================================
 
 class AsignacionTurnoBase(BaseModel):
@@ -14,7 +14,7 @@ class AsignacionTurnoBase(BaseModel):
     """
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador al que se le asigna el turno")
     turno_id: UUID = Field(..., description="ID único UUID del turno laboral teórico asignado")
-    fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la vigencia del turno en formato AAAA-MM-DD")
+    fecha_inicio: date = Field(..., description="Fecha de inicio de la vigencia del turno en formato AAAA-MM-DD")
 
 
 class AsignacionTurnoCreate(AsignacionTurnoBase):
@@ -22,7 +22,7 @@ class AsignacionTurnoCreate(AsignacionTurnoBase):
     Esquema utilizado para recibir los datos desde el cliente al asignar un cuadrante
     o turno fijo a un empleado.
     """
-    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización de la vigencia del turno si aplica")
+    fecha_fin: Optional[date] = Field(None, description="Fecha de finalización de la vigencia del turno si aplica")
 
     @model_validator(mode='after')
     def validar_rango_fechas(self) -> 'AsignacionTurnoCreate':
@@ -33,11 +33,23 @@ class AsignacionTurnoCreate(AsignacionTurnoBase):
         if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
             raise ValueError("La fecha de finalización de la asignación no puede ser anterior a la fecha de inicio.")
         return self
+
+
 class AsignacionTurnoMasivaCreate(BaseModel):
-    trabajador_id: UUID
-    turnos_ids: List[UUID]
-    fecha_inicio: datetime.date
-    fecha_fin: Optional[datetime.date] = None
+    """
+    Esquema validado para la asignación masiva de múltiples turnos a un trabajador.
+    """
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador")
+    turnos_ids: List[UUID] = Field(..., min_length=1, max_length=100, description="Lista de IDs de turnos a asignar de forma atómica")
+    fecha_inicio: date = Field(..., description="Fecha de inicio de vigencia para todos los turnos del lote")
+    fecha_fin: Optional[date] = Field(None, description="Fecha de finalización opcional para el lote")
+
+    @model_validator(mode='after')
+    def validar_rango_fechas_masivo(self) -> 'AsignacionTurnoMasivaCreate':
+        if self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError("La fecha de finalización del lote no puede ser anterior a la fecha de inicio.")
+        return self
+
 
 class AsignacionTurnoResponse(AsignacionTurnoBase):
     """
@@ -45,11 +57,7 @@ class AsignacionTurnoResponse(AsignacionTurnoBase):
     para pintar el calendario o la jornada teórica del operario.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
-    
-    # Propiedades complementarias opcionales expuestas en el JSON
-    fecha_fin: Optional[datetime.date] = Field(None)
-    created_at: Optional[datetime.date] = Field(None)
+    fecha_fin: Optional[date] = Field(None, description="Fecha de finalización de la asignación")
+    created_at: Optional[date] = Field(None, description="Fecha de creación del registro")
 
-    class Config:
-        # Habilita el modo de conversión directa para modelos tipados de SQLAlchemy 2.0
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,10 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 from models.enums import AccionRetencionEnum
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - POLÍTICAS DE RETENCIÓN
 # ==========================================
 
 class PoliticaRetencionBase(BaseModel):
@@ -29,8 +29,6 @@ class PoliticaRetencionResponse(PoliticaRetencionBase):
     Esquema utilizado para estructurar las respuestas JSON que el servidor envía a las aplicaciones.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
-    
-    empresa_id: Optional[UUID] = Field(None)
+    empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa cliente si aplica")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

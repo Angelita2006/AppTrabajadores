@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.empresas import Empresas
 from schemas.auditoria_accesos import AuditoriaAccesoCreate, AuditoriaAccesoResponse
 from models.trabajadores import Trabajadores
@@ -11,12 +14,28 @@ from models.auditoria_accesos import AuditoriaAccesos
 
 router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
 @router.post("", response_model=AuditoriaAccesoResponse, status_code=status.HTTP_201_CREATED)
-def registrar_acceso_auditoria(obj_in: AuditoriaAccesoCreate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def registrar_acceso_auditoria(
+    request: Request,
+    obj_in: AuditoriaAccesoCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/auditoria-accesos
     Registra de forma inmutable una acción de consulta, descarga o exportación de datos horarios.
     """
+    # Validar permisos de empresa si no es Administrador global
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para registrar auditorías en esta empresa."
+        )
+
     try:
         # 1. Validación de seguridad: Verifica que la empresa exista
         empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
@@ -71,27 +90,65 @@ def registrar_acceso_auditoria(obj_in: AuditoriaAccesoCreate, db: Session = Depe
 
 
 @router.get("", response_model=List[AuditoriaAccesoResponse])
-def obtener_toda_la_auditoria(db: Session = Depends(get_db)):
+def obtener_toda_la_auditoria(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/auditoria-accesos
-    Devuelve la trazabilidad completa y absoluta de accesos del Saas para la gestoría.
+    Devuelve la trazabilidad completa y absoluta de accesos aplicando aislamiento multi-tenant.
     """
-    return db.query(AuditoriaAccesos).all()
+    query = db.query(AuditoriaAccesos)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(AuditoriaAccesos.empresa_id == usuario_actual.empresa_id)
+
+    return query.all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[AuditoriaAccesoResponse])
-def obtener_auditoria_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
+def obtener_auditoria_empresa(
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/auditoria-accesos/empresa/{id_empresa}
     Recupera el historial de consultas de forma aislada para un cliente específico (tenant).
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar la auditoría de esta empresa."
+        )
+
     return db.query(AuditoriaAccesos).filter(AuditoriaAccesos.empresa_id == id_empresa).all()
 
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[AuditoriaAccesoResponse])
-def obtener_auditoria_por_trabajador(id_trabajador: UUID, db: Session = Depends(get_db)):
+def obtener_auditoria_por_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/auditoria-accesos/trabajador/{id_trabajador}
     Filtra qué usuarios o inspectores han revisado el expediente de un operario concreto.
     """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para ver la auditoría de este trabajador."
+            )
+
     return db.query(AuditoriaAccesos).filter(AuditoriaAccesos.trabajador_id == id_trabajador).all()

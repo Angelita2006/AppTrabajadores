@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - PERMISOS
 # ==========================================
 
 class PermisoBase(BaseModel):
@@ -10,7 +10,7 @@ class PermisoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un permiso del sistema (RBAC)
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    codigo: str = Field(..., max_length=100, description="Código único del permiso en formato slug (Ej: 'fichajes.fichar')")
+    codigo: str = Field(..., min_length=2, max_length=100, description="Código único del permiso en formato slug (Ej: 'fichajes.fichar')")
 
 
 class PermisoCreate(PermisoBase):
@@ -27,8 +27,6 @@ class PermisoResponse(PermisoBase):
     para auditar o pintar las capacidades del usuario en la interfaz.
     """
     id: int = Field(..., description="Identificador numérico único del permiso (SmallInteger)")
-    
-    descripcion: Optional[str] = Field(None)
+    descripcion: Optional[str] = Field(None, description="Texto explicativo sobre qué acción autoriza este permiso")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

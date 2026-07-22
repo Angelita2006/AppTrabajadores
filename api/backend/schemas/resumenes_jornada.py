@@ -1,10 +1,10 @@
 import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - RESÚMENES DE JORNADA
 # ==========================================
 
 class ResumenJornadaBase(BaseModel):
@@ -44,8 +44,7 @@ class ResumenJornadaResponse(ResumenJornadaBase):
     cerrado: bool = Field(..., description="Estado de cierre diario")
     actualizado_en: datetime.datetime = Field(..., description="Marca de tiempo del último recálculo automático efectuado (now)")
     
-    hora_entrada: Optional[datetime.datetime] = Field(None)
-    hora_salida: Optional[datetime.datetime] = Field(None)
+    hora_entrada: Optional[datetime.datetime] = Field(None, description="Primer marcaje de entrada registrado en el día")
+    hora_salida: Optional[datetime.datetime] = Field(None, description="Último marcaje de salida registrado en el día")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

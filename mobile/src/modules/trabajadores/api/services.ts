@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../../service/api/api";
 import {
   AusenciaCreateRequest,
@@ -40,7 +41,7 @@ import { Trabajador, UsuarioSesion } from "../types/trabajador";
 // ====================================================================
 
 /**
- * Valida el correo y la contraseña contra la base de datos de producción.
+ * Valida el correo y la contraseña contra la base de datos de producción y almacena el token JWT.
  * @param email Correo electrónico
  * @param password Contraseña en texto plano
  */
@@ -48,23 +49,43 @@ export const getUsuarioByEmailYPassword = async (
   email: string,
   password: string,
 ): Promise<UsuarioSesion> => {
-  // Conectado al nuevo router de Usuarios / Trabajadores unificado
   const respuesta = await api.post("/api/usuarios/login", {
     email,
     password,
   });
-  return respuesta.data;
+
+  // Almacenamiento seguro del token JWT devuelto por el backend
+  if (respuesta.data?.access_token) {
+    await AsyncStorage.setItem("userToken", respuesta.data.access_token);
+
+    // Inyectamos de inmediato el token en la instancia global de Axios
+    // para evitar fallos de sincronización en peticiones subsiguientes realizadas en el mismo flujo
+    api.defaults.headers.common["Authorization"] =
+      `Bearer ${respuesta.data.access_token}`;
+  }
+
+  // Devolvemos el objeto de sesión (mapeando la estructura devuelta por el backend)
+  return respuesta.data.usuario || respuesta.data;
 };
 
 /**
  * Recupera la información del usuario asociado a un trabajador específico.
+ * URI: GET /api/usuarios/trabajador/{idTrabajador}
  * @param idTrabajador Identificador único de tipo UUID (string)
  */
 export const getUsuarioByIdTrabajador = async (
   idTrabajador: string,
 ): Promise<UsuarioSesion> => {
-  const respuesta = await api.get(`/api/usuarios/trabajador/${idTrabajador}`);
-  return respuesta.data;
+  try {
+    const respuesta = await api.get(`/api/usuarios/trabajador/${idTrabajador}`);
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error.response?.data?.detail;
+    throw new Error(
+      apiMessage ||
+        "Error al recuperar la cuenta de usuario vinculada al trabajador.",
+    );
+  }
 };
 
 /**
@@ -79,41 +100,74 @@ export const getUsuarioById = async (
 };
 
 /**
- * Obtiene la plantilla completa de usuarios registrados en el sistema Saas.
- */
-export const obtenerUsuarios = async () => {
-  const respuesta = await api.get("/api/trabajadores");
-  return respuesta.data;
-};
-
-/**
- * Obtiene la plantilla completa de empleados registrados en el sistema Saas.
+ * Obtiene la plantilla completa de empleados registrados en el sistema Saas aplicando aislamiento multi-tenant.
+ * URI: GET /api/trabajadores
  */
 export const obtenerTrabajadores = async () => {
-  const respuesta = await api.get("/api/trabajadores");
-  return respuesta.data;
+  try {
+    const respuesta = await api.get("/api/trabajadores");
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al recuperar la plantilla de empleados del sistema.",
+    );
+  }
 };
 
 /**
  * Recupera la información detallada de un trabajador específico mediante su UUID.
+ * URI: GET /api/trabajadores/{idTrabajador}
  * @param idTrabajador Identificador único de tipo UUID (string)
  */
 export const obtenerTrabajador = async (idTrabajador: string) => {
-  const respuesta = await api.get(`/api/trabajadores/${idTrabajador}`);
-  return respuesta.data;
+  try {
+    const token = await AsyncStorage.getItem("userToken");
+
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+
+    const respuesta = await api.get(`/api/trabajadores/${idTrabajador}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error.response?.data?.detail || error.message;
+    throw new Error(
+      apiMessage === "Not authenticated"
+        ? "Not authenticated"
+        : apiMessage || "Error al recuperar los detalles del trabajador.",
+    );
+  }
 };
 
 /**
  * Consulta la organización o empresa principal asignada al expediente del empleado.
+ * URI: GET /api/trabajadores/{idTrabajador}/empresas
  * @param idTrabajador Identificador único de tipo UUID (string)
  */
 export const obtenerEmpresasTrabajador = async (
   idTrabajador: string,
 ): Promise<Empresa[]> => {
-  const respuesta = await api.get<Empresa[]>(
-    `/api/trabajadores/${idTrabajador}/empresas`,
-  );
-  return respuesta.data;
+  try {
+    // Verificamos y obtenemos el token de forma explícita para evitar fallos de sincronización
+    const token = await AsyncStorage.getItem("userToken");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const respuesta = await api.get<Empresa[]>(
+      `/api/trabajadores/${idTrabajador}/empresas`,
+      { headers },
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al recuperar la empresa vinculada al trabajador.",
+    );
+  }
 };
 
 // ====================================================================
@@ -556,11 +610,19 @@ export const crearTurnoLaboral = async (datosTurno: TurnoCreate) => {
 
 /**
  * Recupera los cuadrantes horarios dados de alta de forma aislada por una organización (tenant).
- * URI: GET /api/turnos/empresa/{id_empresa}
+ * URI: GET /api/turnos/empresa/{idEmpresa}
+ * @param idEmpresa Identificador único de la empresa de tipo UUID (string)
  */
 export const obtenerTurnosEmpresa = async (idEmpresa: string) => {
-  const respuesta = await api.get(`/api/turnos/empresa/${idEmpresa}`);
-  return respuesta.data;
+  try {
+    const respuesta = await api.get(`/api/turnos/empresa/${idEmpresa}`);
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al recuperar los turnos de la empresa.",
+    );
+  }
 };
 
 /**

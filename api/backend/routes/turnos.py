@@ -1,22 +1,43 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, contains_eager
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.empresas import Empresas
 from schemas.turnos import TurnoCreate, TurnoResponse, TurnoUpdate
 from models.turnos import Turnos
+from models.usuarios import Usuarios
 
 router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
 @router.post("", response_model=TurnoResponse, status_code=status.HTTP_201_CREATED)
-def crear_turno_laboral(obj_in: TurnoCreate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")  # Protegido frente a la creación masiva o automatizada de turnos
+def crear_turno_laboral(
+    request: Request,
+    obj_in: TurnoCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/turnos
-    Registra un nuevo cuadrante de turno teórico validando los datos con Pydantic.
+    Registra un nuevo cuadrante de turno teórico validando empresa y permisos.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para crear turnos en esta empresa."
+        )
+
     try:
-        # 1. Validación de seguridad: Verifica que la empresa exista
         empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
         if not empresa:
             raise HTTPException(
@@ -24,7 +45,6 @@ def crear_turno_laboral(obj_in: TurnoCreate, db: Session = Depends(get_db)):
                 detail=f"Empresa ({obj_in.empresa_id}) no encontrada."
             )
 
-        # 2. Mapea los datos del esquema directamente al modelo físico de la base de datos (ARRAY e ID dinámicos)
         nuevo_turno = Turnos(
             empresa_id=obj_in.empresa_id,
             nombre=obj_in.nombre,
@@ -50,28 +70,55 @@ def crear_turno_laboral(obj_in: TurnoCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=List[TurnoResponse])
-def obtener_todos_los_turnos(db: Session = Depends(get_db)):
+def obtener_todos_los_turnos(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/turnos
-    Devuelve el catálogo de todos los turnos teóricos de la plataforma Saas para la gestoría.
+    Devuelve el catálogo de turnos. Si es admin global ve todo; si es de empresa, filtra por su tenant.
     """
-    return db.query(Turnos).join(Turnos.empresa).order_by(Empresas.nombre_comercial.asc(), Turnos.nombre.asc()).all()
+    query = db.query(Turnos).join(Turnos.empresa)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(Turnos.empresa_id == usuario_actual.empresa_id)
+
+    return query.order_by(Empresas.nombre_comercial.asc(), Turnos.nombre.asc()).all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[TurnoResponse])
-def obtener_turnos_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
+def obtener_turnos_empresa(
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/turnos/empresa/{id_empresa}
-    Recupera los cuadrantes horarios dados de alta de forma aislada por una organización (tenant).
+    Recupera los cuadrantes horarios de una empresa específica aplicando aislamiento multi-tenant.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los turnos de esta empresa."
+        )
+
     return db.query(Turnos).filter(Turnos.empresa_id == id_empresa).order_by(Turnos.nombre.asc()).all()
 
 
 @router.get("/{id_turno}", response_model=TurnoResponse)
-def obtener_turno_laboral(id_turno: UUID, db: Session = Depends(get_db)):
+def obtener_turno_laboral(
+    id_turno: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/turnos/{id_turno}
-    Busca las características de un turno específico utilizando su identificador único UUID.
+    Busca un turno específico validando que pertenezca al ámbito del usuario.
     """
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     if not turno:
@@ -79,13 +126,28 @@ def obtener_turno_laboral(id_turno: UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Turno laboral con ID {id_turno} no localizado en el catálogo."
         )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != turno.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver este turno."
+        )
+
     return turno
 
+
 @router.put("/{id_turno}/editar", response_model=TurnoResponse)
-def editar_turno(id_turno: UUID, obj_in: TurnoUpdate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")  # Protegido frente a modificaciones masivas concurrentes
+def editar_turno(
+    request: Request,
+    id_turno: UUID, 
+    obj_in: TurnoUpdate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: PUT /api/turnos/{id_turno}/editar
-    Modifica cualquier propiedad de un turno, incluyendo horas y días de la semana.
+    Modifica un turno validando la pertenencia a la empresa o rol de administrador.
     """
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     
@@ -94,11 +156,15 @@ def editar_turno(id_turno: UUID, obj_in: TurnoUpdate, db: Session = Depends(get_
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No se ha encontrado ningún turno con el ID {id_turno}."
         )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != turno.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar este turno."
+        )
     
-    # Obtenemos los datos enviados en el body y los convertimos a diccionario
     update_data = obj_in.dict(exclude_unset=True)
     
-    # Actualizamos dinámicamente los campos
     for key, value in update_data.items():
         if hasattr(turno, key):
             setattr(turno, key, value)
@@ -107,17 +173,30 @@ def editar_turno(id_turno: UUID, obj_in: TurnoUpdate, db: Session = Depends(get_
     db.refresh(turno)
     return turno
 
+
 @router.delete("/{id_turno}", status_code=status.HTTP_200_OK)
-def eliminar_turno_maestro(id_turno: UUID, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")  # Protegido frente a eliminaciones masivas de turnos
+def eliminar_turno_maestro(
+    request: Request,
+    id_turno: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: DELETE /api/turnos/{id_turno}
-    Elimina físicamente un turno. Si se borra, las asignaciones ligadas se eliminan automáticamente (CASCADE).
+    Elimina físicamente un turno validando permisos de administración o empresa.
     """
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     if not turno:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Turno laboral con ID {id_turno} no localizado."
+        )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != turno.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para eliminar este turno."
         )
     
     db.delete(turno)

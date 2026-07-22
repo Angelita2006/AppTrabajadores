@@ -2,27 +2,47 @@ import json
 import os
 from google import genai 
 from google.genai import types
-
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from core.config import settings
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from schemas.festivos import FestivoResponse2
 from core.database import get_db
+from core.security import obtener_usuario_actual
 from models.festivos import Festivos
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.calendarios_laborales import CalendariosLaborales
+from models.usuarios import Usuarios
 from schemas.calendarios_laborales import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse, CalendarioLaboralUpdate
 
 router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Laborales"])
 
+# Instancia local del limitador para este router
+limiter = Limiter(key_func=get_remote_address)
+
+
 @router.post("", response_model=CalendarioLaboralResponse, status_code=status.HTTP_201_CREATED)
-def crear_calendario_laboral(obj_in: CalendarioLaboralCreate, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def crear_calendario_laboral(
+    request: Request,
+    obj_in: CalendarioLaboralCreate, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: POST /api/calendarios-laborales
     Registra un nuevo calendario laboral anual asociándolo a una empresa o centro de trabajo.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para crear calendarios laborales en esta empresa."
+        )
+
     try:
         # 1. Validación de seguridad: Verifica que la empresa exista
         empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
@@ -63,11 +83,15 @@ def crear_calendario_laboral(obj_in: CalendarioLaboralCreate, db: Session = Depe
             detail=f"Ha ocurrido un error al crear el calendario laboral: {str(error)}"
         )
 
+
 @router.put("/{id_calendario}", response_model=CalendarioLaboralResponse)
+@limiter.limit("20/minute")
 def actualizar_calendario_laboral(
+    request: Request,
     id_calendario: UUID, 
     obj_in: CalendarioLaboralUpdate, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: PUT /api/calendarios-laborales/{id_calendario}
@@ -79,6 +103,12 @@ def actualizar_calendario_laboral(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Calendario laboral con ID {id_calendario} no encontrado."
+        )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar este calendario laboral."
         )
 
     # 2. Validación de seguridad opcional: Si se provee un centro_trabajo_id, verificar que exista
@@ -112,35 +142,77 @@ def actualizar_calendario_laboral(
             detail=f"Error al actualizar el calendario laboral: {str(error)}"
         )
 
+
 @router.get("", response_model=List[CalendarioLaboralResponse])
-def obtener_todos_los_calendarios(db: Session = Depends(get_db)):
+def obtener_todos_los_calendarios(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/calendarios-laborales
-    Devuelve la lista global de todos los calendarios del sistema Saas para la gestoría.
+    Devuelve la lista global de todos los calendarios aplicando aislamiento multi-tenant.
     """
-    return db.query(CalendariosLaborales).all()
+    query = db.query(CalendariosLaborales)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(CalendariosLaborales.empresa_id == usuario_actual.empresa_id)
+
+    return query.all()
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[CalendarioLaboralResponse])
-def obtener_calendarios_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
+def obtener_calendarios_empresa(
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/calendarios-laborales/empresa/{id_empresa}
     Recupera los calendarios dados de alta de forma aislada por una organización (tenant).
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los calendarios de esta empresa."
+        )
+
     return db.query(CalendariosLaborales).filter(CalendariosLaborales.empresa_id == id_empresa).all()
 
 
 @router.get("/centro/{id_centro}", response_model=List[CalendarioLaboralResponse])
-def obtener_calendarios_centro(id_centro: UUID, db: Session = Depends(get_db)):
+def obtener_calendarios_centro(
+    id_centro: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/calendarios-laborales/centro/{id_centro}
     Recupera los calendarios asociados específicamente a una sede física concreta.
     """
+    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
+    if not centro:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Centro de trabajo no encontrado.")
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != centro.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los calendarios de este centro de trabajo."
+        )
+
     return db.query(CalendariosLaborales).filter(CalendariosLaborales.centro_trabajo_id == id_centro).all()
 
 
 @router.get("/{id_calendario}", response_model=CalendarioLaboralResponse)
-def obtener_calendario_laboral(id_calendario: UUID, db: Session = Depends(get_db)):
+def obtener_calendario_laboral(
+    id_calendario: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: GET /api/calendarios-laborales/{id_calendario}
     Busca un calendario laboral específico mediante su identificador único UUID.
@@ -151,11 +223,22 @@ def obtener_calendario_laboral(id_calendario: UUID, db: Session = Depends(get_db
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Calendario laboral con ID {id_calendario} no encontrado."
         )
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar este calendario laboral."
+        )
+
     return calendario
 
 
 @router.delete("/{id_calendario}", status_code=status.HTTP_200_OK)
-def eliminar_calendario_laboral(id_calendario: UUID, db: Session = Depends(get_db)):
+def eliminar_calendario_laboral(
+    id_calendario: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     URI: DELETE /api/calendarios-laborales/{id_calendario}
     Elimina físicamente un calendario. Al tener 'ondelete=CASCADE', la base de datos 
@@ -168,15 +251,32 @@ def eliminar_calendario_laboral(id_calendario: UUID, db: Session = Depends(get_d
             detail=f"Calendario laboral con ID {id_calendario} no encontrado."
         )
     
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para eliminar este calendario laboral."
+        )
+
     db.delete(calendario)
     db.commit()
     return {"detail": f"Calendario laboral ({id_calendario}) eliminado correctamente junto con sus festivos asociados."}
 
+
 @router.get("/empresa/{id_empresa}/con-festivos", response_model=List[CalendarioConFestivosResponse])
-def obtener_calendarios_y_festivos_empresa(id_empresa: UUID, db: Session = Depends(get_db)):
+def obtener_calendarios_y_festivos_empresa(
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
     """
     Recupera todos los calendarios de una empresa integrando sus respectivos días festivos.
     """
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los calendarios y festivos de esta empresa."
+        )
+
     # 1. Verificamos si la empresa existe
     empresa_existe = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa_existe:
@@ -196,8 +296,6 @@ def obtener_calendarios_y_festivos_empresa(id_empresa: UUID, db: Session = Depen
         # 4. Construimos la lista utilizando el Schema de Pydantic explícitamente
         lista_festivos = []
         for f in festivos_db:
-            # IMPORTANTE: Si en tu modelo 'Festivos' la columna no se llama 'fecha' o 'descripcion',
-            # cámbialo aquí a la derecha (ej: f.fecha_festivo o f.nombre_festivo)
             lista_festivos.append(
                 FestivoResponse2(
                     id=f.id,
@@ -212,7 +310,7 @@ def obtener_calendarios_y_festivos_empresa(id_empresa: UUID, db: Session = Depen
             CalendarioConFestivosResponse(
                 id=cal.id,
                 nombre=cal.nombre,
-                anio=cal.anio, # Si en tu BD se llama 'ano', cámbialo a cal.ano
+                anio=cal.anio,
                 centro_trabajo_id=cal.centro_trabajo_id,
                 festivos=lista_festivos
             )
@@ -220,13 +318,14 @@ def obtener_calendarios_y_festivos_empresa(id_empresa: UUID, db: Session = Depen
         
     return resultado
 
+
 def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     """
     Envía el archivo PDF binario a Gemini para que extraiga visualmente
     todos los días festivos en un formato JSON limpio.
     """
     # Inicializa el cliente usando la clave de entorno GEMINI_API_KEY
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    client = genai.Client(api_key=settings.GEMINI_API_KEY.__str__())
     
     # Preparamos el archivo binario para enviarlo directamente como InlineData
     documento_pdf = types.Part.from_bytes(
@@ -265,11 +364,24 @@ def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     
 
 @router.post("/calendarios/{calendario_id}/importar-pdf")
+@limiter.limit("10/minute")
 async def importar_calendario_pdf(
+    request: Request,
     calendario_id: UUID, 
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
+    calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == calendario_id).first()
+    if not calendario:
+        raise HTTPException(status_code=404, detail="Calendario laboral no encontrado.")
+
+    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para importar festivos en este calendario laboral."
+        )
+
     if not file.filename or not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="El archivo debe ser un formato PDF válido.")
         

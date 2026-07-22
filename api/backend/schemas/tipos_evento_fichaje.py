@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 # ==========================================
-# ESQUEMAS DE VALIDACIÓN (PYDANTIC)
+# ESQUEMAS DE VALIDACIÓN (PYDANTIC) - TIPOS EVENTO FICHAJE
 # ==========================================
 
 class TipoEventoFichajeBase(BaseModel):
@@ -9,8 +9,8 @@ class TipoEventoFichajeBase(BaseModel):
     Propiedades comunes compartidas para la validación de un tipo de evento,
     basado en el catálogo global e inmutable de la plataforma.
     """
-    codigo: str = Field(..., max_length=30, description="Código único identificativo en mayúsculas (Ej: 'ENTRADA', 'SALIDA')")
-    descripcion: str = Field(..., max_length=150, description="Texto explicativo del evento (Ej: 'Entrada a la jornada')")
+    codigo: str = Field(..., min_length=2, max_length=30, description="Código único identificativo en mayúsculas (Ej: 'ENTRADA', 'SALIDA')")
+    descripcion: str = Field(..., min_length=2, max_length=150, description="Texto explicativo del evento (Ej: 'Entrada a la jornada')")
     computa_como_trabajo: bool = Field(True, description="Determina si el tiempo transcurrido tras este evento suma como jornada efectiva")
 
 
@@ -29,5 +29,4 @@ class TipoEventoFichajeResponse(TipoEventoFichajeBase):
     """
     id: int = Field(..., description="Identificador numérico único del tipo de evento (SmallInteger)")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
