@@ -24,7 +24,6 @@ router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Labor
 # Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
-
 @router.post("", response_model=CalendarioLaboralResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
 def crear_calendario_laboral(
@@ -271,11 +270,6 @@ def obtener_calendarios_y_festivos_empresa(
     """
     Recupera todos los calendarios de una empresa integrando sus respectivos días festivos.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los calendarios y festivos de esta empresa."
-        )
 
     # 1. Verificamos si la empresa existe
     empresa_existe = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -408,7 +402,7 @@ async def importar_calendario_pdf(
                 festivo_existente.tipo = f["tipo"]
                 festivos_finales_retorno.append(festivo_existente)
             else:
-                # ➕ Si NO existe, creamos el registro desde cero de forma segura
+                # Si NO existe, creamos el registro desde cero de forma segura
                 nuevo_festivo = Festivos(
                     calendario_id=calendario_id,
                     fecha=fecha_str,

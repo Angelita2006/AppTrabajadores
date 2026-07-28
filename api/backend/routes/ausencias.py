@@ -105,11 +105,6 @@ def obtener_ausencias_por_empresa(
     URI: GET /api/ausencias/empresa/{id_empresa}
     Filtra las solicitudes dentro de una empresa cliente para el panel de recursos humanos.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar las ausencias de esta empresa."
-        )
 
     return db.query(Ausencias).filter(Ausencias.empresa_id == id_empresa).all()
 

@@ -174,11 +174,6 @@ def obtener_fichajes_trabajador_empresa(
     URI: GET /api/fichajes/trabajador/{id_trabajador}/empresa/{id_empresa}
     Recupera el historial completo de marcajes para un usuario y organización particulares.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los fichajes de esta empresa."
-        )
 
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
@@ -244,12 +239,6 @@ def obtener_fichajes_hoy(
             detail=f"Trabajador ({id_trabajador}) no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los fichajes de este trabajador."
-        )
-
     hoy = date.today()
     
     fichajes_db = db.query(Fichajes).filter(
@@ -285,12 +274,6 @@ def obtener_fichajes_semana_actual(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Trabajador no localizado."
-        )
-
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los fichajes de este trabajador."
         )
 
     hoy = date.today()
@@ -339,31 +322,14 @@ def obtener_fichajes_turno_actual(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Trabajador no localizado."
         )
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los fichajes de este trabajador."
-        )
 
     turno = db.query(Turnos).filter(Turnos.empresa_id == trabajador.empresa_id).first()
     if not turno:
-        return ({
-            "id": None,
-            "fecha_hora": None,
-            "tipo_evento": None, 
-            "metodo_fichaje": None,
-            "estado": None,
-        })
+        return ([])
+    
     asignacion_turno = db.query(AsignacionesTurno).filter(AsignacionesTurno.trabajador_id == id_trabajador, AsignacionesTurno.turno_id == turno.id).where(AsignacionesTurno.created_at <= datetime.now()).order_by(AsignacionesTurno.created_at.desc()).first()
     if not asignacion_turno:
-        return ({
-            "id": None,
-            "fecha_hora": None,
-            "tipo_evento": None, 
-            "metodo_fichaje": None,
-            "estado": None,
-        })
+        return ([])
     
     fecha_inicio = asignacion_turno.fecha_inicio
     fecha_fin = asignacion_turno.fecha_fin
@@ -410,12 +376,6 @@ def obtener_ultimo_fichaje_trabajador(
             detail=f"Trabajador ({trabajador_id}) no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los fichajes de este trabajador."
-        )
-
     ultimo_fichaje = db.query(Fichajes).filter(
         Fichajes.trabajador_id == trabajador_id
     ).order_by(Fichajes.fecha_hora.desc()).first()
@@ -445,11 +405,6 @@ def listar_fichajes_empresa_por_fecha(
     URI: GET /api/fichajes/empresa/{empresa_id}
     Devuelve los marcajes de la plantilla filtrados por fecha.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para listar los fichajes de esta empresa."
-        )
 
     try:
         resultados = (

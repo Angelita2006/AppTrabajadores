@@ -18,7 +18,6 @@ router = APIRouter(prefix="/api/departamentos", tags=["Departamentos"])
 # Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
-
 @router.post("", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")  # Protegido frente a la creación masiva o automatizada de departamentos
 def crear_departamento(
@@ -106,11 +105,6 @@ def obtener_departamentos_empresa(
     URI: GET /api/departamentos/empresa/{id_empresa}
     Recupera de forma estrictamente aislada los departamentos dados de alta por una organización (tenant).
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los departamentos de esta empresa."
-        )
 
     return db.query(Departamentos).filter(Departamentos.empresa_id == id_empresa).all()
 

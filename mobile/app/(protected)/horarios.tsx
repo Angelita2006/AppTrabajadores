@@ -1,4 +1,5 @@
 import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-turno/api/services";
+import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
   DIAS_SEMANA,
@@ -9,6 +10,7 @@ import {
 import { obtenerTurno } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { ThemedText } from "@/src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
@@ -62,7 +64,11 @@ export default function HorariosScreen() {
     let isMounted = true;
 
     const cargarPlanificacionYFichajes = async () => {
-      if (!usuarioActual?.trabajador_id) {
+      if (
+        !usuarioActual?.trabajador_id &&
+        (usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA ||
+          usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA)
+      ) {
         if (isMounted) setCargando(false);
         return;
       }
@@ -70,12 +76,18 @@ export default function HorariosScreen() {
       try {
         if (isMounted) setCargando(true);
 
-        const trabajadorId = usuarioActual.trabajador_id;
+        const trabajadorId = usuarioActual?.trabajador_id;
+        if (!trabajadorId) return;
 
-        const [asignaciones, todosLosFichajes] = await Promise.all([
+        const [asignaciones, todosLosFichajes]: [
+          AsignacionTurno[],
+          RegistroFichaje[],
+        ] = await Promise.all([
           obtenerAsignacionesTurnoTrabajador(trabajadorId),
           obtenerFichajesTurnoActual(trabajadorId),
         ]);
+
+        if (todosLosFichajes.length <= 0) return;
 
         const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
           (f: Record<string, any>) => ({

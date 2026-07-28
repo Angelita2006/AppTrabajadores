@@ -1,7 +1,22 @@
 export const obtenerMensajeAmigableError = (error: any): string => {
-  // 1. Si el backend envió un mensaje personalizado explícito, lo respetamos
-  if (error?.response?.data?.message) {
-    return error.response.data.message;
+  // 1. Capturar el mensaje personalizado o el 'detail' que envía FastAPI
+  const errorData = error?.response?.data;
+  if (errorData) {
+    // FastAPI suele enviar los errores en `detail` (puede ser un string o un array de errores de validación)
+    if (typeof errorData.detail === "string") {
+      return errorData.detail;
+    }
+    if (Array.isArray(errorData.detail)) {
+      // Si es un error de validación de Pydantic (422), podemos extraer el primer mensaje legible
+      return (
+        errorData.detail.map((err: any) => err.msg).join(", ") ||
+        "Error de validación en los datos."
+      );
+    }
+    // Compatibilidad por si en algún sitio usas `message`
+    if (errorData.message) {
+      return errorData.message;
+    }
   }
 
   // 2. Capturar por código de estado HTTP si proviene de Axios o fetch
@@ -26,7 +41,7 @@ export const obtenerMensajeAmigableError = (error: any): string => {
       case 503:
         return "Hubo un fallo en los servidores. Por favor, inténtalo de nuevo más tarde.";
       default:
-        return `Ocurrió un error inesperado en el servidor (Código: ${status}).`;
+        return `Ocurrió un error inesperado en el servidor.`;
     }
   }
 

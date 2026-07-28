@@ -155,11 +155,6 @@ def obtener_trabajadores_empresa(
     URI: GET /api/empresas/{id_empresa}/trabajadores
     Recupera la plantilla completa de empleados vinculados a la organización.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para ver los trabajadores de esta empresa."
-        )
 
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:

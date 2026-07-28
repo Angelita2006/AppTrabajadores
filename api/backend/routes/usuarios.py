@@ -315,11 +315,6 @@ def get_usuario_por_id_trabajador(
     URI: GET /api/usuarios/trabajador/{id_trabajador}
     Devuelve la cuenta de usuario asociada a un expediente de trabajador bajo autenticación.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.trabajador_id != id_trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para consultar este expediente."
-        )
 
     usuario = db.query(Usuarios).filter(Usuarios.trabajador_id == id_trabajador).first()
     if not usuario:

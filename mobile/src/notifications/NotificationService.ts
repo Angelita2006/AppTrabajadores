@@ -110,7 +110,7 @@ export const NotificationService = {
         const triggerSalida = new Date();
         triggerSalida.setHours(parseInt(hS, 10), parseInt(mS, 10), 0, 0);
 
-        if (triggerSalida <= ahora) {
+        if (triggerSalida < ahora) {
           triggerSalida.setDate(triggerSalida.getDate() + 1);
         }
 

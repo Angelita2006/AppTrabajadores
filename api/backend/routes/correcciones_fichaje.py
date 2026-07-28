@@ -34,11 +34,6 @@ def solicitar_correccion(
     URI: POST /api/correcciones
     Crea una nueva solicitud de rectificación horaria en estado 'pendiente' por defecto.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para solicitar correcciones en esta empresa."
-        )
 
     empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
     if not empresa:
@@ -83,16 +78,8 @@ def obtener_todas_las_correcciones(
     """
     URI: GET /api/correcciones
     Lista el histórico completo de solicitudes aplicando aislamiento multi-tenant.
-    """
-    query = db.query(CorreccionesFichaje)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(CorreccionesFichaje.empresa_id == usuario_actual.empresa_id)
+    """    
+    query = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.empresa_id == usuario_actual.empresa_id)
 
     return query.all()
 

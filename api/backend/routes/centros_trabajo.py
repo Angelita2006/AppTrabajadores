@@ -102,11 +102,6 @@ def obtener_centros_empresa(
     URI: GET /api/centros-trabajo/empresa/{id_empresa}
     Recupera de forma aislada las sedes físicas dadas de alta por una organización concreta (tenant).
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los centros de trabajo de esta empresa."
-        )
 
     return db.query(CentrosTrabajo).filter(CentrosTrabajo.empresa_id == id_empresa).all()
 

@@ -1,5 +1,7 @@
 import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
+import { ObserveRoot, useObserve } from "expo-observe";
 import { Tabs } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import {
@@ -9,18 +11,29 @@ import {
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
+// Opcional: Mantener la pantalla de carga visible mientras se prepara el contexto
+SplashScreen.preventAutoHideAsync?.();
+
 function TabsNavigation() {
   const { usuarioActual } = useSesion();
   const [estaListo, setEstaListo] = useState(false);
+  const { markInteractive } = useObserve();
 
-  // Escudo de tiempo: Damos 300ms para que el almacenamiento nativo del móvil
-  // devuelva los datos del usuario antes de que Expo Router calcule los href locales.
+  // Escudo de tiempo y sincronización de métricas
   useEffect(() => {
     const timer = setTimeout(() => {
       setEstaListo(true);
+      // Marcamos la aplicación como interactiva una vez superado el escudo de carga nativo
+      try {
+        SplashScreen.hideAsync?.();
+      } catch (e) {
+        // Ignorar si el splash ya se ocultó
+      }
+      markInteractive();
     }, 300);
+
     return () => clearTimeout(timer);
-  }, [usuarioActual]);
+  }, [usuarioActual, markInteractive]);
 
   // Si el dispositivo físico sigue leyendo los datos de sesión, mostramos un cargando nativo
   if (!estaListo) {
@@ -220,10 +233,13 @@ function TabsNavigation() {
   );
 }
 
-export default function TabLayout() {
+function TabLayout() {
   return (
     <ProveedorSesion>
       <TabsNavigation />
     </ProveedorSesion>
   );
 }
+
+// Exportamos utilizando ObserveRoot.wrap como exige la librería para capturar métricas TTI
+export default ObserveRoot.wrap(TabLayout);

@@ -169,12 +169,6 @@ export default function VacacionesScreen() {
 
       setSolicitudes([nueva, ...solicitudes]);
       setMotivo("");
-
-      // const exitoMsg =
-      //   "Tu petición ha sido enviada al departamento de recursos humanos.";
-      // Platform.OS === "web"
-      //   ? alert(exitoMsg)
-      //   : Alert.alert("Solicitud Tramitada", exitoMsg);
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {

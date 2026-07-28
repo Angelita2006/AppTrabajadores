@@ -101,11 +101,6 @@ def obtener_turnos_empresa(
     URI: GET /api/turnos/empresa/{id_empresa}
     Recupera los cuadrantes horarios de una empresa específica aplicando aislamiento multi-tenant.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los turnos de esta empresa."
-        )
 
     return db.query(Turnos).filter(Turnos.empresa_id == id_empresa).order_by(Turnos.nombre.asc()).all()
 

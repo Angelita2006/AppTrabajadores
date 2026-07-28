@@ -10,6 +10,7 @@ import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { obtenerTurno } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   FontAwesome5,
@@ -79,7 +80,7 @@ const capitalizar = (texto: string) => {
 };
 
 export default function FichajesHistorialScreen() {
-  const { empresaSeleccionada } = useSesion();
+  const { empresaSeleccionada, usuarioActual } = useSesion();
   const [fichajesSemanales, setFichajesSemanales] = useState<RegistroFichaje[]>(
     [],
   );
@@ -120,6 +121,12 @@ export default function FichajesHistorialScreen() {
 
   const cargarFichajesYTurnosSemanales = async () => {
     try {
+      if (
+        usuarioActual?.tipo_usuario !== TipoUsuarioEnum.ADMIN_EMPRESA &&
+        usuarioActual?.tipo_usuario !== TipoUsuarioEnum.ADMIN_GESTORIA
+      )
+        return;
+
       setCargando(true);
       const promesasFichajes = [];
 
