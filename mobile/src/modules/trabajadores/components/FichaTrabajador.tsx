@@ -3,13 +3,11 @@ import { Card } from "@/src/shared/ui/AppSurface";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
+import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { Contrato } from "../../contratos/types/contrato";
-import { ItemTurno } from "../../turnos/types/turno";
-import {
-  obtenerAsignacionesTurnoTrabajador,
-  obtenerTurno,
-} from "../api/services";
+import { obtenerTurno } from "../../turnos/api/services";
+import { Turno } from "../../turnos/types/turno";
 
 export const FichaTrabajador = ({
   item,
@@ -20,12 +18,13 @@ export const FichaTrabajador = ({
   abrirEdicionContrato,
   handleGuardarContrato,
   handleAsignarTurnoTrabajador,
+  prepararAsignarTurno,
 }: any) => {
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
     [],
   );
 
-  const [turnos, setTurnos] = useState<ItemTurno[]>([]);
+  const [turnos, setTurnos] = useState<Turno[]>([]);
 
   useEffect(() => {
     const cargarTurnos = async () => {
@@ -283,7 +282,10 @@ export const FichaTrabajador = ({
                       styles.botonAccionSecundario,
                       { backgroundColor: "#FDF4FF" },
                     ]}
-                    onPress={() => handleAccion("reasignar_turno")}
+                    onPress={() => {
+                      handleAccion("reasignar_turno");
+                      prepararAsignarTurno(item);
+                    }}
                   >
                     <MaterialCommunityIcons
                       name="calendar-refresh"

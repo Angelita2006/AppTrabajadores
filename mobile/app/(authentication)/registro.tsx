@@ -1,4 +1,5 @@
 // app/mobile/app/(authentication)/registro.tsx
+import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -14,9 +15,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {
-  registrarUsuarioAcceso
-} from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import VideoBackground from "../../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";

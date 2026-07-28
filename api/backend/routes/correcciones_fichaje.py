@@ -5,13 +5,13 @@ from typing import List, Any
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from correcciones_fichaje import CorreccionesFichaje
+from models.correcciones_fichaje import CorreccionesFichaje
 from models.contratos import Contratos
 from routes.fichajes import calcular_hash_fichaje, mapear_id_evento
 from core.database import get_db
 from core.security import obtener_usuario_actual
 from models.empresas import Empresas
-from models.enums import EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
+from models.enums import TipoFichajeEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.fichajes import Fichajes
@@ -165,7 +165,7 @@ def resolver_incidencia(
 
     try:
         incidencia.estado = nuevo_estado
-        incidencia.resolutor_usuario_id = resolutor_usuario_id
+        incidencia.aprobado_por_usuario_id = resolutor_usuario_id  
         incidencia.fecha_resolucion = datetime.now()
 
         if nuevo_estado == EstadoCorreccionEnum.APROBADA:
@@ -192,15 +192,11 @@ def resolver_incidencia(
 
                 fecha_hora_propuesta = datetime.fromisoformat(f"{fecha_str}T{hora_str}:00+02:00")
 
-                if isinstance(evento_input, int):
-                    id_real_evento: int = evento_input
-                elif isinstance(evento_input, str):
-                    try:
-                        id_real_evento = int(evento_input)
-                    except ValueError:
-                        id_real_evento = 1
+                if isinstance(evento_input, str):
+                        id_real_evento = TipoFichajeEnum[evento_input]
                 else:
                     id_real_evento = 1
+                    raise ValueError
 
                 sha256_calculado = calcular_hash_fichaje(
                     trabajador_id=str(incidencia.trabajador_id),

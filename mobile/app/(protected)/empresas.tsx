@@ -1,29 +1,46 @@
 import {
+  crearCalendarioLaboral,
+  eliminarCalendarioLaboral,
+  importarCalendarioPDF,
+  modificarCalendarioLaboral,
+  obtenerCalendarioYFestivos,
+} from "@/src/modules/calendarios-laborales/api/services";
+import {
   CalendarioFestivo,
   CalendarioLaboralCreate,
   CalendarioLaboralResponse,
   CalendarioLaboralUpdate,
 } from "@/src/modules/calendarios-laborales/types/calendario";
+import {
+  crearCentroTrabajo,
+  editarCentroTrabajo,
+  eliminarCentroTrabajo,
+  obtenerCentrosPorEmpresa,
+} from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
+import {
+  crearDepartamento,
+  editarDepartamento,
+  eliminarDepartamento,
+  obtenerDepartamentosEmpresa,
+} from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
-import { obtenerEmpresas } from "@/src/modules/empresas/api/services";
+import {
+  guardarDatosEmpresa,
+  obtenerEmpresas,
+} from "@/src/modules/empresas/api/services";
+import {
+  crearFestivo,
+  editarFestivo,
+} from "@/src/modules/festivos/api/services";
 import { Festivo } from "@/src/modules/festivos/types/festivo";
 import {
-  crearCalendarioLaboral,
-  crearDepartamento,
-  editarCentroTrabajo,
-  editarDepartamento,
+  crearTurnoLaboral,
   editarTurno,
-  eliminarCalendarioLaboral,
-  eliminarCentroTrabajo,
-  eliminarDepartamento,
   eliminarTurno,
-  importarCalendarioPDF,
-  modificarCalendarioLaboral,
-  obtenerDepartamentosEmpresa,
   obtenerTurnosEmpresa,
-} from "@/src/modules/trabajadores/api/services";
-import { ItemTurno } from "@/src/modules/turnos/types/turno";
+} from "@/src/modules/turnos/api/services";
+import { Turno } from "@/src/modules/turnos/types/turno";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { Picker } from "@react-native-picker/picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -42,16 +59,7 @@ import {
   View,
 } from "react-native";
 import { Empresa } from "../../src/modules/empresas/types/empresa";
-import {
-  crearCentroTrabajo,
-  crearFestivo,
-  crearTurnoLaboral,
-  editarFestivo,
-  guardarDatosEmpresa,
-  obtenerCalendarioYFestivos,
-  obtenerCentrosPorEmpresa,
-} from "../../src/modules/trabajadores/api/services";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { CalendarLaboralAnual } from "../../src/shared/components/calendar";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
@@ -73,9 +81,7 @@ export default function EmpresasScreen() {
   const [centrosConfigurados, setCentrosConfigurados] = useState<
     CentroTrabajo[]
   >([]);
-  const [turnosEstructurales, setTurnosEstructurales] = useState<ItemTurno[]>(
-    [],
-  );
+  const [turnosEstructurales, setTurnosEstructurales] = useState<Turno[]>([]);
   const [calendarioFestivos, setCalendarioFestivos] = useState<
     CalendarioFestivo[]
   >([]);
@@ -106,7 +112,7 @@ export default function EmpresasScreen() {
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
   const [duracionPausa, setDuracionPausa] = useState("0");
-  const [turnoEnEdicion, setTurnoEnEdicion] = useState<ItemTurno | null>(null);
+  const [turnoEnEdicion, setTurnoEnEdicion] = useState<Turno | null>(null);
 
   // ESTADOS: Departamentos
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
@@ -294,13 +300,12 @@ export default function EmpresasScreen() {
         codigo_ccc: codigoCcc.trim() || null,
       });
 
-      Alert.alert(
-        "Alta Exitosa",
-        `Centro "${nombreCentro}" configurado en el Tenant.`,
-      );
       setNombreCentro("");
       setDireccionCentro("");
       setCodigoCcc("");
+      setActivoCentro(false);
+      setZonaHoraria("Europe/Madrid");
+      setCentroEnEdicion(null);
       setMostrarFormCentro(false);
       await cargarDatosEmpresa(empresaSeleccionada.id);
     } catch (error: any) {
@@ -679,7 +684,6 @@ export default function EmpresasScreen() {
       setNuevoTipoFestivo("");
       setDiaSeleccionadoCtx(null);
     } catch (error: any) {
-      // Capturamos el detalle del HTTP HTTPException enviado desde FastAPI si ocurre un error
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
         alert(`Error de Sincronización: ${mensajeAmigable}`);
@@ -885,7 +889,7 @@ export default function EmpresasScreen() {
     }
   }
 
-  const handleEditarTurno = async (turno: ItemTurno) => {
+  const handleEditarTurno = async (turno: Turno) => {
     try {
       setGuardando(true);
       await editarTurno(turno.id, turno);
@@ -1584,7 +1588,7 @@ export default function EmpresasScreen() {
                     Turnos
                   </ThemedText>
 
-                  {turnosEstructurales.map((turno: ItemTurno) => (
+                  {turnosEstructurales.map((turno: Turno) => (
                     <View key={turno.id}>
                       <View
                         style={[

@@ -1,19 +1,19 @@
+import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
+import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
+import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { getUsuarioByIdTrabajador } from "@/src/modules/usuarios/api/services";
+import {
+  actualizarEstadoAusencia,
+  asignarAusenciaOVacaciones,
+  obtenerAusenciasYVacacionesEmpresa,
+} from "@/src/modules/vacaciones/api/services";
 import {
   AusenciaCreateRequest,
   AusenciaResponse,
   EstadoAusencia,
   ItemAusencia,
   TipoAusencia,
-} from "@/src/modules/ausencias/types/ausencia";
-import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
-import {
-  actualizarEstadoAusencia,
-  asignarAusenciaOVacaciones,
-  getUsuarioByIdTrabajador,
-  obtenerAusenciasYVacacionesEmpresa,
-  obtenerTrabajador,
-} from "@/src/modules/trabajadores/api/services";
-import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+} from "@/src/modules/vacaciones/types/ausencia";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 

@@ -1,12 +1,27 @@
+import {
+  eliminarTodasAsignacionesTrabajador,
+  obtenerAsignacionesTurnoTrabajador,
+} from "@/src/modules/asignaciones-turno/api/services";
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
+import { obtenerCentrosPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
+import {
+  actualizarContratoActivoTrabajador,
+  crearContrato,
+  obtenerContratoActivoTrabajador,
+  rescindirContratoActivoTrabajador,
+} from "@/src/modules/contratos/api/services";
 import { Contrato } from "@/src/modules/contratos/types/contrato";
+import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
 import {
   PlantillaProvider,
   usePlantilla,
 } from "@/src/modules/empresas/components/PlantillaProvider";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
-import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
+import { Turno } from "@/src/modules/turnos/types/turno";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -20,22 +35,11 @@ import {
   View,
 } from "react-native";
 import {
-  actualizarContratoActivoTrabajador,
   actualizarTrabajador,
   asignarTurnosTrabajador,
-  crearContrato,
   crearTrabajador,
-  eliminarTodasAsignacionesTrabajador,
-  obtenerAsignacionesTurnoTrabajador,
-  obtenerCentrosPorEmpresa,
-  obtenerContratoActivoTrabajador,
-  obtenerDepartamentosEmpresa,
-  obtenerTurnosEmpresa,
-  rescindirContratoActivoTrabajador,
 } from "../../src/modules/trabajadores/api/services";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import {
-  TipoUsuario,
   Trabajador,
   TrabajadorPlantilla,
 } from "../../src/modules/trabajadores/types/trabajador";
@@ -75,7 +79,7 @@ function PlantillaScreen() {
   const [procesando, setProcesando] = useState(false);
   const [filtroEstado] = useState<"todos" | "altas">("todos");
 
-  const [turnosEmpresa, setTurnosEmpresa] = useState<ItemTurno[]>([]);
+  const [turnosEmpresa, setTurnosEmpresa] = useState<Turno[]>([]);
   const [cargandoSelectores, setCargandoSelectores] = useState(false);
 
   const [modalActivo, setModalActivo] = useState<TipoModal>(null);
@@ -89,9 +93,7 @@ function PlantillaScreen() {
   const [telefono, setTelefono] = useState("");
   const [nss, setNss] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
-  const [fechaInicio, setFechaInicio] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [departamentoId, setDepartamentoId] = useState<string>("");
   const [puestoTrabajo, setPuestoTrabajo] = useState("");
@@ -105,13 +107,11 @@ function PlantillaScreen() {
     [],
   );
   const [contratoAEditar, setContratoAEditar] = useState<Contrato>();
-  const [turnosSeleccionados, setTurnosSeleccionados] = useState<ItemTurno[]>(
-    [],
-  );
+  const [turnosSeleccionados, setTurnosSeleccionados] = useState<Turno[]>([]);
   const esGestoria =
-    usuarioActual?.tipo_usuario === ("Admin_gestoría" as TipoUsuario);
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
   const esAdminEmpresa =
-    usuarioActual?.tipo_usuario === ("Admin_empresa" as TipoUsuario);
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA;
   const esAdministrador = esGestoria || esAdminEmpresa;
 
   // Formulario: Alta de Trabajador
@@ -357,8 +357,7 @@ function PlantillaScreen() {
       setProcesando(false);
     }
   };
-
-  const prepararAsignarTurno = async (trabajador: Trabajador) => {
+  const prepararReasignarTurno = async (trabajador: Trabajador) => {
     try {
       setCargandoSelectores(true);
       if (!usuarioActual?.empresa_id) {
@@ -366,7 +365,8 @@ function PlantillaScreen() {
         return;
       }
 
-      const datosTurnos: ItemTurno[] = await obtenerTurnosEmpresa(
+      // 1. Obtener los turnos de la empresa
+      const datosTurnos: Turno[] = await obtenerTurnosEmpresa(
         usuarioActual.empresa_id,
       );
 
@@ -375,9 +375,34 @@ function PlantillaScreen() {
         return;
       }
 
+      // 2. Obtener las asignaciones del trabajador para encontrar las vigentes
+      const asignaciones: AsignacionTurno[] =
+        await obtenerAsignacionesTurnoTrabajador(trabajador.id);
+      const hoy = new Date().toISOString().split("T")[0];
+
+      const vigentes: AsignacionTurno[] = asignaciones.filter(
+        (a: AsignacionTurno) =>
+          a.fecha_inicio <= hoy && (!a.fecha_fin || a.fecha_fin >= hoy),
+      );
+
+      if (vigentes.length > 0) {
+        vigentes.forEach((vigente: AsignacionTurno) => {
+          // 3. Rellenar los estados del formulario con los datos actuales
+          const turnoEncontrado = datosTurnos.find(
+            (t) => t.id === vigente.turno_id,
+          );
+
+          if (turnoEncontrado) {
+            turnosSeleccionados.push(turnoEncontrado);
+          }
+          setFechaInicio(vigente.fecha_inicio);
+          setFechaFin(vigente.fecha_fin ?? "");
+        });
+      }
+
       setTurnosEmpresa(datosTurnos);
       setTrabajadorSeleccionado(trabajador);
-      setModalActivo("asignar_turno");
+      setModalActivo("reasignar_turno"); // ¡Aquí estaba el error principal!
     } catch (error: any) {
       alert(obtenerMensajeAmigableError(error));
     } finally {
@@ -452,9 +477,9 @@ function PlantillaScreen() {
 
       if (vigente) {
         setFechaInicio(vigente.fecha_inicio);
-        setFechaFin(vigente.fecha_fin || "");
+        setFechaFin(vigente.fecha_fin || hoy);
 
-        const turnosVigentes = turnosEmpresa.filter((t: ItemTurno) =>
+        const turnosVigentes = turnosEmpresa.filter((t: Turno) =>
           vigente.turnos_ids.includes(t.id),
         );
         setTurnosSeleccionados(turnosVigentes);
@@ -570,7 +595,7 @@ function PlantillaScreen() {
                   handleAsignarTurnoTrabajador={() => {
                     manejarClicReasignar(item);
                   }}
-                  prepararAsignarTurno={prepararAsignarTurno}
+                  prepararAsignarTurno={prepararReasignarTurno}
                 />
               );
             })}
@@ -1071,7 +1096,7 @@ function PlantillaScreen() {
                         style={{ maxHeight: 160 }}
                         nestedScrollEnabled={true}
                       >
-                        {turnosEmpresa.map((turno: ItemTurno) => {
+                        {turnosEmpresa.map((turno: Turno) => {
                           const estaSeleccionado = turnosSeleccionados.some(
                             (t) => t.id === turno.id,
                           );

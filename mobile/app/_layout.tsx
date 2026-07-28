@@ -1,11 +1,11 @@
+import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { Tabs } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
-} from "../src/modules/trabajadores/store/SesionContext";
-import { TipoUsuario } from "../src/modules/trabajadores/types/trabajador";
+} from "../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
@@ -42,8 +42,8 @@ function TabsNavigation() {
 
   // Escudo de control horario: Evaluamos si el perfil cuenta con rango directivo
   const esAdmin =
-    usuarioActual?.tipo_usuario === ("Admin_empresa" as TipoUsuario) ||
-    usuarioActual?.tipo_usuario === ("Admin_gestoría" as TipoUsuario);
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA ||
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
 
   return (
     <Tabs

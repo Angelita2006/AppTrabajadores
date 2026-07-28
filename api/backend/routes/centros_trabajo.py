@@ -248,3 +248,4 @@ def eliminar_centro_trabajo(
                 f"históricos activos (fichajes/contratos). Error: {str(error)}"
             )
         )
+    

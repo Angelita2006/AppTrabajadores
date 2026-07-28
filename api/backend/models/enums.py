@@ -35,6 +35,12 @@ class OrigenFichajeEnum(str, enum.Enum):
     CORRECCION_RRHH = 'Corrección_rrhh'
     SISTEMA = 'Sistema'
 
+class TipoFichajeEnum(int, enum.Enum):
+    ENTRADA = 1
+    SALIDA = 2
+    INICIO_PAUSA = 3
+    FIN_PAUSA = 4
+
 class TipoContratoEnum(str, enum.Enum):
     INDEFINIDO = 'Indefinido'
     TEMPORAL = 'Temporal'

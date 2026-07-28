@@ -1,9 +1,14 @@
+import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
+import { Departamento } from "../../departamentos/types/departamento";
+import { Empresa } from "../../empresas/types/empresa";
+import { Trabajador } from "../../trabajadores/types/trabajador";
+
 // Enums basados exactamente en TipoContratoEnum y TipoJornadaEnum del Backend
 export enum TipoContratoEnum {
   INDEFINIDO = "Indefinido",
   TEMPORAL = "Temporal",
   FORMACION = "Formación",
-  PRÁCTICAS = "Prácticas",
+  PRACTICAS = "Prácticas",
 }
 
 export enum TipoJornadaEnum {
@@ -11,6 +16,9 @@ export enum TipoJornadaEnum {
   PARCIAL = "Parcial",
 }
 
+/**
+ * Representa el contrato laboral de un empleado (Tabla: contratos)
+ */
 export interface Contrato {
   id: string; // UUID v4 mapeado como string
   trabajador_id: string; // UUID v4
@@ -31,4 +39,10 @@ export interface Contrato {
   activo: boolean;
   created_at: string; // ISO DateTime string (DateTime con Zona Horaria)
   updated_at: string; // ISO DateTime string
+
+  // Relaciones opcionales para cargas anidadas (eager loading)
+  trabajador?: Trabajador | null;
+  empresa?: Empresa | null;
+  centro_trabajo?: CentroTrabajo | null;
+  departamento?: Departamento | null;
 }

@@ -1,4 +1,4 @@
-import { registrarOrganizacionCompleta } from "@/src/modules/trabajadores/api/services";
+import { registrarOrganizacionCompleta } from "@/src/modules/another-services/services";
 import { ThemedText } from "@/src/shared/components/themed-text";
 import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";

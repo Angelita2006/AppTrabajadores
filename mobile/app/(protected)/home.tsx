@@ -1,28 +1,28 @@
+import {
+  obtenerFichajesHoy,
+  registrarFichaje,
+} from "@/src/modules/fichajes/api/services";
+import {
+  obtenerIdNumericoTipo,
+  RegistroFichaje,
+  TipoFichaje,
+} from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Platform,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
-import {
-  obtenerFichajesHoy,
-  registrarFichaje,
-} from "../../src/modules/trabajadores/api/services";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
-
-interface RegistroFichaje {
-  id: string;
-  tipo_evento: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA";
-  fecha_hora: string;
-}
 
 export default function HomeScreen() {
   const {
@@ -103,7 +103,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     async function sincronizarJornadaActual() {
-      if (!usuarioActual?.trabajador_id) return;
+      if (!usuarioActual?.trabajador_id) {
+        setCargando(false);
+        return;
+      }
 
       try {
         setCargando(true);
@@ -113,6 +116,9 @@ export default function HomeScreen() {
 
         if (fichajesHoy.length === 0) {
           setEstadoActual(Estado.Activo);
+          setSegundosAcumuladosHoy(0);
+          setTiempoFormateado("00:00:00");
+          setTimestampBaseActual(null);
           return;
         }
 
@@ -125,12 +131,12 @@ export default function HomeScreen() {
         let marcaEntradaActiva: number | null = null;
         let marcaPausaActiva: number | null = null;
 
-        eventos.forEach((fichaje, index) => {
+        eventos.forEach((fichaje) => {
           const tMs = new Date(fichaje.fecha_hora).getTime();
 
-          if (fichaje.tipo_evento === "ENTRADA") {
+          if (fichaje.tipo_evento === TipoFichaje.ENTRADA) {
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento === "INICIO_PAUSA") {
+          } else if (fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA) {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.floor(
                 (tMs - marcaEntradaActiva) / 1000,
@@ -138,13 +144,13 @@ export default function HomeScreen() {
               marcaEntradaActiva = null;
             }
             marcaPausaActiva = tMs;
-          } else if (fichaje.tipo_evento === "FIN_PAUSA") {
+          } else if (fichaje.tipo_evento === TipoFichaje.FIN_PAUSA) {
             if (marcaPausaActiva !== null) {
               segundosCalculados += Math.floor((tMs - marcaPausaActiva) / 1000);
               marcaPausaActiva = null;
             }
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento === "SALIDA") {
+          } else if (fichaje.tipo_evento === TipoFichaje.SALIDA) {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.floor(
                 (tMs - marcaEntradaActiva) / 1000,
@@ -152,42 +158,44 @@ export default function HomeScreen() {
               marcaEntradaActiva = null;
             }
           }
-
-          if (index === eventos.length - 1) {
-            if (fichaje.tipo_evento === "SALIDA") {
-              setEstadoActual(Estado.Activo);
-            } else if (fichaje.tipo_evento === "INICIO_PAUSA") {
-              setEstadoActual(Estado.Descansando);
-            } else {
-              setEstadoActual(Estado.Trabajando);
-            }
-          }
         });
+
+        const ultimoFichaje = eventos[eventos.length - 1];
+        const ultimoEvento = ultimoFichaje.tipo_evento;
+
+        if (ultimoEvento === TipoFichaje.SALIDA) {
+          setEstadoActual(Estado.Activo);
+          setTimestampBaseActual(null);
+        } else if (ultimoEvento === TipoFichaje.INICIO_PAUSA) {
+          setEstadoActual(Estado.Descansando);
+          setTimestampBaseActual(marcaPausaActiva);
+        } else {
+          setEstadoActual(Estado.Trabajando);
+          setTimestampBaseActual(marcaEntradaActiva);
+        }
 
         setSegundosAcumuladosHoy(segundosCalculados);
 
-        const ultimoEvento = eventos[eventos.length - 1].tipo_evento;
-        if (ultimoEvento === "ENTRADA" || ultimoEvento === "FIN_PAUSA") {
-          setTimestampBaseActual(marcaEntradaActiva);
-          const tramoActual = marcaEntradaActiva
-            ? Math.floor((Date.now() - marcaEntradaActiva) / 1000)
-            : 0;
-          setTiempoFormateado(
-            formatearSegundos(segundosCalculados + tramoActual),
-          );
-        } else if (ultimoEvento === "INICIO_PAUSA") {
-          setTimestampBaseActual(marcaPausaActiva);
-          const tramoActual = marcaPausaActiva
-            ? Math.floor((Date.now() - marcaPausaActiva) / 1000)
-            : 0;
+        const timestampBase =
+          ultimoEvento === TipoFichaje.INICIO_PAUSA
+            ? marcaPausaActiva
+            : marcaEntradaActiva;
+
+        if (
+          (ultimoEvento === TipoFichaje.ENTRADA ||
+            ultimoEvento === TipoFichaje.FIN_PAUSA ||
+            ultimoEvento === TipoFichaje.INICIO_PAUSA) &&
+          timestampBase !== null
+        ) {
+          const tramoActual = Math.floor((Date.now() - timestampBase) / 1000);
           setTiempoFormateado(
             formatearSegundos(segundosCalculados + tramoActual),
           );
         } else {
-          setTimestampBaseActual(null);
           setTiempoFormateado(formatearSegundos(segundosCalculados));
         }
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         const mensajeAmigable = obtenerMensajeAmigableError(error);
         console.error("Fallo de sincronización horaria:", error);
         if (Platform.OS === "web") {
@@ -204,8 +212,7 @@ export default function HomeScreen() {
   }, [usuarioActual]);
 
   useEffect(() => {
-    const { AppState } = require("react-native");
-    let intervalo: number;
+    let intervalo: any;
 
     const actualizarRelojDiferencial = () => {
       if (estadoActual === Estado.Activo || timestampBaseActual === null)
@@ -237,14 +244,14 @@ export default function HomeScreen() {
     );
 
     return () => {
-      clearInterval(intervalo);
+      if (intervalo) clearInterval(intervalo);
       subscripcionAppState.remove();
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
-    tipoLabel: "ENTRADA" | "SALIDA" | "INICIO_PAUSA" | "FIN_PAUSA",
+    tipoLabel: TipoFichaje,
   ) => {
     if (
       !usuarioActual?.trabajador_id ||
@@ -273,31 +280,36 @@ export default function HomeScreen() {
         trabajador_id: usuarioActual.trabajador_id,
         empresa_id: empresaSeleccionada.id,
         centro_trabajo_id: centroTrabajoActual.id,
-        tipo_evento_id: tipoLabel,
+        tipo_evento_id: obtenerIdNumericoTipo(tipoLabel as TipoFichaje),
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
         observaciones:
-          tipoLabel === "ENTRADA"
+          tipoLabel === TipoFichaje.ENTRADA
             ? "Inicio de jornada"
-            : tipoLabel === "SALIDA"
+            : tipoLabel === TipoFichaje.SALIDA
               ? "Cierre de jornada"
-              : tipoLabel === "INICIO_PAUSA"
+              : tipoLabel === TipoFichaje.INICIO_PAUSA
                 ? "Inicio de descanso"
                 : "Descanso terminado",
       });
 
+      const ahoraMs = Date.now();
+
       if (timestampBaseActual !== null) {
         const segundosDelTramoQueCierra = Math.floor(
-          (Date.now() - timestampBaseActual) / 1000,
+          (ahoraMs - timestampBaseActual) / 1000,
         );
-        setSegundosAcumuladosHoy((prev) => prev + segundosDelTramoQueCierra);
+        setSegundosAcumuladosHoy((prev) => {
+          const totalNuevo = prev + segundosDelTramoQueCierra;
+          setTiempoFormateado(formatearSegundos(totalNuevo));
+          return totalNuevo;
+        });
       }
 
-      // Cerramos el tramo activo fijando la base del cronómetro a null.
-      if (tipoLabel === "SALIDA") {
+      if (tipoLabel === TipoFichaje.SALIDA) {
         setTimestampBaseActual(null);
       } else {
-        setTimestampBaseActual(Date.now());
+        setTimestampBaseActual(ahoraMs);
       }
 
       setEstadoActual(nuevoEstado);
@@ -313,7 +325,7 @@ export default function HomeScreen() {
     }
   };
 
-  if (cargando && segundosAcumuladosHoy === 0) {
+  if (cargando && segundosAcumuladosHoy === 0 && timestampBaseActual === null) {
     return (
       <View
         style={{
@@ -426,7 +438,7 @@ export default function HomeScreen() {
               cargando && styles.botonDeshabilitado,
             ]}
             onPress={() =>
-              registrarMarcajeHorario(Estado.Trabajando, "ENTRADA")
+              registrarMarcajeHorario(Estado.Trabajando, TipoFichaje.ENTRADA)
             }
             disabled={cargando}
           >
@@ -446,9 +458,15 @@ export default function HomeScreen() {
             ]}
             onPress={() => {
               if (estadoActual === Estado.Descansando) {
-                registrarMarcajeHorario(Estado.Trabajando, "FIN_PAUSA");
+                registrarMarcajeHorario(
+                  Estado.Trabajando,
+                  TipoFichaje.FIN_PAUSA,
+                );
               } else {
-                registrarMarcajeHorario(Estado.Descansando, "INICIO_PAUSA");
+                registrarMarcajeHorario(
+                  Estado.Descansando,
+                  TipoFichaje.INICIO_PAUSA,
+                );
               }
             }}
             disabled={cargando}
@@ -475,7 +493,9 @@ export default function HomeScreen() {
               styles.botonSalida,
               cargando && styles.botonDeshabilitado,
             ]}
-            onPress={() => registrarMarcajeHorario(Estado.Activo, "SALIDA")}
+            onPress={() =>
+              registrarMarcajeHorario(Estado.Activo, TipoFichaje.SALIDA)
+            }
             disabled={cargando}
           >
             <IconSymbol name="stop" size={24} color="#FFFFFF" />

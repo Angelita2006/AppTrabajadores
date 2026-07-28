@@ -1,3 +1,7 @@
+import {
+  confirmarCambioPassword,
+  solicitarTokenRecuperacion,
+} from "@/src/modules/another-services/services";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -18,10 +22,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import {
-  confirmarCambioPassword,
-  solicitarTokenRecuperacion,
-} from "../../src/modules/trabajadores/api/services";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
 import VideoBackground from "../../src/shared/ui/VideoBackground";

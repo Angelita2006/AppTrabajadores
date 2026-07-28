@@ -45,9 +45,9 @@ class CorreccionFichajeResponse(CorreccionFichajeBase):
     Esquema utilizado para estructurar las respuestas JSON hacia la interfaz.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado de la corrección")
-    estado: EstadoCorreccionEnum = Field(..., description="Estado actual de la solicitud (pendiente, aprobada, rechazada)")
+    estado: EstadoCorreccionEnum = Field(..., description="Estado actual de la solicitud")
     solicitado_por_usuario_id: UUID = Field(..., description="ID del usuario solicitante")
-    resolutor_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que resolvió la incidencia")
+    aprobado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que aprobó/resolvió la incidencia")
     fecha_solicitud: datetime.datetime = Field(..., description="Fecha y hora de la solicitud")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha y hora de la resolución")
 

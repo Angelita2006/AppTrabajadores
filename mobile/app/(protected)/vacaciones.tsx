@@ -1,14 +1,14 @@
 import {
+  obtenerAusenciasYVacacionesTrabajador,
+  solicitarAusenciaOVacaciones,
+} from "@/src/modules/vacaciones/api/services";
+import {
   AusenciaCreateRequest,
   AusenciaResponse,
   EstadoAusencia,
   ItemAusencia,
   TipoAusencia,
-} from "@/src/modules/ausencias/types/ausencia";
-import {
-  obtenerAusenciasYVacacionesTrabajador,
-  solicitarAusenciaOVacaciones,
-} from "@/src/modules/trabajadores/api/services";
+} from "@/src/modules/vacaciones/types/ausencia";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -20,7 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -51,10 +51,11 @@ export default function VacacionesScreen() {
         await obtenerAusenciasYVacacionesTrabajador(trabajadorActual.id);
       setSolicitudes(ausenciasTrabajador || []);
     } catch (error: any) {
+      const mensaje = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
-        alert(obtenerMensajeAmigableError(error));
+        alert(mensaje);
       } else {
-        Alert.alert("Error de Carga", obtenerMensajeAmigableError(error));
+        Alert.alert("Error de Carga", mensaje);
       }
     } finally {
       setBuscandoInicial(false);
@@ -68,10 +69,12 @@ export default function VacacionesScreen() {
   // Cálculo dinámico del total de días reales acumulados de todas las solicitudes
   const totalDiasSolicitados = useMemo(() => {
     return solicitudes.reduce((acumulador, item) => {
+      if (!item.fecha_inicio || !item.fecha_fin) return acumulador;
       const inicio = new Date(item.fecha_inicio);
       const fin = new Date(item.fecha_fin);
 
-      // Calcular la diferencia en milisegundos y pasar a días (+1 para incluir el día de inicio)
+      if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return acumulador;
+
       const diferenciaTiempo = fin.getTime() - inicio.getTime();
       const dias = Math.max(
         0,
@@ -87,9 +90,12 @@ export default function VacacionesScreen() {
       if (item.estado !== EstadoAusencia.APROBADA) {
         return acumulador;
       }
+      if (!item.fecha_inicio || !item.fecha_fin) return acumulador;
 
       const inicio = new Date(item.fecha_inicio);
       const fin = new Date(item.fecha_fin);
+
+      if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) return acumulador;
 
       const diferenciaTiempo = fin.getTime() - inicio.getTime();
       const dias = Math.max(
@@ -103,44 +109,48 @@ export default function VacacionesScreen() {
 
   const enviarSolicitud = async () => {
     if (!tipoAusencia) {
-      if (Platform.OS === "web") {
-        alert(
-          "Formulario incompleto: Por favor, selecciona un tipo de ausencia.",
-        );
-      } else {
-        Alert.alert(
-          "Formulario incompleto",
-          "Por favor, selecciona un tipo de ausencia.",
-        );
-      }
+      const msg = "Por favor, selecciona un tipo de ausencia.";
+      Platform.OS === "web"
+        ? alert(msg)
+        : Alert.alert("Formulario incompleto", msg);
       return;
     }
     if (!motivo.trim()) {
-      if (Platform.OS === "web") {
-        alert(
-          "Formulario incompleto: Por favor, escribe el motivo o causa legal de la ausencia.",
-        );
-      } else {
-        Alert.alert(
-          "Formulario incompleto",
-          "Por favor, escribe el motivo o causa legal de la ausencia.",
-        );
-      }
+      const msg = "Por favor, escribe el motivo o causa legal de la ausencia.";
+      Platform.OS === "web"
+        ? alert(msg)
+        : Alert.alert("Formulario incompleto", msg);
+      return;
+    }
+
+    const trabajadorIdEfectivo =
+      trabajadorActual?.id ?? usuarioActual?.trabajador_id;
+    if (!trabajadorIdEfectivo) {
+      const msg =
+        "No se ha encontrado un perfil de trabajador asociado a la sesión.";
+      Platform.OS === "web" ? alert(msg) : Alert.alert("Error de Sesión", msg);
+      return;
+    }
+
+    if (!empresaSeleccionada?.id) {
+      const msg =
+        "Debe tener una empresa seleccionada para emitir una solicitud.";
+      Platform.OS === "web"
+        ? alert(msg)
+        : Alert.alert("Empresa Requerida", msg);
       return;
     }
 
     try {
       setCargando(true);
 
-      if (usuarioActual!.trabajador_id == null) return;
-
       const payload: AusenciaCreateRequest = {
-        trabajador_id: usuarioActual!.trabajador_id,
-        empresa_id: empresaSeleccionada!.id,
+        trabajador_id: trabajadorIdEfectivo,
+        empresa_id: empresaSeleccionada.id,
         tipo_ausencia: tipoAusencia,
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
-        motivo: motivo,
+        motivo: motivo.trim(),
         justificante_metadata: {},
       };
 
@@ -160,16 +170,11 @@ export default function VacacionesScreen() {
       setSolicitudes([nueva, ...solicitudes]);
       setMotivo("");
 
-      if (Platform.OS === "web") {
-        alert(
-          "Solicitud Tramitada: Tu petición ha sido enviada al departamento de recursos humanos.",
-        );
-      } else {
-        Alert.alert(
-          "Solicitud Tramitada",
-          "Tu petición ha sido enviada al departamento de recursos humanos.",
-        );
-      }
+      // const exitoMsg =
+      //   "Tu petición ha sido enviada al departamento de recursos humanos.";
+      // Platform.OS === "web"
+      //   ? alert(exitoMsg)
+      //   : Alert.alert("Solicitud Tramitada", exitoMsg);
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
@@ -264,6 +269,7 @@ export default function VacacionesScreen() {
                 onChangeText={setFechaInicio}
                 style={styles.input}
                 placeholder="AAAA-MM-DD"
+                placeholderTextColor="#94A3B8"
               />
             </View>
             <View style={styles.columnaFecha}>
@@ -273,6 +279,7 @@ export default function VacacionesScreen() {
                 onChangeText={setFechaFin}
                 style={styles.input}
                 placeholder="AAAA-MM-DD"
+                placeholderTextColor="#94A3B8"
               />
             </View>
           </View>

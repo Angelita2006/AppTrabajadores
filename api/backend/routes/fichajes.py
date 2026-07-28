@@ -437,7 +437,7 @@ def obtener_ultimo_fichaje_trabajador(
 @router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK)
 def listar_fichajes_empresa_por_fecha(
     empresa_id: UUID, 
-    fecha: datetime, 
+    fecha: date, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):

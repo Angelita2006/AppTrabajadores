@@ -1,6 +1,10 @@
+import { obtenerCentrosPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { Empresa } from "@/src/modules/empresas/types/empresa";
+import { getUsuarioByEmailYPassword } from "@/src/modules/usuarios/api/services";
+import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { NotificationService } from "@/src/notifications/NotificationService";
+import { setAuthToken } from "@/src/service/api/api";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -21,16 +25,15 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { obtenerEmpresa } from "../src/modules/empresas/api/services";
-import {
-  getUsuarioByEmailYPassword,
-  obtenerCentrosPorEmpresa,
-  obtenerEmpresasTrabajador,
-} from "../src/modules/trabajadores/api/services";
-import { useSesion } from "../src/modules/trabajadores/store/SesionContext";
+import { obtenerEmpresasTrabajador } from "../src/modules/trabajadores/api/services";
+import { useSesion } from "../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../src/shared/ui/AppSurface";
 import VideoBackground from "../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
+
+// 1. EL CANDADO DEBE ESTAR FUERA DEL COMPONENTE PARA QUE SEA PERSISTENTE
+let isAuthenticatingGlobal = false;
 
 export default function RootIndexScreen() {
   const {
@@ -46,11 +49,13 @@ export default function RootIndexScreen() {
     setCentroTrabajoActual,
   } = useSesion();
 
-  const esAdminGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
-  const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
+  const esAdminGestoria =
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
+  const esAdminEmpresa =
+    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA;
   const esAdmin = esAdminGestoria || esAdminEmpresa;
 
-  const [email, setEmail] = useState("angelitagarciavalera@gmail.com");
+  const [email, setEmail] = useState("admin-fichapp@gmail.com");
   const [password, setPassword] = useState("password123");
   const passwordInputRef = useRef<TextInput | null>(null);
   const [isObscured, setIsObscured] = useState(true);
@@ -77,7 +82,14 @@ export default function RootIndexScreen() {
   // CARGA REACTIVA DE CENTROS AL CAMBIAR DE EMPRESA
   useEffect(() => {
     const cargarCentrosDeLaEmpresa = async () => {
-      if (!empresaSeleccionada?.id) return;
+      // Si estamos en plena autenticación, bloqueamos este efecto para que no colisione
+      if (isAuthenticatingGlobal) return;
+
+      if (!empresaSeleccionada?.id) {
+        setCentrosDisponibles([]);
+        setCentroTrabajoActual(null);
+        return;
+      }
 
       try {
         setCargandoCentros(true);
@@ -107,7 +119,7 @@ export default function RootIndexScreen() {
   useEffect(() => {
     const configurarNotificaciones = async () => {
       if (Platform.OS === "web") return;
-      if (usuarioActual) {
+      if (usuarioActual && !isAuthenticatingGlobal) {
         const permitido = await NotificationService.requestPermissions();
         if (permitido) {
           await NotificationService.probarNotificacionEnUnMinuto();
@@ -134,7 +146,10 @@ export default function RootIndexScreen() {
 
     try {
       setCargando(true);
-      const usuarioSesion = await getUsuarioByEmailYPassword(email, password);
+      const respuestaLogin = await getUsuarioByEmailYPassword(email, password);
+      const { access_token, usuario } = respuestaLogin;
+      const usuarioSesion = usuario;
+      setAuthToken(access_token);
       setUsuarioActual(usuarioSesion);
 
       if (
@@ -148,6 +163,7 @@ export default function RootIndexScreen() {
         try {
           const empresasTrabajador = await obtenerEmpresasTrabajador(
             usuarioSesion.trabajador_id,
+            access_token,
           );
           setEmpresas(empresasTrabajador);
           if (empresasTrabajador.length > 0) {
@@ -171,7 +187,8 @@ export default function RootIndexScreen() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    setAuthToken(""); // Limpiamos el token del cliente API
     setEmpresaSeleccionada(null);
     setCentroTrabajoActual(null);
     setCentrosDisponibles([]);
@@ -296,7 +313,7 @@ export default function RootIndexScreen() {
                   usuario.ultimo_acceso
                     ? usuario.ultimo_acceso
                         .replace("T", " a las ")
-                        .substring(0, 32)
+                        .substring(0, 22)
                         .concat(" hs")
                     : "Sesión Actual"
                 }
@@ -897,46 +914,63 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     backgroundColor: "#F8FAFC",
   },
-  selectorItemActivo: { borderColor: "#EA580C", backgroundColor: "#FFF7ED" },
-  selectorItemText: { fontSize: 14, color: "#475569", fontWeight: "500" },
-  selectorItemTextActivo: { color: "#EA580C", fontWeight: "700" },
+  selectorItemActivo: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  selectorItemText: {
+    fontSize: 14,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  selectorItemTextActivo: {
+    color: "#1D4ED8",
+    fontWeight: "700",
+  },
   chipCentro: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F8FAFC",
   },
-  chipCentroActivo: { borderColor: "#EA580C", backgroundColor: "#EA580C" },
-  chipCentroText: { fontSize: 13, color: "#64748B", fontWeight: "600" },
-  chipCentroTextActivo: { color: "#FFFFFF", fontWeight: "700" },
+  chipCentroActivo: {
+    borderColor: "#EA580C",
+    backgroundColor: "#FFF7ED",
+  },
+  chipCentroText: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  chipCentroTextActivo: {
+    color: "#C2410C",
+    fontWeight: "700",
+  },
   zonaHorariaCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     backgroundColor: "#F1F5F9",
     padding: 10,
     borderRadius: 8,
-    marginTop: 4,
+    gap: 8,
+    marginVertical: 4,
   },
-  zonaHorariaTexto: { fontSize: 13, color: "#64748B" },
+  zonaHorariaTexto: {
+    fontSize: 13,
+    color: "#475569",
+  },
   organizationRegisterButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    width: "100%",
-    height: 48,
-    borderWidth: 1.5,
-    borderColor: "#CBD5E1",
-    borderRadius: 14,
-    backgroundColor: "#F8FAFC",
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 14,
+    padding: 10,
   },
   organizationRegisterText: {
-    fontSize: 13,
     color: "#1E293B",
+    fontSize: 13,
     fontWeight: "700",
   },
 });

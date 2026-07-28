@@ -1,17 +1,15 @@
+import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-turno/api/services";
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
+import { obtenerContratoActivoTrabajador } from "@/src/modules/contratos/api/services";
+import { obtenerFichajesEmpresaPorFecha } from "@/src/modules/fichajes/api/services";
 import {
+  DIAS_SEMANA,
   RegistroFichaje,
-  TipoFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
-import {
-  obtenerAsignacionesTurnoTrabajador,
-  obtenerContratoActivoTrabajador,
-  obtenerFichajesEmpresaPorFecha,
-  obtenerTrabajador,
-  obtenerTurno,
-} from "@/src/modules/trabajadores/api/services";
-import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
-import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
+import { obtenerTurno } from "@/src/modules/turnos/api/services";
+import { Turno } from "@/src/modules/turnos/types/turno";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   FontAwesome5,
@@ -28,19 +26,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
-
-const DIAS_SEMANA = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-];
 
 const extraerHora = (fechaHoraStr: string, incluirSegundos = false): string => {
   if (!fechaHoraStr) return "00:00";
@@ -136,7 +123,6 @@ export default function FichajesHistorialScreen() {
       setCargando(true);
       const promesasFichajes = [];
 
-      // 1. Obtener fichajes de la semana
       for (let i = 0; i < 6; i++) {
         const diaConsultar = new Date(lunesSemanaActual);
         diaConsultar.setDate(lunesSemanaActual.getDate() + i);
@@ -147,37 +133,42 @@ export default function FichajesHistorialScreen() {
           .toISOString()
           .split("T")[0];
 
+        // Blindamos cada petición individual para que un fallo aislado no tire toda la semana
         promesasFichajes.push(
           obtenerFichajesEmpresaPorFecha(
             empresaSeleccionada?.id || "",
             fechaLocalStr,
-          ),
+          ).catch((err) => {
+            console.warn(
+              `No se pudieron obtener fichajes para la fecha ${fechaLocalStr}`,
+              err,
+            );
+            return []; // Devolvemos array vacío en caso de fallo en ese día
+          }),
         );
       }
 
       const resultadosDias = await Promise.all(promesasFichajes);
       const todosLosFichajes: RegistroFichaje[] = resultadosDias.flat();
 
-      const fichajesValidos = todosLosFichajes.filter(
-        (f) => !f.estado?.localeCompare("Válido"),
-      );
+      // Filtro seguro tolerante a mayúsculas/minúsculas
+      const fichajesValidos = todosLosFichajes.filter((f) => {
+        const estadoLimpio = f.estado?.trim().toLowerCase() || "";
+        return estadoLimpio === "válido" || estadoLimpio === "valido";
+      });
+
       setFichajesSemanales(fichajesValidos);
 
       const idTrabajadoresUnicos = Array.from(
         new Set(fichajesValidos.map((f) => f.trabajador_id)),
       );
 
-      // 2. Objetos acumuladores locales
-      const nuevoMapaObjetosTurnos: { [key: string]: ItemTurno[] } = {};
+      const nuevoMapaObjetosTurnos: { [key: string]: any[] } = {};
       const nuevoMapaDatosFiscales: { [key: string]: any } = {};
 
-      // 3. Procesar cada trabajador una sola vez
       for (const idTrabajador of idTrabajadoresUnicos) {
         try {
-          // Obtener datos fiscales del trabajador
           const trabajador = await obtenerTrabajador(idTrabajador);
-
-          // Obtener contrato (usando ID empresa y trabajador)
           const contratoActivo = await obtenerContratoActivoTrabajador(
             idTrabajador,
             empresaSeleccionada?.id || "",
@@ -189,7 +180,7 @@ export default function FichajesHistorialScreen() {
 
           if (Array.isArray(asignacionesTurno)) {
             for (const asig of asignacionesTurno) {
-              const tInfo: ItemTurno = await obtenerTurno(asig.turno_id);
+              const tInfo: Turno = await obtenerTurno(asig.turno_id);
               if (tInfo && tInfo.dias_semana) {
                 tInfo.dias_semana.forEach((diaNum: number) => {
                   const nombreDia = DIAS_SEMANA[diaNum];
@@ -214,19 +205,19 @@ export default function FichajesHistorialScreen() {
             tipo_contrato: capitalizar(contratoActivo?.tipo_contrato || ""),
             dias_planificados: diasPlanificadosTexto,
             horas_semana: capitalizar(
-              contratoActivo?.horas_semana.toString().substring(0, 2) || "0",
+              contratoActivo?.horas_semana?.toString().substring(0, 2) || "40",
             ),
-            nif_nie: trabajador.nif_nie || "",
-            numero_seguridad_social: trabajador.numero_seguridad_social || "",
+            nif_nie: trabajador?.nif_nie || "",
+            numero_seguridad_social: trabajador?.numero_seguridad_social || "",
           };
 
-          const asignaciones: AsignacionTurno[] =
-            await obtenerAsignacionesTurnoTrabajador(idTrabajador);
-
-          if (Array.isArray(asignaciones) && asignaciones.length > 0) {
-            const turnosTrabajador: ItemTurno[] = [];
-            for (const asig of asignaciones) {
-              const tInfo: ItemTurno = await obtenerTurno(asig.turno_id);
+          if (
+            Array.isArray(asignacionesTurno) &&
+            asignacionesTurno.length > 0
+          ) {
+            const turnosTrabajador: any[] = [];
+            for (const asig of asignacionesTurno) {
+              const tInfo: Turno = await obtenerTurno(asig.turno_id);
               if (tInfo) {
                 turnosTrabajador.push({
                   id: asig.id,
@@ -240,7 +231,7 @@ export default function FichajesHistorialScreen() {
                   fecha_real:
                     asig.fecha_inicio || new Date().toISOString().split("T")[0],
                   dias_semana: tInfo.dias_semana || "",
-                  tipo_jornada: tInfo.tipo_jornada || "Completa",
+                  tipo_jornada: contratoActivo?.tipo_jornada || "Completa",
                   fecha_asignacion_inicio: asig.fecha_inicio,
                   fecha_asignacion_fin: asig.fecha_fin || "",
                 });
@@ -248,7 +239,12 @@ export default function FichajesHistorialScreen() {
             }
             nuevoMapaObjetosTurnos[idTrabajador] = turnosTrabajador;
           }
-        } catch (_: any) {}
+        } catch (innerErr) {
+          console.warn(
+            `Error procesando datos del trabajador ${idTrabajador}:`,
+            innerErr,
+          );
+        }
       }
 
       setMapaDatosFiscales(nuevoMapaDatosFiscales);
@@ -277,7 +273,7 @@ export default function FichajesHistorialScreen() {
       lunesSemanaActual.getDate() + 6,
     );
 
-    const listaFiltrada = lista.filter((t: ItemTurno) => {
+    const listaFiltrada = lista.filter((t: any) => {
       if (!t.fecha_asignacion_inicio) return false;
 
       const partesInicio = t.fecha_asignacion_inicio.split("T")[0].split("-");
@@ -311,8 +307,8 @@ export default function FichajesHistorialScreen() {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
         const fin = t.hora_fin ? t.hora_fin.substring(0, 5) : "00:00";
         const pausa =
-          t.minutos_pausa_obligatoria > 0
-            ? ` [Pausa: ${t.minutos_pausa_obligatoria} min]`
+          t.duracion_pausa_minutos > 0
+            ? ` [Pausa: ${t.duracion_pausa_minutos} min]`
             : "";
         return `${t.nombre} (${inicio}-${fin})${pausa}`;
       })
@@ -333,7 +329,7 @@ export default function FichajesHistorialScreen() {
           nombre: f.trabajador_nombre,
           tipoJornada: fiscal?.jornada,
           tipoContrato: fiscal?.tipo_contrato,
-          diasAsignados: turnoActivo?.diasSemana,
+          diasAsignados: turnoActivo?.dias_semana,
           horasContrato: fiscal?.horas_semana,
           nif_nie: fiscal?.nif_nie || "N/A",
           numero_seguridad_social: fiscal?.numero_seguridad_social || "-",
@@ -423,7 +419,7 @@ export default function FichajesHistorialScreen() {
     }
 
     const trabajadoresAIncluir = trabajadoresAgrupadosSemanales.filter(
-      (t: Trabajador) =>
+      (t: any) =>
         trabajadoresSeleccionadosParaPdf.some(
           (idSeleccionado) => String(idSeleccionado) === String(t.id),
         ),
@@ -441,100 +437,154 @@ export default function FichajesHistorialScreen() {
         let filasCalendarioHtml = "";
         let totalMinutosSemanales = 0;
 
-        for (let i = 0; i < 6; i++) {
-          const diaActual = new Date(lunesSemanaActual);
-          diaActual.setDate(lunesSemanaActual.getDate() + i);
-          const isoFechaStr = diaActual.toISOString().split("T")[0];
-          const nombreDiaUI = DIAS_SEMANA[diaActual.getDay()];
-          const datosDia = t.dias[isoFechaStr];
+        // Recorremos los días de la semana exactamente igual que la interfaz
+        Object.entries(t.dias || {}).forEach(
+          ([fechaKey, datosDia]: [string, any]) => {
+            const [anio, mes, dia] = fechaKey.split("-").map(Number);
+            const fechaObjeto = new Date(anio, mes - 1, dia);
 
-          if (datosDia) {
-            Object.entries(datosDia.turnos).forEach(
-              ([nombreTurno, marcas]: [string, any]) => {
-                let entrada = "-";
-                let salida = "-";
-                let entradaMinutos = 0;
-                let salidaMinutos = 0;
-                let aPausaInicio: Date | null = null;
-                let tiempoPausasMinutos = 0;
+            const nombresDiasSemana = [
+              "Domingo",
+              "Lunes",
+              "Martes",
+              "Miércoles",
+              "Jueves",
+              "Viernes",
+              "Sábado",
+            ];
+            const nombreDiaReal = nombresDiasSemana[fechaObjeto.getDay()];
+            const fechaFormateada = `${dia}/${mes}`;
 
-                marcas.forEach((m: RegistroFichaje) => {
-                  const hora = extraerHora(m.fecha_hora, false);
-                  if (m.tipo_evento === TipoFichaje.ENTRADA) {
-                    entrada = hora;
-                    entradaMinutos = horaAMinutos(hora);
+            if (
+              datosDia &&
+              datosDia.turnos &&
+              Object.keys(datosDia.turnos).length > 0
+            ) {
+              Object.entries(datosDia.turnos).forEach(
+                ([nombreTurno, eventos]: [string, any]) => {
+                  let entrada = "-";
+                  let salida = "-";
+                  let entradaMinutos = 0;
+                  let salidaMinutos = 0;
+                  let aPausaInicio: Date | null = null;
+                  let tiempoPausasMinutos = 0;
+
+                  const listaEventos = Array.isArray(eventos) ? eventos : [];
+
+                  listaEventos.forEach((m: RegistroFichaje) => {
+                    const hora = extraerHora(m.fecha_hora, false);
+
+                    // Usamos la misma lógica que la pantalla para determinar el tipo de evento
+                    const tipoEval = m.tipo_evento;
+
+                    // Comprobamos los IDs o textos comunes para Entradas (1 o similar)
+                    const esEntrada =
+                      tipoEval === 1 ||
+                      String(tipoEval).toUpperCase() === "ENTRADA" ||
+                      String(tipoEval).toUpperCase().includes("ENTRADA");
+
+                    // Comprobamos los IDs o textos comunes para Salidas (2 o similar)
+                    const esSalida =
+                      tipoEval === 2 ||
+                      String(tipoEval).toUpperCase() === "SALIDA" ||
+                      String(tipoEval).toUpperCase().includes("SALIDA");
+
+                    // Comprobamos inicio de pausa (3 o similar)
+                    const esInicioPausa =
+                      tipoEval === 3 ||
+                      String(tipoEval).toUpperCase().includes("INICIO_PAUSA") ||
+                      String(tipoEval).toUpperCase().includes("PAUSA");
+
+                    // Comprobamos fin de pausa (4 o similar)
+                    const esFinPausa =
+                      tipoEval === 4 ||
+                      String(tipoEval).toUpperCase().includes("FIN_PAUSA");
+
+                    if (esEntrada) {
+                      entrada = hora;
+                      entradaMinutos = horaAMinutos(hora);
+                    }
+                    if (esSalida) {
+                      salida = hora;
+                      salidaMinutos = horaAMinutos(hora);
+                    }
+                    if (esInicioPausa && !esFinPausa) {
+                      if (m.fecha_hora) {
+                        aPausaInicio = new Date(
+                          m.fecha_hora.replace(/ /g, "T"),
+                        );
+                      }
+                    }
+                    if (esFinPausa && aPausaInicio && m.fecha_hora) {
+                      const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
+                      tiempoPausasMinutos += Math.round(
+                        (fin.getTime() - aPausaInicio.getTime()) / 60000,
+                      );
+                      aPausaInicio = null;
+                    }
+                  });
+
+                  let minutesTrabajadosHoy = 0;
+                  let estadoLinea = "Incompleto";
+                  let colorEstado = "#EA580C";
+
+                  if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
+                    minutesTrabajadosHoy =
+                      salidaMinutos - entradaMinutos - tiempoPausasMinutos;
+                    if (minutesTrabajadosHoy < 0) minutesTrabajadosHoy = 0;
+                    totalMinutosSemanales += minutesTrabajadosHoy;
+                    estadoLinea =
+                      nombreDiaReal === "Sábado" ? "Horas extra" : "Efectuado";
+                    colorEstado = "#16A34A";
+                  } else if (entrada === "-" && salida === "-") {
+                    estadoLinea =
+                      nombreDiaReal === "Sábado"
+                        ? "Sin horas extra"
+                        : "Sin marcas";
+                    colorEstado = "#94A3B8";
                   }
-                  if (m.tipo_evento === TipoFichaje.SALIDA) {
-                    salida = hora;
-                    salidaMinutos = horaAMinutos(hora);
-                  }
-                  if (m.tipo_evento === TipoFichaje.INICIO_PAUSA)
-                    aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
-                  if (m.tipo_evento === TipoFichaje.FIN_PAUSA && aPausaInicio) {
-                    const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
-                    tiempoPausasMinutos += Math.round(
-                      (fin.getTime() - aPausaInicio.getTime()) / 60000,
-                    );
-                    aPausaInicio = null;
-                  }
-                });
 
-                let minutesTrabajadosHoy = 0;
-                let estadoLinea = "Incompleto";
-                let colorEstado = "#EA580C";
+                  const horasHoyTexto =
+                    minutesTrabajadosHoy > 0
+                      ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
+                      : "-";
 
-                if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
-                  minutesTrabajadosHoy =
-                    salidaMinutos - entradaMinutos - tiempoPausasMinutos;
-                  if (minutesTrabajadosHoy < 0) minutesTrabajadosHoy = 0;
-                  totalMinutosSemanales += minutesTrabajadosHoy;
-                  estadoLinea =
-                    nombreDiaUI === "Sábado" ? "Horas extra" : "Efectuado";
-                  colorEstado = "#16A34A";
-                } else if (entrada === "-" && salida === "-") {
-                  estadoLinea =
-                    nombreDiaUI === "Sábado" ? "Sin horas extra" : "Sin marcas";
-                  colorEstado = "#94A3B8";
-                }
+                  const pausasTexto =
+                    tiempoPausasMinutos > 0
+                      ? `${tiempoPausasMinutos} min`
+                      : "-";
 
-                const horasHoyTexto =
-                  minutesTrabajadosHoy > 0
-                    ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
-                    : "-";
+                  filasCalendarioHtml += `
+                    <tr>
+                      <td><small style=font-size:14px;><strong>${nombreDiaReal} (${fechaFormateada})</strong></small><br/><small style="color:#555;">${nombreTurno}</small></td>
+                      <td>${entrada}</td>
+                      <td>${salida}</td>
+                      <td style=width:10px>${pausasTexto}</td>
+                      <td style="font-weight: bold;">${horasHoyTexto}</td>
+                      <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
+                      <td class="celda-firma"></td>
+                    </tr>
+                  `;
+                },
+              );
+            } else {
+              const esSabado = nombreDiaReal === "Sábado";
+              const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
 
-                const pausasTexto =
-                  tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
-
-                filasCalendarioHtml += `
-            <tr>
-              <td><strong>${nombreDiaUI}</strong><br/><small style="color:#555;">${nombreTurno}</small></td>
-              <td>${entrada}</td>
-              <td>${salida}</td>
-              <td>${pausasTexto}</td>
-              <td style="font-weight: bold;">${horasHoyTexto}</td>
-              <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
-              <td class="celda-firma"></td>
-            </tr>
-          `;
-              },
-            );
-          } else {
-            const esSabado = nombreDiaUI === "Sábado";
-            const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
-
-            filasCalendarioHtml += `
-          <tr>
-            <td><strong>${nombreDiaUI}</strong></td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td>
-            <td class="celda-firma"></td>
-          </tr>
-        `;
-          }
-        }
+              filasCalendarioHtml += `
+                <tr>
+                  <td><strong>${nombreDiaReal} (${fechaFormateada})</strong></td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td>-</td>
+                  <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td>
+                  <td class="celda-firma"></td>
+                </tr>
+              `;
+            }
+          },
+        );
 
         const rSocial =
           empresaSeleccionada?.nombre_comercial +
@@ -704,7 +754,6 @@ export default function FichajesHistorialScreen() {
     trabajadoresSeleccionadosParaPdf,
     empresaSeleccionada,
     rangoSemanaStr,
-    lunesSemanaActual,
     fichajesSemanales,
     mapaDatosFiscales,
   ]);
@@ -811,7 +860,6 @@ export default function FichajesHistorialScreen() {
                     </ThemedText>
                   </View>
 
-                  {/* CHECKBOX DE SELECCIÓN PARA EL PDF */}
                   <Pressable
                     onPress={() => {
                       if (estaSeleccionado) {

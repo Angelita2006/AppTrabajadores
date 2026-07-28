@@ -1,3 +1,7 @@
+import {
+  obtenerCorreccionesPorEmpresa,
+  resolverSolicitudCorreccion,
+} from "@/src/modules/correcciones-fichaje/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -13,13 +17,9 @@ import {
 import {
   EstadoCorreccion,
   IncidenciaResponse,
-} from "../../src/modules/correcciones-fichaje/types/incidencia";
-import {
-  obtenerCorreccionesPorEmpresa,
-  obtenerTrabajador,
-  resolverSolicitudCorreccion,
-} from "../../src/modules/trabajadores/api/services";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
+} from "../../src/modules/correcciones-fichaje/types/correccion";
+import { obtenerTrabajador } from "../../src/modules/trabajadores/api/services";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -44,7 +44,11 @@ export default function AdminIncidenciasScreen() {
   }, [incidencias]);
 
   const cargarIncidenciasGlobales = useCallback(async () => {
-    if (!empresaSeleccionada?.id) return;
+    if (!empresaSeleccionada?.id) {
+      setCargando(false);
+      setIncidencias([]);
+      return;
+    }
 
     try {
       setCargando(true);
@@ -54,7 +58,7 @@ export default function AdminIncidenciasScreen() {
       );
 
       const incidenciasConTrabajador = await Promise.all(
-        datosGlobales.map(async (incidencia) => {
+        (datosGlobales || []).map(async (incidencia) => {
           try {
             const trabajador: Trabajador = await obtenerTrabajador(
               incidencia.trabajador_id,
@@ -91,14 +95,11 @@ export default function AdminIncidenciasScreen() {
 
   const handleResolverIncidencia = useCallback(
     async (idCorreccion: string, decision: "Aprobada" | "Rechazada") => {
-      // if (procesandoId) return;
-
       if (!usuarioActual?.id) {
-        if (Platform.OS === "web") {
-          alert("Sesión inválida: No se pudo identificar al usuario.");
-        } else {
-          Alert.alert("Sesión inválida", "No se pudo identificar al usuario.");
-        }
+        const msg = "Sesión inválida: No se pudo identificar al usuario.";
+        Platform.OS === "web"
+          ? alert(msg)
+          : Alert.alert("Sesión inválida", msg);
         return;
       }
 
@@ -128,17 +129,6 @@ export default function AdminIncidenciasScreen() {
               : item,
           ),
         );
-
-        // if (Platform.OS === "web") {
-        //   alert(
-        //     `Acción procesada: La incidencia ha sido marcada como ${decision} con éxito.`,
-        //   );
-        // } else {
-        //   Alert.alert(
-        //     "Acción procesada",
-        //     `La incidencia ha sido marcada como ${decision} con éxito.`,
-        //   );
-        // }
       } catch (error: any) {
         const mensajeAmigable = obtenerMensajeAmigableError(error);
         if (Platform.OS === "web") {
@@ -150,7 +140,7 @@ export default function AdminIncidenciasScreen() {
         setProcesandoId(null);
       }
     },
-    [procesandoId, usuarioActual?.id],
+    [usuarioActual?.id],
   );
 
   const getColoresEstado = (estado: EstadoCorreccion) => {
@@ -253,7 +243,7 @@ export default function AdminIncidenciasScreen() {
             const tipoCorreccion =
               item.tipo_correccion?.replace(/_/g, " ").toUpperCase() ??
               "SIN TIPO";
-            const isBusy = Boolean(procesandoId);
+            const isBusy = procesandoId !== null;
             const isCurrentItemProcessing = procesandoId === item.id;
 
             return (

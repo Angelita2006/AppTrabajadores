@@ -1,22 +1,19 @@
-import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
+import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-turno/api/services";
+import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
+  DIAS_SEMANA,
   EstadoFichaje,
   RegistroFichaje,
   TipoFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
-import {
-  obtenerAsignacionesTurnoTrabajador,
-  obtenerFichajesTurnoActual,
-} from "@/src/modules/trabajadores/api/services";
-import { useSesion } from "@/src/modules/trabajadores/store/SesionContext";
-import { obtenerTurno } from "@/src/modules/turnos/services/services";
-import { ItemTurno } from "@/src/modules/turnos/types/turno";
+import { obtenerTurno } from "@/src/modules/turnos/api/services";
+import { Turno } from "@/src/modules/turnos/types/turno";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "@/src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
-import * as Crypto from "expo-crypto";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,8 +23,6 @@ import {
   View,
 } from "react-native";
 
-// Helper para comprobar si un día de la semana (0-6) entra en un patrón string como "LMXJV"
-// Modifica esta función si tu backend devuelve los días laborables en otro formato.
 const cumpleDiasSemana = (
   fecha: Date,
   diasPermitidosStr: number[],
@@ -36,131 +31,151 @@ const cumpleDiasSemana = (
   return diasPermitidosStr.includes(diaSemana);
 };
 
+const aMinutos = (horaStr: string): number => {
+  if (!horaStr) return 0;
+  const [h, m] = horaStr.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+const obtenerMinutosFichaje = (fechaHoraIso: string): number => {
+  const partes = fechaHoraIso.split("T");
+  if (!partes[1]) return 0;
+  const horaLimpia = partes[1].substring(0, 5);
+  return aMinutos(horaLimpia);
+};
+
+const formatearAHorasYMinutos = (minutosTotales: number): string => {
+  const hrs = Math.floor(minutosTotales / 60);
+  const mins = minutosTotales % 60;
+  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+};
+
 export default function HorariosScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
-  const [cuadrante, setCuadrante] = useState<ItemTurno[]>([]);
+  const [cuadrante, setCuadrante] = useState<Turno[]>([]);
   const [fichajesRealizados, setFichajesRealizados] = useState<
     RegistroFichaje[]
   >([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const cargarPlanificacionYFichajes = async () => {
       if (!usuarioActual?.trabajador_id) {
-        setCargando(false);
+        if (isMounted) setCargando(false);
         return;
       }
 
       try {
-        setCargando(true);
+        if (isMounted) setCargando(true);
 
-        const asignaciones: AsignacionTurno[] =
-          await obtenerAsignacionesTurnoTrabajador(
-            usuarioActual!.trabajador_id,
-          );
+        const trabajadorId = usuarioActual.trabajador_id;
 
-        const todosLosFichajes = await obtenerFichajesTurnoActual(
-          usuarioActual!.trabajador_id,
-        );
+        const [asignaciones, todosLosFichajes] = await Promise.all([
+          obtenerAsignacionesTurnoTrabajador(trabajadorId),
+          obtenerFichajesTurnoActual(trabajadorId),
+        ]);
 
         const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
-          (f: any) => ({
+          (f: Record<string, any>) => ({
             id: f.id,
             fecha_hora: f.fecha_hora,
-            tipo_evento: String(
-              f.tipo_evento,
-            ) as unknown as RegistroFichaje["tipo_evento"],
+            tipo_evento: f.tipo_evento as TipoFichaje,
             estado: f.estado,
-            trabajador_id: f.trabajador_id ?? usuarioActual.trabajador_id,
+            trabajador_id: f.trabajador_id ?? trabajadorId,
             trabajador_nombre: f.trabajador_nombre ?? "",
             turno_nombre: f.turno_nombre ?? "",
             metodo_fichaje: f.metodo_fichaje ?? "",
           }),
         );
 
+        if (!isMounted) return;
         setFichajesRealizados(fichajesFormateados);
 
-        let turnos: ItemTurno[] = [];
+        let turnos: Turno[] = [];
         const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0); // Resetear horas para comparar solo fechas
+        hoy.setHours(12, 0, 0, 0);
 
         for (const asignacion_turno of asignaciones) {
+          if (!asignacion_turno.fecha_inicio) continue;
+
+          const fecha_inicio = new Date(asignacion_turno.fecha_inicio);
+          fecha_inicio.setHours(12, 0, 0, 0);
+
+          let fecha_fin: Date;
           if (asignacion_turno.fecha_fin) {
-            const fecha_inicio = new Date(asignacion_turno.fecha_inicio);
-            const fecha_fin = new Date(asignacion_turno.fecha_fin);
-            fecha_fin.setHours(23, 59, 59, 999); // Asegurar fin del día
-            // FILTRO 1: Evitar asignaciones antiguas que ya terminaron antes de hoy
-            if (fecha_fin < hoy) {
-              continue;
+            fecha_fin = new Date(asignacion_turno.fecha_fin);
+          } else {
+            fecha_fin = new Date();
+            fecha_fin.setMonth(fecha_fin.getMonth() + 2);
+          }
+          fecha_fin.setHours(12, 0, 0, 0);
+
+          if (fecha_fin < hoy) continue;
+
+          const turnoData = await obtenerTurno(asignacion_turno.turno_id);
+          if (!turnoData) continue;
+
+          const diasLaborables = turnoData.dias_semana;
+          let fechaCursor = new Date(fecha_inicio);
+
+          let seguridad = 0;
+          while (fechaCursor <= fecha_fin && seguridad < 180) {
+            seguridad++;
+            if (cumpleDiasSemana(fechaCursor, diasLaborables)) {
+              const anio = fechaCursor.getFullYear();
+              const mes = String(fechaCursor.getMonth() + 1).padStart(2, "0");
+              const dia = String(fechaCursor.getDate()).padStart(2, "0");
+              const fechaLocalStr = `${anio}-${mes}-${dia}`;
+
+              const itemTurno = {
+                id: `${asignacion_turno.id || "t"}-${fechaLocalStr}`,
+                empresa_id: turnoData.empresa_id,
+                nombre: turnoData.nombre,
+                hora_inicio: turnoData.hora_inicio,
+                hora_fin: turnoData.hora_fin,
+                duracion_pausa_minutos: turnoData.duracion_pausa_minutos,
+                color_hex: turnoData.color_hex || "#2563EB",
+                dias_semana: diasLaborables,
+                created_at: turnoData.created_at || new Date().toISOString(),
+                fecha_real: fechaLocalStr,
+              } as Turno & { fecha_real: string };
+
+              turnos.push(itemTurno);
             }
-
-            const turno: ItemTurno = await obtenerTurno(
-              asignacion_turno.turno_id,
-            );
-
-            // Asumimos que el turno o asignación puede traer una cadena de días laborables (ej: "LMXJV")
-            const diasLaborables = (turno as ItemTurno).dias_semana || [
-              1, 2, 3, 4, 5,
-            ];
-
-            let fechaCursor = new Date(fecha_inicio);
-
-            // Recorremos los días de la asignación
-            while (fechaCursor <= fecha_fin) {
-              // FILTRO 2: Solo generar el turno si coincide con los días de la semana válidos (ej: Lunes a Viernes)
-              if (cumpleDiasSemana(fechaCursor, diasLaborables)) {
-                const fechaInstanteActual = new Date(fechaCursor);
-
-                const itemTurno: ItemTurno = {
-                  id: Crypto.randomUUID(),
-                  turno_id: turno.id,
-                  empresa_id: turno.empresa_id,
-                  nombre: fechaInstanteActual.toLocaleDateString("es-ES", {
-                    weekday: "long",
-                  }),
-                  hora_inicio: turno.hora_inicio,
-                  hora_fin: turno.hora_fin,
-                  duracion_pausa_minutos: turno.duracion_pausa_minutos,
-                  color_hex: turno.color_hex || "#2563EB",
-                  fecha_real: fechaInstanteActual.toISOString().split("T")[0],
-                  dias_semana: diasLaborables,
-                  tipo_jornada: turno.tipo_jornada,
-                  fecha_asignacion_inicio: turno.fecha_asignacion_inicio,
-                  fecha_asignacion_fin: turno.fecha_asignacion_fin,
-                };
-
-                turnos.push(itemTurno);
-              }
-
-              // Avanzar un día
-              fechaCursor.setDate(fechaCursor.getDate() + 1);
-            }
+            fechaCursor.setDate(fechaCursor.getDate() + 1);
           }
         }
 
         turnos.sort((a, b) => {
-          if (a.fecha_real !== b.fecha_real) {
-            return a.fecha_real.localeCompare(b.fecha_real);
+          const fechaA = (a as Turno & { fecha_real: string }).fecha_real || "";
+          const fechaB = (b as Turno & { fecha_real: string }).fecha_real || "";
+
+          if (fechaA !== fechaB) {
+            return fechaA.localeCompare(fechaB);
           }
           return a.hora_inicio.localeCompare(b.hora_inicio);
         });
 
-        setCuadrante(turnos);
-      } catch (error: any) {
+        if (isMounted) setCuadrante(turnos);
+      } catch (error: unknown) {
         const mensajeAmigable = obtenerMensajeAmigableError(error);
         if (Platform.OS === "web") {
-          alert(`Error de Sincronización: ${mensajeAmigable}`);
+          window.alert(`Error de Sincronización: ${mensajeAmigable}`);
         } else {
           Alert.alert("Error de Sincronización", mensajeAmigable);
         }
       } finally {
-        setCargando(false);
+        if (isMounted) setCargando(false);
       }
     };
 
-    if (usuarioActual?.trabajador_id) {
-      cargarPlanificacionYFichajes();
-    }
+    cargarPlanificacionYFichajes();
+
+    return () => {
+      isMounted = false;
+    };
   }, [usuarioActual]);
 
   return (
@@ -189,16 +204,12 @@ export default function HorariosScreen() {
         />
       ) : (
         <View style={{ gap: 12, paddingBottom: 20 }}>
-          {cuadrante.map((item) => {
-            const horaInicioTurno = item.hora_inicio.substring(0, 5);
-            const horaFinTurno = item.hora_fin.substring(0, 5);
-            const fechaRealStr = item.fecha_real;
-
-            const aMinutos = (horaStr: string) => {
-              const [h, m] = horaStr.split(":").map(Number);
-              return h * 60 + m;
-            };
-
+          {cuadrante.map((item: Turno) => {
+            const horaInicioTurno =
+              item.hora_inicio?.substring(0, 5) || "00:00";
+            const horaFinTurno = item.hora_fin?.substring(0, 5) || "00:00";
+            const fechaRealStr = (item as Turno & { fecha_real: string })
+              .fecha_real;
             const minInicio = aMinutos(horaInicioTurno);
             let minFin = aMinutos(horaFinTurno);
 
@@ -209,48 +220,16 @@ export default function HorariosScreen() {
             const limiteInferiorMins = minInicio - TOLERANCIA_MINS;
             const limiteSuperiorMins = minFin + TOLERANCIA_MINS;
 
-            const obtenerMinutosFichaje = (fechaHoraIso: string) => {
-              const partes = fechaHoraIso.split("T");
-              if (!partes[1]) return 0;
-              const horaLimpia = partes[1].substring(0, 5);
-              return aMinutos(horaLimpia);
-            };
-
-            // fichajesRealizados.forEach((f) => {
-            //   alert(
-            //     "Fichaje: " +
-            //       f.tipo_evento.toString() +
-            //       " Hora: " +
-            //       f.fecha_hora +
-            //       " Turno: " +
-            //       f.turno_nombre,
-            //   );
-            // });
-
             const marcajesDelDia = fichajesRealizados.filter((fichaje) => {
-              // alert("Estado del fichaje: " + fichaje.estado);
-              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0) {
-                // alert("No pasó");
+              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
                 return false;
-              }
               const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
-              if (fechaFichajeStr !== fechaRealStr) {
-                // alert(
-                //   "Fecha fichaje: " +
-                //     fechaFichajeStr +
-                //     " Fecha real: " +
-                //     fechaRealStr +
-                //     " No pasó",
-                // );
-                return false;
-              }
+              if (fechaFichajeStr !== fechaRealStr) return false;
 
               const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
-              // alert("Tipo de fichaje: " + tipoEventoStr);
-              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA") {
-                // alert("No pasó");
+              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA")
                 return false;
-              }
+
               let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
               if (esNocturno && minsFichaje < limiteInferiorMins) {
                 minsFichaje += 24 * 60;
@@ -261,8 +240,6 @@ export default function HorariosScreen() {
                 minsFichaje <= limiteSuperiorMins
               );
             });
-
-            // alert(fichajesRealizados.length);
 
             marcajesDelDia.sort(
               (a, b) =>
@@ -270,31 +247,33 @@ export default function HorariosScreen() {
                 new Date(b.fecha_hora).getTime(),
             );
 
-            const pausasDelDia = fichajesRealizados.filter((fichaje) => {
-              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
-                return false;
-              const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
-              if (fechaFichajeStr !== fechaRealStr) return false;
+            const pausasDelDia = fichajesRealizados.filter(
+              (fichaje: RegistroFichaje) => {
+                if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
+                  return false;
+                const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
+                if (fechaFichajeStr !== fechaRealStr) return false;
 
-              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
-              const esPausa =
-                fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
-                tipoEventoStr === "INICIO_PAUSA" ||
-                fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
-                tipoEventoStr === "FIN_PAUSA";
+                const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
+                const esPausa =
+                  fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
+                  tipoEventoStr === "INICIO_PAUSA" ||
+                  fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
+                  tipoEventoStr === "FIN_PAUSA";
 
-              if (!esPausa) return false;
+                if (!esPausa) return false;
 
-              let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
-              if (esNocturno && minsFichaje < limiteInferiorMins) {
-                minsFichaje += 24 * 60;
-              }
+                let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
+                if (esNocturno && minsFichaje < limiteInferiorMins) {
+                  minsFichaje += 24 * 60;
+                }
 
-              return (
-                minsFichaje >= limiteInferiorMins &&
-                minsFichaje <= limiteSuperiorMins
-              );
-            });
+                return (
+                  minsFichaje >= limiteInferiorMins &&
+                  minsFichaje <= limiteSuperiorMins
+                );
+              },
+            );
 
             let minutosConsumidos = 0;
             const pausasOrdenadas = [...pausasDelDia].sort(
@@ -304,7 +283,7 @@ export default function HorariosScreen() {
             );
 
             let marcaInicioPausa: number | null = null;
-            pausasOrdenadas.forEach((fichaje) => {
+            pausasOrdenadas.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
               const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
 
@@ -328,7 +307,7 @@ export default function HorariosScreen() {
             let minutosTrabajadosReales = 0;
             let marcaEntradaTurno: number | null = null;
 
-            marcajesDelDia.forEach((fichaje) => {
+            marcajesDelDia.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
               const esEntrada =
                 fichaje.tipo_evento === TipoFichaje.ENTRADA ||
@@ -354,19 +333,17 @@ export default function HorariosScreen() {
               minutosTeoricosTotales - (item?.duracion_pausa_minutos ?? 0),
             );
 
-            const formatearAHorasYMinutos = (
-              minutosTotales: number,
-            ): string => {
-              const hrs = Math.floor(minutosTotales / 60);
-              const mins = minutosTotales % 60;
-              return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-            };
-
             const textoTrabajadoReal = formatearAHorasYMinutos(
               minutosTrabajadosReales,
             );
             const textoTrabajadoTeorico =
               formatearAHorasYMinutos(minutosTeoricosNetos);
+
+            const [anioF, mesF, diaF] = fechaRealStr.split("-").map(Number);
+            const fechaObjetoLocal = new Date(anioF, mesF - 1, diaF, 12, 0, 0);
+            const diaSemanaIndex = fechaObjetoLocal.getDay();
+            const nombreDiaStr =
+              DIAS_SEMANA[diaSemanaIndex]?.toUpperCase() || "";
 
             return (
               <Card key={item.id}>
@@ -381,12 +358,10 @@ export default function HorariosScreen() {
                     <View style={styles.headerTarjeta}>
                       <View>
                         <ThemedText style={styles.nombreTurno}>
-                          {item?.nombre
-                            ? item.nombre.toUpperCase()
-                            : "Turno Sin Especificar"}
+                          {nombreDiaStr}
                         </ThemedText>
                         <ThemedText style={styles.fechaSubtexto}>
-                          {item.fecha_real}
+                          {fechaRealStr}
                         </ThemedText>
                       </View>
                       <View style={styles.badgeVigencia}>
@@ -400,7 +375,7 @@ export default function HorariosScreen() {
                       <View style={styles.itemHora}>
                         <IconSymbol name="schedule" size={16} color="#475569" />
                         <ThemedText style={styles.textoHoras}>
-                          {`${item.hora_inicio.substring(0, 5)} a ${item.hora_fin.substring(0, 5)}`}
+                          {`${horaInicioTurno} a ${horaFinTurno}`}
                         </ThemedText>
                       </View>
                       <ThemedText style={styles.textoPausa}>
@@ -514,7 +489,6 @@ export default function HorariosScreen() {
   );
 }
 
-// Conservamos tus estilos intactos abajo...
 const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,

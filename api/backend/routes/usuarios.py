@@ -3,16 +3,16 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
 from core.security import get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual
 from models.empresas import Empresas
 from schemas.usuarios import LoginRequest, UsuarioCreate, UsuarioRegisterCreate, UsuarioResponse
 from models.usuarios import Usuarios
 from models.trabajadores import Trabajadores
 from core.database import get_db
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends, status, HTTPException
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios y Autenticación"])
 
@@ -165,7 +165,7 @@ def login_plataforma(request: Request, credenciales: LoginRequest, db: Session =
     db.commit()
     db.refresh(usuario)
 
-    access_token = crear_token_acceso(data={"sub": str(usuario.id), "email": usuario.email})
+    access_token = crear_token_acceso(data={"sub": str(usuario.id), "id": usuario.email})
 
     return {
         "access_token": access_token,
@@ -190,6 +190,24 @@ def obtener_todos_los_usuarios(
         )
     return db.query(Usuarios).order_by(Usuarios.nombre.asc()).all()
 
+@router.post("/login-form")
+def login_para_swagger(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Swagger envía el email en el campo 'username' del formulario
+    user = db.query(Usuarios).filter(Usuarios.email == form_data.username).first()
+    
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Credenciales incorrectas"
+        )
+    
+    # Aquí generas tu token JWT con la misma lógica que usas en tu login normal
+    access_token = crear_token_acceso(data={"sub": user.email, "empresa_id": str(user.empresa_id)})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 @router.get("/{id_usuario}", response_model=UsuarioResponse)
 def obtener_usuario_por_id(

@@ -7,55 +7,25 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
+import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
+import { obtenerCentroTrabajo } from "../../centros-trabajo/api/services";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
+import { obtenerContratosTrabajador } from "../../contratos/api/services";
+import { Contrato } from "../../contratos/types/contrato";
 import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import {
-  obtenerAsignacionesTurnoTrabajador,
-  obtenerCentroTrabajo,
-  obtenerContratosTrabajador,
   obtenerEmpresasTrabajador,
   obtenerTrabajador,
-} from "../api/services";
-import { Trabajador, UsuarioSesion } from "../types/trabajador";
-
-interface ContratoLaboral {
-  id: string;
-  trabajador_id: string;
-  empresa_id: string;
-  centro_trabajo_id: string;
-  departamento_id: string | null;
-  tipo_contrato: string;
-  tipo_jornada: string;
-  horas_semana: number;
-  fecha_inicio: string;
-  fecha_fin: string | null;
-  puesto_trabajo: string | null;
-  categoria_profesional: string | null;
-  activo: boolean;
-}
-
-interface AsignacionTurno {
-  id: string;
-  empresa_id: string;
-  trabajador_id: string;
-  turno_id: string;
-  fecha_inicio: string;
-  fecha_fin: string | null;
-  turno?: {
-    id: string;
-    nombre: string;
-    hora_inicio: string;
-    hora_fin: string;
-    minutos_pausa_obligatoria: number;
-    color_hex: string;
-  } | null;
-}
+} from "../../trabajadores/api/services";
+import { Trabajador } from "../../trabajadores/types/trabajador";
+import { TipoUsuarioEnum, UsuarioResponse } from "../../usuarios/types/usuario";
 
 interface SesionContextValue {
   // 1. IDENTIDAD Y CONTROL DE ACCESO
-  usuarioActual: UsuarioSesion | null;
-  setUsuarioActual: (usuario: UsuarioSesion | null) => void;
+  usuarioActual: UsuarioResponse | null;
+  setUsuarioActual: (usuario: UsuarioResponse | null) => void;
   empresas: Empresa[];
   setEmpresas: (empresas: Empresa[]) => void;
   empresaSeleccionada: Empresa | null;
@@ -64,7 +34,7 @@ interface SesionContextValue {
 
   // 2. EXPEDIENTE LABORAL COMPUESTO Y SELECCIÓN DE ENTORNO
   trabajadorActual: Trabajador | null;
-  contratoActual: ContratoLaboral | null;
+  contratoActual: Contrato | null;
   turnoActual: AsignacionTurno | null;
   centroTrabajoActual: CentroTrabajo | null;
   setCentroTrabajoActual: (centro: CentroTrabajo | null) => void;
@@ -72,7 +42,7 @@ interface SesionContextValue {
   // 3. PROPIEDADES DIRECTAS CALCULADAS
   centroTrabajoId: string | null;
   departamentoId: string | null;
-  rolUsuario: string | null;
+  rolUsuario: TipoUsuarioEnum | null;
 
   // 4. CONTROL DE ASINCRONÍA
   cargandoSesionLocal: boolean;
@@ -86,7 +56,7 @@ const STORAGE_KEY_SELECCIONADA = "@fichapp_empresa_seleccionada";
 const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado";
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
-  const [usuarioActual, setUsuarioActual] = useState<UsuarioSesion | null>(
+  const [usuarioActual, setUsuarioActual] = useState<UsuarioResponse | null>(
     null,
   );
   const [empresaSeleccionada, setEmpresaSeleccionada] =
@@ -95,9 +65,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [trabajadorActual, setTrabajadorActual] = useState<Trabajador | null>(
     null,
   );
-  const [contratoActual, setContratoActual] = useState<ContratoLaboral | null>(
-    null,
-  );
+  const [contratoActual, setContratoActual] = useState<Contrato | null>(null);
   const [turnoActual, setTurnoActual] = useState<AsignacionTurno | null>(null);
   const [centroTrabajoActual, setCentroTrabajoActual] =
     useState<CentroTrabajo | null>(null);
@@ -138,58 +106,79 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   // ====================================================================
-  // MOTOR 2: SELECCIÓN AUTOMÁTICA DE TENANT Y RESOLUCIÓN EN CASCADA
+  // MOTOR 2: RESOLUCIÓN DE EMPRESAS AL CAMBIAR DE USUARIO (LOGIN / LOGOUT)
   // ====================================================================
   useEffect(() => {
-    if (cargandoSesionLocal || !usuarioActual || empresaSeleccionada) return;
+    if (cargandoSesionLocal) return;
 
-    async function inicializarEmpresaSeleccionada() {
-      const usuario = usuarioActual;
-      if (!usuario) return;
+    async function inicializarEntornoUsuario() {
+      if (!usuarioActual) {
+        // Limpieza si no hay usuario
+        setEmpresas([]);
+        setEmpresaSeleccionada(null);
+        setTrabajadorActual(null);
+        setContratoActual(null);
+        setTurnoActual(null);
+        setCentroTrabajoActual(null);
+        return;
+      }
 
       try {
-        if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
-          const empresa = await obtenerEmpresa(usuario.empresa_id);
+        // 1. Administrador de Empresa
+        if (
+          usuarioActual.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA &&
+          usuarioActual.empresa_id
+        ) {
+          const empresa = await obtenerEmpresa(usuarioActual.empresa_id);
           setEmpresas([empresa]);
           setEmpresaSeleccionada(empresa);
           return;
         }
 
-        if (usuario.tipo_usuario === "Admin_gestoría") {
+        // 2. Administrador de Gestoría (Carga todas las empresas)
+        if (usuarioActual.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA) {
           const todasLasEmpresas = await obtenerEmpresas();
           setEmpresas(todasLasEmpresas);
-          if (todasLasEmpresas.length > 0) {
+          if (todasLasEmpresas.length > 0 && !empresaSeleccionada) {
             setEmpresaSeleccionada(todasLasEmpresas[0]);
           }
           return;
         }
 
-        if (usuario.trabajador_id) {
+        // 3. Trabajador estándar
+        if (usuarioActual.trabajador_id) {
+          const token = await AsyncStorage.getItem("user_token");
           const empresasTrabajador = await obtenerEmpresasTrabajador(
-            usuario.trabajador_id,
+            usuarioActual.trabajador_id,
+            token || "",
           );
           setEmpresas(empresasTrabajador);
-          if (empresasTrabajador.length > 0) {
+          if (empresasTrabajador.length > 0 && !empresaSeleccionada) {
             setEmpresaSeleccionada(empresasTrabajador[0]);
           }
         }
       } catch (error) {
-        console.error("Error al inicializar la empresa seleccionada:", error);
+        console.error("Error al inicializar las empresas del usuario:", error);
       }
     }
 
-    inicializarEmpresaSeleccionada();
-  }, [usuarioActual, empresaSeleccionada, cargandoSesionLocal]);
+    inicializarEntornoUsuario();
+  }, [usuarioActual, cargandoSesionLocal]);
 
+  // ====================================================================
+  // MOTOR 3: CARGA DE EXPEDIENTE LABORAL (CUANDO HAY USUARIO Y EMPRESA)
+  // ====================================================================
   useEffect(() => {
     if (cargandoSesionLocal) return;
 
     async function cargarFichaLaboralCompuesta() {
       if (!usuarioActual?.trabajador_id || !empresaSeleccionada?.id) {
-        setTrabajadorActual(null);
-        setContratoActual(null);
-        setTurnoActual(null);
-        setCentroTrabajoActual(null);
+        // Si es un admin, no tiene trabajador_id, limpiamos campos de trabajador
+        if (!usuarioActual?.trabajador_id) {
+          setTrabajadorActual(null);
+          setContratoActual(null);
+          setTurnoActual(null);
+        }
         return;
       }
 
@@ -204,36 +193,32 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         setTrabajadorActual(datosTrabajador);
 
         const contratoVigente = listaContratos.find(
-          (c: ContratoLaboral) =>
+          (c: Contrato) =>
             c.activo === true && c.empresa_id === empresaSeleccionada.id,
         );
         setContratoActual(contratoVigente ?? null);
 
         if (contratoVigente?.centro_trabajo_id) {
-          if (
-            !centroTrabajoActual ||
-            centroTrabajoActual.empresa_id !== empresaSeleccionada.id
-          ) {
-            try {
-              const datosCentro = await obtenerCentroTrabajo(
-                contratoVigente.centro_trabajo_id,
-              );
-              setCentroTrabajoActual(datosCentro);
-            } catch (errCentro) {
-              console.error(
-                "Error al resolver el objeto Centro de Trabajo:",
-                errCentro,
-              );
-              setCentroTrabajoActual(null);
-            }
+          try {
+            const datosCentro = await obtenerCentroTrabajo(
+              contratoVigente.centro_trabajo_id,
+            );
+            setCentroTrabajoActual(datosCentro);
+          } catch (errCentro) {
+            console.error(
+              "Error al resolver el objeto Centro de Trabajo:",
+              errCentro,
+            );
+            setCentroTrabajoActual(null);
           }
-        } else if (!centroTrabajoActual) {
+        } else {
           setCentroTrabajoActual(null);
         }
 
         const hoyStr = new Date().toISOString().split("T")[0];
         const turnoVigente = listaTurnos.find((t: AsignacionTurno) => {
-          const coincideFiltro = t.empresa_id === empresaSeleccionada.id;
+          const coincideFiltro =
+            (t as any).empresa_id === empresaSeleccionada.id;
           const esPosteriorInicio = t.fecha_inicio <= hoyStr;
           const esAnteriorFin = !t.fecha_fin || t.fecha_fin >= hoyStr;
           return coincideFiltro && esPosteriorInicio && esAnteriorFin;
@@ -241,21 +226,24 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         setTurnoActual(turnoVigente ?? null);
       } catch (error) {
         console.error(
-          "Error en la sincronización en cascada de PostgreSQL:",
+          "Error en la sincronización del expediente laboral:",
           error,
         );
         setTrabajadorActual(null);
         setContratoActual(null);
         setTurnoActual(null);
-        setCentroTrabajoActual(null);
       }
     }
 
     cargarFichaLaboralCompuesta();
-  }, [usuarioActual, empresaSeleccionada, cargandoSesionLocal]);
+  }, [
+    usuarioActual?.trabajador_id,
+    empresaSeleccionada?.id,
+    cargandoSesionLocal,
+  ]);
 
   // ====================================================================
-  // MOTOR 3: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO (CORREGIDO)
+  // MOTOR 4: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO
   // ====================================================================
   useEffect(() => {
     if (cargandoSesionLocal) return;
@@ -290,7 +278,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
           }
         } else {
-          // Limpieza total en caso de Logout
           await Promise.all([
             AsyncStorage.removeItem(STORAGE_KEY_USUARIO),
             AsyncStorage.removeItem(STORAGE_KEY_EMPRESAS),

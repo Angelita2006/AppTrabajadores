@@ -71,16 +71,19 @@ def obtener_usuario_actual(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id_raw = payload.get("sub")
-        if not isinstance(user_id_raw, str):
+        user_email_raw = payload.get("sub")
+        if not isinstance(user_email_raw, str):
             raise credentials_exception
-        user_id: str = user_id_raw
+        user_id: str = user_email_raw
         if user_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-        
-    usuario = db.query(Usuarios).filter(Usuarios.id == user_id).first()
+
+    if user_id.__contains__("@"): 
+        usuario = db.query(Usuarios).filter(Usuarios.email == user_id).first()
+    else:
+        usuario = db.query(Usuarios).filter(Usuarios.id == user_id).first()    
     if usuario is None or not usuario.activo:
         raise credentials_exception
         

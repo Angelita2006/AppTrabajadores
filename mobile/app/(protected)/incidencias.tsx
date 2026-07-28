@@ -1,3 +1,10 @@
+import {
+  obtenerCorreccionesPorEmpresa,
+  obtenerIncidenciasTrabajador,
+  resolverSolicitudCorreccion,
+  solicitarCorreccionHoraria,
+} from "@/src/modules/correcciones-fichaje/api/services";
+import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
@@ -7,22 +14,15 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
-  View
+  View,
 } from "react-native";
 import {
   EstadoCorreccion,
   IncidenciaCreateRequest,
   IncidenciaResponse,
   TipoCorreccion,
-} from "../../src/modules/correcciones-fichaje/types/incidencia";
-import {
-  obtenerCorreccionesPorEmpresa,
-  obtenerFichajesSemanaActual,
-  obtenerIncidenciasTrabajador,
-  resolverSolicitudCorreccion,
-  solicitarCorreccionHoraria,
-} from "../../src/modules/trabajadores/api/services";
-import { useSesion } from "../../src/modules/trabajadores/store/SesionContext";
+} from "../../src/modules/correcciones-fichaje/types/correccion";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -48,10 +48,10 @@ export default function IncidenciasScreen() {
   const [fechaAfectada, setFechaAfectada] = useState("2026-06-29");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
 
-  // CORRECCIÓN 1: Forzamos string plano "ENTRADA" desde el inicio
   const [eventoSolitado, setEventoSolicitado] = useState<string>("ENTRADA");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
+
   const esAdmin = useMemo(() => {
     return (
       usuarioActual?.tipo_usuario === "Admin_empresa" ||
@@ -99,7 +99,6 @@ export default function IncidenciasScreen() {
           if (!fichaje || !fichaje.estado) return false;
 
           const estadoFichajeApi = fichaje.estado.toString();
-
           const esValido = estadoFichajeApi === "Válido";
           if (!esValido) return false;
 
@@ -169,20 +168,31 @@ export default function IncidenciasScreen() {
       return;
     }
 
+    // Validación extra para asegurarnos que hay fecha y hora si no es anulación
+    if (tipoCorreccion !== "Anulación") {
+      if (!fechaAfectada.trim() || !horaRealPropuesta.trim()) {
+        alert("Debes indicar la fecha del descuadre y la hora propuesta.");
+        return;
+      }
+    }
+
     try {
       setCargando(true);
+
+      const idTrabajadorEfectivo =
+        trabajadorActual?.id || usuarioActual?.trabajador_id;
       if (
         !usuarioActual?.id ||
-        !usuarioActual?.trabajador_id ||
-        !empresaSeleccionada?.id
+        !empresaSeleccionada?.id ||
+        !idTrabajadorEfectivo
       ) {
-        alert("Expediente corporativo incompleto.");
+        alert("Expediente corporativo incompleto o faltan datos de sesión.");
         return;
       }
 
       const payload: IncidenciaCreateRequest = {
         empresa_id: empresaSeleccionada.id,
-        trabajador_id: usuarioActual.trabajador_id,
+        trabajador_id: idTrabajadorEfectivo,
         tipo_correccion: tipoCorreccion,
         solicitado_por_usuario_id: usuarioActual.id,
         motivo: comentario.trim(),
@@ -198,16 +208,17 @@ export default function IncidenciasScreen() {
             : {},
         valor_anterior:
           tipoCorreccion === "Modificación" || tipoCorreccion === "Anulación"
-            ? { hora_anterior: horaAnterior.trim() }
+            ? { hora_anterior: horaAnterior ? horaAnterior.trim() : "00:00" }
             : null,
       };
 
       const respuestaBackend = await solicitarCorreccionHoraria(payload);
       setIncidencias((prev) => [respuestaBackend, ...prev]);
+
+      // Limpieza de formulario
       setComentario("");
       setFichajeAfectadoId("");
       setHoraAnterior("");
-      alert("La solicitud ha sido registrada correctamente.");
     } catch (error: any) {
       alert(obtenerMensajeAmigableError(error));
     } finally {
@@ -222,6 +233,7 @@ export default function IncidenciasScreen() {
     eventoSolitado,
     horaAnterior,
     usuarioActual,
+    trabajadorActual,
     empresaSeleccionada,
   ]);
 
@@ -239,8 +251,6 @@ export default function IncidenciasScreen() {
         setIncidencias((prev) =>
           prev.map((item) => (item.id === idCorreccion ? resuelta : item)),
         );
-
-        alert(`La incidencia ha sido marcada como ${decision}.`);
       } catch (error: any) {
         alert(obtenerMensajeAmigableError(error));
       } finally {
@@ -387,7 +397,6 @@ export default function IncidenciasScreen() {
 
                   <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
                   <View style={styles.selectorTipos}>
-                    {/* CORRECCIÓN 4: Iteramos un array de strings puros estáticos */}
                     {["ENTRADA", "SALIDA"].map((evento) => (
                       <Pressable
                         key={evento}
@@ -482,7 +491,6 @@ export default function IncidenciasScreen() {
             const fechaD = item.valor_nuevo?.fecha_descuadre;
             const horaP = item.valor_nuevo?.hora_propuesta;
 
-            // CORRECCIÓN 5: Aseguramos fallback seguro por si viene vacío desde la base de datos
             const eventoS = item.valor_nuevo?.evento_solicitado
               ? item.valor_nuevo.evento_solicitado.toString().toUpperCase()
               : "N/A";
