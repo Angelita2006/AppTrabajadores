@@ -28,6 +28,10 @@ class Usuarios(Base):
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, comment='NULL para usuarios de la gestoría con acceso potencial a varias empresas (ámbito real definido en usuarios_roles).')
     trabajador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     ultimo_acceso: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    
+    # Nuevos campos para el código de recuperación
+    codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    codigo_expira_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True)
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios') # type: ignore
     trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', back_populates='usuarios') # type: ignore

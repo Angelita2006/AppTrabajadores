@@ -83,6 +83,7 @@ export default function IncidenciasScreen() {
         );
         setIncidencias(datosGlobales);
       } else {
+        if (!usuarioActual) return;
         if (!trabajadorActual?.id) return;
 
         const [datosPersonales, listaFichajesRaw] = await Promise.all([

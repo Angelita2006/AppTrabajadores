@@ -1,5 +1,5 @@
 {
-  "name": "apptrabajadores",
+  "name": "Fichapp",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -36,7 +36,6 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
-    "expo-observe": "^57.0.8",
     "expo-print": "~15.0.8",
     "expo-router": "~6.0.24",
     "expo-sharing": "~14.0.8",

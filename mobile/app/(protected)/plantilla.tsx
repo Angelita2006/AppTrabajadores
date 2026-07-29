@@ -214,6 +214,7 @@ function PlantillaScreen() {
   const cerrarModales = () => {
     setModalActivo(null);
     setTrabajadorSeleccionado(null);
+
     setNombre("");
     setApellidos("");
     setNifNie("");
@@ -221,8 +222,16 @@ function PlantillaScreen() {
     setTelefono("");
     setNss("");
     setFechaNacimiento("");
+
     setTipoContrato("");
+    setTipoJornada("");
+    setHorasSemana("");
+    setFechaInicio("");
+    setFechaFin("");
+    setPuestoTrabajo("");
+    setCategoriaProfesional("");
     setCentroTrabajoId("");
+    setDepartamentoId("");
   };
 
   const handleAltaTrabajadorCompleta = async () => {
@@ -357,6 +366,7 @@ function PlantillaScreen() {
       setProcesando(false);
     }
   };
+
   const prepararReasignarTurno = async (trabajador: Trabajador) => {
     try {
       setCargandoSelectores(true);
@@ -498,6 +508,25 @@ function PlantillaScreen() {
     }
   };
 
+  const handleRescindirContrato = async () => {
+    if (!trabajadorSeleccionado) return;
+
+    try {
+      setProcesando(true);
+
+      await rescindirContratoActivoTrabajador(
+        trabajadorSeleccionado.id,
+        trabajadorSeleccionado.empresa_id,
+      );
+      await cargarPlantilla();
+      cerrarModales();
+    } catch (err: any) {
+      alert(obtenerMensajeAmigableError(err));
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   const handleTramitarBajaTotal = async () => {
     if (!trabajadorSeleccionado) return;
 
@@ -591,7 +620,7 @@ function PlantillaScreen() {
                   setModalActivo={setModalActivo}
                   styles={styles}
                   abrirEdicionContrato={() => abrirEdicionContrato(item)}
-                  handleGuardarContrato={() => handleGuardarContrato}
+                  handleGuardarContrato={handleGuardarContrato}
                   handleAsignarTurnoTrabajador={() => {
                     manejarClicReasignar(item);
                   }}
@@ -622,7 +651,7 @@ function PlantillaScreen() {
                 {modalActivo === "asignar_turno" && "Asignar Turno de Trabajo"}
                 {modalActivo === "reasignar_turno" &&
                   "Reasignar Turno (Modificación)"}
-                {modalActivo === "eliminar_turno" && "Quitar Turno Asignado"}
+                {modalActivo === "eliminar_turno" && "Quitar Turno Asignedo"}
               </ThemedText>
               <Pressable onPress={cerrarModales}>
                 <FontAwesome5 name="times" size={18} color="#64748B" />
@@ -876,15 +905,18 @@ function PlantillaScreen() {
                     />
                   </View>
 
-                  {/* Selector de Centro de Trabajo */}
+                  {/* Selector de Centro de Trabajo (Sin ScrollView anidado conflictivo) */}
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
                       Centro de Trabajo *
                     </ThemedText>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={{ marginTop: 5 }}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: 5,
+                      }}
                     >
                       {listaCentros.map((centro: CentroTrabajo) => (
                         <Pressable
@@ -907,18 +939,21 @@ function PlantillaScreen() {
                           </ThemedText>
                         </Pressable>
                       ))}
-                    </ScrollView>
+                    </View>
                   </View>
 
-                  {/* Selector de Departamento */}
+                  {/* Selector de Departamento (Sin ScrollView anidado conflictivo) */}
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
                       Departamento
                     </ThemedText>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={{ marginTop: 5 }}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: 5,
+                      }}
                     >
                       {listaDepartamentos.map((depto: Departamento) => (
                         <Pressable
@@ -941,14 +976,14 @@ function PlantillaScreen() {
                           </ThemedText>
                         </Pressable>
                       ))}
-                    </ScrollView>
+                    </View>
                   </View>
 
                   <Pressable
                     ref={botonGuardarContratoRef}
                     style={styles.btnGuardarModal}
                     onPress={
-                      modalActivo == "editar_contrato"
+                      modalActivo === "editar_contrato"
                         ? handleEditarContrato
                         : handleGuardarContrato
                     }
@@ -959,7 +994,7 @@ function PlantillaScreen() {
                     <ThemedText style={styles.btnGuardarModalTexto}>
                       {procesando
                         ? "Procesando..."
-                        : modalActivo == "editar_contrato"
+                        : modalActivo === "editar_contrato"
                           ? "Confirmar cambios"
                           : "Formalizar Contrato"}
                     </ThemedText>
@@ -1005,23 +1040,13 @@ function PlantillaScreen() {
                     onPress={() => {
                       if (trabajadorSeleccionado?.activo) {
                         if (modalActivo === "rescindir_contrato") {
-                          handleTramitarBajaTotal();
+                          handleRescindirContrato?.();
                         } else {
                           handleTramitarBajaTotal();
                         }
                       } else {
                         handleReactivarTrabajador();
                       }
-                    }}
-                    onLayout={() => {
-                      // Enfocar automáticamente el botón según corresponda al abrir el modal
-                      setTimeout(() => {
-                        if (modalActivo === "rescindir_contrato") {
-                          botonRescindirContratoRef.current?.focus?.();
-                        } else {
-                          botonConfirmarBajaRef.current?.focus?.();
-                        }
-                      }, 100);
                     }}
                     disabled={procesando}
                     accessible={true}
@@ -1031,13 +1056,11 @@ function PlantillaScreen() {
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <ThemedText style={styles.btnGuardarModalTexto}>
-                        {procesando
-                          ? "Procesando..."
-                          : modalActivo === "rescindir_contrato"
-                            ? "Confirmar Rescisión"
-                            : trabajadorSeleccionado?.activo
-                              ? "Confirmar Baja"
-                              : "Confirmar Reactivación"}
+                        {modalActivo === "rescindir_contrato"
+                          ? "Confirmar Rescisión"
+                          : trabajadorSeleccionado?.activo
+                            ? "Confirmar Baja"
+                            : "Confirmar Reactivación"}
                       </ThemedText>
                     )}
                   </Pressable>
@@ -1087,7 +1110,7 @@ function PlantillaScreen() {
                   <View style={styles.campoForm}>
                     <ThemedText style={styles.labelForm}>
                       {modalActivo === "reasignar_turno"
-                        ? "Seleccione los Nuevos Turnos *"
+                        ? "Seleccione los Turnos *"
                         : "Turnos de la Empresa *"}
                     </ThemedText>
 
@@ -1199,12 +1222,6 @@ function PlantillaScreen() {
                       { backgroundColor: "#EA580C" },
                     ]}
                     onPress={handleEliminarTurnos}
-                    onLayout={() => {
-                      // Enfocar automáticamente al abrir el modal de eliminar turnos
-                      setTimeout(() => {
-                        botonConfirmarEliminarTurnoRef.current?.focus?.();
-                      }, 100);
-                    }}
                     disabled={procesando}
                     accessible={true}
                     accessibilityRole="button"

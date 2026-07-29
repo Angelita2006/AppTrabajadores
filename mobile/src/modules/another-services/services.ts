@@ -68,7 +68,7 @@ export const registrarOrganizacionCompleta = async (
 /**
  * Envía una solicitud al servidor para validar el email y despachar el token de restauración.
  */
-export const solicitarTokenRecuperacion = async (
+export const solicitarCodigoRecuperacion = async (
   email: string,
 ): Promise<any> => {
   const respuesta = await api.post("/api/auth/recuperar-password", { email });
@@ -80,8 +80,8 @@ export const solicitarTokenRecuperacion = async (
  */
 export const confirmarCambioPassword = async (data: {
   email: string;
-  token_verificacion: string;
-  nuevo_password: string;
+  codigo_verificacion: string;
+  nueva_password: string;
 }): Promise<any> => {
   const respuesta = await api.post("/api/auth/confirmar-password", data);
   return respuesta.data;

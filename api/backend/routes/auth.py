@@ -9,45 +9,41 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from schemas.auth import ConfirmarPasswordRequest, EmailRecuperacionRequest
 from core.database import get_db
-from core.security import get_password_hash, obtener_usuario_actual
+from core.security import get_password_hash
 from models.usuarios import Usuarios
 from core.config import settings
+import random
+from datetime import timedelta, timezone
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 # Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
-# Configuración de correo (idealmente cárgalo desde os.getenv o tu archivo de configuración)
-# SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+# Configuración de correo
 SMTP_SERVER = settings.SMTP_SERVER
-# SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_PORT = settings.SMTP_PORT
-# SMTP_USER = os.getenv("SMTP_USER", "tu_correo@gmail.com")
 SMTP_USER = settings.SMTP_USER
-# SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "tu_password_o_token_de_aplicacion")
 SMTP_PASSWORD = settings.SMTP_PASSWORD
-# EMAILS_FROM = os.getenv("EMAILS_FROM", "no-reply@fichapp.com")
 EMAILS_FROM = settings.EMAILS_FROM
 
-def enviar_correo_recuperacion(destinatario: str, token: str):
+def enviar_correo_recuperacion(destinatario: str, codigo: str):
     """Función auxiliar para enviar el correo mediante SMTP"""
     try:
         mensaje = MIMEMultipart("alternative")
-        mensaje["Subject"] = "Código de recuperación de contraseña - FichApp"
+        mensaje.add_header("Subject", "Código de recuperación de contraseña - FichApp")
         mensaje["From"] = EMAILS_FROM
         mensaje["To"] = destinatario
 
-        # Cuerpo del mensaje en HTML / Texto plano
         html = f"""
         <html>
           <body style="font-family: Arial, sans-serif; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 5px;">
               <h2 style="color: #2563EB;">Recuperación de Contraseña</h2>
-              <p>Has solicitado restablecer tu contraseña en <strong>FichApp</strong>.</p>
+              <p>Has solicitado restablecer tu contraseña en <strong>Fichapp</strong>.</p>
               <p>Tu código de verificación de 6 dígitos es:</p>
               <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1f2937; border-radius: 4px;">
-                {token}
+                {codigo}
               </div>
               <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
             </div>
@@ -55,9 +51,8 @@ def enviar_correo_recuperacion(destinatario: str, token: str):
         </html>
         """
 
-        mensaje.attach(MIMEText(html, "html"))
+        mensaje.attach(MIMEText(html, "html", "utf-8"))
 
-        # Conexión y envío con el servidor SMTP
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
             servidor.starttls()
             servidor.login(SMTP_USER, SMTP_PASSWORD)
@@ -70,7 +65,6 @@ def enviar_correo_recuperacion(destinatario: str, token: str):
             detail="No se pudo enviar el correo electrónico de recuperación. Inténtalo más tarde."
         )
 
-
 @router.post("/recuperar-password", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
 def solicitar_recuperacion_password(
@@ -80,30 +74,39 @@ def solicitar_recuperacion_password(
 ):
     """
     URI: POST /api/auth/recuperar-password
-    Valida el correo en PostgreSQL y envía el token seguro mediante correo electrónico.
+    Valida el correo en PostgreSQL, genera un código aleatorio de 6 dígitos y lo guarda en la BD.
     """
-    # 1. Verificamos si la cuenta existe en el SaaS para mitigar ataques de enumeración
     usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
     if not usuario:
-        # Por seguridad frente a enumeración, muchas veces se retorna 200 igual, 
-        # pero mantenemos tu validación de 404 si así lo requiere tu lógica de negocio.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No consta ninguna cuenta registrada con esa dirección de correo electrónico."
         )
 
-    # 2. Generación del token temporal (Fijado a '123456' o dinámico si prefieres)
-    token_simulado = "123456"
+    # 1. Generación del código aleatorio real de 6 dígitos
+    codigo_aleatorio = f"{random.randint(0, 999999):06d}"
 
-    # 3. ENVÍO REAL DEL CORREO ELECTRÓNICO
-    enviar_correo_recuperacion(usuario.email, token_simulado)
+    # 2. Guardar el código y su expiración (15 minutos con zona horaria UTC)
+    try:
+        usuario.codigo_recuperacion = codigo_aleatorio
+        usuario.codigo_expira_at = datetime.datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    # Retornamos un mensaje de éxito genérico para confirmar que Axios reciba HTTP 200
+        db.add(usuario)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al procesar la solicitud de recuperación."
+        )
+
+    # 3. Envío real del correo electrónico
+    enviar_correo_recuperacion(usuario.email, codigo_aleatorio)
+
     return {
         "status": "success",
         "message": "Se ha enviado un código de verificación a tu correo electrónico."
     }
-
 
 @router.post("/confirmar-password", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
@@ -114,9 +117,8 @@ def confirmar_password(
 ):
     """
     URI: POST /api/auth/confirmar-password
-    Consolida el cambio definitivo de clave validando el token de 6 dígitos.
+    Valida el código de recuperación persistido en la BD y actualiza la contraseña.
     """
-    # 1. Buscar al usuario
     usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
     if not usuario:
         raise HTTPException(
@@ -124,27 +126,34 @@ def confirmar_password(
             detail="El usuario especificado no existe."
         )
 
-    # 2. Validación del Token
-    token_valido = getattr(usuario, 'token_recuperacion', '123456') or '123456'
-    
-    if payload.token_verificacion != token_valido:
+    # 1. Validación estricta del código registrado
+    if not usuario.codigo_recuperacion or payload.codigo_verificacion != usuario.codigo_recuperacion:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El token de 6 dígitos introducido es incorrecto o ha expirado."
+            detail="El código de verificación introducido es incorrecto."
+        )
+
+    # 2. Validar si el código ha expirado (comparando ambos con zona horaria UTC)
+    if usuario.codigo_expira_at and datetime.datetime.now(timezone.utc) > usuario.codigo_expira_at:
+        usuario.codigo_recuperacion = None
+        usuario.codigo_expira_at = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación ha expirado. Solicita uno nuevo."
         )
 
     # 3. Hashear la nueva contraseña y actualizar el registro del usuario
     try:
-        usuario.password_hash = get_password_hash(payload.nuevo_password)
+        usuario.password_hash = get_password_hash(payload.nueva_password)
         
-        # Limpiamos el token consumido para evitar reutilizaciones
-        if hasattr(usuario, 'token_recuperacion'):
-            usuario.token_recuperacion = None
-            usuario.token_expira_at = None
+        # Limpiamos los campos de recuperación consumidos
+        usuario.codigo_recuperacion = None
+        usuario.codigo_expira_at = None
             
-        # Actualizamos también la fecha de modificación que usa tu modelo
+        # Actualizamos la fecha de modificación con UTC
         if hasattr(usuario, 'updated_at'):
-            usuario.updated_at = datetime.datetime.now()
+            usuario.updated_at = datetime.datetime.now(timezone.utc)
             
         db.add(usuario) 
         db.commit()

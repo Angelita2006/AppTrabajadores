@@ -65,6 +65,9 @@ def registrar_trabajador(
         nombre=obj_in.nombre,
         apellidos=obj_in.apellidos,
         email=obj_in.email,
+        telefono=obj_in.telefono,
+        numero_seguridad_social=obj_in.numero_seguridad_social,
+        fecha_nacimiento=obj_in.fecha_nacimiento
     )
     
     db.add(nuevo_trabajador)
@@ -277,6 +280,8 @@ def asignar_turnos_trabajador(
             nueva_asignacion = AsignacionesTurno(
                 trabajador_id=id_trabajador,
                 turno_id=turno_id,
+                fecha_inicio=obj_in.fecha_inicio, 
+                fecha_fin=obj_in.fecha_fin,
             )
             db.add(nueva_asignacion)
             nuevas_asignaciones.append(nueva_asignacion)

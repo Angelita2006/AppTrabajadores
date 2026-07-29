@@ -140,21 +140,25 @@ def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Sessi
 
 
 @router.post("/login")
-@limiter.limit("5/minute")  # Protegido estrictamente contra ataques de fuerza bruta
+@limiter.limit("5/minute")
 def login_plataforma(request: Request, credenciales: LoginRequest, db: Session = Depends(get_db)):
-    """
-    URI: POST /api/usuarios/login
-    Valida el correo y la contraseña exclusivamente mediante hash seguro, 
-    actualiza el último acceso y emite un token JWT Bearer.
-    """
     usuario = db.query(Usuarios).filter(Usuarios.email == credenciales.email).first()
 
-    if not usuario or not verify_password(credenciales.password, str(usuario.password_hash)):
+    # 1. Si el usuario no existe
+    if not usuario:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El correo electrónico o la contraseña introducidos son incorrectos."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No hay ningún usuario registrado con ese correo electrónico."
         )
 
+    # 2. Si la contraseña es incorrecta
+    if not verify_password(credenciales.password, str(usuario.password_hash)):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="La contraseña introducida es incorrecta."
+        )
+
+    # 3. Si la cuenta está desactivada
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

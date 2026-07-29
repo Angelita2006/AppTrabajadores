@@ -16,14 +16,12 @@ export const FichaTrabajador = ({
   setModalActivo,
   styles,
   abrirEdicionContrato,
-  handleGuardarContrato,
   handleAsignarTurnoTrabajador,
   prepararAsignarTurno,
 }: any) => {
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
     [],
   );
-
   const [turnos, setTurnos] = useState<Turno[]>([]);
 
   useEffect(() => {
@@ -39,7 +37,6 @@ export const FichaTrabajador = ({
         // Filtramos las asignaciones para sacar sólo las vigentes
         const asignacionesFiltradas = asignaciones.filter((at) => {
           const fechaInicio = new Date(at.fecha_inicio).getTime();
-          // si no tiene fecha de fin, la fecha de fin es la fecha de hoy
           let fechaFin = hoyTime;
           if (at.fecha_fin !== null && at.fecha_fin !== undefined)
             fechaFin = new Date(at.fecha_fin).getTime();
@@ -53,9 +50,7 @@ export const FichaTrabajador = ({
           (at: AsignacionTurno) => obtenerTurno(at.turno_id),
         );
 
-        // Esperamos a que todas las peticiones terminen
         const turnosObtenidos = await Promise.all(promesasTurnos);
-
         setTurnos(turnosObtenidos);
       } catch (error) {
         console.error("Error cargando turnos:", error);
@@ -68,11 +63,6 @@ export const FichaTrabajador = ({
   }, [trabajadorId]);
 
   const contratoActivoDelTrabajador: Contrato = item.contratoActivo;
-
-  const handleAccion = (tipoModal: string) => {
-    onSeleccionarTrabajador(item);
-    setModalActivo(tipoModal);
-  };
 
   return (
     <Card>
@@ -177,7 +167,8 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#EFF6FF" },
                     ]}
                     onPress={() => {
-                      handleAccion("editar_contrato");
+                      onSeleccionarTrabajador(item);
+                      setModalActivo("editar_contrato");
                       abrirEdicionContrato();
                     }}
                   >
@@ -198,7 +189,10 @@ export const FichaTrabajador = ({
                       styles.botonAccionSecundario,
                       { backgroundColor: "#FEF2F2" },
                     ]}
-                    onPress={() => handleAccion("rescindir_contrato")}
+                    onPress={() => {
+                      onSeleccionarTrabajador(item);
+                      setModalActivo("rescindir_contrato");
+                    }}
                   >
                     <FontAwesome5
                       name="file-signature"
@@ -224,8 +218,8 @@ export const FichaTrabajador = ({
                     { backgroundColor: "#2563EB" },
                   ]}
                   onPress={() => {
-                    handleAccion("nuevo_contrato");
-                    handleGuardarContrato();
+                    onSeleccionarTrabajador(item);
+                    setModalActivo("nuevo_contrato");
                   }}
                 >
                   <FontAwesome5 name="plus" size={10} color="#FFFFFF" />
@@ -283,7 +277,8 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#FDF4FF" },
                     ]}
                     onPress={() => {
-                      handleAccion("reasignar_turno");
+                      onSeleccionarTrabajador(item);
+                      setModalActivo("reasignar_turno");
                       prepararAsignarTurno(item);
                     }}
                   >
@@ -308,7 +303,10 @@ export const FichaTrabajador = ({
                       styles.botonAccionSecundario,
                       { backgroundColor: "#FFF5EB" },
                     ]}
-                    onPress={() => handleAccion("eliminar_turno")}
+                    onPress={() => {
+                      onSeleccionarTrabajador(item);
+                      setModalActivo("eliminar_turno");
+                    }}
                   >
                     <MaterialCommunityIcons
                       name="calendar-remove"
@@ -334,6 +332,7 @@ export const FichaTrabajador = ({
                     { backgroundColor: "#16A34A" },
                   ]}
                   onPress={() => {
+                    onSeleccionarTrabajador(item);
                     handleAsignarTurnoTrabajador();
                   }}
                 >
@@ -373,7 +372,8 @@ export const FichaTrabajador = ({
           <Pressable
             style={styles.botonBajaEmpresa}
             onPress={() => {
-              handleAccion("baja_trabajador");
+              onSeleccionarTrabajador(item);
+              setModalActivo("baja_trabajador");
             }}
           >
             <FontAwesome5 name="user-slash" size={11} color="#991B1B" />
@@ -398,7 +398,8 @@ export const FichaTrabajador = ({
           <Pressable
             style={styles.botonReactivarEmpresa}
             onPress={() => {
-              handleAccion("reactivar_trabajador");
+              onSeleccionarTrabajador(item);
+              setModalActivo("reactivar_trabajador");
             }}
           >
             <FontAwesome5 name="user-slash" size={11} color="#117937" />

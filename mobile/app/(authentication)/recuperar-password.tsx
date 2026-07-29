@@ -1,6 +1,6 @@
 import {
   confirmarCambioPassword,
-  solicitarTokenRecuperacion,
+  solicitarCodigoRecuperacion,
 } from "@/src/modules/another-services/services";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
@@ -28,11 +28,11 @@ import VideoBackground from "../../src/shared/ui/VideoBackground";
 
 export default function RecuperarPasswordScreen() {
   const router = useRouter();
-  const [paso, setPaso] = useState<1 | 2>(1); // 1 = Pedir Email, 2 = Validar Token y Cambiar Clave
+  const [paso, setPaso] = useState<1 | 2>(1); // 1 = Pedir Email, 2 = Validar Código y Cambiar Password
 
   const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
-  const [nuevoPassword, setNuevoPassword] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [nuevaPassword, setNuevaPassword] = useState("");
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
 
@@ -44,7 +44,7 @@ export default function RecuperarPasswordScreen() {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
   }, [opacidadTarjeta]);
 
-  const handleSolicitarToken = async () => {
+  const handleSolicitarCodigo = async () => {
     if (!email.includes("@")) {
       if (Platform.OS === "web") {
         alert(
@@ -61,7 +61,7 @@ export default function RecuperarPasswordScreen() {
 
     try {
       setCargando(true);
-      await solicitarTokenRecuperacion(email);
+      await solicitarCodigoRecuperacion(email);
 
       // Transición animada de la tarjeta hacia el paso 2
       opacidadTarjeta.value = withTiming(0, { duration: 200 }, () => {
@@ -69,10 +69,16 @@ export default function RecuperarPasswordScreen() {
         opacidadTarjeta.value = withTiming(1, { duration: 300 });
       });
 
-      Alert.alert(
-        "Código Despachado",
-        "Usa el token '123456' que hemos impreso de forma segura en la consola de tu servidor.",
-      );
+      if (Platform.OS === "web") {
+        alert(
+          "Código Enviado: Hemos enviado un código de verificación de 6 dígitos a tu bandeja de entrada.",
+        );
+      } else {
+        Alert.alert(
+          "Código Enviado",
+          "Hemos enviado un código de verificación de 6 dígitos a tu bandeja de entrada.",
+        );
+      }
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
@@ -85,16 +91,16 @@ export default function RecuperarPasswordScreen() {
     }
   };
 
-  const handleRestablecerClave = async () => {
-    if (token.length !== 6 || nuevoPassword.length < 6) {
+  const handleRestablecerPassword = async () => {
+    if (codigo.length !== 6 || nuevaPassword.length < 6) {
       if (Platform.OS === "web") {
         alert(
-          "Datos Incorrectos: El token requiere 6 dígitos y la contraseña al menos 6 caracteres.",
+          "Datos Incorrectos: El código requiere 6 dígitos y la contraseña al menos 6 caracteres.",
         );
       } else {
         Alert.alert(
           "Datos Incorrectos",
-          "El token requiere 6 dígitos y la contraseña al menos 6 caracteres.",
+          "El código requiere 6 dígitos y la contraseña al menos 6 caracteres.",
         );
       }
       return;
@@ -104,8 +110,8 @@ export default function RecuperarPasswordScreen() {
       setCargando(true);
       await confirmarCambioPassword({
         email: email,
-        token_verificacion: token,
-        nuevo_password: nuevoPassword,
+        codigo_verificacion: codigo,
+        nueva_password: nuevaPassword,
       });
 
       Alert.alert(
@@ -193,7 +199,7 @@ export default function RecuperarPasswordScreen() {
                   styles.primaryButton,
                   cargando && styles.buttonDisabled,
                 ]}
-                onPress={handleSolicitarToken}
+                onPress={handleSolicitarCodigo}
                 disabled={cargando}
               >
                 {cargando ? (
@@ -207,11 +213,13 @@ export default function RecuperarPasswordScreen() {
             </View>
           ) : (
             // ==========================================
-            // ASISTENTE PASO 2: INTRODUCIR TOKEN Y CLAVE
+            // ASISTENTE PASO 2: INTRODUCIR CÓDIGO Y NUEVA PASSWORD
             // ==========================================
             <View style={styles.formularioWidth}>
               <View style={styles.field}>
-                <ThemedText style={styles.label}>Token de 6 dígitos</ThemedText>
+                <ThemedText style={styles.label}>
+                  Código de 6 dígitos
+                </ThemedText>
                 <View style={styles.inputWrapper}>
                   <IconSymbol
                     name="lock"
@@ -220,12 +228,12 @@ export default function RecuperarPasswordScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    value={token}
-                    onChangeText={setToken}
+                    value={codigo}
+                    onChangeText={setCodigo}
                     style={styles.inputContainer}
                     keyboardType="number-pad"
                     maxLength={6}
-                    placeholder="Introduce el código 123456"
+                    placeholder="Introduce el código"
                     placeholderTextColor="#94A3B8"
                     editable={!cargando}
                   />
@@ -242,8 +250,8 @@ export default function RecuperarPasswordScreen() {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    value={nuevoPassword}
-                    onChangeText={setNuevoPassword}
+                    value={nuevaPassword}
+                    onChangeText={setNuevaPassword}
                     secureTextEntry={isObscured}
                     style={styles.inputContainer}
                     placeholder="Mínimo 6 caracteres"
@@ -269,7 +277,7 @@ export default function RecuperarPasswordScreen() {
                   styles.confirmButton,
                   cargando && styles.buttonDisabled,
                 ]}
-                onPress={handleRestablecerClave}
+                onPress={handleRestablecerPassword}
                 disabled={cargando}
               >
                 {cargando ? (

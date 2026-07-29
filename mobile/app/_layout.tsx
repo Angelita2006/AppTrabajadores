@@ -1,5 +1,4 @@
 import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
-import { ObserveRoot, useObserve } from "expo-observe";
 import { Tabs } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
@@ -11,31 +10,23 @@ import {
 import { ThemedText } from "../src/shared/components/themed-text";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
-// Opcional: Mantener la pantalla de carga visible mientras se prepara el contexto
 SplashScreen.preventAutoHideAsync?.();
 
 function TabsNavigation() {
   const { usuarioActual } = useSesion();
   const [estaListo, setEstaListo] = useState(false);
-  const { markInteractive } = useObserve();
 
-  // Escudo de tiempo y sincronización de métricas
   useEffect(() => {
     const timer = setTimeout(() => {
       setEstaListo(true);
-      // Marcamos la aplicación como interactiva una vez superado el escudo de carga nativo
       try {
         SplashScreen.hideAsync?.();
-      } catch (e) {
-        // Ignorar si el splash ya se ocultó
-      }
-      markInteractive();
+      } catch (e) {}
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [usuarioActual, markInteractive]);
+  }, [usuarioActual]);
 
-  // Si el dispositivo físico sigue leyendo los datos de sesión, mostramos un cargando nativo
   if (!estaListo) {
     return (
       <View
@@ -52,8 +43,6 @@ function TabsNavigation() {
   }
 
   const tieneSesion = usuarioActual !== null;
-
-  // Escudo de control horario: Evaluamos si el perfil cuenta con rango directivo
   const esAdmin =
     usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA ||
     usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
@@ -76,7 +65,7 @@ function TabsNavigation() {
             style={{
               fontSize: 9,
               textAlign: "center",
-              color: color,
+              color,
               marginTop: 4,
               fontWeight: "700",
             }}
@@ -89,6 +78,7 @@ function TabsNavigation() {
         headerShown: false,
       }}
     >
+      {/* Tus pantallas de Tabs.Screen se quedan exactamente igual */}
       <Tabs.Screen
         name="(protected)/home"
         options={{
@@ -99,7 +89,6 @@ function TabsNavigation() {
           href: tieneSesion ? (!esAdmin ? "/(protected)/home" : null) : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/plantilla"
         options={{
@@ -110,7 +99,6 @@ function TabsNavigation() {
           href: esAdmin ? "/(protected)/plantilla" : null,
         }}
       />
-
       <Tabs.Screen
         name="index"
         options={{
@@ -121,7 +109,6 @@ function TabsNavigation() {
           href: !tieneSesion ? null : "/",
         }}
       />
-
       <Tabs.Screen
         name="(protected)/empresas"
         options={{
@@ -132,7 +119,6 @@ function TabsNavigation() {
           href: tieneSesion ? (esAdmin ? "/(protected)/empresas" : null) : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/horarios"
         options={{
@@ -147,7 +133,6 @@ function TabsNavigation() {
             : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/vacaciones"
         options={{
@@ -162,7 +147,6 @@ function TabsNavigation() {
             : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/aprobar-vacaciones"
         options={{
@@ -177,7 +161,6 @@ function TabsNavigation() {
             : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/incidencias"
         options={{
@@ -192,7 +175,6 @@ function TabsNavigation() {
             : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/fichajes"
         options={{
@@ -203,7 +185,6 @@ function TabsNavigation() {
           href: tieneSesion ? (esAdmin ? "/(protected)/fichajes" : null) : null,
         }}
       />
-
       <Tabs.Screen
         name="(protected)/resolver-incidencias"
         options={{
@@ -218,8 +199,6 @@ function TabsNavigation() {
             : null,
         }}
       />
-
-      {/* Controladores ocultos de ruteo interno */}
       <Tabs.Screen name="(authentication)/registro" options={{ href: null }} />
       <Tabs.Screen
         name="(authentication)/registro-organizacion"
@@ -233,13 +212,11 @@ function TabsNavigation() {
   );
 }
 
-function TabLayout() {
+// AQUÍ ESTÁ LA CLAVE: El export por defecto debe envolver al componente de navegación con el Proveedor
+export default function RootLayout() {
   return (
     <ProveedorSesion>
       <TabsNavigation />
     </ProveedorSesion>
   );
 }
-
-// Exportamos utilizando ObserveRoot.wrap como exige la librería para capturar métricas TTI
-export default ObserveRoot.wrap(TabLayout);

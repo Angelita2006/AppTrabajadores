@@ -30,7 +30,15 @@ export const getUsuarioByEmailYPassword = async (
 
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    // 1. Imprimimos el error completo en la consola para ver qué trae exactamente
+    console.log("Error completo recibido de la API:", error);
+
+    // 2. Buscamos el mensaje en todas las ubicaciones posibles de Axios / FastAPI
+    const apiMessage =
+      error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      error?.message;
+
     throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
   }
 };

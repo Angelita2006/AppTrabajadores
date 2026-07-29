@@ -5,7 +5,6 @@ import { getUsuarioByEmailYPassword } from "@/src/modules/usuarios/api/services"
 import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { setAuthToken } from "@/src/service/api/api";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -122,7 +121,7 @@ export default function RootIndexScreen() {
       if (usuarioActual && !isAuthenticatingGlobal) {
         const permitido = await NotificationService.requestPermissions();
         if (permitido) {
-          await NotificationService.probarNotificacionEnUnMinuto();
+          // await NotificationService.probarNotificacionEnUnMinuto();
           await NotificationService.programarAlarmasTurno(usuarioActual.id);
         }
       }
@@ -174,13 +173,12 @@ export default function RootIndexScreen() {
         }
       }
     } catch (error: any) {
+      const mensajeError = error?.message;
+
       if (Platform.OS === "web") {
-        alert(`Fallo de Autenticación: ${obtenerMensajeAmigableError(error)}`);
+        alert(`Fallo de Autenticación\n\n${mensajeError}`);
       } else {
-        Alert.alert(
-          "Fallo de Autenticación",
-          obtenerMensajeAmigableError(error),
-        );
+        Alert.alert("Fallo de Autenticación\n\n", mensajeError);
       }
     } finally {
       setCargando(false);

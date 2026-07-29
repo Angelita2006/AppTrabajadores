@@ -12,6 +12,8 @@ class AsignarTurnosRequest(BaseModel):
     Esquema para la asignación masiva de turnos a un trabajador.
     """
     turnos: List[UUID] = Field(..., description="Lista de identificadores de turnos a asignar")
+    fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de vigencia de los turnos")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de fin opcional")
 
     model_config = ConfigDict(from_attributes=True)
 
