@@ -1,23 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { Platform } from "react-native";
 
 const getBaseURL = () => {
-  if (Platform.OS === "web") {
-    // return "http://localhost:8080";
-    return "https://contrastively-cliffier-shelly.ngrok-free.dev";
-  }
-  if (Platform.OS === "android") {
-    // return "http://10.0.2.2:8080";
-    return "https://contrastively-cliffier-shelly.ngrok-free.dev";
-  }
-  // return "http://localhost:8080";
-  return "https://contrastively-cliffier-shelly.ngrok-free.dev";
+  return "https://registrohorariosimple.es";
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 5000,
 });
 
 // Variable en memoria global para acceso instantáneo

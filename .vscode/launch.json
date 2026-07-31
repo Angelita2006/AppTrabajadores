@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Android (Pixel 9)",
+      "name": "Debug Android (Pixel 10)",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}/mobile",

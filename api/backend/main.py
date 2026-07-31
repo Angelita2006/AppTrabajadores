@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api"
 )
 
 @app.middleware("http")
@@ -126,6 +127,6 @@ app.include_router(usuarios_roles.router)
 app.include_router(usuarios.router) 
 app.include_router(auth.router)
 
-@app.get("/")
+@app.get("/api")
 def read_root():
     return {"mensaje": "¡API de FICHAPP funcionando en producción!"}

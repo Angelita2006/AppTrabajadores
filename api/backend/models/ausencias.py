@@ -25,7 +25,7 @@ class Ausencias(Base):
     # tipo_ausencia: Mapped[TipoAusenciaEnum] = mapped_column(Enum(TipoAusenciaEnum, name='tipo_ausencia_enum'), nullable=False)
     tipo_ausencia: Mapped[str] = mapped_column(Text, nullable=False)
     # estado: Mapped[EstadoAusenciaEnum] = mapped_column(Enum(EstadoAusenciaEnum, name='estado_ausencia_enum'), nullable=False, server_default=text("'Pendiente'::estado_ausencia_enum"))
-    estado: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'Pendiente'::estado"))
+    estado: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'Pendiente'"))
     
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[datetime.date] = mapped_column(Date, nullable=False)

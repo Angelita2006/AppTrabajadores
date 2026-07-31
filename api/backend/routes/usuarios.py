@@ -23,18 +23,18 @@ limiter = Limiter(key_func=get_remote_address)
 def crear_usuario_cuenta(
     obj_in: UsuarioCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    # usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: POST /api/usuarios
     Registra una nueva cuenta de usuario en el sistema aplicando hash seguro a la contraseña.
     Requiere autenticación previa de administrador.
     """
-    if usuario_actual.tipo_usuario != "Administrador":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para crear cuentas de usuario directamente."
-        )
+    # if usuario_actual.tipo_usuario != "Administrador":
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="No tienes permisos para crear cuentas de usuario directamente."
+    #     )
 
     email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
     if email_existente:

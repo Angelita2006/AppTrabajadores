@@ -2,6 +2,8 @@ import {
   confirmarCambioPassword,
   solicitarCodigoRecuperacion,
 } from "@/src/modules/another-services/services";
+import LottieBackground from "@/src/shared/ui/LottieBackground";
+import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -24,7 +26,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/themed-text";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
-import VideoBackground from "../../src/shared/ui/VideoBackground";
 
 export default function RecuperarPasswordScreen() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function RecuperarPasswordScreen() {
   const [nuevaPassword, setNuevaPassword] = useState("");
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
+  const [mostrarFondo, setMostrarVideo] = useState(false);
 
   // Inicializamos en 0 para la animación de entrada suave
   const opacidadTarjeta = useSharedValue(0);
@@ -42,6 +44,13 @@ export default function RecuperarPasswordScreen() {
   useEffect(() => {
     // Forzamos a Reanimated a despertar el componente al cargar la vista
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
+
+    // Diagnóstico: Retardamos un ciclo corto el montaje del video para evitar choques con el render inicial
+    const timer = setTimeout(() => {
+      setMostrarVideo(true);
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [opacidadTarjeta]);
 
   const handleSolicitarCodigo = async () => {
@@ -146,7 +155,9 @@ export default function RecuperarPasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <VideoBackground />
+      {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
+      {mostrarFondo &&
+        (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -314,19 +325,13 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   loginCard: {
-    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
     width: "90%",
     maxWidth: 420,
-
-    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
     alignSelf: "center",
-
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
     alignItems: "center",
-
-    // Filtro inteligente para aplicar sombras seguras según la plataforma
     ...Platform.select({
       web: {
         boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",

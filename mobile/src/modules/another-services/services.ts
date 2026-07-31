@@ -1,6 +1,6 @@
 import api from "@/src/service/api/api";
+import { obtenerEmpresaPorCif } from "../empresas/api/services";
 import {
-  Empresa,
   RegistroOrganizacionDTO,
   RespuestaRegistroCompleto,
 } from "../empresas/types/empresa";
@@ -14,7 +14,8 @@ export const registrarOrganizacionCompleta = async (
   datos: RegistroOrganizacionDTO,
 ): Promise<RespuestaRegistroCompleto> => {
   try {
-    const responseEmpresa = await api.post<Empresa>("/api/empresas", {
+    // 1. Crear la empresa
+    await api.post("/api/empresas", {
       nombre_comercial: datos.nombre_comercial,
       razon_social: datos.razon_social || datos.nombre_comercial,
       cif: datos.cif,
@@ -25,11 +26,19 @@ export const registrarOrganizacionCompleta = async (
       direccion_fiscal: null,
     });
 
-    const empresaCreada = responseEmpresa.data;
+    // 2. Recuperar la empresa recién creada utilizando tu método por CIF
+    const empresaCreada = await obtenerEmpresaPorCif(datos.cif);
 
+    if (!empresaCreada || !empresaCreada.id) {
+      throw new Error(
+        "No se pudo obtener el identificador de la empresa registrada.",
+      );
+    }
+
+    // 3. Crear el trabajador asociado usando el ID obtenido
     const responseTrabajador = await api.post<Trabajador>("/api/trabajadores", {
       empresa_id: empresaCreada.id,
-      nif_nie: datos.cif,
+      nif_nie: "",
       nombre: datos.nombre_admin || "Admin",
       apellidos: datos.apellidos_admin || datos.nombre_comercial,
       email: datos.email,
@@ -40,6 +49,7 @@ export const registrarOrganizacionCompleta = async (
 
     const trabajadorCreado = responseTrabajador.data;
 
+    // 4. Crear el usuario administrador vinculado
     const responseUsuario = await api.post<UsuarioSesion>("/api/usuarios", {
       nombre: `${trabajadorCreado.nombre} ${trabajadorCreado.apellidos}`,
       email: datos.email,
@@ -60,6 +70,7 @@ export const registrarOrganizacionCompleta = async (
     const apiMessage = error.response?.data?.detail;
     throw new Error(
       apiMessage ||
+        error.message ||
         "Ha ocurrido un error inesperado al procesar el alta de organización.",
     );
   }

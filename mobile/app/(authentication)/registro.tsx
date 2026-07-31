@@ -1,12 +1,12 @@
-// app/mobile/app/(authentication)/registro.tsx
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
+import LottieBackground from "@/src/shared/ui/LottieBackground";
+import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,14 +15,19 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/themed-text";
-import VideoBackground from "../../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../../src/shared/ui/icon-symbol";
 
 export default function RegistroScreen() {
   const router = useRouter();
   const [cargando, setCargando] = useState(false);
   const [isObscured, setIsObscured] = useState(true);
+  const [mostrarFondo, setMostrarVideo] = useState(false);
 
   // Estados del Formulario Multiempresa adaptados a tu backend de PostgreSQL
   const [nombre, setNombre] = useState("");
@@ -41,6 +46,19 @@ export default function RegistroScreen() {
   const nifNieRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+
+  const opacidadTarjeta = useSharedValue(0);
+
+  useEffect(() => {
+    opacidadTarjeta.value = withTiming(1, { duration: 500 });
+
+    // Retardo breve para evitar choques con la navegación inicial
+    const timer = setTimeout(() => {
+      setMostrarVideo(true);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [opacidadTarjeta]);
 
   const validarCampos = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -83,11 +101,16 @@ export default function RegistroScreen() {
         password: password,
       });
 
-      Alert.alert(
-        "Alta Consolidada",
-        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.",
-        [{ text: "Ir al Acceso", onPress: () => router.replace("/") }],
-      );
+      const mensajeExito =
+        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.";
+      if (Platform.OS === "web") {
+        alert(`Alta Consolidada: ${mensajeExito}`);
+        router.replace("/");
+      } else {
+        Alert.alert("Alta Consolidada", mensajeExito, [
+          { text: "Ir al Acceso", onPress: () => router.replace("/") },
+        ]);
+      }
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
@@ -100,17 +123,34 @@ export default function RegistroScreen() {
     }
   };
 
+  const estiloTarjetaAnimada = useAnimatedStyle(() => {
+    return {
+      opacity: opacidadTarjeta.value,
+      transform: [
+        {
+          translateY: withTiming(
+            opacidadTarjeta.value * 0 + (1 - opacidadTarjeta.value) * 40,
+          ),
+        },
+      ],
+    };
+  });
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <VideoBackground />
+      {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
+      {mostrarFondo &&
+        (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
+        showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={styles.loginCard}>
+        <Animated.View style={[styles.loginCard, estiloTarjetaAnimada]}>
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
               <IconSymbol name="person" size={26} color="#FFFFFF" />
@@ -277,6 +317,7 @@ export default function RegistroScreen() {
                 <Pressable
                   onPress={() => setIsObscured(!isObscured)}
                   style={styles.eyeButton}
+                  disabled={cargando}
                 >
                   <IconSymbol
                     name={isObscured ? "visibility-off" : "visibility"}
@@ -306,8 +347,13 @@ export default function RegistroScreen() {
             onPress={() => router.replace("/")}
             style={styles.linkVolver}
           >
-            <ThemedText style={styles.linkTexto}>
-              ¿Ya tienes cuenta? Inicia Sesión
+            <ThemedText
+              style={{ fontSize: 13, color: "#64748B", fontWeight: "700" }}
+            >
+              ¿Ya tienes cuenta?{" "}
+              <ThemedText style={{ color: "#2563EB" }}>
+                Inicia Sesión
+              </ThemedText>
             </ThemedText>
           </Pressable>
         </Animated.View>
@@ -322,22 +368,16 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 24,
+    paddingVertical: 16,
   },
   loginCard: {
-    // 1. Ocupa el 90% en móviles, pero nunca superará los 420px en pantallas grandes (Web/Tablets)
     width: "90%",
     maxWidth: 420,
-
-    // 2. Centra la tarjeta horizontalmente si el contenedor padre es más ancho que el maxWidth
     alignSelf: "center",
-
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
     alignItems: "center",
-
-    // Filtro inteligente para aplicar sombras seguras según la plataforma
     ...Platform.select({
       web: {
         boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",

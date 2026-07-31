@@ -1,5 +1,6 @@
 import { registrarOrganizacionCompleta } from "@/src/modules/another-services/services";
 import { ThemedText } from "@/src/shared/components/themed-text";
+import LottieBackground from "@/src/shared/ui/LottieBackground";
 import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -32,6 +33,7 @@ export default function RegistroOrganizacionScreen() {
 
   const [cargando, setCargando] = useState(false);
   const [isObscured, setIsObscured] = useState(true);
+  const [mostrarFondo, setMostrarVideo] = useState(false);
 
   // Estados de error visual
   const [errorNombre, setErrorNombre] = useState(false);
@@ -43,7 +45,14 @@ export default function RegistroOrganizacionScreen() {
 
   useEffect(() => {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
-  }, []);
+
+    // Retardo breve para evitar choques con la navegación inicial
+    const timer = setTimeout(() => {
+      setMostrarVideo(true);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [opacidadTarjeta]);
 
   const validarFormulario = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -117,7 +126,10 @@ export default function RegistroOrganizacionScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <VideoBackground />
+      {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
+      {mostrarFondo &&
+        (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
@@ -130,10 +142,7 @@ export default function RegistroOrganizacionScreen() {
               <IconSymbol name="business" size={28} color="#FFFFFF" />
             </View>
             <ThemedText style={styles.mainTitle}>
-              Alta de Organización
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Registra tu empresa en la plataforma Saas
+              Registro de Organización
             </ThemedText>
           </View>
 
@@ -210,7 +219,7 @@ export default function RegistroOrganizacionScreen() {
 
           <View style={styles.divisor} />
           <ThemedText style={styles.seccionSubtitulo}>
-            Datos Cuenta Administrador
+            Datos del Administrador
           </ThemedText>
 
           {/* INPUT: NOMBRE ADMIN */}
@@ -352,7 +361,7 @@ export default function RegistroOrganizacionScreen() {
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <ThemedText style={styles.buttonText}>
-                Registrar y Activar Empresa
+                Registrar Empresa
               </ThemedText>
             )}
           </Pressable>
@@ -383,7 +392,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 32,
+    paddingVertical: 72,
+    paddingBottom: 80,
   },
   registerCard: {
     width: "90%",
@@ -393,9 +403,15 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 28,
     ...Platform.select({
-      web: { boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)" },
+      web: {
+        maxWidth: 620,
+        boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)",
+      } as any,
       default: {
-        boxShadow: "0px 4px 12px 0px rgba(0, 0, 0, 0.1)",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
         elevation: 8,
       },
     }),

@@ -1,10 +1,11 @@
 import { obtenerCentrosPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
-import { Empresa } from "@/src/modules/empresas/types/empresa";
 import { getUsuarioByEmailYPassword } from "@/src/modules/usuarios/api/services";
 import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { setAuthToken } from "@/src/service/api/api";
+import LottieBackground from "@/src/shared/ui/LottieBackground";
+import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -27,11 +28,9 @@ import { obtenerEmpresa } from "../src/modules/empresas/api/services";
 import { obtenerEmpresasTrabajador } from "../src/modules/trabajadores/api/services";
 import { useSesion } from "../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../src/shared/components/themed-text";
-import { AppScreen, Card, Row, StatCard } from "../src/shared/ui/AppSurface";
-import VideoBackground from "../src/shared/ui/VideoBackground";
 import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
-// 1. EL CANDADO DEBE ESTAR FUERA DEL COMPONENTE PARA QUE SEA PERSISTENTE
+// Candado global para persistir el estado de autenticación entre renders
 let isAuthenticatingGlobal = false;
 
 export default function RootIndexScreen() {
@@ -46,6 +45,7 @@ export default function RootIndexScreen() {
     contratoActual,
     centroTrabajoActual,
     setCentroTrabajoActual,
+    cargandoSesionLocal,
   } = useSesion();
 
   const esAdminGestoria =
@@ -54,8 +54,8 @@ export default function RootIndexScreen() {
     usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA;
   const esAdmin = esAdminGestoria || esAdminEmpresa;
 
-  const [email, setEmail] = useState("admin-fichapp@gmail.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const passwordInputRef = useRef<TextInput | null>(null);
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
@@ -78,24 +78,29 @@ export default function RootIndexScreen() {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
   }, [opacidadTarjeta, setUsuarioActual, usuarioActual]);
 
-  // CARGA REACTIVA DE CENTROS AL CAMBIAR DE EMPRESA
   useEffect(() => {
+    let isMounted = true;
+
     const cargarCentrosDeLaEmpresa = async () => {
-      // Si estamos en plena autenticación, bloqueamos este efecto para que no colisione
       if (isAuthenticatingGlobal) return;
 
       if (!empresaSeleccionada?.id) {
-        setCentrosDisponibles([]);
-        setCentroTrabajoActual(null);
+        if (isMounted) {
+          setCentrosDisponibles([]);
+          setCentroTrabajoActual(null);
+        }
         return;
       }
 
       try {
-        setCargandoCentros(true);
+        if (isMounted) setCargandoCentros(true);
         const centros = await obtenerCentrosPorEmpresa(empresaSeleccionada.id);
-        setCentrosDisponibles(centros);
 
-        if (centros.length > 0) {
+        if (!isMounted) return;
+
+        setCentrosDisponibles(centros ?? []);
+
+        if (centros && centros.length > 0) {
           if (
             !centroTrabajoActual ||
             centroTrabajoActual.empresa_id !== empresaSeleccionada.id
@@ -108,11 +113,15 @@ export default function RootIndexScreen() {
       } catch (err) {
         console.error("Error al cargar centros de trabajo:", err);
       } finally {
-        setCargandoCentros(false);
+        if (isMounted) setCargandoCentros(false);
       }
     };
 
     cargarCentrosDeLaEmpresa();
+
+    return () => {
+      isMounted = false;
+    };
   }, [empresaSeleccionada?.id]);
 
   useEffect(() => {
@@ -121,7 +130,6 @@ export default function RootIndexScreen() {
       if (usuarioActual && !isAuthenticatingGlobal) {
         const permitido = await NotificationService.requestPermissions();
         if (permitido) {
-          // await NotificationService.probarNotificacionEnUnMinuto();
           await NotificationService.programarAlarmasTurno(usuarioActual.id);
         }
       }
@@ -143,29 +151,31 @@ export default function RootIndexScreen() {
   const handleLogin = async () => {
     if (!validarFormulario()) return;
 
+    isAuthenticatingGlobal = true;
     try {
       setCargando(true);
       const respuestaLogin = await getUsuarioByEmailYPassword(email, password);
-      const { access_token, usuario } = respuestaLogin;
-      const usuarioSesion = usuario;
-      setAuthToken(access_token);
-      setUsuarioActual(usuarioSesion);
 
-      if (
-        usuarioSesion.tipo_usuario === "Admin_empresa" &&
-        usuarioSesion.empresa_id
-      ) {
-        const empresa = await obtenerEmpresa(usuarioSesion.empresa_id);
+      if (!respuestaLogin) {
+        throw new Error("No se pudo obtener respuesta del servidor.");
+      }
+
+      const { access_token, usuario } = respuestaLogin;
+      setAuthToken(access_token);
+      setUsuarioActual(usuario);
+
+      if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
+        const empresa = await obtenerEmpresa(usuario.empresa_id);
         setEmpresas([empresa]);
         setEmpresaSeleccionada(empresa);
-      } else if (usuarioSesion.trabajador_id) {
+      } else if (usuario.trabajador_id) {
         try {
           const empresasTrabajador = await obtenerEmpresasTrabajador(
-            usuarioSesion.trabajador_id,
+            usuario.trabajador_id,
             access_token,
           );
-          setEmpresas(empresasTrabajador);
-          if (empresasTrabajador.length > 0) {
+          setEmpresas(empresasTrabajador ?? []);
+          if (empresasTrabajador && empresasTrabajador.length > 0) {
             setEmpresaSeleccionada(empresasTrabajador[0]);
           }
         } catch (errorEmpresa) {
@@ -173,20 +183,21 @@ export default function RootIndexScreen() {
         }
       }
     } catch (error: any) {
-      const mensajeError = error?.message;
+      const mensajeError = error?.message || "Ocurrió un error desconocido";
 
       if (Platform.OS === "web") {
         alert(`Fallo de Autenticación\n\n${mensajeError}`);
       } else {
-        Alert.alert("Fallo de Autenticación\n\n", mensajeError);
+        Alert.alert("Fallo de Autenticación", mensajeError);
       }
     } finally {
       setCargando(false);
+      isAuthenticatingGlobal = false;
     }
   };
 
   const handleLogout = async () => {
-    setAuthToken(""); // Limpiamos el token del cliente API
+    setAuthToken("");
     setEmpresaSeleccionada(null);
     setCentroTrabajoActual(null);
     setCentrosDisponibles([]);
@@ -207,398 +218,16 @@ export default function RootIndexScreen() {
     };
   });
 
-  const puedeCambiarEmpresa =
-    esAdminGestoria && empresas.length > 1 && !!empresaSeleccionada;
+  const mostrarFondo = !cargandoSesionLocal && !usuarioActual;
 
-  const renderEmpresaSelection = () => {
-    return (
-      <View style={styles.selectorContainer}>
-        <ThemedText style={styles.detailLabel}>
-          {puedeCambiarEmpresa ? "Cambiar de Empresa" : "Empresa vinculada"}
-        </ThemedText>
-        <View style={styles.pickerWrapper}>
-          {puedeCambiarEmpresa ? (
-            empresas.map((emp: Empresa) => {
-              const estaSeleccionada = empresaSeleccionada?.id === emp.id;
-              return (
-                <Pressable
-                  key={emp.id}
-                  style={[
-                    styles.selectorItem,
-                    estaSeleccionada && styles.selectorItemActivo,
-                  ]}
-                  onPress={() => {
-                    if (empresaSeleccionada?.id !== emp.id) {
-                      setEmpresaSeleccionada(emp);
-                    }
-                  }}
-                >
-                  <ThemedText
-                    style={[
-                      styles.selectorItemText,
-                      estaSeleccionada && styles.selectorItemTextActivo,
-                    ]}
-                  >
-                    {emp.nombre_comercial}
-                  </ThemedText>
-                </Pressable>
-              );
-            })
-          ) : (
-            <ThemedText style={styles.selectorSingleText}>
-              {empresaSeleccionada?.nombre_comercial ??
-                "No hay empresa vinculada"}
-            </ThemedText>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const renderAdminProfile = () => {
-    const usuario = usuarioActual;
-    if (!usuario) return null;
-
-    return (
-      <AppScreen title="Panel de Gestión">
-        <Row>
-          <StatCard
-            label="Rol de Sistema"
-            value={usuario.tipo_usuario
-              .toString()
-              .replace("_", " ")
-              .toUpperCase()}
-          />
-        </Row>
-
-        <Animated.View
-          style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
-        >
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="business" size={20} color="#EA580C" />
-              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                Mi Empresa Activa
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              {renderEmpresaSelection()}
-              <Detail
-                label="CIF / NIF"
-                value={empresaSeleccionada?.cif ?? "No disponible"}
-              />
-              <Detail
-                label="Zona Horaria"
-                value={empresaSeleccionada?.zona_horaria ?? "Europe/Madrid"}
-              />
-            </View>
-          </Card>
-
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="manage-accounts" size={20} color="#475569" />
-              <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
-                Seguridad y Cuenta
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail label="Correo Electrónico" value={usuario.email} />
-              <Detail
-                label="Último Acceso"
-                value={
-                  usuario.ultimo_acceso
-                    ? usuario.ultimo_acceso
-                        .replace("T", " a las ")
-                        .substring(0, 22)
-                        .concat(" hs")
-                    : "Sesión Actual"
-                }
-              />
-            </View>
-          </Card>
-
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <IconSymbol name="logout" size={18} color="#FFFFFF" />
-            <ThemedText style={styles.logoutButtonText}>
-              Cerrar Sesión
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      </AppScreen>
-    );
-  };
-
-  if (usuarioActual && esAdmin) {
-    return renderAdminProfile();
-  }
-
-  if (usuarioActual && trabajadorActual) {
-    return (
-      <AppScreen title="Mi Perfil">
-        <Row>
-          <StatCard
-            label="Estado"
-            value={usuarioActual.activo ? "Activo" : "Inactivo"}
-            tone={usuarioActual?.activo ? "success" : "danger"}
-          />
-          <StatCard
-            label="Empresa Activa"
-            value={empresaSeleccionada?.nombre_comercial ?? "Sin Asignar"}
-          />
-        </Row>
-
-        <Animated.View
-          style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
-        >
-          {/* BLOCK 1: IDENTIDAD DEL TRABAJADOR */}
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="person" size={20} color="#2563EB" />
-              <ThemedText style={styles.perfilTitle}>
-                Información Personal
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail
-                label="Nombre Completo"
-                value={`${trabajadorActual?.nombre} ${trabajadorActual.apellidos}`}
-              />
-              <Detail
-                label="Documento (NIF/NIE)"
-                value={trabajadorActual?.nif_nie}
-              />
-              <Detail
-                label="Número Seguridad Social"
-                value={
-                  trabajadorActual?.numero_seguridad_social ??
-                  "No cumplimentado"
-                }
-              />
-              <Detail
-                label="Teléfono Móvil"
-                value={trabajadorActual?.telefono ?? "No registrado"}
-              />
-            </View>
-          </Card>
-
-          {/* BLOCK 2: DETALLES DE CONTRATACIÓN */}
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="description" size={20} color="#16A34A" />
-              <ThemedText style={[styles.perfilTitle, { color: "#16A34A" }]}>
-                Condiciones Contractuales
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail
-                label="Puesto de Trabajo"
-                value={
-                  contratoActual?.puesto_trabajo ?? "Operario / No Definido"
-                }
-              />
-              <Detail
-                label="Tipo de Contrato"
-                value={contratoActual?.tipo_contrato ?? "Régimen General"}
-              />
-              <Detail
-                label="Fecha Alta Contrato"
-                value={
-                  contratoActual?.fecha_inicio ??
-                  trabajadorActual.fecha_alta_empresa ??
-                  "No consta"
-                }
-              />
-              <Detail
-                label="Vencimiento / Fin"
-                value={contratoActual?.fecha_fin ?? "Indefinido / Continuo"}
-              />
-              <Detail
-                label="Jornada Semanal"
-                value={
-                  contratoActual?.horas_semana
-                    ? `${contratoActual.horas_semana.toString().substring(0, 2)} hs/semana`
-                    : "Según Convenio Colectivo"
-                }
-              />
-            </View>
-          </Card>
-
-          {/* BLOCK 3: ADSCRIPCIÓN CORPORATIVA E INTERCAMBIO DE ENTIDADES */}
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="business" size={20} color="#EA580C" />
-              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                Organización y Centro de Fichaje
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-
-            <View style={styles.detailGrid}>
-              <View style={styles.selectorContainer}>
-                <ThemedText style={styles.detailLabel}>
-                  {empresas.length > 1
-                    ? "Cambiar de Empresa"
-                    : "Empresa vinculada"}
-                </ThemedText>
-                {empresas.length > 1 ? (
-                  <View style={styles.pickerWrapper}>
-                    {empresas.map((emp: Empresa) => (
-                      <Pressable
-                        key={emp.id}
-                        style={[
-                          styles.selectorItem,
-                          empresaSeleccionada?.id === emp.id &&
-                            styles.selectorItemActivo,
-                        ]}
-                        onPress={() => {
-                          if (empresaSeleccionada?.id !== emp.id) {
-                            setEmpresaSeleccionada(emp);
-                          }
-                        }}
-                      >
-                        <ThemedText
-                          style={[
-                            styles.selectorItemText,
-                            empresaSeleccionada?.id === emp.id &&
-                              styles.selectorItemTextActivo,
-                          ]}
-                        >
-                          {emp.nombre_comercial}
-                        </ThemedText>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.pickerWrapper}>
-                    <ThemedText style={styles.selectorSingleText}>
-                      {empresaSeleccionada?.nombre_comercial ??
-                        "No hay empresa vinculada"}
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.selectorContainer}>
-                <ThemedText style={styles.detailLabel}>
-                  Seleccionar Sede / Centro
-                </ThemedText>
-                {cargandoCentros ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#EA580C"
-                    style={{ marginVertical: 10 }}
-                  />
-                ) : (
-                  <View style={styles.pickerWrapperHorizontal}>
-                    {centrosDisponibles.length > 0 ? (
-                      centrosDisponibles.map((centro: CentroTrabajo) => (
-                        <Pressable
-                          key={centro.id}
-                          style={[
-                            styles.chipCentro,
-                            centroTrabajoActual?.id === centro.id &&
-                              styles.chipCentroActivo,
-                          ]}
-                          onPress={() => {
-                            if (centroTrabajoActual?.id !== centro.id) {
-                              setCentroTrabajoActual(centro);
-                            }
-                          }}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.chipCentroText,
-                              centroTrabajoActual?.id === centro.id &&
-                                styles.chipCentroTextActivo,
-                            ]}
-                          >
-                            {centro.nombre}
-                          </ThemedText>
-                        </Pressable>
-                      ))
-                    ) : (
-                      <ThemedText style={styles.detailValue}>
-                        No hay centros configurados para esta empresa
-                      </ThemedText>
-                    )}
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.zonaHorariaCard}>
-                <IconSymbol name="schedule" size={16} color="#475569" />
-                <ThemedText style={styles.zonaHorariaTexto}>
-                  Zona Horaria de Registro:{" "}
-                  <ThemedText style={{ fontWeight: "700", color: "#0F172A" }}>
-                    {centroTrabajoActual?.zona_horaria ?? "Europe/Madrid"}
-                  </ThemedText>
-                </ThemedText>
-              </View>
-
-              <Detail
-                label="Dirección de la Sede"
-                value={centroTrabajoActual?.direccion ?? "No registrada"}
-              />
-              <Detail
-                label="CIF / NIF Empresa"
-                value={empresaSeleccionada?.cif ?? "No disponible"}
-              />
-            </View>
-          </Card>
-
-          {/* BLOCK 4: SEGURIDAD Y CUENTA */}
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="manage-accounts" size={20} color="#475569" />
-              <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
-                Seguridad y Cuenta
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail label="Correo Electrónico" value={usuarioActual.email} />
-              <Detail
-                label="Rol Autorizado Sistema"
-                value={usuarioActual.tipo_usuario.toString().toUpperCase()}
-              />
-              <Detail
-                label="Último Acceso Registrado"
-                value={
-                  usuarioActual.ultimo_acceso
-                    ? usuarioActual.ultimo_acceso
-                        .replace("T", " a las ")
-                        .substring(0, 22)
-                        .concat(" hs")
-                    : "Sesión Actual"
-                }
-              />
-            </View>
-          </Card>
-
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <IconSymbol name="logout" size={18} color="#FFFFFF" />
-            <ThemedText style={styles.logoutButtonText}>
-              Cerrar Sesión
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      </AppScreen>
-    );
-  }
-
-  // ====================================================================
-  // VISTA DE ACCESO (FORMULARIO DE LOGIN)
-  // ====================================================================
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <VideoBackground />
+      {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
+      {mostrarFondo &&
+        (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
@@ -614,7 +243,6 @@ export default function RootIndexScreen() {
             </ThemedText>
           </View>
 
-          {/* CAMPO CORREO ELECTRÓNICO */}
           <View style={styles.field}>
             <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
             <View
@@ -697,7 +325,7 @@ export default function RootIndexScreen() {
             </View>
             <Pressable
               onPress={() =>
-                router.replace("/(authentication)/recuperar-password")
+                router.push("/(authentication)/recuperar-password")
               }
               style={{ alignSelf: "center", marginVertical: 16 }}
             >
@@ -730,19 +358,20 @@ export default function RootIndexScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.replace("/(authentication)/registro")}
+            onPress={() => router.push("/(authentication)/registro")}
             style={{ alignSelf: "center", marginVertical: 16 }}
           >
             <ThemedText
-              style={{ fontSize: 13, color: "#2563EB", fontWeight: "700" }}
+              style={{ fontSize: 13, color: "#64748B", fontWeight: "700" }}
             >
-              ¿No tienes una cuenta? Regístrate
+              ¿No tienes una cuenta?{" "}
+              <ThemedText style={{ color: "#2563EB" }}>Regístrate</ThemedText>
             </ThemedText>
           </Pressable>
 
           <Pressable
             onPress={() =>
-              router.replace("/(authentication)/registro-organizacion")
+              router.push("/(authentication)/registro-organizacion")
             }
             style={styles.organizationRegisterButton}
           >
@@ -762,22 +391,24 @@ export default function RootIndexScreen() {
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <ThemedText style={styles.detailLabel}>{label}</ThemedText>
-      <ThemedText style={styles.detailValue}>{value ?? "-"}</ThemedText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F172A" },
+  container: {
+    flex: 1,
+    backgroundColor: "#0F172A",
+  },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 24,
+    ...Platform.select({
+      ios: {
+        paddingBottom: 40,
+      },
+      android: {
+        paddingBottom: 32,
+      },
+    }),
   },
   loginCard: {
     width: "90%",
@@ -854,110 +485,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 6,
     paddingHorizontal: 4,
-  },
-  perfilTitle: { color: "#2563EB", fontSize: 18, fontWeight: "800" },
-  detailGrid: { gap: 12 },
-  detailRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  detailLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  detailValue: {
-    fontSize: 15,
-    color: "#0F172A",
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  logoutButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
-  seccionPerfilHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    justifyContent: "center",
-  },
-  separadorPerfil: { height: 1, backgroundColor: "#E2E8F0", marginVertical: 6 },
-  logoutButton: {
-    backgroundColor: "#EF4444",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  selectorContainer: { marginVertical: 4 },
-  pickerWrapper: { flexDirection: "column", gap: 6, marginTop: 6 },
-  selectorSingleText: {
-    color: "#334155",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  pickerWrapperHorizontal: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 6,
-  },
-  selectorItem: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-  },
-  selectorItemActivo: {
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
-  },
-  selectorItemText: {
-    fontSize: 14,
-    color: "#475569",
-    fontWeight: "500",
-  },
-  selectorItemTextActivo: {
-    color: "#1D4ED8",
-    fontWeight: "700",
-  },
-  chipCentro: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-  },
-  chipCentroActivo: {
-    borderColor: "#EA580C",
-    backgroundColor: "#FFF7ED",
-  },
-  chipCentroText: {
-    fontSize: 13,
-    color: "#475569",
-    fontWeight: "500",
-  },
-  chipCentroTextActivo: {
-    color: "#C2410C",
-    fontWeight: "700",
-  },
-  zonaHorariaCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F1F5F9",
-    padding: 10,
-    borderRadius: 8,
-    gap: 8,
-    marginVertical: 4,
-  },
-  zonaHorariaTexto: {
-    fontSize: 13,
-    color: "#475569",
   },
   organizationRegisterButton: {
     flexDirection: "row",

@@ -54,6 +54,7 @@ const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESAS = "@fichapp_empresas_lista";
 const STORAGE_KEY_SELECCIONADA = "@fichapp_empresa_seleccionada";
 const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado";
+const STORAGE_KEY_TOKEN = "user_token"; // Unificado para evitar fallos de lectura
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioResponse | null>(
@@ -73,21 +74,24 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [cargandoSesionLocal, setCargandoSesionLocal] = useState<boolean>(true);
 
   // ====================================================================
-  // MOTOR 1: RESTAURACIÓN EN FRÍO (AsyncStorage)
+  // MOTOR 1: RESTAURACIÓN EN FRÍO (AsyncStorage optimizado con Promise.all)
   // ====================================================================
   useEffect(() => {
     async function recuperarSesionPermanente() {
       try {
-        const usuarioGuardado = await AsyncStorage.getItem(STORAGE_KEY_USUARIO);
-        const empresasGuardadas =
-          await AsyncStorage.getItem(STORAGE_KEY_EMPRESAS);
-        const seleccionadaGuardada = await AsyncStorage.getItem(
-          STORAGE_KEY_SELECCIONADA,
-        );
-        const centroGuardado = await AsyncStorage.getItem(
-          STORAGE_KEY_CENTRO_SELECCIONADO,
-        );
+        const [
+          usuarioGuardado,
+          empresasGuardadas,
+          seleccionadaGuardada,
+          centroGuardado,
+        ] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEY_USUARIO),
+          AsyncStorage.getItem(STORAGE_KEY_EMPRESAS),
+          AsyncStorage.getItem(STORAGE_KEY_SELECCIONADA),
+          AsyncStorage.getItem(STORAGE_KEY_CENTRO_SELECCIONADO),
+        ]);
 
+        // Restauración unificada para minimizar renders en cascada
         if (usuarioGuardado) setUsuarioActual(JSON.parse(usuarioGuardado));
         if (empresasGuardadas) setEmpresas(JSON.parse(empresasGuardadas));
         if (seleccionadaGuardada)
@@ -106,14 +110,16 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   // ====================================================================
-  // MOTOR 2: RESOLUCIÓN DE EMPRESAS AL CAMBIAR DE USUARIO (LOGIN / LOGOUT)
+  // MOTOR 2: RESOLUCIÓN DE EMPRESAS (Con control de Race Conditions)
   // ====================================================================
   useEffect(() => {
     if (cargandoSesionLocal) return;
 
+    let isCancelled = false;
+
     async function inicializarEntornoUsuario() {
       if (!usuarioActual) {
-        // Limpieza si no hay usuario
+        if (isCancelled) return;
         setEmpresas([]);
         setEmpresaSeleccionada(null);
         setTrabajadorActual(null);
@@ -130,50 +136,68 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           usuarioActual.empresa_id
         ) {
           const empresa = await obtenerEmpresa(usuarioActual.empresa_id);
+          if (isCancelled) return;
           setEmpresas([empresa]);
           setEmpresaSeleccionada(empresa);
           return;
         }
 
-        // 2. Administrador de Gestoría (Carga todas las empresas)
+        // 2. Administrador de Gestoría
         if (usuarioActual.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA) {
           const todasLasEmpresas = await obtenerEmpresas();
+          if (isCancelled) return;
           setEmpresas(todasLasEmpresas);
-          if (todasLasEmpresas.length > 0 && !empresaSeleccionada) {
-            setEmpresaSeleccionada(todasLasEmpresas[0]);
-          }
+          setEmpresaSeleccionada(
+            (prev) =>
+              prev ??
+              (todasLasEmpresas.length > 0 ? todasLasEmpresas[0] : null),
+          );
           return;
         }
 
         // 3. Trabajador estándar
         if (usuarioActual.trabajador_id) {
-          const token = await AsyncStorage.getItem("user_token");
+          const token = await AsyncStorage.getItem(STORAGE_KEY_TOKEN);
+          if (isCancelled) return;
           const empresasTrabajador = await obtenerEmpresasTrabajador(
             usuarioActual.trabajador_id,
             token || "",
           );
+          if (isCancelled) return;
           setEmpresas(empresasTrabajador);
-          if (empresasTrabajador.length > 0 && !empresaSeleccionada) {
-            setEmpresaSeleccionada(empresasTrabajador[0]);
-          }
+          setEmpresaSeleccionada(
+            (prev) =>
+              prev ??
+              (empresasTrabajador.length > 0 ? empresasTrabajador[0] : null),
+          );
         }
       } catch (error) {
-        console.error("Error al inicializar las empresas del usuario:", error);
+        if (!isCancelled) {
+          console.error(
+            "Error al inicializar las empresas del usuario:",
+            error,
+          );
+        }
       }
     }
 
     inicializarEntornoUsuario();
+
+    return () => {
+      isCancelled = true; // Cancela respuestas pendientes si el usuario cambia antes de terminar
+    };
   }, [usuarioActual, cargandoSesionLocal]);
 
   // ====================================================================
-  // MOTOR 3: CARGA DE EXPEDIENTE LABORAL (CUANDO HAY USUARIO Y EMPRESA)
+  // MOTOR 3: CARGA DE EXPEDIENTE LABORAL (Con control de Race Conditions)
   // ====================================================================
   useEffect(() => {
     if (cargandoSesionLocal) return;
 
+    let isCancelled = false;
+
     async function cargarFichaLaboralCompuesta() {
       if (!usuarioActual?.trabajador_id || !empresaSeleccionada?.id) {
-        // Si es un admin, no tiene trabajador_id, limpiamos campos de trabajador
         if (!usuarioActual?.trabajador_id) {
           setTrabajadorActual(null);
           setContratoActual(null);
@@ -190,6 +214,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             obtenerAsignacionesTurnoTrabajador(usuarioActual.trabajador_id),
           ]);
 
+        if (isCancelled) return;
+
         setTrabajadorActual(datosTrabajador);
 
         const contratoVigente = listaContratos.find(
@@ -203,13 +229,15 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             const datosCentro = await obtenerCentroTrabajo(
               contratoVigente.centro_trabajo_id,
             );
-            setCentroTrabajoActual(datosCentro);
+            if (!isCancelled) setCentroTrabajoActual(datosCentro);
           } catch (errCentro) {
-            console.error(
-              "Error al resolver el objeto Centro de Trabajo:",
-              errCentro,
-            );
-            setCentroTrabajoActual(null);
+            if (!isCancelled) {
+              console.error(
+                "Error al resolver el objeto Centro de Trabajo:",
+                errCentro,
+              );
+              setCentroTrabajoActual(null);
+            }
           }
         } else {
           setCentroTrabajoActual(null);
@@ -225,17 +253,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         });
         setTurnoActual(turnoVigente ?? null);
       } catch (error) {
-        console.error(
-          "Error en la sincronización del expediente laboral:",
-          error,
-        );
-        setTrabajadorActual(null);
-        setContratoActual(null);
-        setTurnoActual(null);
+        if (!isCancelled) {
+          console.error(
+            "Error en la sincronización del expediente laboral:",
+            error,
+          );
+          setTrabajadorActual(null);
+          setContratoActual(null);
+          setTurnoActual(null);
+        }
       }
     }
 
     cargarFichaLaboralCompuesta();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [
     usuarioActual?.trabajador_id,
     empresaSeleccionada?.id,
@@ -251,32 +285,28 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     async function guardarEstadosEnDisco() {
       try {
         if (usuarioActual) {
-          await AsyncStorage.setItem(
-            STORAGE_KEY_USUARIO,
-            JSON.stringify(usuarioActual),
-          );
-          await AsyncStorage.setItem(
-            STORAGE_KEY_EMPRESAS,
-            JSON.stringify(empresas),
-          );
-
-          if (empresaSeleccionada) {
-            await AsyncStorage.setItem(
-              STORAGE_KEY_SELECCIONADA,
-              JSON.stringify(empresaSeleccionada),
-            );
-          } else {
-            await AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA);
-          }
-
-          if (centroTrabajoActual) {
-            await AsyncStorage.setItem(
-              STORAGE_KEY_CENTRO_SELECCIONADO,
-              JSON.stringify(centroTrabajoActual),
-            );
-          } else {
-            await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
-          }
+          await Promise.all([
+            AsyncStorage.setItem(
+              STORAGE_KEY_USUARIO,
+              JSON.stringify(usuarioActual),
+            ),
+            AsyncStorage.setItem(
+              STORAGE_KEY_EMPRESAS,
+              JSON.stringify(empresas),
+            ),
+            empresaSeleccionada
+              ? AsyncStorage.setItem(
+                  STORAGE_KEY_SELECCIONADA,
+                  JSON.stringify(empresaSeleccionada),
+                )
+              : AsyncStorage.removeItem(STORAGE_KEY_SELECCIONADA),
+            centroTrabajoActual
+              ? AsyncStorage.setItem(
+                  STORAGE_KEY_CENTRO_SELECCIONADO,
+                  JSON.stringify(centroTrabajoActual),
+                )
+              : AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO),
+          ]);
         } else {
           await Promise.all([
             AsyncStorage.removeItem(STORAGE_KEY_USUARIO),

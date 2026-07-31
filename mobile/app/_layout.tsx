@@ -1,5 +1,4 @@
-import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
-import { Tabs } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -7,34 +6,58 @@ import {
   ProveedorSesion,
   useSesion,
 } from "../src/modules/usuarios/store/SesionContext";
-import { ThemedText } from "../src/shared/components/themed-text";
-import { IconSymbol } from "../src/shared/ui/icon-symbol";
 
+// Evita que la pantalla de inicio del sistema desaparezca antes de tiempo
 SplashScreen.preventAutoHideAsync?.();
 
-function TabsNavigation() {
-  const { usuarioActual } = useSesion();
+function InitialLayout() {
+  const { usuarioActual, cargandoSesionLocal } = useSesion();
+  const segments = useSegments();
+  const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
 
+  // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
     const timer = setTimeout(() => {
       setEstaListo(true);
       try {
         SplashScreen.hideAsync?.();
-      } catch (e) {}
-    }, 300);
+      } catch (e) {
+        console.error("Error al ocultar el splash screen:", e);
+      }
+    }, 400);
 
     return () => clearTimeout(timer);
-  }, [usuarioActual]);
+  }, []);
 
-  if (!estaListo) {
+  // Efecto central de protección de rutas (Guard) antierrores
+  useEffect(() => {
+    // Evita evaluar redirecciones si el layout general o el contexto aún cargan
+    if (!estaListo || cargandoSesionLocal) return;
+
+    const enGrupoAutenticacion = segments[0] === "(authentication)";
+    const tieneSesion = usuarioActual !== null;
+    const segmentLength = (segments as string[]).length;
+
+    // Caso 1: Usuario sin sesión intentando acceder a rutas protegidas de la app
+    if (!tieneSesion && !enGrupoAutenticacion) {
+      router.replace("/");
+    }
+    // Caso 2: Usuario con sesión activa atrapado en el login/registro o raíz pura
+    else if (tieneSesion && (enGrupoAutenticacion || segmentLength === 0)) {
+      router.replace("/(tabs)/perfil");
+    }
+  }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
+
+  // Pantalla de carga robusta mientras se valida la persistencia o el temporizador
+  if (!estaListo || cargandoSesionLocal) {
     return (
       <View
         style={{
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#FFFFFF",
+          backgroundColor: "#0F172A",
         }}
       >
         <ActivityIndicator size="large" color="#2563EB" />
@@ -42,181 +65,19 @@ function TabsNavigation() {
     );
   }
 
-  const tieneSesion = usuarioActual !== null;
-  const esAdmin =
-    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA ||
-    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
-
   return (
-    <Tabs
-      screenOptions={{
-        tabBarStyle: {
-          display: tieneSesion ? "flex" : "none",
-          height: 90,
-          paddingTop: 10,
-          paddingBottom: 14,
-          backgroundColor: "#FFFFFF",
-          borderTopWidth: 1,
-          borderTopColor: "#E2E8F0",
-        },
-        tabBarLabel: ({ children, color }) => (
-          <ThemedText
-            numberOfLines={1}
-            style={{
-              fontSize: 9,
-              textAlign: "center",
-              color,
-              marginTop: 4,
-              fontWeight: "700",
-            }}
-          >
-            {children}
-          </ThemedText>
-        ),
-        tabBarActiveTintColor: "#2563EB",
-        tabBarInactiveTintColor: "#64748B",
-        headerShown: false,
-      }}
-    >
-      {/* Tus pantallas de Tabs.Screen se quedan exactamente igual */}
-      <Tabs.Screen
-        name="(protected)/home"
-        options={{
-          title: "Fichar",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="house.fill" color={color} />
-          ),
-          href: tieneSesion ? (!esAdmin ? "/(protected)/home" : null) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/plantilla"
-        options={{
-          title: "Plantilla",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="group" color={color} />
-          ),
-          href: esAdmin ? "/(protected)/plantilla" : null,
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: tieneSesion ? "Perfil" : "Login",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="person" color={color} />
-          ),
-          href: !tieneSesion ? null : "/",
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/empresas"
-        options={{
-          title: "Empresa",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="briefcase.fill" color={color} />
-          ),
-          href: tieneSesion ? (esAdmin ? "/(protected)/empresas" : null) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/horarios"
-        options={{
-          title: "Horarios",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="schedule" color={color} />
-          ),
-          href: tieneSesion
-            ? !esAdmin
-              ? "/(protected)/horarios"
-              : null
-            : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/vacaciones"
-        options={{
-          title: "Vacaciones",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="event" color={color} />
-          ),
-          href: tieneSesion
-            ? !esAdmin
-              ? "/(protected)/vacaciones"
-              : null
-            : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/aprobar-vacaciones"
-        options={{
-          title: "Vacaciones",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="event" color={color} />
-          ),
-          href: tieneSesion
-            ? esAdmin
-              ? "/(protected)/aprobar-vacaciones"
-              : null
-            : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/incidencias"
-        options={{
-          title: "Incidencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="warning" color={color} />
-          ),
-          href: tieneSesion
-            ? !esAdmin
-              ? "/(protected)/incidencias"
-              : null
-            : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/fichajes"
-        options={{
-          title: "Registro",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="schedule" color={color} />
-          ),
-          href: tieneSesion ? (esAdmin ? "/(protected)/fichajes" : null) : null,
-        }}
-      />
-      <Tabs.Screen
-        name="(protected)/resolver-incidencias"
-        options={{
-          title: "Incidencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="warning" color={color} />
-          ),
-          href: tieneSesion
-            ? esAdmin
-              ? "/(protected)/resolver-incidencias"
-              : null
-            : null,
-        }}
-      />
-      <Tabs.Screen name="(authentication)/registro" options={{ href: null }} />
-      <Tabs.Screen
-        name="(authentication)/registro-organizacion"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="(authentication)/recuperar-password"
-        options={{ href: null }}
-      />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(authentication)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
   );
 }
 
-// AQUÍ ESTÁ LA CLAVE: El export por defecto debe envolver al componente de navegación con el Proveedor
 export default function RootLayout() {
   return (
     <ProveedorSesion>
-      <TabsNavigation />
+      <InitialLayout />
     </ProveedorSesion>
   );
 }

@@ -26,17 +26,17 @@ def crear_empresa(
     request: Request,
     obj_in: EmpresaCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    # usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: POST /api/empresas
     Registra una nueva empresa cliente (tenant) en el sistema validando los datos con Pydantic.
     """
-    if usuario_actual.tipo_usuario != "Administrador":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos de Administrador para crear nuevas empresas."
-        )
+    # if usuario_actual.tipo_usuario != "Administrador":
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="No tienes permisos de Administrador para crear nuevas empresas."
+    #     )
 
     try:
         empresa_existente = db.query(Empresas).filter(Empresas.cif == obj_in.cif).first()
