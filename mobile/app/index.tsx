@@ -309,20 +309,23 @@ export default function RootIndexScreen() {
                 returnKeyType="go"
                 onSubmitEditing={handleLogin}
               />
-              {Platform.OS !== "web" && (
-                <Pressable
-                  onPress={() => setIsObscured(!isObscured)}
-                  style={styles.eyeButton}
-                  disabled={cargando}
-                >
-                  <IconSymbol
-                    name={isObscured ? "visibility-off" : "visibility"}
-                    size={22}
-                    color="#64748B"
-                  />
-                </Pressable>
-              )}
+              <Pressable
+                onPress={() => setIsObscured(!isObscured)}
+                style={styles.eyeButton}
+                disabled={cargando}
+              >
+                <IconSymbol
+                  name={isObscured ? "visibility-off" : "visibility"}
+                  size={22}
+                  color="#64748B"
+                />
+              </Pressable>
             </View>
+            {errorPassword && (
+              <ThemedText style={styles.errorText}>
+                La contraseña requiere al menos 6 caracteres.
+              </ThemedText>
+            )}
             <Pressable
               onPress={() =>
                 router.push("/(authentication)/recuperar-password")
@@ -335,11 +338,6 @@ export default function RootIndexScreen() {
                 ¿Has olvidado tu contraseña?
               </ThemedText>
             </Pressable>
-            {errorPassword && (
-              <ThemedText style={styles.errorText}>
-                La contraseña requiere al menos 6 caracteres.
-              </ThemedText>
-            )}
           </View>
 
           <Pressable

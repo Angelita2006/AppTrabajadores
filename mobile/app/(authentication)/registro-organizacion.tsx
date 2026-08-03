@@ -5,7 +5,7 @@ import VideoBackground from "@/src/shared/ui/VideoBackground";
 import { IconSymbol } from "@/src/shared/ui/icon-symbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,13 @@ export default function RegistroOrganizacionScreen() {
   const [cargando, setCargando] = useState(false);
   const [isObscured, setIsObscured] = useState(true);
   const [mostrarFondo, setMostrarVideo] = useState(false);
+
+  // Referencias para el manejo del foco entre inputs
+  const cifRef = useRef<TextInput>(null);
+  const nombreAdminRef = useRef<TextInput>(null);
+  const apellidosAdminRef = useRef<TextInput>(null);
+  const emailAdminRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   // Estados de error visual
   const [errorNombre, setErrorNombre] = useState(false);
@@ -173,6 +180,9 @@ export default function RegistroOrganizacionScreen() {
                 placeholder="Ej. Mi Empresa S.L."
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => cifRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             {errorNombre && (
@@ -198,6 +208,7 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={cifRef}
                 value={cif}
                 onChangeText={(text) => {
                   setCif(text.toUpperCase());
@@ -208,6 +219,9 @@ export default function RegistroOrganizacionScreen() {
                 placeholder="Ej. B12345678"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => nombreAdminRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             {errorCif && (
@@ -233,12 +247,16 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={nombreAdminRef}
                 value={nombreAdmin}
                 onChangeText={setNombreAdmin}
                 style={styles.inputContainer}
                 placeholder="Nombre del gestor"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => apellidosAdminRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -254,12 +272,16 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={apellidosAdminRef}
                 value={apellidosAdmin}
                 onChangeText={setApellidosAdmin}
                 style={styles.inputContainer}
                 placeholder="Apellidos del gestor"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => emailAdminRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -282,6 +304,7 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={emailAdminRef}
                 value={emailAdmin}
                 onChangeText={(text) => {
                   setEmailAdmin(text);
@@ -293,6 +316,9 @@ export default function RegistroOrganizacionScreen() {
                 placeholder="admin@empresa.com"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             {errorEmail && (
@@ -318,6 +344,7 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={passwordRef}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -328,6 +355,8 @@ export default function RegistroOrganizacionScreen() {
                 placeholder="Mínimo 6 caracteres"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
+                returnKeyType="done"
+                onSubmitEditing={handleRegistroOrganizacion}
               />
               <Pressable
                 onPress={() => setIsObscured(!isObscured)}
