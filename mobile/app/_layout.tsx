@@ -1,3 +1,9 @@
+import {
+  FontAwesome,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
@@ -15,6 +21,13 @@ function InitialLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
+
+  // Carga explícita de las fuentes de iconos para que se generen en el dist web
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+    ...FontAwesome.font,
+    ...MaterialCommunityIcons.font,
+  });
 
   // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
