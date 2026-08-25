@@ -1,7 +1,6 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import LottieBackground from "@/src/shared/ui/LottieBackground";
 import VideoBackground from "@/src/shared/ui/VideoBackground";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -112,11 +111,10 @@ export default function RegistroScreen() {
         ]);
       }
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {
-        alert(`Fallo de Integridad: ${mensajeAmigable}`);
+        alert(`Error de registro: ${error}`);
       } else {
-        Alert.alert("Fallo de Integridad", mensajeAmigable);
+        Alert.alert("Error de registro", error);
       }
     } finally {
       setCargando(false);

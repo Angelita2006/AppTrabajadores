@@ -5,13 +5,14 @@ from typing import List, Any
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from models.centros_trabajo import CentrosTrabajo
 from models.correcciones_fichaje import CorreccionesFichaje
 from models.contratos import Contratos
-from routes.fichajes import calcular_hash_fichaje, mapear_id_evento
+from routes.fichajes import calcular_hash_fichaje
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum, TipoFichajeEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
 from models.empresas import Empresas
-from models.enums import TipoFichajeEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.fichajes import Fichajes
@@ -19,7 +20,6 @@ from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFich
 
 router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=CorreccionFichajeResponse, status_code=status.HTTP_201_CREATED)
@@ -34,6 +34,11 @@ def solicitar_correccion(
     URI: POST /api/correcciones
     Crea una nueva solicitud de rectificación horaria en estado 'pendiente' por defecto.
     """
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para solicitar correcciones en esta empresa."
+        )
 
     empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
     if not empresa:
@@ -79,7 +84,10 @@ def obtener_todas_las_correcciones(
     URI: GET /api/correcciones
     Lista el histórico completo de solicitudes aplicando aislamiento multi-tenant.
     """    
-    query = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.empresa_id == usuario_actual.empresa_id)
+    query = db.query(CorreccionesFichaje)
+    
+    if usuario_actual.empresa_id:
+        query = query.filter(CorreccionesFichaje.empresa_id == usuario_actual.empresa_id)
 
     return query.all()
 
@@ -94,7 +102,7 @@ def obtener_correcciones_por_empresa(
     URI: GET /api/correcciones/empresa/{id_empresa}
     Filtra las peticiones dentro de un mismo tenant (útil para el panel de RRHH de la empresa).
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para consultar las correcciones de esta empresa."
@@ -117,7 +125,7 @@ def obtener_correcciones_por_trabajador(
     if not trabajador:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
         if usuario_actual.trabajador_id != id_trabajador:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -135,13 +143,13 @@ def resolver_incidencia(
     nuevo_estado: EstadoCorreccionEnum, 
     resolutor_usuario_id: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     incidencia = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.id == id_correccion).first()
     if not incidencia:
         raise HTTPException(status_code=404, detail="Solicitud de corrección no encontrada.")
     
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != incidencia.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != incidencia.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para resolver incidencias en esta empresa."
@@ -164,7 +172,7 @@ def resolver_incidencia(
                     fichaje_original.hash_integridad = calcular_hash_fichaje(
                         trabajador_id=str(fichaje_original.trabajador_id),
                         empresa_id=str(fichaje_original.empresa_id),
-                        tipo_evento_id=int(fichaje_original.tipo_evento_id),
+                        tipo_evento_id=str(fichaje_original.tipo_evento_id),
                         fecha_iso=fichaje_original.fecha_hora.isoformat()
                     )
             
@@ -177,34 +185,47 @@ def resolver_incidencia(
                 if not fecha_str or not hora_str:
                     raise HTTPException(status_code=400, detail="Datos de tiempo insuficientes en la solicitud.")
 
-                fecha_hora_propuesta = datetime.fromisoformat(f"{fecha_str}T{hora_str}:00+02:00")
+                fecha_hora_propuesta = datetime.fromisoformat(f"{fecha_str}T{hora_str}:00")
 
                 if isinstance(evento_input, str):
-                        id_real_evento = TipoFichajeEnum[evento_input]
+                    try:
+                        id_real_evento = TipoFichajeEnum[evento_input].value
+                    except KeyError:
+                        id_real_evento = int(evento_input) if str(evento_input).isdigit() else 1
                 else:
-                    id_real_evento = 1
-                    raise ValueError
+                    id_real_evento = int(evento_input) if evento_input else 1
 
                 sha256_calculado = calcular_hash_fichaje(
                     trabajador_id=str(incidencia.trabajador_id),
                     empresa_id=str(incidencia.empresa_id),
-                    tipo_evento_id=id_real_evento,
+                    tipo_evento_id=str(id_real_evento),
                     fecha_iso=fecha_hora_propuesta.isoformat()
                 )
 
+                # 1. Obtener el centro de trabajo de forma robusta
                 centro_id = None
-                if fichaje_original:
+                if fichaje_original and fichaje_original.centro_trabajo_id:
                     centro_id = fichaje_original.centro_trabajo_id
-                else:
-                    contrato = db.query(Contratos).filter(Contratos.trabajador_id == incidencia.trabajador_id).first()
-                    if contrato:
-                        centro_id = contrato.centro_trabajo_id
                 
+                if not centro_id:
+                    contrato = db.query(Contratos).filter(Contratos.trabajador_id == incidencia.trabajador_id).first()
+                    if contrato and contrato.centro_trabajo_id:
+                        centro_id = contrato.centro_trabajo_id
+
                 if not centro_id:
                     raise HTTPException(
                         status_code=400, 
-                        detail="No se pudo procesar el alta: El trabajador no posee un contrato con centro de trabajo asignado."
+                        detail="No se pudo procesar: El trabajador no posee un contrato con centro de trabajo asignado."
                     )
+
+                # 2. Consultar el centro o el fichaje afectado y extraer latitud/longitud asegurando el formato correcto
+                latitud = None
+                longitud = None
+
+                centro_trabajo = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == centro_id).first()
+                if centro_trabajo:
+                    latitud = getattr(centro_trabajo, 'latitud', None)
+                    longitud = getattr(centro_trabajo, 'longitud', None)
 
                 nuevo_fichaje = Fichajes(
                     empresa_id=incidencia.empresa_id,
@@ -217,6 +238,8 @@ def resolver_incidencia(
                     origen=OrigenFichajeEnum.CORRECCION_RRHH,
                     estado=EstadoFichajeEnum.VALIDO,
                     hash_integridad=sha256_calculado,
+                    latitud=latitud,      
+                    longitud=longitud,    
                     fichaje_sustituido_id=incidencia.fichaje_afectado_id, 
                     observaciones=f"Fichaje corrector mediante incidencia: {incidencia.motivo}"
                 )
@@ -234,7 +257,7 @@ def resolver_incidencia(
             status_code=500,
             detail=f"Error al resolver la corrección de fichajes: {str(e)}"
         )
-
+    
 
 @router.delete("/{id_correccion}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_solicitud_correccion(
@@ -254,7 +277,7 @@ def eliminar_solicitud_correccion(
             detail="Solicitud de corrección no encontrada."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != solicitud.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != solicitud.empresa_id:
         if usuario_actual.id != solicitud.solicitado_por_usuario_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -272,13 +295,13 @@ def restaurar_correccion_pendiente(
     request: Request,
     id_correccion: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     incidencia = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.id == id_correccion).first()
     if not incidencia:
         raise HTTPException(status_code=404, detail="Solicitud de corrección no encontrada.")
     
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != incidencia.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != incidencia.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para restaurar esta corrección."

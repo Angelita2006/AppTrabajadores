@@ -1,5 +1,4 @@
 import datetime
-import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -17,10 +16,9 @@ from datetime import timedelta, timezone
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
-# Configuración de correo
+# Configuración
 SMTP_SERVER = settings.SMTP_SERVER
 SMTP_PORT = settings.SMTP_PORT
 SMTP_USER = settings.SMTP_USER

@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import Any, Optional
 from uuid import UUID
-from models.enums import TipoContratoEnum, TipoJornadaEnum
+from core.enums import TipoContratoEnum, TipoJornadaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CONTRATOS
@@ -24,15 +24,16 @@ class ContratoUpdate(BaseModel):
     puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Puesto de trabajo")
     categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría profesional")
     trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador")
+    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class ContratoBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de un contrato laboral
     basado en el modelo relacional mapeado por sqlacodegen.
     """
+    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
     centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
@@ -43,12 +44,12 @@ class ContratoBase(BaseModel):
     horas_semana: Decimal = Field(..., gt=Decimal('0'), max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio del contrato en formato AAAA-MM-DD")
 
-
 class ContratoCreate(ContratoBase):
     """
     Esquema utilizado para registrar un nuevo contrato en el sistema.
     Valida las restricciones lógicas y de negocio antes de la inserción.
     """
+    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
     departamento_id: Optional[UUID] = Field(None, description="ID único UUID del departamento asignado")
     puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Denominación del puesto laboral")
     categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría según convenio profesional")
@@ -82,7 +83,6 @@ class ContratoCreate(ContratoBase):
             
         return self
 
-
 class ContratoResponse(ContratoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia el frontend móvil o web.
@@ -91,7 +91,8 @@ class ContratoResponse(ContratoBase):
     activo: bool = Field(..., description="Determina si el contrato se encuentra vigente")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
-    
+
+    calendario_laboral_id: Optional[UUID] = Field(None, description="ID del calendario laboral asignado")
     departamento_id: Optional[UUID] = Field(None, description="ID del departamento")
     puesto_trabajo: Optional[str] = Field(None, description="Puesto de trabajo")
     categoria_profesional: Optional[str] = Field(None, description="Categoría profesional")

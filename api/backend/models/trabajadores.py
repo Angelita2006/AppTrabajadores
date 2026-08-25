@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, DateTime, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 
@@ -31,6 +31,7 @@ class Trabajadores(Base):
     numero_seguridad_social: Mapped[Optional[str]] = mapped_column(String(20))
     fecha_nacimiento: Mapped[Optional[datetime.date]] = mapped_column(Date)
     fecha_baja_empresa: Mapped[Optional[datetime.date]] = mapped_column(Date)
+    foto_url: Mapped[Optional[str]] = mapped_column(Text)
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores') # type: ignore
     asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador') # type: ignore

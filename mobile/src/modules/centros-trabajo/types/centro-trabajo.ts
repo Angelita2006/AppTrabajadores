@@ -13,6 +13,8 @@ export interface CentroTrabajo {
   updated_at: string; // Mapea DateTime(True) en formato ISO string
   codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
   direccion?: string | null; // Dirección física o postal (opcional)
+  latitud: number; // Latitud geográfica
+  longitud: number; // Longitud geográfica
 
   // Relación opcional para carga anidada (eager loading)
   empresa?: Empresa | null;
@@ -28,6 +30,8 @@ export interface CentroTrabajoCreate {
   zona_horaria?: string; // Zona horaria (por defecto "Europe/Madrid")
   codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
   direccion?: string | null; // Dirección física (opcional)
+  latitud: number; // Latitud geográfica
+  longitud: number; // Longitud geográfica
 }
 
 /**
@@ -39,4 +43,6 @@ export interface CentroTrabajoUpdate {
   activo?: boolean;
   codigo_ccc?: string | null;
   direccion?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
 }

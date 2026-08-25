@@ -1,4 +1,5 @@
-from sqlalchemy import Column, ForeignKey, PrimaryKeyConstraint, SmallInteger, String, Table, UniqueConstraint
+import uuid
+from sqlalchemy import Column, ForeignKey, PrimaryKeyConstraint, SmallInteger, String, Table, UniqueConstraint, Uuid
 from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
@@ -18,7 +19,7 @@ class Roles(Base):
         UniqueConstraint('nombre', name='roles_nombre_key')
     )
 
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     descripcion: Mapped[Optional[str]] = mapped_column(String(255))
 

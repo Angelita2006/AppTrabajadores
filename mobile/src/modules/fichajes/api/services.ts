@@ -7,13 +7,8 @@ import { FichajeCreateParams, RegistroFichaje } from "../types/registrofichaje";
 export const registrarFichaje = async (
   data: FichajeCreateParams,
 ): Promise<RegistroFichaje> => {
-  try {
-    const respuesta = await api.post<RegistroFichaje>("/api/fichajes", data);
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
-    throw new Error(apiMessage || "Error al registrar el fichaje.");
-  }
+  const respuesta = await api.post<RegistroFichaje>("/api/fichajes", data);
+  return respuesta.data;
 };
 
 /**
@@ -24,7 +19,7 @@ export const obtenerFichajes = async (): Promise<RegistroFichaje[]> => {
     const respuesta = await api.get<RegistroFichaje[]>("/api/fichajes");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar el historial de fichajes.",
     );
@@ -44,7 +39,7 @@ export const obtenerFichajesTrabajadorYEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar los fichajes del trabajador.",
     );
@@ -63,7 +58,7 @@ export const obtenerFichajesHoy = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener los fichajes de hoy.");
   }
 };
@@ -80,7 +75,7 @@ export const obtenerFichajesSemanaActual = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los fichajes de la semana.",
     );
@@ -99,7 +94,7 @@ export const obtenerFichajesTurnoActual = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los fichajes del turno actual.",
     );
@@ -118,7 +113,7 @@ export const obtenerUltimoFichaje = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al consultar el último fichaje.");
   }
 };
@@ -139,7 +134,7 @@ export const obtenerFichajesEmpresaPorFecha = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los fichajes de la empresa por fecha.",
     );

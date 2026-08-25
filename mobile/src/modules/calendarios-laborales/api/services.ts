@@ -20,7 +20,7 @@ export const crearCalendarioLaboral = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar el nuevo calendario laboral.",
     );
@@ -41,7 +41,7 @@ export const modificarCalendarioLaboral = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al actualizar el calendario laboral ${idCalendario}.`,
@@ -61,7 +61,7 @@ export const obtenerCalendario = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || `Calendario laboral con ID ${calendarioId} no encontrado.`,
     );
@@ -71,7 +71,7 @@ export const obtenerCalendario = async (
 /**
  * Recupera los calendarios anuales de una empresa junto con el listado de sus días festivos.
  */
-export const obtenerCalendarioYFestivos = async (
+export const obtenerCalendariosYFestivos = async (
   empresaId: string,
 ): Promise<CalendarioFestivo[]> => {
   try {
@@ -80,7 +80,7 @@ export const obtenerCalendarioYFestivos = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al recuperar los calendarios y festivos de la empresa ${empresaId}.`,
@@ -92,7 +92,7 @@ export const obtenerCalendarioYFestivos = async (
  * Envía un archivo binario PDF al servidor para ser analizado mediante IA.
  */
 export const importarCalendarioPDF = async (
-  calendarioId: string,
+  calendario_id: string,
   formData: FormData,
 ): Promise<{
   status: string;
@@ -101,7 +101,7 @@ export const importarCalendarioPDF = async (
 }> => {
   try {
     const respuesta = await api.post(
-      `/api/calendarios-laborales/${calendarioId}/importar-pdf`,
+      `/api/calendarios-laborales/${calendario_id}/importar-pdf`,
       formData,
       {
         headers: {
@@ -112,7 +112,7 @@ export const importarCalendarioPDF = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Error al procesar y guardar el archivo PDF del calendario.",
@@ -126,12 +126,5 @@ export const importarCalendarioPDF = async (
 export const eliminarCalendarioLaboral = async (
   idCalendario: string,
 ): Promise<void> => {
-  try {
-    await api.delete(`/api/calendarios-laborales/${idCalendario}`);
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
-    throw new Error(
-      apiMessage || `Error al eliminar el calendario laboral ${idCalendario}.`,
-    );
-  }
+  await api.delete(`/api/calendarios-laborales/${idCalendario}`);
 };

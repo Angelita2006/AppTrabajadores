@@ -1,16 +1,13 @@
 from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import String
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.calendarios_laborales import CalendariosLaborales
 from models.usuarios import Usuarios
 from models.festivos import Festivos
@@ -18,9 +15,7 @@ from schemas.festivos import FestivoCreate, FestivoResponse
 
 router = APIRouter(prefix="/api/festivos", tags=["Festivos"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post("", response_model=FestivoResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("15/minute")  # Protegido frente a la creación masiva no deseada de días festivos
@@ -28,7 +23,7 @@ def crear_festivo(
     request: Request,
     obj_in: FestivoCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/festivos
@@ -41,7 +36,7 @@ def crear_festivo(
             detail=f"Calendario laboral ({obj_in.calendario_id}) no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+    if usuario_actual.empresa_id != calendario.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear festivos en este calendario."
@@ -89,13 +84,12 @@ def obtener_todos_los_festivos(
     """
     query = db.query(Festivos).join(Festivos.calendario)
     
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(CalendariosLaborales.empresa_id == usuario_actual.empresa_id)
+    if not usuario_actual.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No estás vinculado a ninguna empresa."
+        )
+    query = query.filter(CalendariosLaborales.empresa_id == usuario_actual.empresa_id)
 
     return query.order_by(Festivos.fecha.asc()).all()
 
@@ -117,7 +111,7 @@ def obtener_festivos_por_calendario(
             detail=f"Calendario laboral ({id_calendario}) no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != calendario.empresa_id:
+    if usuario_actual.empresa_id != calendario.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para consultar los festivos de este calendario."
@@ -133,7 +127,7 @@ def editar_festivo(
     nuevo_tipo = None, 
     nueva_descripcion = None, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/festivos/{id_festivo}/editar
@@ -148,7 +142,7 @@ def editar_festivo(
         )
     
     calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == festivo.calendario_id).first()
-    if usuario_actual.tipo_usuario != "Administrador" and calendario and usuario_actual.empresa_id != calendario.empresa_id:
+    if calendario and usuario_actual.empresa_id != calendario.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para editar este festivo."
@@ -171,7 +165,7 @@ def editar_festivo(
 def eliminar_festivo_manual(
     id_festivo: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: DELETE /api/festivos/{id_festivo}
@@ -185,7 +179,7 @@ def eliminar_festivo_manual(
         )
     
     calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == festivo.calendario_id).first()
-    if usuario_actual.tipo_usuario != "Administrador" and calendario and usuario_actual.empresa_id != calendario.empresa_id:
+    if calendario and usuario_actual.empresa_id != calendario.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar este festivo."

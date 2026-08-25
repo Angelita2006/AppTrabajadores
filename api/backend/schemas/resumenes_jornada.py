@@ -16,7 +16,6 @@ class ResumenJornadaBase(BaseModel):
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador asociado")
     fecha: datetime.date = Field(..., description="Fecha del día computado en formato AAAA-MM-DD")
 
-
 class ResumenJornadaCreate(ResumenJornadaBase):
     """
     Esquema utilizado por procesos automáticos o tareas cron (jobs) del backend
@@ -29,7 +28,6 @@ class ResumenJornadaCreate(ResumenJornadaBase):
     cerrado: bool = Field(False, description="Determina si el día ha sido consolidado y bloqueado para nóminas")
     hora_entrada: Optional[datetime.datetime] = Field(None, description="Primer marcaje de entrada registrado en el día")
     hora_salida: Optional[datetime.datetime] = Field(None, description="Último marcaje de salida registrado en el día")
-
 
 class ResumenJornadaResponse(ResumenJornadaBase):
     """

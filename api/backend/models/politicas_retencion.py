@@ -1,10 +1,10 @@
 import uuid
-from sqlalchemy import CheckConstraint, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, UniqueConstraint, Uuid, text
+from sqlalchemy import CheckConstraint, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, UniqueConstraint, Uuid, text
 from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from models.enums import AccionRetencionEnum
+from core.enums import AccionRetencionEnum
 
 class PoliticasRetencion(Base):
     __tablename__ = 'politicas_retencion'

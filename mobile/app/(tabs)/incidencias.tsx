@@ -198,7 +198,7 @@ export default function IncidenciasScreen() {
         solicitado_por_usuario_id: usuarioActual.id,
         motivo: comentario.trim(),
         fichaje_afectado_id:
-          tipoCorreccion !== "Alta_manual" ? fichajeAfectadoId.trim() : null,
+          tipoCorreccion !== "Alta_manual" ? fichajeAfectadoId : null,
         valor_nuevo:
           tipoCorreccion !== "Anulación"
             ? {

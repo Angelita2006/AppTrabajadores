@@ -7,17 +7,16 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from models.ausencias import Ausencias
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.empresas import Empresas
-from models.enums import EstadoAusenciaEnum
+from core.enums import EstadoAusenciaEnum
 from schemas.ausencias import AusenciaCreate, AusenciaResponse
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 
-# Inicialización del enrutador modular para el control de vacaciones, bajas y permisos
 router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=AusenciaResponse, status_code=status.HTTP_201_CREATED)
@@ -26,14 +25,14 @@ def solicitar_ausencia(
     request: Request,
     obj_in: AusenciaCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/ausencias
     Registra una nueva solicitud de ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.
     """
-    # Validar permisos de tenant / administrador
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+    # Validar permisos de tenant / empresa
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para registrar ausencias en esta empresa."
@@ -73,65 +72,48 @@ def solicitar_ausencia(
         )
 
 
-@router.get("", response_model=List[AusenciaResponse])
-def obtener_todas_las_ausencias(
+@router.put("/{id_ausencia}/estado", response_model=AusenciaResponse)
+@limiter.limit("20/minute")
+def actualizar_estado_ausencia(
+    request: Request,
+    id_ausencia: UUID, 
+    nuevo_estado: str,  
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: GET /api/ausencias
-    Lista el histórico completo de ausencias y bajas aplicando aislamiento multi-tenant.
+    URI: PUT /api/ausencias/{id_ausencia}/estado?nuevo_estado=aprobado
+    Modifica el estado de una solicitud de ausencia (aprobar o rechazar).
     """
-    query = db.query(Ausencias)
+    # 1. Buscar la ausencia por su ID único
+    ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
     
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(Ausencias.empresa_id == usuario_actual.empresa_id)
+    if not ausencia:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró ninguna solicitud de ausencia con el ID {id_ausencia}."
+        )
 
-    return query.all()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == ausencia.trabajador_id).first()
+    if usuario_actual.empresa_id and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar el estado de esta ausencia."
+        )
 
-
-@router.get("/empresa/{id_empresa}", response_model=List[AusenciaResponse])
-def obtener_ausencias_por_empresa(
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/ausencias/empresa/{id_empresa}
-    Filtra las solicitudes dentro de una empresa cliente para el panel de recursos humanos.
-    """
-
-    return db.query(Ausencias).filter(Ausencias.empresa_id == id_empresa).all()
-
-
-@router.get("/trabajador/{id_trabajador}", response_model=List[AusenciaResponse])
-def obtener_ausencias_por_trabajador(
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/ausencias/trabajador/{id_trabajador}
-    Permite al operario consultar el estado de sus bajas o vacaciones desde la app móvil.
-    """
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
-
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        if usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para consultar las ausencias de este trabajador."
-            )
-
-    return db.query(Ausencias).filter(Ausencias.trabajador_id == id_trabajador).all()
-
+    # 2. Actualizar el campo de estado de forma dinámica
+    setattr(ausencia, "estado", nuevo_estado)
+    
+    try:
+        db.commit()
+        db.refresh(ausencia)
+        return ausencia
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar el estado de la ausencia: {str(error)}"
+        )
 
 @router.put("/{id_ausencia}/resolver", response_model=AusenciaResponse)
 @limiter.limit("20/minute")
@@ -142,7 +124,7 @@ def resolver_solicitud_ausencia(
     resolutor_usuario_id: UUID, 
     observaciones: Optional[str] = None,
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/ausencias/{id_ausencia}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID
@@ -153,7 +135,7 @@ def resolver_solicitud_ausencia(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud de ausencia no localizada.")
 
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == ausencia.trabajador_id).first()
-    if usuario_actual.tipo_usuario != "Administrador" and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para resolver esta solicitud de ausencia."
@@ -181,45 +163,44 @@ def resolver_solicitud_ausencia(
     db.refresh(ausencia)
     return ausencia
 
-@router.put("/{id_ausencia}/estado", response_model=AusenciaResponse)
-@limiter.limit("20/minute")
-def actualizar_estado_ausencia(
-    request: Request,
-    id_ausencia: UUID, 
-    nuevo_estado: str,  
+@router.get("/empresa/{id_empresa}", response_model=List[AusenciaResponse])
+def obtener_ausencias_por_empresa(
+    id_empresa: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
-    URI: PUT /api/ausencias/{id_ausencia}/estado?nuevo_estado=aprobado
-    Modifica el estado de una solicitud de ausencia (aprobar o rechazar).
+    URI: GET /api/ausencias/empresa/{id_empresa}
+    Filtra las solicitudes dentro de una empresa cliente para el panel de recursos humanos.
     """
-    # 1. Buscar la ausencia por su ID único
-    ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
-    
-    if not ausencia:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró ninguna solicitud de ausencia con el ID {id_ausencia}."
-        )
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == ausencia.trabajador_id).first()
-    if usuario_actual.tipo_usuario != "Administrador" and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar el estado de esta ausencia."
+            detail="No tienes autorización para consultar las ausencias de esta empresa."
         )
 
-    # 2. Actualizar el campo de estado de forma dinámica
-    setattr(ausencia, "estado", nuevo_estado)
-    
-    try:
-        db.commit()
-        db.refresh(ausencia)
-        return ausencia
-    except Exception as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar el estado de la ausencia: {str(error)}"
-        )
+    return db.query(Ausencias).filter(Ausencias.empresa_id == id_empresa).all()
+
+
+@router.get("/trabajador/{id_trabajador}", response_model=List[AusenciaResponse])
+def obtener_ausencias_por_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    URI: GET /api/ausencias/trabajador/{id_trabajador}
+    Permite al operario consultar el estado de sus bajas o vacaciones desde la app móvil.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
+        if getattr(usuario_actual, "trabajador_id", None) != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para consultar las ausencias de este trabajador."
+            )
+
+    return db.query(Ausencias).filter(Ausencias.trabajador_id == id_trabajador).all()

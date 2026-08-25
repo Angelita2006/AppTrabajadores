@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from models.enums import TipoUsuarioEnum
+from core.enums import TipoUsuarioEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - USUARIOS
@@ -17,7 +17,6 @@ class UsuarioBase(BaseModel):
     email: EmailStr = Field(..., max_length=255, description="Correo electrónico único de acceso")
     tipo_usuario: TipoUsuarioEnum = Field(..., description="Categoría de usuario (admin_gestoria, admin_empresa, trabajador, etc.)")
 
-
 class UsuarioCreate(UsuarioBase):
     """
     Esquema utilizado para recibir los datos durante la creación de una cuenta.
@@ -26,7 +25,6 @@ class UsuarioCreate(UsuarioBase):
     password_raw: str = Field(..., min_length=6, max_length=255, description="Contraseña en texto plano antes del hash")
     empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa cliente asignada")
     trabajador_id: Optional[UUID] = Field(None, description="ID único UUID del expediente de trabajador vinculado")
-
 
 class UsuarioRegisterCreate(BaseModel):
     """
@@ -39,7 +37,6 @@ class UsuarioRegisterCreate(BaseModel):
     password: str = Field(..., min_length=6, max_length=255, description="Contraseña de acceso del usuario")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class UsuarioResponse(UsuarioBase):
     """
@@ -57,7 +54,6 @@ class UsuarioResponse(UsuarioBase):
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class LoginRequest(BaseModel):
     """

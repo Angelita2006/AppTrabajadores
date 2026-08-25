@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Any, Dict
 from uuid import UUID
-from models.enums import TipoCorreccionEnum, EstadoCorreccionEnum
+from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CORRECCIONES
@@ -20,13 +20,11 @@ class CorreccionFichajeBase(BaseModel):
     valor_nuevo: Optional[Dict[str, Any]] = Field(None, description="Nuevos valores propuestos en formato JSON")
     motivo: str = Field(..., min_length=2, description="Justificación detallada de la solicitud de corrección")
 
-
 class CorreccionFichajeCreate(CorreccionFichajeBase):
     """
     Esquema utilizado para recibir los datos al solicitar una nueva corrección.
     """
     solicitado_por_usuario_id: UUID = Field(..., description="ID del usuario que realiza la petición")
-
 
 class CorreccionFichajeUpdate(BaseModel):
     """
@@ -38,7 +36,6 @@ class CorreccionFichajeUpdate(BaseModel):
     estado: Optional[EstadoCorreccionEnum] = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class CorreccionFichajeResponse(CorreccionFichajeBase):
     """

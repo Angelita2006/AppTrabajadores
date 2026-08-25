@@ -21,9 +21,9 @@ class EmpresaUpdate(BaseModel):
     convenio_colectivo: Optional[str] = Field(None, max_length=255, description="Convenio de aplicación sectorial")
     direccion_fiscal: Optional[str] = Field(None, description="Domicilio social o fiscal de la empresa")
     fecha_baja: Optional[datetime.date] = Field(None, description="Fecha de baja del cliente si aplica")
+    logo_url: Optional[str] = Field(None, description="Ruta o URL del logotipo corporativo") 
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class EmpresaBase(BaseModel):
     """
@@ -35,7 +35,6 @@ class EmpresaBase(BaseModel):
     zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria por defecto para los centros de trabajo")
     configuracion: dict = Field(default_factory=dict, description="Ajustes y parámetros específicos en formato JSON")
 
-
 class EmpresaCreate(EmpresaBase):
     """
     Esquema utilizado para recibir los datos de registro de una empresa desde el cliente.
@@ -45,7 +44,6 @@ class EmpresaCreate(EmpresaBase):
     codigo_cnae: Optional[str] = Field(None, max_length=10, description="Clasificación Nacional de Actividades Económicas")
     convenio_colectivo: Optional[str] = Field(None, max_length=255, description="Convenio de aplicación sectorial")
     direccion_fiscal: Optional[str] = Field(None, description="Domicilio social o fiscal de la empresa")
-
 
 class EmpresaResponse(EmpresaBase):
     """
@@ -58,11 +56,11 @@ class EmpresaResponse(EmpresaBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
     
-    # Propiedades complementarias opcionales que viajan en el JSON
     nombre_comercial: Optional[str] = Field(None, description="Nombre comercial")
     codigo_cnae: Optional[str] = Field(None, description="Código CNAE")
     convenio_colectivo: Optional[str] = Field(None, description="Convenio colectivo aplicable")
     direccion_fiscal: Optional[str] = Field(None, description="Dirección fiscal")
     fecha_baja: Optional[datetime.date] = Field(None, description="Fecha de baja del cliente si aplica")
+    logo_url: Optional[str] = Field(None, description="Ruta o URL del logotipo corporativo") 
 
     model_config = ConfigDict(from_attributes=True)

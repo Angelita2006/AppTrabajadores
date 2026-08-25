@@ -3,7 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
-from models.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
+from core.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - FICHAJES
@@ -20,7 +20,6 @@ class FichajeBase(BaseModel):
     tipo_evento_id: int = Field(..., description="ID numérico del tipo de evento (SmallInteger)")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Método utilizado para realizar el marcaje")
 
-
 class FichajeCreate(BaseModel):
     """
     Esquema unificado para recibir marcajes desde clientes web o móviles.
@@ -30,7 +29,7 @@ class FichajeCreate(BaseModel):
     trabajador_id: UUID = Field(..., description="ID UUID del expediente del empleado")
     centro_trabajo_id: UUID = Field(..., description="ID UUID del centro de trabajo asignado")
     
-    tipo_evento_id: int = Field(..., description="ID numérico del tipo de evento horario")
+    tipo_evento_id: UUID = Field(..., description="ID numérico del tipo de evento horario")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Canal: app_movil, web, qr, etc.")
     
     origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR, description="Origen del fichaje")
@@ -45,6 +44,7 @@ class FichajeCreate(BaseModel):
     fecha_hora_dispositivo: Optional[datetime] = Field(None, description="Fecha y hora reportada por el dispositivo")
     observaciones: Optional[str] = Field(None, max_length=500, description="Observaciones adicionales")
 
+    forzar_hora_extra: Optional[bool] = Field(False, description="Bandera para forzar fichaje en festivo como horas extra")
 
 class FichajeResponse(FichajeBase):
     """

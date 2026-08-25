@@ -2,10 +2,9 @@ import datetime
 from typing import Optional
 import uuid
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, Text, Uuid, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
 
 class Ausencias(Base):
     __tablename__ = 'ausencias'
@@ -22,27 +21,22 @@ class Ausencias(Base):
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     
-    # tipo_ausencia: Mapped[TipoAusenciaEnum] = mapped_column(Enum(TipoAusenciaEnum, name='tipo_ausencia_enum'), nullable=False)
     tipo_ausencia: Mapped[str] = mapped_column(Text, nullable=False)
-    # estado: Mapped[EstadoAusenciaEnum] = mapped_column(Enum(EstadoAusenciaEnum, name='estado_ausencia_enum'), nullable=False, server_default=text("'Pendiente'::estado_ausencia_enum"))
     estado: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'Pendiente'"))
     
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     motivo: Mapped[str] = mapped_column(Text, nullable=False, comment='Explicación o causa legal de la ausencia.')
     
-    # Campo JSONB para adjuntar metadatos del justificante (URL del archivo PDF, número de colegiado, etc.)
     justificante_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     
-    # Control de auditoría para la resolución de RRHH
     validado_por_usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     fecha_resolucion: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     observaciones_admin: Mapped[Optional[str]] = mapped_column(Text, comment='Notas añadidas por el validador al aprobar/rechazar.')
 
-    # Relaciones del ORM
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='ausencias') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='ausencias') # type: ignore
     validado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas') # type: ignore

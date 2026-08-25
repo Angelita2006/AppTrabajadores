@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyCo
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from models.enums import EstadoCorreccionEnum, TipoCorreccionEnum
+from core.enums import EstadoCorreccionEnum, TipoCorreccionEnum
 
 class CorreccionesFichaje(Base):
     __tablename__ = 'correcciones_fichaje'

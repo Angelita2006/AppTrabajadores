@@ -5,7 +5,8 @@ from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.empresas import Empresas
 from schemas.auditoria_accesos import AuditoriaAccesoCreate, AuditoriaAccesoResponse
 from models.trabajadores import Trabajadores
@@ -14,7 +15,6 @@ from models.auditoria_accesos import AuditoriaAccesos
 
 router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=AuditoriaAccesoResponse, status_code=status.HTTP_201_CREATED)
@@ -23,14 +23,14 @@ def registrar_acceso_auditoria(
     request: Request,
     obj_in: AuditoriaAccesoCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/auditoria-accesos
     Registra de forma inmutable una acción de consulta, descarga o exportación de datos horarios.
     """
-    # Validar permisos de empresa si no es Administrador global
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+    # Validar permisos de empresa si no pertenece a la misma empresa
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para registrar auditorías en esta empresa."
@@ -88,29 +88,6 @@ def registrar_acceso_auditoria(
             detail=f"Ha ocurrido un error al guardar el registro de auditoría: {str(error)}"
         )
 
-
-@router.get("", response_model=List[AuditoriaAccesoResponse])
-def obtener_toda_la_auditoria(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/auditoria-accesos
-    Devuelve la trazabilidad completa y absoluta de accesos aplicando aislamiento multi-tenant.
-    """
-    query = db.query(AuditoriaAccesos)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(AuditoriaAccesos.empresa_id == usuario_actual.empresa_id)
-
-    return query.all()
-
-
 @router.get("/empresa/{id_empresa}", response_model=List[AuditoriaAccesoResponse])
 def obtener_auditoria_empresa(
     id_empresa: UUID, 
@@ -121,7 +98,7 @@ def obtener_auditoria_empresa(
     URI: GET /api/auditoria-accesos/empresa/{id_empresa}
     Recupera el historial de consultas de forma aislada para un cliente específico (tenant).
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para consultar la auditoría de esta empresa."
@@ -144,8 +121,8 @@ def obtener_auditoria_por_trabajador(
     if not trabajador:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        if usuario_actual.trabajador_id != id_trabajador:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
+        if getattr(usuario_actual, "trabajador_id", None) != id_trabajador:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver la auditoría de este trabajador."

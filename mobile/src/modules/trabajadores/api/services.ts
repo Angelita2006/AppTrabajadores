@@ -14,7 +14,7 @@ export const obtenerTrabajadores = async (): Promise<Trabajador[]> => {
     const respuesta = await api.get<Trabajador[]>("/api/trabajadores");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar la plantilla de empleados del sistema.",
     );
@@ -34,7 +34,7 @@ export const obtenerTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail || error.message;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar los detalles del trabajador.",
     );
@@ -51,7 +51,7 @@ export const crearTrabajador = async (
     const respuesta = await api.post<Trabajador>("/api/trabajadores", data);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al registrar el nuevo trabajador.");
   }
 };
@@ -70,7 +70,7 @@ export const actualizarTrabajador = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar el trabajador.");
   }
 };
@@ -93,7 +93,7 @@ export const obtenerEmpresasTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar las empresas del trabajador.",
     );
@@ -112,7 +112,7 @@ export const eliminarTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al eliminar el trabajador.");
   }
 };
@@ -144,7 +144,34 @@ export const asignarTurnosTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al asignar los turnos al trabajador.");
+  }
+};
+
+/**
+ * Edita los datos sobre una asignación de turno existente.
+ */
+export const actualizarAsignacionTurno = async (
+  idAsignacion: string,
+  fechaInicio: string,
+  fechaFin: string | null,
+): Promise<any> => {
+  try {
+    // El backend espera fecha_fin por query params y fecha_inicio de forma opcional
+    const params = new URLSearchParams();
+    if (fechaFin) params.append("fecha_fin", fechaFin);
+    if (fechaInicio) params.append("fecha_inicio", fechaInicio);
+
+    const respuesta = await api.put(
+      `/api/asignaciones-turno/${idAsignacion}/editar?${params.toString()}`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.message || error?.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al actualizar la asignación de turno.",
+    );
   }
 };

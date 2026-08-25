@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.empresas import Empresas
 from models.motivos_pausa import MotivosPausa
 from models.usuarios import Usuarios
@@ -15,9 +14,7 @@ from schemas.motivos_pausa import MotivoPausaCreate, MotivoPausaResponse
 
 router = APIRouter(prefix="/api/motivos-pausa", tags=["Motivos de Pausa"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post("", response_model=MotivoPausaResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("15/minute")  # Protegido frente a la creación masiva no deseada de tipologías de pausa
@@ -25,7 +22,7 @@ def crear_motivo_pausa(
     request: Request,
     obj_in: MotivoPausaCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/motivos-pausa
@@ -40,12 +37,11 @@ def crear_motivo_pausa(
                     detail=f"Empresa ({obj_in.empresa_id}) no encontrada."
                 )
 
-        if usuario_actual.tipo_usuario != "Administrador":
-            if not obj_in.empresa_id or usuario_actual.empresa_id != obj_in.empresa_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="No tienes permisos para crear motivos de pausa globales o para otra empresa."
-                )
+        if not obj_in.empresa_id or usuario_actual.empresa_id != obj_in.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para crear motivos de pausa globales o para otra empresa."
+            )
 
         nuevo_motivo = MotivosPausa(
             nombre=obj_in.nombre,
@@ -68,43 +64,18 @@ def crear_motivo_pausa(
             detail=f"Ha ocurrido un error al crear el motivo de pausa: {str(error)}"
         )
 
-
-@router.get("", response_model=List[MotivoPausaResponse])
-def obtener_todos_los_motivos(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/motivos-pausa
-    Devuelve el catálogo absoluto o filtrado por empresa según el rol del usuario.
-    """
-    query = db.query(MotivosPausa)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(
-            (MotivosPausa.empresa_id == usuario_actual.empresa_id) | (MotivosPausa.empresa_id == None)
-        )
-
-    return query.order_by(MotivosPausa.nombre.asc()).all()
-
-
 @router.get("/empresa/{id_empresa}", response_model=List[MotivoPausaResponse])
 def obtener_motivos_disponibles_empresa(
     id_empresa: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: GET /api/motivos-pausa/empresa/{id_empresa}
     Recupera los motivos de descanso utilizables por una empresa: los comunes globales (NULL) 
     y los personalizados propios de esta organización.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
+    if usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para ver los motivos de pausa de esta empresa."
@@ -119,7 +90,7 @@ def obtener_motivos_disponibles_empresa(
 def obtener_motivo_pausa(
     id_motivo: int, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: GET /api/motivos-pausa/{id_motivo}
@@ -132,7 +103,7 @@ def obtener_motivo_pausa(
             detail=f"Motivo de pausa con ID {id_motivo} no encontrado."
         )
     
-    if usuario_actual.tipo_usuario != "Administrador" and motivo.empresa_id is not None and motivo.empresa_id != usuario_actual.empresa_id:
+    if motivo.empresa_id is not None and motivo.empresa_id != usuario_actual.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para acceder a este motivo de pausa."

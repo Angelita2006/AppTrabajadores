@@ -1,5 +1,4 @@
 import datetime
-from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional
 from uuid import UUID
@@ -34,7 +33,6 @@ class TurnoUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TurnoBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de un turno teórico
@@ -66,13 +64,11 @@ class TurnoBase(BaseModel):
                 
         return sorted(list(set(valores)))
 
-
 class TurnoCreate(TurnoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al configurar un nuevo turno.
     """
     pass
-
 
 class TurnoResponse(TurnoBase):
     """

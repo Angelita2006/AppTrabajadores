@@ -5,14 +5,14 @@ import uuid
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, Numeric, PrimaryKeyConstraint, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from models.enums import TipoContratoEnum, TipoJornadaEnum
+from core.enums import TipoContratoEnum, TipoJornadaEnum
 
 class Contratos(Base):
     __tablename__ = 'contratos'
     __table_args__ = (
         CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check'),
         CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check'),
-        ForeignKeyConstraint(['centro_trabajo_id'], ['centros_trabajo.id'], ondelete='RESTRICT', name='contratos_centro_trabajo_id_fkey'),
+        ForeignKeyConstraint(['calendario_laboral_id'], ['calendarios_laborales.id'], ondelete='SET NULL', name='contratos_calendario_laboral_id_fkey'),        ForeignKeyConstraint(['centro_trabajo_id'], ['centros_trabajo.id'], ondelete='RESTRICT', name='contratos_centro_trabajo_id_fkey'),
         ForeignKeyConstraint(['departamento_id'], ['departamentos.id'], ondelete='SET NULL', name='contratos_departamento_id_fkey'),
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='contratos_empresa_id_fkey'),
         ForeignKeyConstraint(['trabajador_id'], ['trabajadores.id'], ondelete='RESTRICT', name='contratos_trabajador_id_fkey'),
@@ -23,6 +23,7 @@ class Contratos(Base):
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    calendario_laboral_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
     tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False)
     tipo_jornada: Mapped[TipoJornadaEnum] = mapped_column(Enum(TipoJornadaEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_jornada_enum'), nullable=False)
     horas_semana: Mapped[decimal.Decimal] = mapped_column(Numeric(5, 2), nullable=False)
@@ -39,3 +40,4 @@ class Contratos(Base):
     departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos') # type: ignore
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos') # type: ignore
+    calendario_laboral: Mapped[Optional['CalendariosLaborales']] = relationship('CalendariosLaborales') # type: ignore

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import api from "../../../service/api/api";
 import { Empresa, EmpresaUpdate } from "../types/empresa";
 
@@ -9,7 +10,7 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
     const respuesta = await api.get<Empresa[]>("/api/empresas");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener el catálogo de empresas.");
   }
 };
@@ -22,7 +23,7 @@ export const obtenerEmpresa = async (idEmpresa: string): Promise<Empresa> => {
     const respuesta = await api.get<Empresa>(`/api/empresas/${idEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar la información de la empresa.",
     );
@@ -39,7 +40,7 @@ export const obtenerEmpresaPorCif = async (
     const respuesta = await api.get<Empresa>(`/api/empresas/cif/${cifEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al buscar la empresa por su CIF.");
   }
 };
@@ -61,7 +62,7 @@ export const crearEmpresa = async (data: {
     const respuesta = await api.post<Empresa>("/api/empresas", data);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al registrar la nueva empresa.");
   }
 };
@@ -78,7 +79,7 @@ export const obtenerTrabajadoresEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los trabajadores de la empresa.",
     );
@@ -104,7 +105,7 @@ export const cambiarRazonSocialEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar la razón social.");
   }
 };
@@ -123,7 +124,7 @@ export const actualizarDatosEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al actualizar los datos de la empresa.",
     );
@@ -153,7 +154,82 @@ export const guardarDatosEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al guardar los datos de la empresa.");
   }
+};
+
+/**
+ * Actualiza específicamente el logo de una empresa existente.
+ */
+export const actualizarLogoEmpresa = async (
+  idEmpresa: string,
+  fileUri: string,
+): Promise<Empresa> => {
+  try {
+    const formData = new FormData();
+
+    const filename = fileUri.split("/").pop() || "logo.jpg";
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+    // 🌐 COMPATIBILIDAD WEB Y NATIVO (ANDROID/IOS)
+    if (Platform.OS === "web") {
+      // En la web, fetch convierte la URI temporal de la galería en un Blob binario válido
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+      formData.append("file", blob, filename);
+    } else {
+      // En Android / iOS usamos el formato clásico de React Native
+      formData.append("file", {
+        uri: fileUri,
+        name: filename,
+        type,
+      } as any);
+    }
+
+    const respuesta = await api.put<Empresa>(
+      `/api/empresas/${idEmpresa}/logo`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    return respuesta.data;
+  } catch (error: any) {
+    // Captura segura del mensaje de error para evitar [object Object] en las alertas
+    const detalle = error?.response?.data?.detail;
+    const mensajeError =
+      typeof detalle === "string"
+        ? detalle
+        : error?.message || "Error de red al subir el logo";
+
+    console.error("Detalle completo del error de red:", error);
+    throw new Error(mensajeError);
+  }
+};
+
+// Puedes colocar esto en un archivo de utilidades o directamente en tu componente
+export const obtenerUrlLogo = (logoUrl?: string | null): string | null => {
+  if (!logoUrl) return null;
+
+  // Si ya viene con http completo, lo devolvemos limpio
+  if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+    if (Platform.OS === "web" && logoUrl.includes("10.0.2.2")) {
+      return logoUrl.replace("10.0.2.2", "localhost");
+    }
+    return logoUrl;
+  }
+
+  // Si estamos en Web, forzamos la ruta absoluta hacia el (puerto 8080)
+  if (Platform.OS === "web") {
+    return `http://localhost:8080${logoUrl}`;
+  }
+
+  // Para Android / emulador
+  const baseURL = api.defaults.baseURL || "http://10.0.2.2:8080";
+  return `${baseURL}${logoUrl}`;
 };

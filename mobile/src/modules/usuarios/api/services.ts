@@ -1,5 +1,6 @@
 import api from "@/src/service/api/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { registrarTokenDispositivo } from "../../another-services/services";
 import {
   LoginResponse,
   UsuarioCreateRequest,
@@ -8,7 +9,7 @@ import {
 } from "../types/usuario";
 
 /**
- * Valida el correo y la contraseña contra la base de datos de producción y almacena el token JWT.
+ * Inicia sesión. Valida el correo y la contraseña contra la base de datos de producción y almacena el token JWT.
  * @param email Correo electrónico
  * @param password Contraseña en texto plano
  */
@@ -26,19 +27,17 @@ export const getUsuarioByEmailYPassword = async (
       await AsyncStorage.setItem("user_token", respuesta.data.access_token);
       api.defaults.headers.common["Authorization"] =
         `Bearer ${respuesta.data.access_token}`;
+
+      // --- AQUÍ LLAMAS AL REGISTRO PUSH ---
+      // Asegúrate de importar la función que creamos antes
+      if (respuesta.data.usuario?.id) {
+        await registrarTokenDispositivo(respuesta.data.usuario.id);
+      }
     }
 
     return respuesta.data;
   } catch (error: any) {
-    // 1. Imprimimos el error completo en la consola para ver qué trae exactamente
-    console.log("Error completo recibido de la API:", error);
-
-    // 2. Buscamos el mensaje en todas las ubicaciones posibles de Axios / FastAPI
-    const apiMessage =
-      error?.response?.data?.detail ||
-      error?.response?.data?.message ||
-      error?.message;
-
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
   }
 };
@@ -56,7 +55,7 @@ export const getUsuarioByIdTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Error al recuperar la cuenta de usuario vinculada al trabajador.",
@@ -77,7 +76,7 @@ export const getUsuarioById = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al obtener el usuario con ID ${idUsuario}.`,
     );
@@ -92,7 +91,7 @@ export const obtenerTodosLosUsuarios = async (): Promise<UsuarioResponse[]> => {
     const respuesta = await api.get<UsuarioResponse[]>("/api/usuarios");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al listar los usuarios de la plataforma.",
     );
@@ -109,7 +108,7 @@ export const crearUsuarioCuenta = async (
     const respuesta = await api.post<UsuarioResponse>("/api/usuarios", data);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar la nueva cuenta de usuario.",
     );
@@ -129,7 +128,7 @@ export const registrarUsuarioAcceso = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al completar el registro del usuario.",
     );
@@ -149,7 +148,7 @@ export const cambiarEstadoUsuario = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al cambiar el estado de la cuenta.");
   }
 };
@@ -175,7 +174,7 @@ export const cambiarPasswordUsuario = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar la contraseña.");
   }
 };

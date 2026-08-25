@@ -42,7 +42,7 @@ export interface RegistroFichaje {
   trabajador_nombre: string;
   turno_nombre: string;
   fecha_hora: string;
-  tipo_evento: TipoFichaje | number;
+  tipo_evento_id: number;
   metodo_fichaje: string;
   observaciones?: string | null;
   estado: EstadoFichaje | string;
@@ -53,8 +53,8 @@ export interface FichajeCreateParams {
   empresa_id: string;
   trabajador_id: string;
   centro_trabajo_id: string;
-  tipo_evento_id: number; // 1: Entrada, 2: Salida, 3: Inicio Pausa, 4: Fin Pausa
-  metodo_fichaje: string; // Ej: "App_movil", "Web", "QR"
+  tipo_evento_id: string;
+  metodo_fichaje: string;
   origen?: string;
   estado?: string;
   latitud?: number | null;
@@ -64,4 +64,5 @@ export interface FichajeCreateParams {
   dispositivo_id?: string | null;
   fecha_hora_dispositivo?: string | null;
   observaciones?: string | null;
+  forzar_hora_extra: boolean;
 }

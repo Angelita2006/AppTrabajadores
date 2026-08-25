@@ -1,27 +1,33 @@
 export const obtenerMensajeAmigableError = (error: any): string => {
-  // 1. Capturar el mensaje personalizado o el 'detail' que envía FastAPI
   const errorData = error?.response?.data;
+
   if (errorData) {
-    // FastAPI suele enviar los errores en `detail` (puede ser un string o un array de errores de validación)
-    if (typeof errorData.detail === "string") {
-      return errorData.detail;
-    }
+    // Si es un array de validaciones (ej. Pydantic)
     if (Array.isArray(errorData.detail)) {
-      // Si es un error de validación de Pydantic (422), podemos extraer el primer mensaje legible
       return (
         errorData.detail.map((err: any) => err.msg).join(", ") ||
         "Error de validación en los datos."
       );
     }
-    // Compatibilidad por si en algún sitio usas `message`
-    if (errorData.message) {
+
+    // Si el backend envía un JSON con { "message": "Mensaje..." }
+    if (typeof errorData.message === "string") {
       return errorData.message;
+    }
+
+    // Si el backend envía el error directamente como texto plano
+    if (typeof errorData === "string") {
+      return errorData;
     }
   }
 
-  // 2. Capturar por código de estado HTTP si proviene de Axios o fetch
-  const status = error?.response?.status;
+  // Errores de Red
+  if (error?.message === "Network Error" || !error?.response) {
+    return "No se pudo establecer conexión con el servidor. Comprueba tu conexión a internet.";
+  }
 
+  // Fallbacks genéricos según el Status Code HTTP
+  const status = error?.response?.status;
   if (status) {
     switch (status) {
       case 400:
@@ -45,11 +51,6 @@ export const obtenerMensajeAmigableError = (error: any): string => {
     }
   }
 
-  // 3. Errores de red (sin conexión a internet)
-  if (error?.message === "Network Error" || !error?.response) {
-    return "No se pudo establecer conexión con el servidor. Comprueba tu conexión a internet.";
-  }
-
-  // 4. Mensaje por defecto para cualquier otro caso
+  // Mensaje por defecto final
   return error?.message || "Ocurrió un error desconocido. Inténtalo de nuevo.";
 };

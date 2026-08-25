@@ -12,8 +12,7 @@ class UsuarioRolBase(BaseModel):
     basadas en el modelo relacional mapeado por sqlacodegen.
     """
     usuario_id: UUID = Field(..., description="ID único UUID del usuario al que se le asigna el perfil")
-    role_id: int = Field(..., description="ID numérico entero del rol asignado (SmallInteger)")
-
+    role_id: UUID = Field(..., description="ID único UUID entero del rol asignado")
 
 class UsuarioRolCreate(UsuarioRolBase):
     """
@@ -24,7 +23,6 @@ class UsuarioRolCreate(UsuarioRolBase):
         None, 
         description="ID único UUID de la empresa a la que limita el rol, o NULL si aplica a todo el sistema"
     )
-
 
 class UsuarioRolResponse(UsuarioRolBase):
     """

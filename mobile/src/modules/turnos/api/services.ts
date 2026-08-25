@@ -5,9 +5,7 @@ import { Turno, TurnoCreate, TurnoUpdate } from "../types/turno";
  * Registra un nuevo cuadrante de turno teórico.
  * URI: POST /api/turnos
  */
-export const crearTurnoLaboral = async (
-  datosTurno: TurnoCreate,
-): Promise<Turno> => {
+export const crearTurno = async (datosTurno: TurnoCreate): Promise<Turno> => {
   try {
     const respuesta = await api.post<Turno>("/api/turnos", {
       empresa_id: datosTurno.empresa_id,
@@ -22,7 +20,7 @@ export const crearTurnoLaboral = async (
     });
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error.response?.data?.message;
     throw new Error(apiMessage || "Error al registrar el nuevo turno laboral.");
   }
 };
@@ -54,7 +52,7 @@ export const obtenerTurnosEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar los turnos de la empresa.",
     );
@@ -70,15 +68,10 @@ export const obtenerTurnoPorId = async (idTurno: string): Promise<Turno> => {
     const respuesta = await api.get<Turno>(`/api/turnos/${idTurno}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error.response?.data?.message;
     throw new Error(apiMessage || `Error al obtener el turno ${idTurno}.`);
   }
 };
-
-/**
- * Alias para mantener compatibilidad con llamadas existentes.
- */
-export const obtenerTurno = obtenerTurnoPorId;
 
 /**
  * Modifica las propiedades de un turno existente.
@@ -95,7 +88,7 @@ export const editarTurno = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error.response?.data?.message;
     throw new Error(apiMessage || `Error al editar el turno ${id_turno}.`);
   }
 };
@@ -107,13 +100,8 @@ export const editarTurno = async (
 export const eliminarTurno = async (
   id_turno: string,
 ): Promise<{ detail: string }> => {
-  try {
-    const response = await api.delete<{ detail: string }>(
-      `/api/turnos/${id_turno}`,
-    );
-    return response.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
-    throw new Error(apiMessage || `Error al eliminar el turno ${id_turno}.`);
-  }
+  const response = await api.delete<{ detail: string }>(
+    `/api/turnos/${id_turno}`,
+  );
+  return response.data;
 };

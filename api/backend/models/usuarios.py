@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from models.enums import TipoUsuarioEnum
+from core.enums import TipoUsuarioEnum
 
 class Usuarios(Base):
     __tablename__ = 'usuarios'
@@ -29,7 +29,6 @@ class Usuarios(Base):
     trabajador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     ultimo_acceso: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     
-    # Nuevos campos para el código de recuperación
     codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     codigo_expira_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True)
 
@@ -40,3 +39,4 @@ class Usuarios(Base):
     correcciones_fichaje_aprobado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.aprobado_por_usuario_id]', back_populates='aprobado_por_usuario') # type: ignore
     correcciones_fichaje_solicitado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.solicitado_por_usuario_id]', back_populates='solicitado_por_usuario') # type: ignore
     ausencias_validadas: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='validado_por_usuario') # type: ignore
+    dispositivos_push: Mapped[list['DispositivosPush']] = relationship('DispositivosPush', back_populates='usuario', cascade="all, delete-orphan")  # type: ignore

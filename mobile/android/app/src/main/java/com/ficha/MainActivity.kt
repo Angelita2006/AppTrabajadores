@@ -1,4 +1,4 @@
-package com.tuusuario.fichapp
+package com.ficha
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

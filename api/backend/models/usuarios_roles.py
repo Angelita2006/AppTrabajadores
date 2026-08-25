@@ -16,7 +16,7 @@ class UsuariosRoles(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text('gen_random_uuid()'))
     usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    role_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    role_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=False)
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, comment='Ámbito del rol. NULL = aplica a todas las empresas que gestiona el usuario (típico de personal de gestoría).')
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios_roles') # type: ignore

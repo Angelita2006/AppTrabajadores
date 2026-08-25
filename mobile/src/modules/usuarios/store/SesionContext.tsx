@@ -54,7 +54,7 @@ const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESAS = "@fichapp_empresas_lista";
 const STORAGE_KEY_SELECCIONADA = "@fichapp_empresa_seleccionada";
 const STORAGE_KEY_CENTRO_SELECCIONADO = "@fichapp_centro_seleccionado";
-const STORAGE_KEY_TOKEN = "user_token"; // Unificado para evitar fallos de lectura
+const STORAGE_KEY_TOKEN = "user_token";
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [usuarioActual, setUsuarioActual] = useState<UsuarioResponse | null>(
@@ -74,7 +74,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [cargandoSesionLocal, setCargandoSesionLocal] = useState<boolean>(true);
 
   // ====================================================================
-  // MOTOR 1: RESTAURACIÓN EN FRÍO (AsyncStorage optimizado con Promise.all)
+  // MOTOR 1: RESTAURACIÓN EN FRÍO (Con validación de coherencia)
   // ====================================================================
   useEffect(() => {
     async function recuperarSesionPermanente() {
@@ -91,12 +91,24 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEY_CENTRO_SELECCIONADO),
         ]);
 
-        // Restauración unificada para minimizar renders en cascada
         if (usuarioGuardado) setUsuarioActual(JSON.parse(usuarioGuardado));
         if (empresasGuardadas) setEmpresas(JSON.parse(empresasGuardadas));
-        if (seleccionadaGuardada)
-          setEmpresaSeleccionada(JSON.parse(seleccionadaGuardada));
-        if (centroGuardado) setCentroTrabajoActual(JSON.parse(centroGuardado));
+
+        let empresaParsed: Empresa | null = null;
+        if (seleccionadaGuardada) {
+          empresaParsed = JSON.parse(seleccionadaGuardada);
+          setEmpresaSeleccionada(empresaParsed);
+        }
+
+        // Validar que el centro guardado pertenezca realmente a la empresa seleccionada restaurada
+        if (centroGuardado && empresaParsed) {
+          const centroParsed = JSON.parse(centroGuardado);
+          if (centroParsed.empresa_id === empresaParsed.id) {
+            setCentroTrabajoActual(centroParsed);
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEY_CENTRO_SELECCIONADO);
+          }
+        }
       } catch (error) {
         console.error(
           "Error al restaurar los ficheros locales de sesión:",
@@ -130,7 +142,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       }
 
       try {
-        // 1. Administrador de Empresa
         if (
           usuarioActual.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA &&
           usuarioActual.empresa_id
@@ -142,7 +153,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 2. Administrador de Gestoría
         if (usuarioActual.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA) {
           const todasLasEmpresas = await obtenerEmpresas();
           if (isCancelled) return;
@@ -155,7 +165,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 3. Trabajador estándar
         if (usuarioActual.trabajador_id) {
           const token = await AsyncStorage.getItem(STORAGE_KEY_TOKEN);
           if (isCancelled) return;
@@ -184,7 +193,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     inicializarEntornoUsuario();
 
     return () => {
-      isCancelled = true; // Cancela respuestas pendientes si el usuario cambia antes de terminar
+      isCancelled = true;
     };
   }, [usuarioActual, cargandoSesionLocal]);
 
@@ -202,6 +211,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           setTrabajadorActual(null);
           setContratoActual(null);
           setTurnoActual(null);
+          setCentroTrabajoActual(null);
         }
         return;
       }
@@ -336,10 +346,12 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     () => centroTrabajoActual?.id ?? contratoActual?.centro_trabajo_id ?? null,
     [centroTrabajoActual, contratoActual],
   );
+
   const departamentoId = useMemo(
     () => contratoActual?.departamento_id ?? null,
     [contratoActual],
   );
+
   const rolUsuario = useMemo(
     () => usuarioActual?.tipo_usuario ?? null,
     [usuarioActual],

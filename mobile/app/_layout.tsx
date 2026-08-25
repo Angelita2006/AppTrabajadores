@@ -1,9 +1,11 @@
+import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
 import {
   FontAwesome,
   Ionicons,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
+import * as Notifications from "expo-notifications"; // <--- Importante
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
@@ -12,6 +14,16 @@ import {
   ProveedorSesion,
   useSesion,
 } from "../src/modules/usuarios/store/SesionContext";
+
+// Configuración global de comportamiento de notificaciones en primer plano
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 // Evita que la pantalla de inicio del sistema desaparezca antes de tiempo
 SplashScreen.preventAutoHideAsync?.();
@@ -42,6 +54,39 @@ function InitialLayout() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // --- EFECTO NUEVO: Registrar token push y escuchar notificaciones al iniciar sesión ---
+  useEffect(() => {
+    if (!usuarioActual?.id) return;
+
+    // 1. Registramos el token FCM / Expo en tu backend de FastAPI apenas se detecta sesión
+    registrarTokenDispositivo(usuarioActual.id);
+
+    // 2. Escuchar cuando llega una notificación con la app abierta
+    const subRecibida = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log("Notificación recibida en primer plano:", notification);
+      },
+    );
+
+    // 3. Escuchar cuando el usuario hace clic en la notificación de olvido de fichaje
+    const subRespuesta = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data;
+        console.log("Usuario presionó la notificación:", data);
+
+        if (data?.type === "OLVIDO_FICHAJE") {
+          // Redirige al usuario a la pantalla correspondiente dentro de tus tabs
+          router.push("/(tabs)/perfil"); // O la ruta específica de fichajes si la tienes
+        }
+      },
+    );
+
+    return () => {
+      subRecibida.remove();
+      subRespuesta.remove();
+    };
+  }, [usuarioActual]);
 
   // Efecto central de protección de rutas (Guard) antierrores
   useEffect(() => {

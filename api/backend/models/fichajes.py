@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import INT, CheckConstraint, DateTime, Enum, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
-from models.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
+from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
 
 class Fichajes(Base):
     __tablename__ = 'fichajes'
@@ -34,7 +34,7 @@ class Fichajes(Base):
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    tipo_evento_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    tipo_evento_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     fecha_hora: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, comment='Instante oficial del fichaje (referencia legal).')
     metodo_fichaje: Mapped[MetodoFichajeEnum] = mapped_column(Enum(MetodoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='metodo_fichaje_enum'), nullable=False)
     origen: Mapped[OrigenFichajeEnum] = mapped_column(Enum(OrigenFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='origen_fichaje_enum'), nullable=False, server_default=text("'Trabajador'::origen_fichaje_enum"))

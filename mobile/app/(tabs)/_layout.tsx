@@ -79,13 +79,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="empresas"
+        name="empresa"
         options={{
           title: "Empresa",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={24} name="briefcase.fill" color={color} />
           ),
-          href: tieneSesion ? (esAdmin ? "/empresas" : null) : null,
+          href: tieneSesion ? (esAdmin ? "/empresa" : null) : null,
         }}
       />
       <Tabs.Screen

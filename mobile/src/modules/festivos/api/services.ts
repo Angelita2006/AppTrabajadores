@@ -9,7 +9,7 @@ export const obtenerTodosLosFestivos = async (): Promise<Festivo[]> => {
     const response = await api.get<Festivo[]>("/api/festivos");
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener todos los festivos.");
   }
 };
@@ -26,7 +26,7 @@ export const obtenerFestivosPorCalendario = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al obtener los festivos del calendario.`,
     );
@@ -43,7 +43,7 @@ export const crearFestivo = async (
     const response = await api.post<Festivo>("/api/festivos", payload);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al crear el día festivo en el servidor.",
     );
@@ -71,7 +71,7 @@ export const editarFestivo = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al editar el festivo en el servidor.");
   }
 };
@@ -88,7 +88,7 @@ export const eliminarFestivo = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al eliminar el día festivo.");
   }
 };

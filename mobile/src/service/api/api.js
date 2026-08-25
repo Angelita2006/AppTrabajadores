@@ -1,8 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import { Platform } from "react-native";
+
+// const getBaseURL = () => {
+//   return "https://registrohorariosimple.es";
+// };
 
 const getBaseURL = () => {
-  return "https://registrohorariosimple.es";
+  if (Platform.OS === "web") {
+    return "http://127.0.0.1:8080"; // Para el navegador web
+  }
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8080"; // Para el emulador de Android
+  }
+  // return "https://api.registrohorariosimple.es";
+  return "http://127.0.0.1:8080"; // Para iOS (emulador) u otros
 };
 
 const api = axios.create({

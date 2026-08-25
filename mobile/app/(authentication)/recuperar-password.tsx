@@ -117,17 +117,25 @@ export default function RecuperarPasswordScreen() {
 
     try {
       setCargando(true);
+
       await confirmarCambioPassword({
         email: email,
         codigo_verificacion: codigo,
         nueva_password: nuevaPassword,
       });
 
-      Alert.alert(
-        "Éxito",
-        "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
-        [{ text: "Ir al Login", onPress: () => router.replace("/") }],
-      );
+      if (Platform.OS === "web") {
+        window.alert(
+          "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
+        );
+        router.replace("/");
+      } else {
+        Alert.alert(
+          "Éxito",
+          "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
+          [{ text: "Ir al Login", onPress: () => router.replace("/") }],
+        );
+      }
     } catch (error: any) {
       const mensajeAmigable = obtenerMensajeAmigableError(error);
       if (Platform.OS === "web") {

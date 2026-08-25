@@ -16,7 +16,6 @@ class CentroTrabajoBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=255, description="Nombre identificativo del centro de trabajo")
     zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria específica del centro de trabajo")
 
-
 class CentroTrabajoCreate(CentroTrabajoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un centro de trabajo.
@@ -24,7 +23,8 @@ class CentroTrabajoCreate(CentroTrabajoBase):
     """
     codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización a la Seguridad Social")
     direccion: Optional[str] = Field(None, max_length=500, description="Dirección postal o física del centro")
-
+    latitud: Optional[float] = Field(None, description="Latitud geográfica del centro de trabajo")  
+    longitud: Optional[float] = Field(None, description="Longitud geográfica del centro de trabajo") 
 
 class CentroTrabajoUpdate(BaseModel):
     """
@@ -36,9 +36,10 @@ class CentroTrabajoUpdate(BaseModel):
     activo: Optional[bool] = Field(None, description="Cambiar estado operativo del centro")
     codigo_ccc: Optional[str] = Field(None, max_length=20, description="Actualizar código CCC")
     direccion: Optional[str] = Field(None, max_length=500, description="Actualizar dirección postal")
+    latitud: Optional[float] = Field(None, description="Actualizar latitud")  
+    longitud: Optional[float] = Field(None, description="Actualizar longitud")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class CentroTrabajoResponse(CentroTrabajoBase):
     """
@@ -51,5 +52,7 @@ class CentroTrabajoResponse(CentroTrabajoBase):
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
     codigo_ccc: Optional[str] = Field(None, description="Código de Cuenta de Cotización")
     direccion: Optional[str] = Field(None, description="Dirección postal")
+    latitud: Optional[float] = Field(None, description="Latitud geográfica") 
+    longitud: Optional[float] = Field(None, description="Longitud geográfica")
 
     model_config = ConfigDict(from_attributes=True)

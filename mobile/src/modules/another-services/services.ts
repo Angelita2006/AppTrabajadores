@@ -1,4 +1,7 @@
 import api from "@/src/service/api/api";
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 import { obtenerEmpresaPorCif } from "../empresas/api/services";
 import {
   RegistroOrganizacionDTO,
@@ -67,10 +70,9 @@ export const registrarOrganizacionCompleta = async (
       usuario: usuarioCreado,
     };
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
-        error.message ||
         "Ha ocurrido un error inesperado al procesar el alta de organización.",
     );
   }
@@ -97,3 +99,45 @@ export const confirmarCambioPassword = async (data: {
   const respuesta = await api.post("/api/auth/confirmar-password", data);
   return respuesta.data;
 };
+
+export async function registrarTokenDispositivo(usuarioId: string) {
+  try {
+    // 1. Solicitar permisos (fundamental para iOS, Android y Web)
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") {
+      console.log("Permiso de notificaciones denegado.");
+      return;
+    }
+
+    // 2. Obtener el projectId directamente desde app.json de forma segura
+    const projectId =
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } })?.eas
+        ?.projectId ?? Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.error("No se encontró el projectId de EAS en la configuración.");
+      return;
+    }
+
+    // 3. Obtener el token de Expo Push
+    const pushTokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: projectId,
+    });
+
+    const fcmToken = pushTokenData.data; // Token que se enviará al backend
+
+    // 4. Enviar el token a tu API de FastAPI usando Axios
+    const respuesta = await api.post("/api/dispositivos-push/", {
+      usuario_id: usuarioId,
+      fcm_token: fcmToken,
+      plataforma: Platform.OS,
+    });
+
+    console.log(
+      "Token push registrado con éxito en el servidor:",
+      respuesta.data,
+    );
+  } catch (error) {
+    console.error("Error al registrar token de Expo:", error);
+  }
+}

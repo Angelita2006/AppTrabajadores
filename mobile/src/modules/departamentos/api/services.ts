@@ -11,7 +11,8 @@ export const obtenerTodosLosDepartamentos = async (): Promise<
     const response = await api.get<Departamento[]>("/api/departamentos");
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(
       apiMessage || "Error al obtener el listado global de departamentos.",
     );
@@ -31,7 +32,8 @@ export const obtenerDepartamentosEmpresa = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(
       apiMessage ||
         `Error al obtener los departamentos de la empresa ${idEmpresa}.`,
@@ -51,7 +53,8 @@ export const crearDepartamento = async (data: {
     const response = await api.post<Departamento>(`/api/departamentos`, data);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(apiMessage || "Error al registrar el nuevo departamento.");
   }
 };
@@ -69,7 +72,8 @@ export const obtenerDepartamentoPorId = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(
       apiMessage ||
         `Error al recuperar la información del departamento ${idDepartamento}.`,
@@ -90,7 +94,8 @@ export const actualizarDepartamento = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(
       apiMessage ||
         `Error al actualizar el nombre del departamento ${idDepartamento}.`,
@@ -115,7 +120,8 @@ export const editarDepartamento = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
+
     throw new Error(
       apiMessage || `Error al editar el departamento ${id_departamento}.`,
     );
@@ -133,7 +139,7 @@ export const eliminarDepartamento = async (
   try {
     await api.delete(`/api/departamentos/${id_departamento}`);
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al eliminar el departamento ${id_departamento}.`,
     );

@@ -3,7 +3,6 @@ import { Card } from "@/src/shared/ui/AppSurface";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { Contrato } from "../../contratos/types/contrato";
 import { obtenerTurno } from "../../turnos/api/services";
@@ -11,7 +10,6 @@ import { Turno } from "../../turnos/types/turno";
 
 export const FichaTrabajador = ({
   item,
-  trabajadorId,
   onSeleccionarTrabajador,
   setModalActivo,
   styles,
@@ -19,50 +17,34 @@ export const FichaTrabajador = ({
   handleAsignarTurnoTrabajador,
   prepararAsignarTurno,
 }: any) => {
-  const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
-    [],
-  );
   const [turnos, setTurnos] = useState<Turno[]>([]);
 
+  const contratoActivoDelTrabajador: Contrato = item.contratoActivo;
+
+  // Las asignaciones de turno ya vienen directamente en el item
+  const asignacionesTurno: AsignacionTurno[] = item.asignacionesTurno || [];
+
+  // Buscamos la información de los turnos usando el turno_id de las asignaciones del item
   useEffect(() => {
-    const cargarTurnos = async () => {
-      setAsignacionesTurno([]);
-      setTurnos([]);
+    const cargarNombresTurnos = async () => {
+      if (asignacionesTurno.length === 0) {
+        setTurnos([]);
+        return;
+      }
+
       try {
-        const asignaciones: AsignacionTurno[] =
-          await obtenerAsignacionesTurnoTrabajador(trabajadorId);
-
-        const hoyTime = new Date().getTime();
-
-        // Filtramos las asignaciones para sacar sólo las vigentes
-        const asignacionesFiltradas = asignaciones.filter((at) => {
-          const fechaInicio = new Date(at.fecha_inicio).getTime();
-          let fechaFin = hoyTime;
-          if (at.fecha_fin !== null && at.fecha_fin !== undefined)
-            fechaFin = new Date(at.fecha_fin).getTime();
-
-          return hoyTime >= fechaInicio && hoyTime <= fechaFin;
-        });
-
-        setAsignacionesTurno(asignacionesFiltradas);
-
-        const promesasTurnos = asignacionesFiltradas.map(
-          (at: AsignacionTurno) => obtenerTurno(at.turno_id),
+        const promesasTurnos = asignacionesTurno.map((at: AsignacionTurno) =>
+          obtenerTurno(at.turno_id),
         );
-
         const turnosObtenidos = await Promise.all(promesasTurnos);
         setTurnos(turnosObtenidos);
       } catch (error) {
-        console.error("Error cargando turnos:", error);
+        console.error("Error cargando detalles de los turnos:", error);
       }
     };
 
-    if (trabajadorId) {
-      cargarTurnos();
-    }
-  }, [trabajadorId]);
-
-  const contratoActivoDelTrabajador: Contrato = item.contratoActivo;
+    cargarNombresTurnos();
+  }, [asignacionesTurno]);
 
   return (
     <Card>
@@ -256,15 +238,19 @@ export const FichaTrabajador = ({
               ]}
             >
               {asignacionesTurno.length > 0
-                ? "Turno asignado en cuadrante"
-                : "⚠️ Sin asignación horaria de turnos en este mes"}
+                ? "Turnos asignados en cuadrante"
+                : "⚠️ Sin asignaciones horarias de turnos vigentes"}
             </ThemedText>
 
             {asignacionesTurno.length > 0 && (
               <ThemedText
                 style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}
               >
-                {"Turnos: " + turnos.map((t) => t.nombre).join(", ")}
+                {"Turnos: " +
+                  turnos
+                    .map((t) => t?.nombre)
+                    .filter(Boolean)
+                    .join(", ")}
               </ThemedText>
             )}
 
@@ -362,23 +348,72 @@ export const FichaTrabajador = ({
       {item.activo && (
         <View
           style={{
-            marginTop: 4,
-            paddingTop: 8,
+            marginTop: 8,
+            paddingTop: 10,
             borderTopWidth: 1,
             borderTopColor: "#E2E8F0",
             borderStyle: "dashed",
+            flexDirection: "row",
+            gap: 8,
           }}
         >
+          {/* Botón Editar Datos */}
           <Pressable
-            style={styles.botonBajaEmpresa}
+            onPress={() => {
+              onSeleccionarTrabajador(item);
+              setModalActivo("editar_trabajador");
+            }}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#EFF6FF",
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+            }}
+          >
+            <FontAwesome5 name="user-edit" size={13} color="#2563EB" />
+            <ThemedText
+              style={{
+                color: "#2563EB",
+                fontSize: 12,
+                fontWeight: "600",
+                marginLeft: 6,
+              }}
+            >
+              Editar Datos
+            </ThemedText>
+          </Pressable>
+
+          {/* Botón Tramitar Baja */}
+          <Pressable
             onPress={() => {
               onSeleccionarTrabajador(item);
               setModalActivo("baja_trabajador");
             }}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#FEF2F2",
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+            }}
           >
-            <FontAwesome5 name="user-slash" size={11} color="#991B1B" />
-            <ThemedText style={styles.textoBotonBajaEmpresa}>
-              Tramitar Baja del Trabajador en Empresa
+            <FontAwesome5 name="user-slash" size={12} color="#DC2626" />
+            <ThemedText
+              style={{
+                color: "#DC2626",
+                fontSize: 12,
+                fontWeight: "600",
+                marginLeft: 6,
+              }}
+            >
+              Tramitar Baja
             </ThemedText>
           </Pressable>
         </View>

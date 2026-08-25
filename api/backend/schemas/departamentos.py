@@ -15,14 +15,12 @@ class DepartamentoBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     nombre: str = Field(..., min_length=2, max_length=255, description="Nombre descriptivo del departamento")
 
-
 class DepartamentoCreate(DepartamentoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un departamento.
     Permite asociar opcionalmente el departamento a un centro de trabajo físico.
     """
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo asociado")
-
 
 class DepartamentoUpdate(BaseModel):
     """
@@ -32,7 +30,6 @@ class DepartamentoUpdate(BaseModel):
     centro_trabajo_id: Optional[UUID] = Field(None, description="Nuevo ID de centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class DepartamentoResponse(DepartamentoBase):
     """

@@ -19,7 +19,7 @@ export const crearCentroTrabajo = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Ha ocurrido un error al crear el centro de trabajo.",
     );
@@ -43,7 +43,7 @@ export const editarCentroTrabajo = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al editar el centro de trabajo ${idCentro}.`,
     );
@@ -67,7 +67,7 @@ export const cambiarEstadoCentroTrabajo = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al cambiar el estado del centro de trabajo ${idCentro}.`,
@@ -87,7 +87,7 @@ export const obtenerCentroTrabajo = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Centro de trabajo con ID ${centroTrabajoId} no encontrado.`,
@@ -114,7 +114,7 @@ export const obtenerCentrosPorEmpresa = async (
 
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al recuperar centros de trabajo de la empresa ${idEmpresa}.`,
@@ -129,12 +129,5 @@ export const obtenerCentrosPorEmpresa = async (
 export const eliminarCentroTrabajo = async (
   centroId: string,
 ): Promise<void> => {
-  try {
-    await api.delete(`/api/centros-trabajo/${centroId}`);
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
-    throw new Error(
-      apiMessage || `Error al eliminar el centro de trabajo ${centroId}.`,
-    );
-  }
+  await api.delete(`/api/centros-trabajo/${centroId}`);
 };

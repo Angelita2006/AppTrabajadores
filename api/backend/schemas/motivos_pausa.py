@@ -14,7 +14,6 @@ class MotivoPausaBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=100, description="Nombre o descripción corta del tipo de descanso (Ej: 'Comida')")
     computa_como_trabajo: bool = Field(False, description="Determina si el tiempo de esta pausa cuenta como jornada efectiva")
 
-
 class MotivoPausaCreate(MotivoPausaBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al registrar un nuevo motivo.
@@ -22,7 +21,6 @@ class MotivoPausaCreate(MotivoPausaBase):
     """
     empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa si es un motivo personalizado, o NULL si es global")
     duracion_max_minutos: Optional[int] = Field(None, ge=1, le=1440, description="Tiempo máximo recomendado para esta pausa (SmallInteger)")
-
 
 class MotivoPausaResponse(MotivoPausaBase):
     """

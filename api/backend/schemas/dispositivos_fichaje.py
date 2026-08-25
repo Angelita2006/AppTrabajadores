@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from models.enums import MetodoFichajeEnum
+from core.enums import MetodoFichajeEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - DISPOSITIVOS DE FICHAJE
@@ -10,21 +10,28 @@ from models.enums import MetodoFichajeEnum
 
 class DispositivoFichajeBase(BaseModel):
     """
-    Propiedades comunes compartidas para la validación de un dispositivo de fichaje
-    basado en el modelo mapeado por sqlacodegen.
+    Propiedades comunes compartidas para la validación de un dispositivo de fichaje.
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     tipo_dispositivo: MetodoFichajeEnum = Field(..., description="Método o tipo de dispositivo (RFID, app, QR, etc.)")
-    identificador: str = Field(..., min_length=2, max_length=100, description="Código único, MAC o número de serie del terminal")
-
 
 class DispositivoFichajeCreate(DispositivoFichajeBase):
     """
     Esquema utilizado para registrar un nuevo punto o medio de fichaje autorizado en el backend.
     """
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo físico asignado")
-    ubicacion: Optional[str] = Field(None, max_length=255, description="Descripción física de la ubicación (Ej: 'Entrada principal')")
+    activo: Optional[bool] = Field(True, description="Estado de activación inicial del dispositivo")
 
+class DispositivoFichajeUpdate(BaseModel):
+    """
+    Esquema utilizado para actualizar un dispositivo existente sin exigir campos fijos.
+    """
+    empresa_id: Optional[UUID] = Field(None, description="ID opcional de la empresa")
+    tipo_dispositivo: Optional[MetodoFichajeEnum] = Field(None, description="Método o tipo de dispositivo")
+    centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo físico asignado")
+    activo: Optional[bool] = Field(None, description="Estado de activación del dispositivo")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class DispositivoFichajeResponse(DispositivoFichajeBase):
     """
@@ -36,8 +43,6 @@ class DispositivoFichajeResponse(DispositivoFichajeBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última actualización de datos")
     
-    # Propiedades complementarias opcionales
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo físico asignado")
-    ubicacion: Optional[str] = Field(None, description="Descripción física de la ubicación")
 
     model_config = ConfigDict(from_attributes=True)

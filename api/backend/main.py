@@ -9,12 +9,14 @@ from core.database import SessionLocal, engine
 from routes import (
     auth, asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, 
     centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, 
-    empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
+    dispositivos_push, empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
     resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
 )
+from core.fichajes_scheduler import iniciar_scheduler_fichajes
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from fastapi.staticfiles import StaticFiles
 
 # 1. Configurar el sistema de logs del servidor
 logging.basicConfig(
@@ -23,12 +25,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 1. Asegurar que la carpeta física exista al arrancar el servidor
+os.makedirs("static/logos", exist_ok=True)
+
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
     version="1.0.0",
-    root_path="/api"
 )
+
+# 2. Montar la carpeta estática para que sea accesible públicamente por HTTP
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.on_event("startup")
+def startup_event():
+    """
+    Inicializa tareas en segundo plano (como el cron de verificación de olvidos de fichaje) al arrancar la API.
+    """
+    iniciar_scheduler_fichajes()
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -112,6 +126,7 @@ app.include_router(contratos.router)
 app.include_router(correcciones_fichaje.router)
 app.include_router(departamentos.router)
 app.include_router(dispositivos_fichaje.router)
+app.include_router(dispositivos_push.router)
 app.include_router(empresas.router)
 app.include_router(festivos.router)
 app.include_router(fichajes.router)

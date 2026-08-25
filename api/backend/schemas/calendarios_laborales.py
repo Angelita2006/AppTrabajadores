@@ -17,14 +17,12 @@ class CalendarioLaboralBase(BaseModel):
     anio: int = Field(..., ge=2000, le=2100, description="Año numérico correspondiente al calendario (SmallInteger)")
     nombre: str = Field(..., min_length=2, max_length=150, description="Nombre descriptivo del calendario (Ej: 'Calendario de Oficinas 2026')")
 
-
 class CalendarioLaboralCreate(CalendarioLaboralBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un calendario.
     Permite acotar el calendario a un centro de trabajo específico si fuera necesario.
     """
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo si es un calendario específico")
-
 
 class CalendarioLaboralUpdate(BaseModel):
     """
@@ -33,7 +31,6 @@ class CalendarioLaboralUpdate(BaseModel):
     anio: Optional[int] = Field(None, ge=2000, le=2100, description="Año numérico")
     nombre: Optional[str] = Field(None, min_length=2, max_length=150, description="Nombre descriptivo del calendario")
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo")
-
 
 class CalendarioLaboralResponse(CalendarioLaboralBase):
     """
@@ -44,7 +41,6 @@ class CalendarioLaboralResponse(CalendarioLaboralBase):
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID único UUID del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)
-
 
 class CalendarioConFestivosResponse(BaseModel):
     """

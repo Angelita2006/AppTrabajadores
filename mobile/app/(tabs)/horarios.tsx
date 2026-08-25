@@ -4,8 +4,7 @@ import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services"
 import {
   DIAS_SEMANA,
   EstadoFichaje,
-  RegistroFichaje,
-  TipoFichaje,
+  RegistroFichaje
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTurno } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
@@ -51,7 +50,6 @@ const formatearAHorasYMinutos = (minutosTotales: number): string => {
   const mins = minutosTotales % 60;
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 };
-
 export default function HorariosScreen() {
   const { usuarioActual, empresaSeleccionada } = useSesion();
   const [cuadrante, setCuadrante] = useState<Turno[]>([]);
@@ -87,13 +85,13 @@ export default function HorariosScreen() {
           obtenerFichajesTurnoActual(trabajadorId),
         ]);
 
-        if (todosLosFichajes.length <= 0) return;
-
         const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
           (f: Record<string, any>) => ({
             id: f.id,
             fecha_hora: f.fecha_hora,
-            tipo_evento: f.tipo_evento as TipoFichaje,
+            tipo_evento_id: f.tipo_evento_id ?? f.tipo_evento,
+            // Guardamos también el código normalizado en mayúsculas por si viene directo del backend (ej: f.codigo o f.tipo_base)
+            codigo_evento: (f.codigo_evento ?? f.codigo ?? "").toUpperCase(),
             estado: f.estado,
             trabajador_id: f.trabajador_id ?? trabajadorId,
             trabajador_nombre: f.trabajador_nombre ?? "",
@@ -232,26 +230,35 @@ export default function HorariosScreen() {
             const limiteInferiorMins = minInicio - TOLERANCIA_MINS;
             const limiteSuperiorMins = minFin + TOLERANCIA_MINS;
 
-            const marcajesDelDia = fichajesRealizados.filter((fichaje) => {
-              if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
-                return false;
-              const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
-              if (fechaFichajeStr !== fechaRealStr) return false;
+            const marcajesDelDia = fichajesRealizados.filter(
+              (fichaje: Record<string, any>) => {
+                if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
+                  return false;
+                const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
+                if (fechaFichajeStr !== fechaRealStr) return false;
 
-              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
-              if (tipoEventoStr !== "ENTRADA" && tipoEventoStr !== "SALIDA")
-                return false;
+                // Comprobamos robustamente el código fijo (ENTRADA o SALIDA)
+                const codigo = (
+                  fichaje.codigo_evento ||
+                  fichaje.tipo_evento_id ||
+                  ""
+                ).toUpperCase();
+                const esEntrada = codigo === "ENTRADA";
+                const esSalida = codigo === "SALIDA";
 
-              let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
-              if (esNocturno && minsFichaje < limiteInferiorMins) {
-                minsFichaje += 24 * 60;
-              }
+                if (!esEntrada && !esSalida) return false;
 
-              return (
-                minsFichaje >= limiteInferiorMins &&
-                minsFichaje <= limiteSuperiorMins
-              );
-            });
+                let minsFichaje = obtenerMinutosFichaje(fichaje.fecha_hora);
+                if (esNocturno && minsFichaje < limiteInferiorMins) {
+                  minsFichaje += 24 * 60;
+                }
+
+                return (
+                  minsFichaje >= limiteInferiorMins &&
+                  minsFichaje <= limiteSuperiorMins
+                );
+              },
+            );
 
             marcajesDelDia.sort(
               (a, b) =>
@@ -260,18 +267,20 @@ export default function HorariosScreen() {
             );
 
             const pausasDelDia = fichajesRealizados.filter(
-              (fichaje: RegistroFichaje) => {
+              (fichaje: Record<string, any>) => {
                 if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
                   return false;
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
                 if (fechaFichajeStr !== fechaRealStr) return false;
 
-                const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
+                // Comprobamos el código fijo para las pausas
+                const codigo = (
+                  fichaje.codigo_evento ||
+                  fichaje.tipo_evento_id ||
+                  ""
+                ).toUpperCase();
                 const esPausa =
-                  fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
-                  tipoEventoStr === "INICIO_PAUSA" ||
-                  fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
-                  tipoEventoStr === "FIN_PAUSA";
+                  codigo === "INICIO_PAUSA" || codigo === "FIN_PAUSA";
 
                 if (!esPausa) return false;
 
@@ -295,20 +304,17 @@ export default function HorariosScreen() {
             );
 
             let marcaInicioPausa: number | null = null;
-            pausasOrdenadas.forEach((fichaje: RegistroFichaje) => {
+            pausasOrdenadas.forEach((fichaje: Record<string, any>) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const tipoEventoStr = String(fichaje.tipo_evento).toUpperCase();
+              const codigo = (
+                fichaje.codigo_evento ||
+                fichaje.tipo_evento_id ||
+                ""
+              ).toUpperCase();
 
-              if (
-                fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA ||
-                tipoEventoStr === "INICIO_PAUSA"
-              ) {
+              if (codigo === "INICIO_PAUSA") {
                 marcaInicioPausa = tMs;
-              } else if (
-                (fichaje.tipo_evento === TipoFichaje.FIN_PAUSA ||
-                  tipoEventoStr === "FIN_PAUSA") &&
-                marcaInicioPausa !== null
-              ) {
+              } else if (codigo === "FIN_PAUSA" && marcaInicioPausa !== null) {
                 const diferenciaMinutos =
                   (tMs - marcaInicioPausa) / (1000 * 60);
                 minutosConsumidos += Math.round(diferenciaMinutos);
@@ -319,11 +325,14 @@ export default function HorariosScreen() {
             let minutosTrabajadosReales = 0;
             let marcaEntradaTurno: number | null = null;
 
-            marcajesDelDia.forEach((fichaje: RegistroFichaje) => {
+            marcajesDelDia.forEach((fichaje: Record<string, any>) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const esEntrada =
-                fichaje.tipo_evento === TipoFichaje.ENTRADA ||
-                String(fichaje.tipo_evento).toUpperCase() === "ENTRADA";
+              const codigo = (
+                fichaje.codigo_evento ||
+                fichaje.tipo_evento_id ||
+                ""
+              ).toUpperCase();
+              const esEntrada = codigo === "ENTRADA";
 
               if (esEntrada) {
                 marcaEntradaTurno = tMs;
@@ -441,15 +450,17 @@ export default function HorariosScreen() {
                         <ThemedText style={styles.tituloFichajesSeccion}>
                           Marcajes en este turno:
                         </ThemedText>
-                        {marcajesDelDia.map((fichaje) => {
+                        {marcajesDelDia.map((fichaje: Record<string, any>) => {
                           const partes = fichaje.fecha_hora.split("T");
                           const horaLimpia = partes[1]
                             ? partes[1].substring(0, 5)
                             : "00:00";
-                          const esEntrada =
-                            fichaje.tipo_evento === TipoFichaje.ENTRADA ||
-                            String(fichaje.tipo_evento).toUpperCase() ===
-                              "ENTRADA";
+                          const codigo = (
+                            fichaje.codigo_evento ||
+                            fichaje.tipo_evento_id ||
+                            ""
+                          ).toUpperCase();
+                          const esEntrada = codigo === "ENTRADA";
 
                           return (
                             <View

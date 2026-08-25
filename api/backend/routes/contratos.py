@@ -5,8 +5,10 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from models.calendarios_laborales import CalendariosLaborales
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.empresas import Empresas
 from models.usuarios import Usuarios
 from schemas.contratos import ContratoCreate, ContratoResponse, ContratoUpdate
@@ -17,9 +19,7 @@ from models.contratos import Contratos
 
 router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post("", response_model=ContratoResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("20/minute")
@@ -27,20 +27,20 @@ def crear_contrato(
     request: Request,
     obj_in: ContratoCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/contratos
     Registra un nuevo contrato laboral en el sistema validando la coherencia estructural de las entidades.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear contratos en esta empresa."
         )
 
     # 1. Validaciones estructurales de existencia (Aislamiento Multiempresa/Tenant)
-    empresa = db.query(Empresas).filter(Representativo := Empresas.id == obj_in.empresa_id).first()
+    empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa no encontrada.")
 
@@ -51,6 +51,10 @@ def crear_contrato(
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == obj_in.centro_trabajo_id).first()
     if not centro:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Centro de trabajo no encontrado.")
+
+    calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == obj_in.calendario_laboral_id).first()
+    if not calendario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario laboral no encontrado.")
 
     if obj_in.departamento_id:
         departamento = db.query(Departamentos).filter(Departamentos.id == obj_in.departamento_id).first()
@@ -70,6 +74,7 @@ def crear_contrato(
         puesto_trabajo=obj_in.puesto_trabajo,
         categoria_profesional=obj_in.categoria_profesional,
         fecha_fin=obj_in.fecha_fin, 
+        calendario_laboral_id=obj_in.calendario_laboral_id,
         activo=True 
     )
 
@@ -85,110 +90,6 @@ def crear_contrato(
             detail=f"Error de integridad al registrar el contrato: {str(error)}"
         )
 
-
-@router.get("", response_model=List[ContratoResponse])
-def obtener_todos_los_contratos(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/contratos
-    Devuelve la nómina contractual global aplicando aislamiento multi-tenant.
-    """
-    query = db.query(Contratos)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(Contratos.empresa_id == usuario_actual.empresa_id)
-
-    return query.all()
-
-
-@router.get("/trabajador/{id_trabajador}", response_model=List[ContratoResponse])
-def obtener_contratos_por_trabajador(
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/contratos/trabajador/{id_trabajador}
-    Recupera la secuencia histórica de contratos asociados al expediente de un empleado.
-    """
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
-
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        if usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para consultar los contratos de este trabajador."
-            )
-
-    return db.query(Contratos).filter(Contratos.trabajador_id == id_trabajador).all()
-
-
-@router.get("/empresa/{id_empresa}", response_model=List[ContratoResponse])
-def obtener_contratos_por_empresa(
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/contratos/empresa/{id_empresa}
-    Filtra los contratos de forma aislada para el panel de administración de una empresa cliente (tenant).
-    """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los contratos de esta empresa."
-        )
-
-    return db.query(Contratos).filter(Contratos.empresa_id == id_empresa).all()
-
-
-@router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}/activo", response_model=ContratoResponse)
-def obtener_contrato_activo_trabajador_empresa(
-    id_trabajador: UUID, 
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo
-    Busca el contrato vigente real de un trabajador asegurando el aislamiento por Empresa (Tenant).
-    """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != id_empresa:
-        if usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes autorización para consultar el contrato activo de este trabajador."
-            )
-
-    hoy = date.today()
-    
-    contrato_activo = db.query(Contratos).filter(
-        Contratos.trabajador_id == id_trabajador,
-        Contratos.empresa_id == id_empresa,  
-        Contratos.activo == True,
-        Contratos.fecha_inicio <= hoy
-    ).filter(
-        (Contratos.fecha_fin == None) | (Contratos.fecha_fin >= hoy)
-    ).order_by(Contratos.fecha_inicio.desc()).first()
-
-    if not contrato_activo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="No se ha encontrado ningún contrato activo para este trabajador en la empresa seleccionada."
-        )
-        
-    return contrato_activo
-
-
 @router.put("/{id_contrato}", response_model=ContratoResponse)
 @limiter.limit("20/minute")
 def actualizar_contrato(
@@ -196,7 +97,7 @@ def actualizar_contrato(
     id_contrato: UUID, 
     obj_in: ContratoUpdate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/contratos/{id_contrato}
@@ -206,7 +107,7 @@ def actualizar_contrato(
     if not contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato no encontrado.")
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != contrato.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != contrato.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para modificar este contrato."
@@ -241,7 +142,7 @@ def rescindir_contrato(
     id_contrato: UUID, 
     fecha_fin: date, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/contratos/{id_contrato}/dar-baja?fecha_fin=AAAA-MM-DD
@@ -252,7 +153,7 @@ def rescindir_contrato(
     if not contrato:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato laboral no encontrado.")
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != contrato.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != contrato.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para dar de baja este contrato."
@@ -278,13 +179,13 @@ def eliminar_todos_los_contratos_trabajador(
     empresa_id: UUID, 
     trabajador_id: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     Elimina TODOS los registros de contratos asociados a un trabajador 
     dentro de una empresa específica.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar contratos en esta empresa."
@@ -311,3 +212,83 @@ def eliminar_todos_los_contratos_trabajador(
     db.commit()
     
     return None
+
+@router.get("/trabajador/{id_trabajador}", response_model=List[ContratoResponse])
+def obtener_contratos_por_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    URI: GET /api/contratos/trabajador/{id_trabajador}
+    Recupera la secuencia histórica de contratos asociados al expediente de un empleado.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para consultar los contratos de este trabajador."
+            )
+
+    return db.query(Contratos).filter(Contratos.trabajador_id == id_trabajador).all()
+
+
+@router.get("/empresa/{id_empresa}", response_model=List[ContratoResponse])
+def obtener_contratos_por_empresa(
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    URI: GET /api/contratos/empresa/{id_empresa}
+    Filtra los contratos de forma aislada para el panel de administración de una empresa cliente (tenant).
+    """
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los contratos de esta empresa."
+        )
+
+    return db.query(Contratos).filter(Contratos.empresa_id == id_empresa).all()
+
+
+@router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}/activo", response_model=ContratoResponse)
+def obtener_contrato_activo_trabajador_empresa(
+    id_trabajador: UUID, 
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    URI: GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo
+    Busca el contrato vigente real de un trabajador asegurando el aislamiento por Empresa (Tenant).
+    """
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes autorización para consultar el contrato activo de este trabajador."
+            )
+
+    hoy = date.today()
+    
+    contrato_activo = db.query(Contratos).filter(
+        Contratos.trabajador_id == id_trabajador,
+        Contratos.empresa_id == id_empresa,  
+        Contratos.activo == True,
+        Contratos.fecha_inicio <= hoy
+    ).filter(
+        (Contratos.fecha_fin == None) | (Contratos.fecha_fin >= hoy)
+    ).order_by(Contratos.fecha_inicio.desc()).first()
+
+    if not contrato_activo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se ha encontrado ningún contrato activo para este trabajador en la empresa seleccionada."
+        )
+        
+    return contrato_activo

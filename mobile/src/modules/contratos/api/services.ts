@@ -13,7 +13,7 @@ export const obtenerContratosTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener la secuencia histórica de contratos del trabajador ${idTrabajador}.`,
@@ -36,12 +36,13 @@ export const crearContrato = async (data: {
   puesto_trabajo?: string | null;
   categoria_profesional?: string | null;
   fecha_fin?: string | null;
+  calendario_laboral_id?: string | null;
 }): Promise<Contrato> => {
   try {
     const respuesta = await api.post<Contrato>("/api/contratos", data);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Error de integridad al registrar el nuevo contrato laboral.",
@@ -65,7 +66,7 @@ export const obtenerContratoActivoTrabajador = async (
     if (error?.response?.status === 404) {
       return null;
     }
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener el contrato activo del trabajador ${idTrabajador} en la empresa ${idEmpresa}.`,
@@ -102,7 +103,7 @@ export const rescindirContratoActivoTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al dar de baja el contrato activo del trabajador ${idTrabajador}.`,
@@ -127,6 +128,7 @@ export const actualizarContratoActivoTrabajador = async (
     puesto_trabajo?: string | null;
     categoria_profesional?: string | null;
     trabajador_id?: string;
+    calendario_laboral_id?: string | null;
   },
 ): Promise<Contrato> => {
   try {
@@ -151,7 +153,7 @@ export const obtenerTodosLosContratos = async (): Promise<Contrato[]> => {
     const respuesta = await api.get<Contrato[]>("/api/contratos");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener el listado global de contratos.",
     );
@@ -170,7 +172,7 @@ export const obtenerContratosPorEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener los contratos de la empresa ${idEmpresa}.`,
@@ -199,7 +201,7 @@ export const eliminarTodosLosContratosTrabajador = async (
       `/api/contratos/empresa/${empresaId}/trabajador/${trabajadorId}`,
     );
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al eliminar los contratos del trabajador ${trabajadorId} en la empresa ${empresaId}.`,

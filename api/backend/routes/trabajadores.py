@@ -2,15 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
 from models.asignaciones_turno import AsignacionesTurno
 from core.database import get_db
-from core.security import obtener_usuario_actual, verify_password
+from core.security import obtener_usuario_actual, verificar_rol_requerido, verify_password
+from core.enums import TipoUsuarioEnum
 from schemas.empresas import EmpresaResponse
-from schemas.trabajadores import AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse
+from schemas.trabajadores import AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse, TrabajadorUpdate
 from schemas.usuarios import LoginRequest
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
@@ -18,9 +17,7 @@ from models.turnos import Turnos
 
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
-
 
 @router.post("", response_model=TrabajadorResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("15/minute")  # Protegido contra altas masivas de empleados
@@ -28,17 +25,11 @@ def registrar_trabajador(
     request: Request,
     obj_in: TrabajadorCreate, 
     db: Session = Depends(get_db),
-    # usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     URI: POST /api/trabajadores
     Registra un nuevo empleado validando el aislamiento por empresa y privilegios de administrador.
     """
-    # if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="No tienes permisos para registrar trabajadores en esta empresa."
-    #     )
 
     if obj_in.email:
         email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
@@ -76,33 +67,7 @@ def registrar_trabajador(
     return nuevo_trabajador
 
 
-@router.patch("/{id_trabajador}", response_model=TrabajadorResponse)
-def actualizar_trabajador(
-    id_trabajador: UUID, 
-    obj_in: dict, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: PATCH /api/trabajadores/{id_trabajador}
-    Actualiza datos de un trabajador validando pertenencia a la empresa o rol de administrador.
-    """
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar este trabajador."
-        )
-    
-    for field, value in obj_in.items():
-        setattr(trabajador, field, value)
-    
-    db.commit()
-    db.refresh(trabajador)
-    return trabajador
+
 
 
 @router.post("/login", response_model=TrabajadorResponse)
@@ -134,90 +99,44 @@ def login_trabajador(request: Request, credenciales: LoginRequest, db: Session =
 
     return usuario_cuenta.trabajador
 
-
-@router.get("", response_model=List[TrabajadorResponse])
-def obtener_trabajadores(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/trabajadores
-    Devuelve la plantilla de empleados aplicando aislamiento multi-tenant.
-    """
-    query = db.query(Trabajadores)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(Trabajadores.empresa_id == usuario_actual.empresa_id)
-
-    return query.order_by(Trabajadores.nombre.asc()).all()
-
-
-@router.get("/{id_trabajador}", response_model=TrabajadorResponse)
-def obtener_trabajador(
+@router.patch("/{id_trabajador}", response_model=TrabajadorResponse)
+def actualizar_trabajador(
     id_trabajador: UUID, 
+    obj_in: TrabajadorUpdate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
-    URI: GET /api/trabajadores/{id_trabajador}
-    Busca los detalles de un empleado validando el acceso a su tenant.
+    URI: PATCH /api/trabajadores/{id_trabajador}
+    Actualiza datos de un trabajador validando pertenencia a la empresa o rol de administrador.
     """
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
+    
+    if usuario_actual.empresa_id != trabajador.empresa_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID {id_trabajador} no encontrado."
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar este trabajador."
         )
-
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        if usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para consultar este expediente."
-            )
-
+    
+    # Obtenemos solo los campos que fueron enviados en la petición (excluyendo los no definidos)
+    datos_actualizacion = obj_in.model_dump(exclude_unset=True)
+    
+    for field, value in datos_actualizacion.items():
+        setattr(trabajador, field, value)
+    
+    db.commit()
+    db.refresh(trabajador)
     return trabajador
 
-
-@router.get("/{id_trabajador}/empresas", response_model=List[EmpresaResponse])
-def obtener_empresas_trabajador(
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/trabajadores/{id_trabajador}/empresas
-    Recupera la empresa vinculada al expediente validando permisos.
-    """
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID {id_trabajador} no encontrado."
-        )
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
-        if usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes autorización para ver las empresas de este trabajador."
-            )
-
-    if trabajador.empresa:
-        return [trabajador.empresa]
-    return []
 
 
 @router.delete("/{id_trabajador}", status_code=status.HTTP_200_OK)
 def eliminar_trabajador(
     id_trabajador: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     URI: DELETE /api/trabajadores/{id_trabajador}
@@ -230,7 +149,7 @@ def eliminar_trabajador(
             detail=f"Trabajador con ID {id_trabajador} no localizado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id != trabajador.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar este trabajador."
@@ -248,7 +167,7 @@ def asignar_turnos_trabajador(
     id_trabajador: UUID, 
     obj_in: AsignarTurnosRequest, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     URI: POST /api/trabajadores/{id_trabajador}/turnos
@@ -261,7 +180,7 @@ def asignar_turnos_trabajador(
             detail=f"Trabajador con ID {id_trabajador} no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id != trabajador.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para asignar turnos a este trabajador."
@@ -304,3 +223,80 @@ def asignar_turnos_trabajador(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error crítico al procesar la asignación múltiple de turnos: {str(error)}"
         )
+
+
+@router.get("", response_model=List[TrabajadorResponse])
+def obtener_trabajadores(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+):
+    """
+    URI: GET /api/trabajadores
+    Devuelve la plantilla de empleados aplicando aislamiento multi-tenant.
+    """
+    query = db.query(Trabajadores)
+    
+    if not usuario_actual.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No estás vinculado a ninguna empresa."
+        )
+    query = query.filter(Trabajadores.empresa_id == usuario_actual.empresa_id)
+
+    return query.order_by(Trabajadores.nombre.asc()).all()
+
+
+@router.get("/{id_trabajador}", response_model=TrabajadorResponse)
+def obtener_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+):
+    """
+    URI: GET /api/trabajadores/{id_trabajador}
+    Busca los detalles de un empleado validando el acceso a su tenant.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador con ID {id_trabajador} no encontrado."
+        )
+
+    if  usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para consultar este expediente."
+            )
+
+    return trabajador
+
+
+@router.get("/{id_trabajador}/empresas", response_model=List[EmpresaResponse])
+def obtener_empresas_trabajador(
+    id_trabajador: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    URI: GET /api/trabajadores/{id_trabajador}/empresas
+    Recupera la empresa vinculada al expediente validando permisos.
+    """
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador con ID {id_trabajador} no encontrado."
+        )
+    
+    if usuario_actual.empresa_id != trabajador.empresa_id:
+        if usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes autorización para ver las empresas de este trabajador."
+            )
+
+    if trabajador.empresa:
+        return [trabajador.empresa]
+    return []

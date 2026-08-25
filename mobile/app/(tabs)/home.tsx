@@ -1,23 +1,28 @@
+import { obtenerDispositivosCentro } from "@/src/modules/dispositivos-fichaje/api/services";
+import { Dispositivo } from "@/src/modules/dispositivos-fichaje/types/dispositivo-fichaje";
 import {
   obtenerFichajesHoy,
   registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
 import {
-  obtenerIdNumericoTipo,
   RegistroFichaje,
   TipoFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
-import React, { useEffect, useState } from "react";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Location from "expo-location";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   AppState,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
+import SignatureCanvas from "react-native-signature-canvas";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/themed-text";
@@ -41,6 +46,15 @@ export default function HomeScreen() {
   const [timestampBaseActual, setTimestampBaseActual] = useState<number | null>(
     null,
   );
+
+  // Estados y referencias para la firma digital
+  const [modalFirmaVisible, setModalFirmaVisible] = useState(false);
+  const [accionPendiente, setAccionPendiente] = useState<{
+    nuevoEstado: Estado;
+    tipoLabel: TipoFichaje;
+  } | null>(null);
+  const signatureRef = useRef<any>(null);
+  const webCanvasRef = useRef<HTMLCanvasElement>(null);
 
   function obtenerFechaHoraCentroISO(zonaHoraria: string): string {
     const ahora = new Date();
@@ -111,7 +125,7 @@ export default function HomeScreen() {
       try {
         setCargando(true);
         const fichajesHoy: RegistroFichaje[] = await obtenerFichajesHoy(
-          usuarioActual.trabajador_id,
+          String(usuarioActual.trabajador_id),
         );
 
         if (fichajesHoy.length === 0) {
@@ -134,26 +148,25 @@ export default function HomeScreen() {
         eventos.forEach((fichaje) => {
           const tMs = new Date(fichaje.fecha_hora).getTime();
 
-          if (fichaje.tipo_evento === TipoFichaje.ENTRADA) {
+          if (fichaje.tipo_evento_id === TipoFichaje.ENTRADA) {
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento === TipoFichaje.INICIO_PAUSA) {
+          } else if (fichaje.tipo_evento_id === TipoFichaje.INICIO_PAUSA) {
             if (marcaEntradaActiva !== null) {
-              segundosCalculados += Math.floor(
-                (tMs - marcaEntradaActiva) / 1000,
+              segundosCalculados += Math.max(
+                0,
+                Math.floor((tMs - marcaEntradaActiva) / 1000),
               );
               marcaEntradaActiva = null;
             }
             marcaPausaActiva = tMs;
-          } else if (fichaje.tipo_evento === TipoFichaje.FIN_PAUSA) {
-            if (marcaPausaActiva !== null) {
-              segundosCalculados += Math.floor((tMs - marcaPausaActiva) / 1000);
-              marcaPausaActiva = null;
-            }
+          } else if (fichaje.tipo_evento_id === TipoFichaje.FIN_PAUSA) {
+            marcaPausaActiva = null;
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento === TipoFichaje.SALIDA) {
+          } else if (fichaje.tipo_evento_id === TipoFichaje.SALIDA) {
             if (marcaEntradaActiva !== null) {
-              segundosCalculados += Math.floor(
-                (tMs - marcaEntradaActiva) / 1000,
+              segundosCalculados += Math.max(
+                0,
+                Math.floor((tMs - marcaEntradaActiva) / 1000),
               );
               marcaEntradaActiva = null;
             }
@@ -161,7 +174,7 @@ export default function HomeScreen() {
         });
 
         const ultimoFichaje = eventos[eventos.length - 1];
-        const ultimoEvento = ultimoFichaje.tipo_evento;
+        const ultimoEvento = ultimoFichaje.tipo_evento_id;
 
         if (ultimoEvento === TipoFichaje.SALIDA) {
           setEstadoActual(Estado.Activo);
@@ -187,7 +200,10 @@ export default function HomeScreen() {
             ultimoEvento === TipoFichaje.INICIO_PAUSA) &&
           timestampBase !== null
         ) {
-          const tramoActual = Math.floor((Date.now() - timestampBase) / 1000);
+          const tramoActual = Math.max(
+            0,
+            Math.floor((Date.now() - timestampBase) / 1000),
+          );
           setTiempoFormateado(
             formatearSegundos(segundosCalculados + tramoActual),
           );
@@ -217,8 +233,9 @@ export default function HomeScreen() {
     const actualizarRelojDiferencial = () => {
       if (estadoActual === Estado.Activo || timestampBaseActual === null)
         return;
-      const segundosTramoAbierto = Math.floor(
-        (Date.now() - timestampBaseActual) / 1000,
+      const segundosTramoAbierto = Math.max(
+        0,
+        Math.floor((Date.now() - timestampBaseActual) / 1000),
       );
       setTiempoFormateado(
         formatearSegundos(segundosAcumuladosHoy + segundosTramoAbierto),
@@ -249,7 +266,8 @@ export default function HomeScreen() {
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
-  const registrarMarcajeHorario = async (
+  // Intercepta el click del botón para abrir primero el modal de firma
+  const iniciarProcesoFichaje = (
     nuevoEstado: Estado,
     tipoLabel: TipoFichaje,
   ) => {
@@ -271,18 +289,92 @@ export default function HomeScreen() {
       return;
     }
 
+    setAccionPendiente({ nuevoEstado, tipoLabel });
+    setModalFirmaVisible(true);
+  };
+
+  // Se ejecuta cuando el usuario confirma la firma en el canvas
+  const handleFirmaOK = async (signatureUri: string) => {
+    setModalFirmaVisible(false);
+    if (!accionPendiente) return;
+
+    const { nuevoEstado, tipoLabel } = accionPendiente;
+    await registrarMarcajeHorario(nuevoEstado, tipoLabel, signatureUri, false);
+    setAccionPendiente(null);
+  };
+
+  const registrarMarcajeHorario = async (
+    nuevoEstado: Estado,
+    tipoLabel: TipoFichaje,
+    signatureUri: string,
+    forzarExtra: boolean = false,
+  ) => {
+    if (
+      !usuarioActual?.trabajador_id ||
+      !empresaSeleccionada?.id ||
+      !centroTrabajoActual?.id
+    ) {
+      return;
+    }
+
     try {
       setCargando(true);
+
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        throw new Error(
+          "Se requieren permisos de ubicación para registrar el fichaje.",
+        );
+      }
+
+      let ubicacion = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = ubicacion.coords;
       const zonaDelCentro = centroTrabajoActual.zona_horaria || "UTC";
       const fechaHoraAjustada = obtenerFechaHoraCentroISO(zonaDelCentro);
 
-      await registrarFichaje({
-        trabajador_id: usuarioActual.trabajador_id,
-        empresa_id: empresaSeleccionada.id,
-        centro_trabajo_id: centroTrabajoActual.id,
-        tipo_evento_id: obtenerIdNumericoTipo(tipoLabel as TipoFichaje),
+      const dispositivosCentro = await obtenerDispositivosCentro(
+        centroTrabajoActual.id,
+      );
+
+      const tipoBuscado = Platform.OS === "web" ? "web" : "app_móvil";
+
+      const dispositivoEncontrado = dispositivosCentro.find(
+        (d: Dispositivo) =>
+          d.tipo_dispositivo.toLocaleLowerCase() === tipoBuscado &&
+          d.centro_trabajo_id === centroTrabajoActual.id,
+      );
+
+      if (!dispositivoEncontrado) {
+        const mensajeAviso =
+          "Dile al administrador de tu empresa que cree los dispositivos disponibles para fichar primero.";
+
+        if (Platform.OS === "web") {
+          alert(mensajeAviso);
+        } else {
+          Alert.alert("Dispositivos no configurados", mensajeAviso);
+        }
+
+        setCargando(false);
+        return;
+      }
+
+      const dispositivoIdUuid = dispositivoEncontrado.id;
+
+      // 1. Crear el fichaje enviando el ID de tipo de evento
+      const respuestaFichaje = await registrarFichaje({
+        trabajador_id: String(usuarioActual.trabajador_id),
+        empresa_id: String(empresaSeleccionada.id),
+        centro_trabajo_id: String(centroTrabajoActual.id),
+        tipo_evento_id: tipoLabel,
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
+        latitud: latitude,
+        longitud: longitude,
+        forzar_hora_extra: forzarExtra,
+        dispositivo_id: dispositivoIdUuid,
         observaciones:
           tipoLabel === TipoFichaje.ENTRADA
             ? "Inicio de jornada"
@@ -293,11 +385,34 @@ export default function HomeScreen() {
                 : "Descanso terminado",
       });
 
+      // 2. Extraer el ID del fichaje creado
+      const fichajeId =
+        respuestaFichaje?.id || (respuestaFichaje as any)?.fichaje_id;
+
+      if (fichajeId && signatureUri && Platform.OS !== "web") {
+        const baseDir = FileSystem.documentDirectory;
+        if (baseDir) {
+          const carpetaFirmas = `${baseDir}firmas_fichajes/`;
+          const infoCarpeta = await FileSystem.getInfoAsync(carpetaFirmas);
+          if (!infoCarpeta.exists) {
+            await FileSystem.makeDirectoryAsync(carpetaFirmas, {
+              intermediates: true,
+            });
+          }
+          const rutaFirmaDestino = `${carpetaFirmas}firma_${fichajeId}.png`;
+          await FileSystem.copyAsync({
+            from: signatureUri,
+            to: rutaFirmaDestino,
+          });
+        }
+      }
+
       const ahoraMs = Date.now();
 
       if (timestampBaseActual !== null) {
-        const segundosDelTramoQueCierra = Math.floor(
-          (ahoraMs - timestampBaseActual) / 1000,
+        const segundosDelTramoQueCierra = Math.max(
+          0,
+          Math.floor((ahoraMs - timestampBaseActual) / 1000),
         );
         setSegundosAcumuladosHoy((prev) => {
           const totalNuevo = prev + segundosDelTramoQueCierra;
@@ -313,15 +428,79 @@ export default function HomeScreen() {
       }
 
       setEstadoActual(nuevoEstado);
-    } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Error de Fichaje: ${mensajeAmigable}`);
-      } else {
-        Alert.alert("Error de Fichaje", mensajeAmigable);
-      }
-    } finally {
       setCargando(false);
+    } catch (error: any) {
+      setCargando(false);
+
+      const statusHttp = error?.response?.status;
+      const mensajeBackend =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "";
+
+      console.log("Error interceptado en fichaje:", {
+        statusHttp,
+        mensajeBackend,
+        forzarExtra,
+      });
+
+      if (forzarExtra) {
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`No se pudo forzar el fichaje: ${mensajeAmigable}`);
+        } else {
+          Alert.alert(
+            "Error",
+            `No se pudo forzar el fichaje: ${mensajeAmigable}`,
+          );
+        }
+        return;
+      }
+
+      if (
+        statusHttp === 409 ||
+        (typeof mensajeBackend === "string" &&
+          mensajeBackend.toLowerCase().includes("festivo"))
+      ) {
+        if (Platform.OS === "web") {
+          const aceptarExtra = window.confirm(
+            "No se puede fichar en un día festivo/no laborable.\n\n¿Aún así quiere fichar como horas extra en festivo?",
+          );
+          if (aceptarExtra && accionPendiente) {
+            registrarMarcajeHorario(nuevoEstado, tipoLabel, signatureUri, true);
+          }
+        } else {
+          Alert.alert(
+            "Día Festivo / No Laborable",
+            "No se puede fichar en un día festivo/no laborable. ¿Aún así quiere fichar como horas extra en festivo?",
+            [
+              {
+                text: "Cancelar",
+                style: "cancel",
+              },
+              {
+                text: "Aceptar",
+                onPress: () => {
+                  registrarMarcajeHorario(
+                    nuevoEstado,
+                    tipoLabel,
+                    signatureUri,
+                    true,
+                  );
+                },
+              },
+            ],
+          );
+        }
+      } else {
+        const mensajeAmigable = obtenerMensajeAmigableError(error);
+        if (Platform.OS === "web") {
+          alert(`Error de Fichaje: ${mensajeAmigable}`);
+        } else {
+          Alert.alert("Error de Fichaje", mensajeAmigable);
+        }
+      }
     }
   };
 
@@ -438,7 +617,7 @@ export default function HomeScreen() {
               cargando && styles.botonDeshabilitado,
             ]}
             onPress={() =>
-              registrarMarcajeHorario(Estado.Trabajando, TipoFichaje.ENTRADA)
+              iniciarProcesoFichaje(Estado.Trabajando, TipoFichaje.ENTRADA)
             }
             disabled={cargando}
           >
@@ -458,12 +637,9 @@ export default function HomeScreen() {
             ]}
             onPress={() => {
               if (estadoActual === Estado.Descansando) {
-                registrarMarcajeHorario(
-                  Estado.Trabajando,
-                  TipoFichaje.FIN_PAUSA,
-                );
+                iniciarProcesoFichaje(Estado.Trabajando, TipoFichaje.FIN_PAUSA);
               } else {
-                registrarMarcajeHorario(
+                iniciarProcesoFichaje(
                   Estado.Descansando,
                   TipoFichaje.INICIO_PAUSA,
                 );
@@ -494,7 +670,7 @@ export default function HomeScreen() {
               cargando && styles.botonDeshabilitado,
             ]}
             onPress={() =>
-              registrarMarcajeHorario(Estado.Activo, TipoFichaje.SALIDA)
+              iniciarProcesoFichaje(Estado.Activo, TipoFichaje.SALIDA)
             }
             disabled={cargando}
           >
@@ -503,6 +679,115 @@ export default function HomeScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Modal o sección de Firma Digital adaptado para Web y Móvil */}
+      {modalFirmaVisible && (
+        <Modal
+          visible={modalFirmaVisible}
+          transparent={true}
+          animationType="slide"
+        >
+          <View style={styles.modalFondo}>
+            <View style={styles.modalContenedor}>
+              <ThemedText style={styles.modalTitulo}>
+                Firma Requerida
+              </ThemedText>
+              <ThemedText style={styles.modalSubtitulo}>
+                Por favor, firme en el recuadro para registrar el fichaje.
+              </ThemedText>
+
+              <View style={styles.canvasContainer}>
+                {Platform.OS === "web" ? (
+                  // Versión Web usando elemento nativo <canvas>
+                  <View style={{ alignItems: "center", width: "100%" }}>
+                    {/* @ts-ignore */}
+                    <canvas
+                      ref={webCanvasRef}
+                      width={320}
+                      height={230}
+                      style={{
+                        border: "1px solid #CBD5E1",
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: 8,
+                        cursor: "crosshair",
+                        touchAction: "none",
+                      }}
+                      onMouseDown={(e) => {
+                        const canvas = webCanvasRef.current;
+                        if (!canvas) return;
+                        const ctx = canvas.getContext("2d");
+                        if (!ctx) return;
+                        const rect = canvas.getBoundingClientRect();
+                        ctx.beginPath();
+                        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+
+                        const onMouseMove = (ev: MouseEvent) => {
+                          ctx.lineTo(
+                            ev.clientX - rect.left,
+                            ev.clientY - rect.top,
+                          );
+                          ctx.stroke();
+                        };
+                        const onMouseUp = () => {
+                          window.removeEventListener("mousemove", onMouseMove);
+                          window.removeEventListener("mouseup", onMouseUp);
+                        };
+                        window.addEventListener("mousemove", onMouseMove);
+                        window.addEventListener("mouseup", onMouseUp);
+                      }}
+                    />
+                  </View>
+                ) : (
+                  // Versión Móvil usando SignatureCanvas / WebView
+                  <SignatureCanvas
+                    ref={signatureRef}
+                    onOK={(sig: string) => handleFirmaOK(sig)}
+                    descriptionText="Firme aquí"
+                    clearText="Limpiar"
+                    confirmText="Guardar"
+                    webStyle={`.m-signature-pad { box-shadow: none; border: 1px solid #cbd5e1; border-radius: 8px; }`}
+                  />
+                )}
+              </View>
+
+              <View style={styles.modalBotonesFila}>
+                <Pressable
+                  style={[styles.botonModal, styles.botonCancelarModal]}
+                  onPress={() => {
+                    setModalFirmaVisible(false);
+                    setAccionPendiente(null);
+                  }}
+                >
+                  <ThemedText style={styles.textoBotonCancelar}>
+                    Cancelar
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.botonModal, styles.botonConfirmarModal]}
+                  onPress={() => {
+                    if (Platform.OS === "web") {
+                      const canvas = webCanvasRef.current;
+                      if (canvas) {
+                        const dataURL = canvas.toDataURL("image/png");
+                        handleFirmaOK(dataURL);
+                      }
+                    } else {
+                      if (signatureRef.current) {
+                        signatureRef.current.readSignature();
+                      }
+                    }
+                  }}
+                >
+                  <ThemedText style={styles.textoBotonConfirmar}>
+                    Aceptar Firma
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </AppScreen>
   );
 }
@@ -555,5 +840,71 @@ const styles = StyleSheet.create({
   botonPausa: { backgroundColor: "#EA580C" },
   botonSalida: { backgroundColor: "#DC2626" },
   botonDeshabilitado: { opacity: 0.5 },
-  textoBoton: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  textoBoton: { color: "#FFFFFF", fontSize: "16", fontWeight: "700" } as any,
+  modalFondo: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 20,
+  },
+  modalContenedor: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: "80%",
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.15)" },
+      default: { elevation: 5 },
+    }),
+  },
+  modalTitulo: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  modalSubtitulo: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  canvasContainer: {
+    height: 250,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    overflow: "hidden",
+    marginBottom: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBotonesFila: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  botonModal: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  botonCancelarModal: {
+    backgroundColor: "#F1F5F9",
+  },
+  botonConfirmarModal: {
+    backgroundColor: "#2563EB",
+  },
+  textoBotonCancelar: {
+    color: "#475569",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  textoBotonConfirmar: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 15,
+  },
 });

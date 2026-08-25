@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, Text, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, String, Text, Uuid, text
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
@@ -22,6 +22,8 @@ class CentrosTrabajo(Base):
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     codigo_ccc: Mapped[Optional[str]] = mapped_column(String(20), comment='Código de Cuenta de Cotización a la Seguridad Social del centro, si aplica.')
     direccion: Mapped[Optional[str]] = mapped_column(Text)
+    latitud: Mapped[Optional[float]] = mapped_column(nullable=True)
+    longitud: Mapped[Optional[float]] = mapped_column(nullable=True)
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='centros_trabajo') # type: ignore
     calendarios_laborales: Mapped[list['CalendariosLaborales']] = relationship('CalendariosLaborales', back_populates='centro_trabajo') # type: ignore

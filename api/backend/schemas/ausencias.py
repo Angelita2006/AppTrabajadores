@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Optional
 from uuid import UUID
-from models.enums import EstadoAusenciaEnum, TipoAusenciaEnum
+from core.enums import EstadoAusenciaEnum, TipoAusenciaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUSENCIAS
@@ -18,7 +18,6 @@ class AusenciaBase(BaseModel):
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la ausencia (AAAA-MM-DD)")
     fecha_fin: datetime.date = Field(..., description="Fecha de finalización de la ausencia (AAAA-MM-DD)")
     motivo: str = Field(..., min_length=2, max_length=1000, description="Justificación detallada de la solicitud")
-
 
 class AusenciaCreate(AusenciaBase):
     """
@@ -36,7 +35,6 @@ class AusenciaCreate(AusenciaBase):
             raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio.")
         return self
 
-
 class AusenciaResponse(AusenciaBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la aplicación móvil o web.
@@ -46,7 +44,6 @@ class AusenciaResponse(AusenciaBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la solicitud")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación")
     
-    # Campos opcionales que se rellenan en la resolución de RRHH
     justificante_metadata: Optional[dict] = Field(None, description="Metadatos o enlaces del justificante")
     validado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que validó la ausencia")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha de resolución de la solicitud")

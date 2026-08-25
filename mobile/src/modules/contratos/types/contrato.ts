@@ -1,3 +1,4 @@
+import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Departamento } from "../../departamentos/types/departamento";
 import { Empresa } from "../../empresas/types/empresa";
@@ -24,7 +25,8 @@ export interface Contrato {
   trabajador_id: string; // UUID v4
   empresa_id: string; // UUID v4
   centro_trabajo_id: string; // UUID v4
-  departamento_id: string | null; // UUID v4 opcional
+  departamento_id: string; // UUID v4 opcional
+  calendario_laboral_id: string; // UUID v4 opcional
 
   tipo_contrato: TipoContratoEnum;
   tipo_jornada: TipoJornadaEnum;
@@ -45,4 +47,5 @@ export interface Contrato {
   empresa?: Empresa | null;
   centro_trabajo?: CentroTrabajo | null;
   departamento?: Departamento | null;
+  calendario_laboral?: CalendarioFestivo | null;
 }

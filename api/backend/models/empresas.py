@@ -28,6 +28,7 @@ class Empresas(Base):
     convenio_colectivo: Mapped[Optional[str]] = mapped_column(String(255))
     direccion_fiscal: Mapped[Optional[str]] = mapped_column(Text)
     fecha_baja: Mapped[Optional[datetime.date]] = mapped_column(Date)
+    logo_url: Mapped[Optional[str]] = mapped_column(Text)
 
     centros_trabajo: Mapped[list['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='empresa') # type: ignore
     motivos_pausa: Mapped[list['MotivosPausa']] = relationship('MotivosPausa', back_populates='empresa') # type: ignore
@@ -45,3 +46,4 @@ class Empresas(Base):
     usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='empresa') # type: ignore
     correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='empresa') # type: ignore
     ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='empresa') # type: ignore
+    tipos_evento_fichaje: Mapped[list['TiposEventoFichaje']] = relationship('TiposEventoFichaje', back_populates='empresa') # type: ignore

@@ -17,7 +17,6 @@ class AsignarTurnosRequest(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TrabajadorUpdate(BaseModel):
     """
     Esquema para la actualización parcial o total de los datos de un trabajador.
@@ -35,7 +34,6 @@ class TrabajadorUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TrabajadorCreate(BaseModel):
     """
     Esquema utilizado para recibir los datos de registro o contratación desde el cliente.
@@ -49,7 +47,6 @@ class TrabajadorCreate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30, description="Teléfono de contacto")
     numero_seguridad_social: Optional[str] = Field(None, max_length=20, description="Número de la Seguridad Social")
     fecha_nacimiento: Optional[datetime.date] = Field(None, description="Fecha de nacimiento")
-
 
 class TrabajadorResponse(BaseModel):
     """

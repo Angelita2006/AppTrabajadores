@@ -22,6 +22,7 @@ export interface Empresa {
   codigo_cnae?: string | null;
   convenio_colectivo?: string | null;
   direccion_fiscal?: string | null;
+  logo_url?: string | null; // Añadido para la gestión del logo corporativo
 
   // Control de Fechas y Auditoría
   fecha_alta: string; // Formato "YYYY-MM-DD"
@@ -47,6 +48,7 @@ export interface EmpresaUpdate {
   codigo_cnae?: string | null;
   convenio_colectivo?: string | null;
   direccion_fiscal?: string | null;
+  logo_url?: string | null; // Añadido para permitir actualizar la URL del logo
   fecha_baja?: string | null;
 }
 
@@ -58,6 +60,7 @@ export interface RegistroOrganizacionDTO {
   razon_social?: string;
   nombre_admin?: string;
   apellidos_admin?: string;
+  logo_url?: string; // Opcional por si deseas incluirlo también en el registro inicial
 }
 
 export interface RespuestaRegistroCompleto {

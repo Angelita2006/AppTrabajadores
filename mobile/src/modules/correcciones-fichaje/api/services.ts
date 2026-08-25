@@ -14,7 +14,7 @@ export const obtenerTodasLasCorrecciones = async (): Promise<
     const respuesta = await api.get<IncidenciaResponse[]>("/api/correcciones");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener el listado completo de correcciones.",
     );
@@ -34,7 +34,7 @@ export const solicitarCorreccionHoraria = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar la solicitud de corrección horaria.",
     );
@@ -53,7 +53,7 @@ export const obtenerCorreccionesPorEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener las correcciones de la empresa ${idEmpresa}.`,
@@ -73,7 +73,7 @@ export const obtenerCorreccionesTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener las correcciones del trabajador ${idTrabajador}.`,
@@ -100,7 +100,7 @@ export const obtenerCorreccionesSolicitadasTrabajador = async (
 };
 
 /**
- * Resuelve una incidencia de fichaje cambiándola a 'aprobada' o 'rechazada'.
+ * Resuelve una incidencia de fichaje cambiándola a 'Aprobada' o 'Rechazada'.
  */
 export const resolverSolicitudCorreccion = async (
   idCorreccion: string,
@@ -120,7 +120,7 @@ export const resolverSolicitudCorreccion = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al resolver la solicitud de corrección ${idCorreccion}.`,
@@ -137,7 +137,7 @@ export const eliminarSolicitudCorreccion = async (
   try {
     await api.delete(`/api/correcciones/${idCorreccion}`);
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al eliminar la solicitud de corrección ${idCorreccion}.`,
@@ -157,7 +157,7 @@ export const restaurarCorreccionPendiente = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al restaurar la corrección ${idCorreccion} a estado pendiente.`,

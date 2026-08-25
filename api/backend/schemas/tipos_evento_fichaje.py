@@ -1,3 +1,6 @@
+from typing import Optional
+import uuid
+
 from pydantic import BaseModel, Field, ConfigDict
 
 # ==========================================
@@ -5,28 +8,21 @@ from pydantic import BaseModel, Field, ConfigDict
 # ==========================================
 
 class TipoEventoFichajeBase(BaseModel):
-    """
-    Propiedades comunes compartidas para la validación de un tipo de evento,
-    basado en el catálogo global e inmutable de la plataforma.
-    """
-    codigo: str = Field(..., min_length=2, max_length=30, description="Código único identificativo en mayúsculas (Ej: 'ENTRADA', 'SALIDA')")
-    descripcion: str = Field(..., min_length=2, max_length=150, description="Texto explicativo del evento (Ej: 'Entrada a la jornada')")
-    computa_como_trabajo: bool = Field(True, description="Determina si el tiempo transcurrido tras este evento suma como jornada efectiva")
-
+    codigo: str = Field(..., max_length=30)
+    descripcion: str = Field(..., max_length=150)
+    computa_como_trabajo: bool = True
 
 class TipoEventoFichajeCreate(TipoEventoFichajeBase):
-    """
-    Esquema utilizado para recibir los datos desde el cliente o scripts de migración
-    al dar de alta una nueva categoría de marcaje horario en el servidor.
-    """
-    pass 
+    empresa_id: Optional[uuid.UUID] = None
 
+class TipoEventoFichajeUpdate(BaseModel):
+    codigo: Optional[str] = Field(None, max_length=30)
+    descripcion: Optional[str] = Field(None, max_length=150)
+    computa_como_trabajo: Optional[bool] = None
 
 class TipoEventoFichajeResponse(TipoEventoFichajeBase):
-    """
-    Esquema utilizado para estructurar las respuestas JSON que el servidor envía a las aplicaciones
-    para mapear los botones de acción rápida y el historial.
-    """
-    id: int = Field(..., description="Identificador numérico único del tipo de evento (SmallInteger)")
+    id: int
+    empresa_id: Optional[uuid.UUID] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True

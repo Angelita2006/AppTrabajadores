@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "765543506621",
+    "project_id": "fichapp-4ffd3",
+    "storage_bucket": "fichapp-4ffd3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:765543506621:android:45e0ffc336262234968dd4",
+        "android_client_info": {
+          "package_name": "com.ficha"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoFEpklZKcM50pYHDxJqCA_e8sAQ_36as"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

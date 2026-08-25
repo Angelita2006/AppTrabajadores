@@ -5,8 +5,10 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from models.contratos import Contratos
 from core.database import get_db
-from core.security import obtener_usuario_actual
+from core.security import obtener_usuario_actual, verificar_rol_requerido
+from core.enums import TipoUsuarioEnum
 from models.empresas import Empresas
 from models.usuarios import Usuarios
 from models.centros_trabajo import CentrosTrabajo
@@ -15,7 +17,6 @@ from schemas.departamentos import DepartamentoCreate, DepartamentoResponse, Depa
 
 router = APIRouter(prefix="/api/departamentos", tags=["Departamentos"])
 
-# Instancia local del limitador para este router
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED)
@@ -24,13 +25,13 @@ def crear_departamento(
     request: Request,
     obj_in: DepartamentoCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: POST /api/departamentos
-    Registra un nuevo departamento dentro de una empresa cliente (tenant).
+    Registra un nuevo departamento dentro de una empresa cliente.
     """
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != obj_in.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear departamentos en esta empresa."
@@ -80,16 +81,12 @@ def obtener_todos_los_departamentos(
 ):
     """
     URI: GET /api/departamentos
-    Devuelve la estructura de departamentos global aplicando aislamiento multi-tenant.
+    Devuelve los departamentos aplicando el filtro de empresa si el usuario está asociado a una.
     """
     query = db.query(Departamentos).join(Departamentos.empresa)
     
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
+    # Si el usuario tiene una empresa asignada (no es global/gestoría), filtramos por su tenant
+    if usuario_actual.empresa_id:
         query = query.filter(Departamentos.empresa_id == usuario_actual.empresa_id)
 
     return query.order_by(Empresas.nombre_comercial.asc()).order_by(Departamentos.nombre.asc()).all()
@@ -103,8 +100,13 @@ def obtener_departamentos_empresa(
 ):
     """
     URI: GET /api/departamentos/empresa/{id_empresa}
-    Recupera de forma estrictamente aislada los departamentos dados de alta por una organización (tenant).
+    Recupera los departamentos de una organización específica.
     """
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar los departamentos de esta empresa."
+        )
 
     return db.query(Departamentos).filter(Departamentos.empresa_id == id_empresa).all()
 
@@ -117,7 +119,7 @@ def obtener_departamento(
 ):
     """
     URI: GET /api/departamentos/{id_departamento}
-    Busca la información de un departamento mediante su identificador único UUID.
+    Busca la información de un departamento mediante su ID.
     """
     departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
     if not departamento:
@@ -125,8 +127,8 @@ def obtener_departamento(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Departamento con ID {id_departamento} no encontrado."
         )
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != departamento.empresa_id:
+
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para consultar este departamento."
@@ -140,11 +142,11 @@ def actualizar_departamento(
     id_departamento: UUID, 
     nuevo_nombre: str, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/departamentos/{id_departamento}
-    Modifica el nombre de un departamento existente actualizando la marca de tiempo de auditoría.
+    Modifica el nombre de un departamento existente.
     """
     departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
     if not departamento:
@@ -152,8 +154,8 @@ def actualizar_departamento(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Departamento con ID {id_departamento} no encontrado."
         )
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != departamento.empresa_id:
+
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para modificar este departamento."
@@ -172,7 +174,7 @@ def editar_departamento(
     id_departamento: UUID, 
     obj_in: DepartamentoUpdate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: PUT /api/departamentos/{id_departamento}/editar
@@ -185,7 +187,7 @@ def editar_departamento(
             detail=f"Departamento con ID {id_departamento} no encontrado."
         )
 
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != departamento.empresa_id:
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para editar este departamento."
@@ -206,11 +208,11 @@ def editar_departamento(
 def eliminar_departamento(
     id_departamento: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
     URI: DELETE /api/departamentos/{id_departamento}
-    Elimina físicamente un departamento.
+    Elimina físicamente un departamento previa validación de contratos activos.
     """
     departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
     if not departamento:
@@ -218,11 +220,22 @@ def eliminar_departamento(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Departamento con ID {id_departamento} no encontrado."
         )
-    
-    if usuario_actual.tipo_usuario != "Administrador" and usuario_actual.empresa_id != departamento.empresa_id:
+
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar este departamento."
+        )
+
+    contratos_activos = db.query(Contratos).filter(
+        Contratos.departamento_id == id_departamento,
+        Contratos.activo == True
+    ).count()
+
+    if contratos_activos > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Acción bloqueada: No se puede eliminar el departamento porque tiene {contratos_activos} contrato(s) activo(s) asociado(s). Debe reasignarlos o rescindirlos primero."
         )
 
     try:
@@ -233,5 +246,5 @@ def eliminar_departamento(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se puede eliminar el departamento porque tiene registros asociados (contratos/empleados). Error: {str(error)}"
+            detail=f"No se puede eliminar el departamento porque tiene registros asociados históricos. Error: {str(error)}"
         )

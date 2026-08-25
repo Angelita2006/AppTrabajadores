@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
-from models.enums import AccionAuditoriaEnum
+from core.enums import AccionAuditoriaEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUDITORÍA DE ACCESOS
@@ -16,7 +16,6 @@ class AuditoriaAccesoBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente analizada (tenant)")
     accion: AccionAuditoriaEnum = Field(..., description="Tipo de acción efectuada (consulta, exportacion, descarga, etc.)")
 
-
 class AuditoriaAccesoCreate(AuditoriaAccesoBase):
     """
     Esquema utilizado de forma interna por el backend para registrar un evento
@@ -27,7 +26,6 @@ class AuditoriaAccesoCreate(AuditoriaAccesoBase):
     detalle: Optional[dict] = Field(default_factory=dict, description="Bloque JSONB con metadatos técnicos adicionales de la acción")
     ip_address: Optional[IPvAnyAddress] = Field(None, description="Dirección IP de red desde donde se efectúa el acceso")
 
-
 class AuditoriaAccesoResponse(AuditoriaAccesoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON destinadas a los informes de auditoría,
@@ -36,7 +34,6 @@ class AuditoriaAccesoResponse(AuditoriaAccesoBase):
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
     fecha_hora: datetime.datetime = Field(..., description="Marca de tiempo real e inmutable del acceso (now)")
     
-    # Propiedades complementarias de trazabilidad relacional
     usuario_id: Optional[UUID] = Field(None, description="ID UUID del usuario que realizó el acceso")
     trabajador_id: Optional[UUID] = Field(None, description="ID UUID del trabajador consultado")
     detalle: Optional[dict] = Field(None, description="Metadatos técnicos almacenados")

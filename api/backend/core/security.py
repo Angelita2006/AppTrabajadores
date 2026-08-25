@@ -1,5 +1,4 @@
 import datetime
-import os
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +7,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from models.usuarios import Usuarios
 from core.config import settings
+from models.roles import Roles
+from models.usuarios_roles import UsuariosRoles
 
 # Claves de configuración para los tokens JWT (en producción, cámbialas por variables de entorno)
 SECRET_KEY = settings.SECRET_KEY.__str__()
@@ -15,8 +16,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 
 
 # Esquema de autenticación OAuth2 para FastAPI
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/usuarios/login")
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/usuarios/login-form")
 
 def get_password_hash(password: str) -> str:
     """
@@ -27,7 +27,6 @@ def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed_bytes = bcrypt.hashpw(password_bytes, salt)
     return hashed_bytes.decode('utf-8')
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -42,7 +41,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-
 def crear_token_acceso(data: dict) -> str:
     """
     Genera un token JWT firmado digitalmente con una fecha de expiración.
@@ -54,7 +52,6 @@ def crear_token_acceso(data: dict) -> str:
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
 
 def obtener_usuario_actual(
     token: str = Depends(oauth2_scheme), 
@@ -88,3 +85,41 @@ def obtener_usuario_actual(
         raise credentials_exception
         
     return usuario
+
+def verificar_rol_requerido(roles_permitidos: list[str]):
+    """
+    Dependencia de FastAPI que valida si el usuario actual posee 
+    al menos uno de los roles requeridos dentro de su empresa o ámbito.
+    """
+    def dependencia_verificacion(
+        usuario_actual: Usuarios = Depends(obtener_usuario_actual),
+        db: Session = Depends(get_db)
+    ):
+        if not usuario_actual.activo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="La cuenta de usuario se encuentra inactiva."
+            )
+
+        # Consultar los roles asignados al usuario en la tabla relacional
+        asignaciones = db.query(UsuariosRoles).join(Roles).filter(
+            UsuariosRoles.usuario_id == usuario_actual.id
+        ).all()
+
+        nombres_roles_usuario = [asig.role.nombre for asig in asignaciones if asig.role]
+
+        # Comprobar si alguno coincide con los permitidos
+        tiene_permiso = any(rol in roles_permitidos for rol in nombres_roles_usuario)
+
+        # Fallback de compatibilidad con el campo antiguo
+        if not tiene_permiso and getattr(usuario_actual, "tipo_usuario", None) in roles_permitidos:
+            tiene_permiso = True
+
+        if not tiene_permiso:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {', '.join(roles_permitidos)}."
+            )
+        
+        return usuario_actual
+    return dependencia_verificacion

@@ -18,7 +18,6 @@ class FestivoResponse2(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class FestivoBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de un día festivo
@@ -28,13 +27,11 @@ class FestivoBase(BaseModel):
     fecha: date = Field(..., description="Fecha del día festivo en formato AAAA-MM-DD")
     tipo: str = Field("nacional", min_length=2, max_length=30, description="Ámbito del festivo (ej: 'nacional', 'autonomico', 'local')")
 
-
 class FestivoCreate(FestivoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al registrar un festivo en el cuadrante.
     """
     descripcion: Optional[str] = Field(None, max_length=255, description="Nombre o motivo del festivo (Ej: 'Año Nuevo')")
-
 
 class FestivoResponse(FestivoBase):
     """
