@@ -2,9 +2,9 @@ import {
   confirmarCambioPassword,
   solicitarCodigoRecuperacion,
 } from "@/src/modules/another-services/services";
-import LottieBackground from "@/src/shared/ui/LottieBackground";
-import VideoBackground from "@/src/shared/ui/VideoBackground";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import LottieBackground from "@/src/shared/ui/Background.native";
+import VideoBackground from "@/src/shared/ui/Background.web";
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -24,8 +24,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { ThemedText } from "../../src/shared/components/themed-text";
-import { IconSymbol } from "../../src/shared/ui/icon-symbol";
+import { ThemedText } from "../../src/shared/components/ThemedText";
+import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function RecuperarPasswordScreen() {
   const router = useRouter();
@@ -55,16 +55,10 @@ export default function RecuperarPasswordScreen() {
 
   const handleSolicitarCodigo = async () => {
     if (!email.includes("@")) {
-      if (Platform.OS === "web") {
-        alert(
-          "Formato Inválido: Por favor, introduce una dirección de correo electrónico válida.",
-        );
-      } else {
-        Alert.alert(
-          "Formato Inválido",
-          "Por favor, introduce una dirección de correo electrónico válida.",
-        );
-      }
+      mostrarMensaje(
+        "Formato Inválido",
+        "Por favor, introduce una dirección de correo electrónico válida.",
+      );
       return;
     }
 
@@ -78,23 +72,15 @@ export default function RecuperarPasswordScreen() {
         opacidadTarjeta.value = withTiming(1, { duration: 300 });
       });
 
-      if (Platform.OS === "web") {
-        alert(
-          "Código Enviado: Hemos enviado un código de verificación de 6 dígitos a tu bandeja de entrada.",
-        );
-      } else {
-        Alert.alert(
-          "Código Enviado",
-          "Hemos enviado un código de verificación de 6 dígitos a tu bandeja de entrada.",
-        );
-      }
+      mostrarMensaje(
+        "Código Enviado",
+        "Hemos enviado un código de verificación de 6 dígitos a tu bandeja de entrada.",
+      );
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Error: ${mensajeAmigable}`);
-      } else {
-        Alert.alert("Error", mensajeAmigable);
-      }
+      mostrarError(
+        "No se pudo solicitar el código de recuperación debido a un error en el servidor: " +
+          error,
+      );
     } finally {
       setCargando(false);
     }
@@ -102,16 +88,10 @@ export default function RecuperarPasswordScreen() {
 
   const handleRestablecerPassword = async () => {
     if (codigo.length !== 6 || nuevaPassword.length < 6) {
-      if (Platform.OS === "web") {
-        alert(
-          "Datos Incorrectos: El código requiere 6 dígitos y la contraseña al menos 6 caracteres.",
-        );
-      } else {
-        Alert.alert(
-          "Datos Incorrectos",
-          "El código requiere 6 dígitos y la contraseña al menos 6 caracteres.",
-        );
-      }
+      mostrarMensaje(
+        "Datos Incorrectos",
+        "El código requiere 6 dígitos y la contraseña al menos 6 caracteres.",
+      );
       return;
     }
 
@@ -124,25 +104,21 @@ export default function RecuperarPasswordScreen() {
         nueva_password: nuevaPassword,
       });
 
+      const mensajeFinal =
+        "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.";
       if (Platform.OS === "web") {
-        window.alert(
-          "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
-        );
+        window.alert(mensajeFinal);
         router.replace("/");
       } else {
-        Alert.alert(
-          "Éxito",
-          "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
-          [{ text: "Ir al Login", onPress: () => router.replace("/") }],
-        );
+        Alert.alert("Éxito", mensajeFinal, [
+          { text: "Ir al Login", onPress: () => router.replace("/") },
+        ]);
       }
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Fallo de Validación: ${mensajeAmigable}`);
-      } else {
-        Alert.alert("Fallo de Validación", mensajeAmigable);
-      }
+      mostrarError(
+        "No se pudo completar el restablecimiento de la contraseña debido a un error en el servidor: " +
+          error,
+      );
     } finally {
       setCargando(false);
     }

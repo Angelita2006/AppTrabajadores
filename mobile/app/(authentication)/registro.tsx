@@ -1,6 +1,5 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
-import LottieBackground from "@/src/shared/ui/LottieBackground";
-import VideoBackground from "@/src/shared/ui/VideoBackground";
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -19,8 +18,10 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { ThemedText } from "../../src/shared/components/themed-text";
-import { IconSymbol } from "../../src/shared/ui/icon-symbol";
+import { ThemedText } from "../../src/shared/components/ThemedText";
+import LottieBackground from "../../src/shared/ui/Background.native";
+import VideoBackground from "../../src/shared/ui/Background.web";
+import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function RegistroScreen() {
   const router = useRouter();
@@ -70,16 +71,10 @@ export default function RegistroScreen() {
     setErrorPassword(!esPasswordValido);
 
     if (!camposCompletos) {
-      if (Platform.OS === "web") {
-        alert(
-          "Campos Vacíos: Por favor, rellena todos los parámetros obligatorios de tu contrato.",
-        );
-      } else {
-        Alert.alert(
-          "Campos Vacíos",
-          "Por favor, rellena todos los parámetros obligatorios de tu contrato.",
-        );
-      }
+      mostrarMensaje(
+        "Campos Vacíos",
+        "Por favor, rellena todos los parámetros obligatorios de tu contrato.",
+      );
       return false;
     }
 
@@ -111,11 +106,9 @@ export default function RegistroScreen() {
         ]);
       }
     } catch (error: any) {
-      if (Platform.OS === "web") {
-        alert(`Error de registro: ${error}`);
-      } else {
-        Alert.alert("Error de registro", error);
-      }
+      mostrarError(
+        "Error al completar el registro y vinculación del usuario: " + error,
+      );
     } finally {
       setCargando(false);
     }

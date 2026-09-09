@@ -3,6 +3,8 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 from core.enums import TipoUsuarioEnum
+from schemas.empresas import EmpresaResponse
+from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - USUARIOS
@@ -32,13 +34,13 @@ class UsuarioRegisterCreate(BaseModel):
     al registrar un nuevo usuario vinculándolo a un trabajador existente.
     """
     empresa_cif: str = Field(..., min_length=5, max_length=20, description="CIF de la empresa cliente para localizar el tenant")
-    nif_nie: str = Field(..., min_length=5, max_length=15, description="Número de identificación fiscal del trabajador")
+    dni_nif_nie: str = Field(..., min_length=5, max_length=15, description="Número de identificación fiscal del trabajador")
     email: EmailStr = Field(..., max_length=255, description="Correo electrónico único de acceso")
     password: str = Field(..., min_length=6, max_length=255, description="Contraseña de acceso del usuario")
 
     model_config = ConfigDict(from_attributes=True)
 
-class UsuarioResponse(UsuarioBase):
+class UsuarioSimpleResponse(UsuarioBase):
     """
     Esquema utilizado para empaquetar los datos del perfil que se envían al cliente.
     Excluye por completo el hash de la contraseña para evitar brechas de seguridad.
@@ -52,6 +54,15 @@ class UsuarioResponse(UsuarioBase):
     empresa_id: Optional[UUID] = Field(None, description="ID de la empresa asociada")
     trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador asociado")
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class UsuarioResponse(UsuarioSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
 
     model_config = ConfigDict(from_attributes=True)
 

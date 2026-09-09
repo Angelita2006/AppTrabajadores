@@ -1,30 +1,57 @@
+import { mostrarError } from "@/src/utils/errorHandler";
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { obtenerCentroTrabajo } from "../../centros-trabajo/api/services";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
-import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaje";
-// Asegúrate de importar 'ThemedText' y 'Row' según la ruta real de tu proyecto
-// import { ThemedText } from '@/components/ThemedText';
-// import { Row } from '@/components/Row';
+import {
+  Dispositivo,
+  TipoDispositivo,
+} from "../../dispositivos-fichaje/types/dispositivo-fichaje";
 
+/**
+ * Propiedades requeridas por el componente ItemDispositivo.
+ */
 interface ItemDispositivoProps {
+  /** Objeto de dispositivo a representar e interactuar. */
   dispositivo: Dispositivo;
+  /** Dispositivo que se encuentra actualmente en modo de edición, o null si ninguno lo está. */
   dispositivoEnEdicion: Dispositivo | null;
-  setDispositivoEnEdicion: (disp: Dispositivo | null) => void;
-  setTipoDispositivoSeleccionado: (tipo: string) => void;
+  /** Función para establecer el dispositivo en edición. */
+  setDispositivoEnEdicion: (dispositivo: Dispositivo | null) => void;
+  /** Función para actualizar el tipo de dispositivo seleccionado en el formulario. */
+  setTipoDispositivoSeleccionado: (tipo: TipoDispositivo) => void;
+  /** Función para actualizar el ID del centro de trabajo asociado en el formulario. */
   setCentroIdAsociado: (id: string) => void;
+  /** Función para actualizar el estado booleano de activación del dispositivo. */
   setEstadoActivoEdicion: (activo: boolean) => void;
+  /** Función para controlar la visibilidad del formulario general de creación/gestión. */
   setMostrarFormDispositivo: (mostrar: boolean) => void;
+  /** Función para ejecutar la eliminación de un dispositivo por su ID. */
   handleEliminarDispositivo: (id: string) => void;
-  handleEditarDispositivo: (disp: Dispositivo) => void;
-  TIPOS_DISPOSITIVOS: any[];
+  /** Función para confirmar y guardar la edición del dispositivo. */
+  handleEditarDispositivo: (dispositivo: Dispositivo) => void;
+  /** Listado de tipos de dispositivos disponibles para selección. */
+  TIPOS_DISPOSITIVO: { label: string; value: TipoDispositivo }[];
+  /** Listado de centros de trabajo configurados en la organización. */
   centrosConfigurados: CentroTrabajo[];
-  tipoDispositivoSeleccionado: string;
+  /** Tipo de dispositivo seleccionado actualmente. */
+  tipoDispositivoSeleccionado: TipoDispositivo;
+  /** ID del centro de trabajo asociado actualmente. */
   centroIdAsociado: string;
+  /** Estado de activación actual para la edición. */
   estadoActivoEdicion: boolean;
+  /** Objeto de estilos personalizados de la aplicación. */
   styles: any;
 }
 
+/**
+ * Componente que representa la tarjeta visual de un dispositivo de fichaje individual,
+ * permitiendo su visualización detallada, eliminación y la visualización de un formulario
+ * desplegable para modificar sus atributos principales.
+ *
+ * @component
+ * @param {ItemDispositivoProps} props - Propiedades del componente.
+ */
 export default function ItemDispositivo({
   dispositivo,
   dispositivoEnEdicion,
@@ -35,7 +62,7 @@ export default function ItemDispositivo({
   setMostrarFormDispositivo,
   handleEliminarDispositivo,
   handleEditarDispositivo,
-  TIPOS_DISPOSITIVOS,
+  TIPOS_DISPOSITIVO,
   centrosConfigurados,
   tipoDispositivoSeleccionado,
   centroIdAsociado,
@@ -44,11 +71,19 @@ export default function ItemDispositivo({
 }: ItemDispositivoProps) {
   const [nombreCentro, setNombreCentro] = useState<string>("Cargando...");
 
+  /**
+   * Efecto secundario para obtener de forma asíncrona el nombre del centro de trabajo
+   * asociado al identificador provisto en el dispositivo.
+   */
   useEffect(() => {
     let montado = true;
     async function cargarCentro() {
       if (!dispositivo.centro_trabajo_id) {
-        if (montado) setNombreCentro("Sin centro asignado");
+        if (montado) {
+          mostrarError(
+            "El dispositivo actual no tiene un centro de trabajo asignado.",
+          );
+        }
         return;
       }
       try {
@@ -56,10 +91,15 @@ export default function ItemDispositivo({
           await obtenerCentroTrabajo(dispositivo.centro_trabajo_id)
         ).nombre;
         if (montado) {
-          setNombreCentro(centroNombre || "Centro no encontrado");
+          setNombreCentro(centroNombre);
         }
-      } catch (error) {
-        if (montado) setNombreCentro("Error al cargar");
+      } catch (error: any) {
+        if (montado) {
+          mostrarError(
+            "Error al cargar la información del centro de trabajo del dispositivo: " +
+              error,
+          );
+        }
       }
     }
     cargarCentro();
@@ -70,6 +110,7 @@ export default function ItemDispositivo({
 
   return (
     <View key={dispositivo.id}>
+      {/* Contenedor principal de la fila del dispositivo */}
       <View
         style={[
           styles.itemListaEstructural,
@@ -82,14 +123,17 @@ export default function ItemDispositivo({
         ]}
       >
         <View style={{ flex: 1 }}>
-          {/* Reemplaza ThemedText por el componente de texto que uses en tu app */}
           <Text style={styles.subtextoElementoLista}>
-            Tipo: {dispositivo.tipo_dispositivo.replace("_", " ")} | Centro:{" "}
-            {nombreCentro} {"\n"}
+            Tipo:{" "}
+            {typeof dispositivo.tipo_dispositivo === "string"
+              ? dispositivo.tipo_dispositivo.replace("_", " ")
+              : dispositivo.tipo_dispositivo}{" "}
+            | Centro: {nombreCentro} {"\n"}
             {dispositivo.activo !== false ? "Activo 🟢" : "Inactivo 🔴"}
           </Text>
         </View>
         <View style={{ flexDirection: "row" }}>
+          {/* Botón para alternar el modo de edición del dispositivo */}
           <Pressable
             style={{
               backgroundColor: "#475569",
@@ -103,17 +147,16 @@ export default function ItemDispositivo({
                 setDispositivoEnEdicion(null);
               } else {
                 setDispositivoEnEdicion(dispositivo);
-                setTipoDispositivoSeleccionado(
-                  dispositivo.tipo_dispositivo || "App_móvil",
-                );
-                setCentroIdAsociado(dispositivo.centro_trabajo_id || "");
-                setEstadoActivoEdicion(dispositivo.activo ?? true);
+                setTipoDispositivoSeleccionado(dispositivo.tipo_dispositivo);
+                setCentroIdAsociado(dispositivo.centro_trabajo_id);
+                setEstadoActivoEdicion(dispositivo.activo);
                 setMostrarFormDispositivo(false);
               }
             }}
           >
             <Text>✏️</Text>
           </Pressable>
+          {/* Botón para eliminar el dispositivo */}
           <Pressable
             style={{
               backgroundColor: "#fee2e2",
@@ -128,16 +171,16 @@ export default function ItemDispositivo({
         </View>
       </View>
 
-      {/* Formulario de Edición */}
+      {/* Formulario de Edición desplegable condicional */}
       {dispositivoEnEdicion?.id === dispositivo.id && (
         <View style={styles.contenedorFormDesplegado}>
           <Text style={styles.formularioTitulo}>Editar Dispositivo</Text>
 
-          {/* Modificar Tipo de Dispositivo en Edición */}
+          {/* Selector horizontal para modificar el tipo de dispositivo */}
           <View style={styles.campoFormulario}>
             <Text style={styles.labelInput}>Tipo de Dispositivo</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {TIPOS_DISPOSITIVOS?.map((tipo: any) => {
+              {TIPOS_DISPOSITIVO.map((tipo) => {
                 const seleccionado = tipoDispositivoSeleccionado === tipo.value;
                 return (
                   <Pressable
@@ -163,11 +206,11 @@ export default function ItemDispositivo({
             </ScrollView>
           </View>
 
-          {/* Modificar Centro de Trabajo en Edición */}
+          {/* Selector horizontal para modificar el centro de trabajo asociado */}
           <View style={styles.campoFormulario}>
             <Text style={styles.labelInput}>Centro de Trabajo Asociado</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {centrosConfigurados?.map((centro: any) => {
+              {centrosConfigurados?.map((centro) => {
                 const esEsteCentro = centroIdAsociado === centro.id;
                 return (
                   <Pressable
@@ -193,7 +236,7 @@ export default function ItemDispositivo({
             </ScrollView>
           </View>
 
-          {/* Modificar Estado Activo en Edición */}
+          {/* Botón interactivo para alternar el estado activo/inactivo del dispositivo */}
           <View style={styles.campoFormulario}>
             <Text style={styles.labelInput}>Estado</Text>
             <Pressable
@@ -215,6 +258,7 @@ export default function ItemDispositivo({
             </Pressable>
           </View>
 
+          {/* Botón de acción para actualizar los cambios en el dispositivo */}
           <Pressable
             style={[
               styles.botonGuardar,
@@ -224,7 +268,7 @@ export default function ItemDispositivo({
               handleEditarDispositivo({
                 ...dispositivo,
                 tipo_dispositivo: tipoDispositivoSeleccionado,
-                centro_trabajo_id: centroIdAsociado || null,
+                centro_trabajo_id: centroIdAsociado,
                 activo: estadoActivoEdicion,
               });
               setDispositivoEnEdicion(null);
@@ -233,6 +277,7 @@ export default function ItemDispositivo({
             <Text style={styles.textoBotonGuardar}>Actualizar Cambios</Text>
           </Pressable>
 
+          {/* Botón para cancelar la edición y cerrar el formulario */}
           <Pressable
             onPress={() => setDispositivoEnEdicion(null)}
             style={{ marginTop: 15 }}

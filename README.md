@@ -1,35 +1,37 @@
-# 📱 AppTrabajadores (Fichapp)
+# AppTrabajadores (Fichapp)
 
 Sistema integral de gestión para trabajadores y control de recursos humanos, compuesto por la API Backend y la aplicación móvil oficial **Fichapp**.
 
 ---
 
-## 🏗️ Estructura del Proyecto
+## Estructura del Proyecto
 
 El repositorio se divide en dos componentes principales además de la documentación y los scripts de base de datos:
 
-* **`api/`**: Backend del sistema. 
-  * `backend/`: Código fuente de FastAPI (rutas, modelos de base de datos, esquemas Pydantic y lógica de seguridad).
-  * `alembic/`: Control de versiones y migraciones de la base de datos.
-* **`mobile/`**: Aplicación móvil **Fichapp** desarrollada con Expo y React Native.
-* **`docs/`**: Documentación técnica del proyecto y esquemas SQL.
+- **`api/`**: Backend del sistema.
+  - `backend/`: Código fuente de FastAPI (rutas, modelos de base de datos, esquemas Pydantic y lógica de seguridad).
+  - `alembic/`: Control de versiones y migraciones de la base de datos.
+- **`mobile/`**: Aplicación móvil **Fichapp** desarrollada con Expo y React Native.
+- **`docs/`**: Documentación técnica del proyecto y esquemas SQL.
 
 ---
 
-## 🚀 Tecnologías Utilizadas
+## Tecnologías Utilizadas
 
 ### **Backend (`api/`)**
-* **Python** (versión 3.14 compatible)
-* **FastAPI**: Framework web moderno y rápido para construir APIs.
-* **SQLAlchemy**: ORM para la gestión de la base de datos relacional.
-* **Alembic**: Herramienta de migraciones para SQLAlchemy.
+
+- **Python** (versión 3.14 compatible)
+- **FastAPI**: Framework web moderno y rápido para construir APIs.
+- **SQLAlchemy**: ORM para la gestión de la base de datos relacional.
+- **Alembic**: Herramienta de migraciones para SQLAlchemy.
 
 ### **Frontend / Móvil (`mobile/`)**
-* **React Native** / **Expo**: Framework para el desarrollo de la aplicación móvil **Fichapp** multiplataforma.
+
+- **React Native** / **Expo**: Framework para el desarrollo de la aplicación móvil **Fichapp** multiplataforma.
 
 ---
 
-## ⚙️ Guía de Instalación y Configuración
+## Guía de Instalación y Configuración
 
 ### 1. Configuración del Backend (API)
 
@@ -103,19 +105,19 @@ EXPO_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-## 📂 Módulos Principales del Backend
+## Módulos Principales del Backend
 
 El sistema incluye modelos y rutas robustas para la gestión de:
 
-* Gestión de Empresas, Centros de Trabajo y Departamentos.
-* Control de Trabajadores, Contratos, Roles y Permisos de Usuarios.
-* Control horario: Fichajes (núcleo de Fichapp), Correcciones de fichaje, Turnos y Asignaciones.
-* Gestión de incidencias: Ausencias, Vacaciones y Festivos.
-* Auditoría de accesos y políticas de retención.
+- Gestión de Empresas, Centros de Trabajo y Departamentos.
+- Control de Trabajadores, Contratos, Roles y Permisos de Usuarios.
+- Control horario: Fichajes (núcleo de Fichapp), Correcciones de fichaje, Turnos y Asignaciones.
+- Gestión de incidencias: Ausencias, Vacaciones y Festivos.
+- Auditoría de accesos y políticas de retención.
 
 ---
 
-## 🧪 Pruebas y Validación
+## Pruebas y Validación
 
 ### Ejecutar Tests en el Backend
 
@@ -128,7 +130,7 @@ pytest
 
 ---
 
-## 📦 Despliegue (Deployment)
+## Despliegue (Deployment)
 
-* **Backend**: Preparado para ser desplegado en servicios cloud compatibles con contenedores Docker o plataformas como Render, Railway o AWS utilizando `uvicorn` como servidor ASGI.
-* **Móvil**: Compilación de Fichapp lista para producción mediante EAS (*Expo Application Services*) para generar los binarios nativos de Android (`.apk` / `.aab`) e iOS (`.ipa`).
+- **Backend**: Preparado para ser desplegado en servicios cloud compatibles con contenedores Docker o plataformas como Render, Railway o AWS utilizando `uvicorn` como servidor ASGI.
+- **Móvil**: Compilación de Fichapp lista para producción mediante EAS (_Expo Application Services_) para generar los binarios nativos de Android (`.apk` / `.aab`) e iOS (`.ipa`).

@@ -1,11 +1,17 @@
 import {
+  crearCorreccion,
   obtenerCorreccionesPorEmpresa,
-  obtenerIncidenciasTrabajador,
-  resolverSolicitudCorreccion,
-  solicitarCorreccionHoraria,
+  obtenerCorreccionesPorTrabajador,
+  resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
+import {
+  obtenerTipoEventoPorId,
+  obtenerTiposEventosEmpresa,
+} from "@/src/modules/tipos_eventos_fichaje/api/services";
+import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,13 +23,13 @@ import {
   View,
 } from "react-native";
 import {
+  CorreccionFichajeCreate,
+  CorreccionFichajeResponse,
   EstadoCorreccion,
-  IncidenciaCreateRequest,
-  IncidenciaResponse,
   TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
-import { ThemedText } from "../../src/shared/components/themed-text";
+import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
 interface FichajeSimplificado {
@@ -34,10 +40,16 @@ interface FichajeSimplificado {
 }
 
 export default function IncidenciasScreen() {
-  const { usuarioActual, empresaSeleccionada, trabajadorActual } = useSesion();
-  const [incidencias, setIncidencias] = useState<IncidenciaResponse[]>([]);
+  const { usuarioActual, empresaActual, trabajadorActual } = useSesion();
+  const [incidencias, setIncidencias] = useState<CorreccionFichajeResponse[]>(
+    [],
+  );
   const [fichajesDisponibles, setFichajesDisponibles] = useState<
     FichajeSimplificado[]
+  >([]);
+
+  const [tiposEventosEmpresa, setTiposEventosEmpresa] = useState<
+    TipoEventoFichaje[]
   >([]);
   const [cargando, setCargando] = useState(true);
 
@@ -45,10 +57,11 @@ export default function IncidenciasScreen() {
   const [tipoCorreccion, setTipoCorreccion] =
     useState<TipoCorreccion>("Alta_manual");
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
-  const [fechaAfectada, setFechaAfectada] = useState("2026-06-29");
+  const [fechaAfectada, setFechaAfectada] = useState("");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
 
-  const [eventoSolitado, setEventoSolicitado] = useState<string>("ENTRADA");
+  const [tipoEventoIdSolicitado, setTipoEventoIdSolicitado] =
+    useState<string>("");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
 
@@ -61,54 +74,59 @@ export default function IncidenciasScreen() {
 
   const conteoEstados = useMemo(() => {
     const pendientes = incidencias.filter(
-      (i) => i.estado === EstadoCorreccion.pendiente,
+      (i) => i.estado === "Pendiente",
     ).length;
-    const aprobadas = incidencias.filter(
-      (i) => i.estado === EstadoCorreccion.aprobada,
-    ).length;
+    const aprobadas = incidencias.filter((i) => i.estado === "Aprobada").length;
     const rechazadas = incidencias.filter(
-      (i) => i.estado === EstadoCorreccion.rechazada,
+      (i) => i.estado === "Rechazada",
     ).length;
     return { pendientes, aprobadas, rechazadas };
   }, [incidencias]);
 
-  // Carga inicial sincronizada de datos
+  // Carga inicial sincronizada de datos (dependencias limpiadas para evitar bucles)
   const cargarDatosInciales = useCallback(async () => {
     try {
       setCargando(true);
+      if (!empresaActual?.id) return;
+
+      const eventosEmpresa = await obtenerTiposEventosEmpresa(empresaActual.id);
+      if (Array.isArray(eventosEmpresa)) {
+        setTiposEventosEmpresa(eventosEmpresa);
+        setTipoEventoIdSolicitado((prev) =>
+          !prev && eventosEmpresa.length > 0 ? eventosEmpresa[0].id : prev,
+        );
+      }
+
       if (esAdmin) {
-        if (!empresaSeleccionada?.id) return;
         const datosGlobales = await obtenerCorreccionesPorEmpresa(
-          empresaSeleccionada.id,
+          empresaActual.id,
         );
         setIncidencias(datosGlobales);
       } else {
-        if (!usuarioActual) return;
-        if (!trabajadorActual?.id) return;
+        if (!usuarioActual || !trabajadorActual?.id) return;
 
         const [datosPersonales, listaFichajesRaw] = await Promise.all([
-          obtenerIncidenciasTrabajador(trabajadorActual.id),
+          obtenerCorreccionesPorTrabajador(trabajadorActual.id),
           obtenerFichajesSemanaActual(trabajadorActual.id),
         ]);
 
         if (!Array.isArray(listaFichajesRaw)) {
           setFichajesDisponibles([]);
+          setIncidencias(datosPersonales);
           return;
         }
 
-        const fichajesFiltrados = listaFichajesRaw.filter((fichaje) => {
-          if (!fichaje || !fichaje.estado) return false;
+        const fichajesProcesadosPromises = listaFichajesRaw.map(
+          async (fichaje: RegistroFichaje) => {
+            if (!fichaje || !fichaje.estado) return null;
+            if (fichaje.estado.toString() !== "Válido") return null;
+            if (!fichaje.tipo_evento_id) return null;
 
-          const estadoFichajeApi = fichaje.estado.toString();
-          const esValido = estadoFichajeApi === "Válido";
-          if (!esValido) return false;
+            const tipoEvento = await obtenerTipoEventoPorId(
+              fichaje.tipo_evento_id,
+            );
+            const codigoEvento = tipoEvento?.codigo?.toUpperCase() || "";
 
-          const tipoEventoStr = fichaje.tipo_evento?.toString().toUpperCase();
-          return tipoEventoStr === "ENTRADA" || tipoEventoStr === "SALIDA";
-        });
-
-        const fichajesProcesados: FichajeSimplificado[] = fichajesFiltrados.map(
-          (fichaje) => {
             const fechaHoraStr = fichaje.fecha_hora || "";
             const [fecha, horaCompleta] = fechaHoraStr.includes("T")
               ? fechaHoraStr.split("T")
@@ -122,20 +140,27 @@ export default function IncidenciasScreen() {
               id: fichaje.id,
               fecha: fecha,
               hora: horaMinutos,
-              tipo_evento: fichaje.tipo_evento.toString().toUpperCase(),
+              tipo_evento: codigoEvento,
             };
           },
         );
 
+        const resultados = await Promise.all(fichajesProcesadosPromises);
+        const fichajesValidos: FichajeSimplificado[] = resultados.filter(
+          (f): f is FichajeSimplificado => f !== null,
+        );
+
         setIncidencias(datosPersonales);
-        setFichajesDisponibles(fichajesProcesados);
+        setFichajesDisponibles(fichajesValidos);
       }
     } catch (error: any) {
-      alert(obtenerMensajeAmigableError(error));
+      mostrarError(
+        "Error al cargar los centros de trabajo de la empresa: " + error,
+      );
     } finally {
       setCargando(false);
     }
-  }, [esAdmin, empresaSeleccionada?.id, trabajadorActual?.id]);
+  }, [esAdmin, empresaActual?.id, trabajadorActual?.id, usuarioActual]);
 
   useEffect(() => {
     cargarDatosInciales();
@@ -148,31 +173,35 @@ export default function IncidenciasScreen() {
     if (fichaje) {
       setFechaAfectada(fichaje.fecha);
       setHoraAnterior(fichaje.hora);
-
-      const tipoUpper = fichaje.tipo_evento.toUpperCase();
-      if (tipoUpper === "ENTRADA" || tipoUpper === "SALIDA") {
-        setEventoSolicitado(tipoUpper);
-      }
     } else {
       setHoraAnterior("");
+      setFechaAfectada("");
     }
   };
 
   const reportarIncidencia = useCallback(async () => {
     if (!comentario.trim()) {
-      alert("Por favor, especifica el motivo o explicación.");
+      mostrarMensaje(
+        "Alerta",
+        "Por favor, especifica el motivo o explicación.",
+      );
       return;
     }
 
     if (tipoCorreccion !== "Alta_manual" && !fichajeAfectadoId.trim()) {
-      alert("Debes seleccionar un fichaje de la lista desplegable.");
+      mostrarMensaje(
+        "Alerta",
+        "Debes seleccionar un fichaje de la lista desplegable.",
+      );
       return;
     }
 
-    // Validación extra para asegurarnos que hay fecha y hora si no es anulación
     if (tipoCorreccion !== "Anulación") {
       if (!fechaAfectada.trim() || !horaRealPropuesta.trim()) {
-        alert("Debes indicar la fecha del descuadre y la hora propuesta.");
+        mostrarMensaje(
+          "Alerta",
+          "Debes indicar la fecha del descuadre y la hora propuesta.",
+        );
         return;
       }
     }
@@ -182,19 +211,19 @@ export default function IncidenciasScreen() {
 
       const idTrabajadorEfectivo =
         trabajadorActual?.id || usuarioActual?.trabajador_id;
-      if (
-        !usuarioActual?.id ||
-        !empresaSeleccionada?.id ||
-        !idTrabajadorEfectivo
-      ) {
-        alert("Expediente corporativo incompleto o faltan datos de sesión.");
+      if (!usuarioActual?.id || !empresaActual?.id || !idTrabajadorEfectivo) {
+        mostrarMensaje(
+          "Alerta",
+          "Expediente corporativo incompleto o faltan datos de sesión.",
+        );
         return;
       }
 
-      const payload: IncidenciaCreateRequest = {
-        empresa_id: empresaSeleccionada.id,
+      const payload: CorreccionFichajeCreate = {
+        empresa_id: empresaActual.id,
         trabajador_id: idTrabajadorEfectivo,
         tipo_correccion: tipoCorreccion,
+        tipo_evento_id: tipoEventoIdSolicitado,
         solicitado_por_usuario_id: usuarioActual.id,
         motivo: comentario.trim(),
         fichaje_afectado_id:
@@ -204,7 +233,7 @@ export default function IncidenciasScreen() {
             ? {
                 fecha_descuadre: fechaAfectada.trim(),
                 hora_propuesta: horaRealPropuesta.trim(),
-                evento_solicitado: eventoSolitado,
+                tipo_evento_id: tipoEventoIdSolicitado,
               }
             : {},
         valor_anterior:
@@ -213,15 +242,17 @@ export default function IncidenciasScreen() {
             : null,
       };
 
-      const respuestaBackend = await solicitarCorreccionHoraria(payload);
+      const respuestaBackend = await crearCorreccion(payload);
       setIncidencias((prev) => [respuestaBackend, ...prev]);
 
-      // Limpieza de formulario
       setComentario("");
       setFichajeAfectadoId("");
       setHoraAnterior("");
+      setFechaAfectada("");
     } catch (error: any) {
-      alert(obtenerMensajeAmigableError(error));
+      mostrarError(
+        "Error al cargar los centros de trabajo de la empresa: " + error,
+      );
     } finally {
       setCargando(false);
     }
@@ -231,11 +262,11 @@ export default function IncidenciasScreen() {
     fichajeAfectadoId,
     fechaAfectada,
     horaRealPropuesta,
-    eventoSolitado,
+    tipoEventoIdSolicitado,
     horaAnterior,
     usuarioActual,
     trabajadorActual,
-    empresaSeleccionada,
+    empresaActual,
   ]);
 
   const handleResolverIncidencia = useCallback(
@@ -244,7 +275,7 @@ export default function IncidenciasScreen() {
         setCargando(true);
         if (!usuarioActual?.id) return;
 
-        const resuelta = await resolverSolicitudCorreccion(
+        const resuelta = await resolverCorreccion(
           idCorreccion,
           decision,
           usuarioActual.id,
@@ -253,7 +284,9 @@ export default function IncidenciasScreen() {
           prev.map((item) => (item.id === idCorreccion ? resuelta : item)),
         );
       } catch (error: any) {
-        alert(obtenerMensajeAmigableError(error));
+        mostrarError(
+          "Error al cargar los centros de trabajo de la empresa: " + error,
+        );
       } finally {
         setCargando(false);
       }
@@ -263,9 +296,9 @@ export default function IncidenciasScreen() {
 
   const getColoresEstado = (estado: EstadoCorreccion) => {
     switch (estado) {
-      case EstadoCorreccion.aprobada:
+      case "Aprobada":
         return { bg: "#DCFCE7", texto: "#16803D" };
-      case EstadoCorreccion.rechazada:
+      case "Rechazada":
         return { bg: "#FEE2E2", texto: "#B91C1C" };
       default:
         return { bg: "#FFEDD5", texto: "#D97706" };
@@ -324,6 +357,8 @@ export default function IncidenciasScreen() {
                     onPress={() => {
                       setTipoCorreccion(tipo);
                       setFichajeAfectadoId("");
+                      setHoraAnterior("");
+                      setFechaAfectada("");
                     }}
                   >
                     <ThemedText
@@ -341,7 +376,7 @@ export default function IncidenciasScreen() {
               {tipoCorreccion !== "Alta_manual" && (
                 <View style={{ marginBottom: 12 }}>
                   <ThemedText style={styles.label}>
-                    Seleccionar Fichaje Original Afectado (Semana Actual)
+                    Seleccionar Fichaje Original Afectado
                   </ThemedText>
                   <View style={styles.pickerContainer}>
                     <Picker
@@ -353,7 +388,7 @@ export default function IncidenciasScreen() {
                       dropdownIconColor="#EA580C"
                     >
                       <Picker.Item
-                        label="Selecciona un fichaje de esta semana"
+                        label="Selecciona un fichaje"
                         value=""
                         enabled={false}
                       />
@@ -381,6 +416,7 @@ export default function IncidenciasScreen() {
                         onChangeText={setFechaAfectada}
                         style={styles.input}
                         placeholder="AAAA-MM-DD"
+                        placeholderTextColor="#94A3B8"
                       />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -392,29 +428,31 @@ export default function IncidenciasScreen() {
                         onChangeText={setHoraRealPropuesta}
                         style={styles.input}
                         placeholder="HH:MM"
+                        placeholderTextColor="#94A3B8"
                       />
                     </View>
                   </View>
 
                   <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
                   <View style={styles.selectorTipos}>
-                    {["ENTRADA", "SALIDA"].map((evento) => (
+                    {tiposEventosEmpresa.map((evento) => (
                       <Pressable
-                        key={evento}
+                        key={evento.id}
                         style={[
                           styles.opcionTipo,
-                          eventoSolitado === evento && styles.opcionTipoActiva,
+                          tipoEventoIdSolicitado === evento.id &&
+                            styles.opcionTipoActiva,
                         ]}
-                        onPress={() => setEventoSolicitado(evento)}
+                        onPress={() => setTipoEventoIdSolicitado(evento.id)}
                       >
                         <ThemedText
                           style={[
                             styles.textoOpcion,
-                            eventoSolitado === evento &&
+                            tipoEventoIdSolicitado === evento.id &&
                               styles.textoOpcionActiva,
                           ]}
                         >
-                          {evento}
+                          {evento.codigo.replace("_", " ").toUpperCase()}
                         </ThemedText>
                       </Pressable>
                     ))}
@@ -438,14 +476,12 @@ export default function IncidenciasScreen() {
                 </View>
               )}
 
-              <ThemedText style={styles.label}>
-                Justificación para RRHH
-              </ThemedText>
+              <ThemedText style={styles.label}>Justificación</ThemedText>
               <TextInput
                 value={comentario}
                 onChangeText={setComentario}
                 style={[styles.input, styles.textArea]}
-                placeholder="Indica el motivo detallado de la corrección o el olvido..."
+                placeholder="Indica el motivo detallado de la corrección..."
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
               />
@@ -459,7 +495,7 @@ export default function IncidenciasScreen() {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <ThemedText style={styles.submitText}>
-                  Solicitar Rectificación
+                  Solicitar corrección
                 </ThemedText>
               )}
             </Pressable>
@@ -492,10 +528,6 @@ export default function IncidenciasScreen() {
             const fechaD = item.valor_nuevo?.fecha_descuadre;
             const horaP = item.valor_nuevo?.hora_propuesta;
 
-            const eventoS = item.valor_nuevo?.evento_solicitado
-              ? item.valor_nuevo.evento_solicitado.toString().toUpperCase()
-              : "N/A";
-
             return (
               <Card key={item.id}>
                 <View style={styles.itemCard}>
@@ -518,8 +550,7 @@ export default function IncidenciasScreen() {
 
                   {tieneValoresNuevos && fechaD && (
                     <ThemedText style={styles.itemTipo}>
-                      Propuesto: {fechaD} a las {horaP ?? "00:00"} hs ({eventoS}
-                      )
+                      Propuesto: {fechaD} a las {horaP ?? "00:00"} hs
                     </ThemedText>
                   )}
 
@@ -533,7 +564,7 @@ export default function IncidenciasScreen() {
                     Motivo: "{item.motivo}"
                   </ThemedText>
 
-                  {esAdmin && item.estado === EstadoCorreccion.pendiente && (
+                  {esAdmin && item.estado === "Pendiente" && (
                     <View style={styles.panelControlJefe}>
                       <Pressable
                         style={[styles.botonResolutor, styles.botonRechazar]}
@@ -636,7 +667,7 @@ const styles = StyleSheet.create({
   submitButton: {
     height: 48,
     backgroundColor: "#EA580C",
-    borderRadius: 12,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
   },

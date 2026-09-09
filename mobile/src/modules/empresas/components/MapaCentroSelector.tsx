@@ -1,31 +1,51 @@
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import React, { useEffect, useState } from "react";
 import {
-    Linking,
-    Platform,
-    Pressable,
-    Text,
-    TextInput,
-    View,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
-interface MapaCentroSelectorProps {
+/**
+ * Propiedades requeridas por el componente de selección geográfica.
+ */
+interface SelectorUbicacionMapaProps {
+  /** Coordenada de latitud actual del centro. */
   latitudCentro: number;
+  /** Coordenada de longitud actual del centro. */
   longitudCentro: number;
+  /** Función para actualizar el estado de la latitud. */
   setLatitudCentro: (val: number) => void;
+  /** Función para actualizar el estado de la longitud. */
   setLongitudCentro: (val: number) => void;
+  /** Objeto de estilos personalizados de la aplicación. */
   styles: any;
 }
 
-export default function MapaCentroSelector({
+/**
+ * Componente multiplataforma para la selección y visualización de coordenadas geográficas.
+ * Utiliza Leaflet de forma dinámica en entorno web y campos de texto con enlace externo en móvil.
+ *
+ * @component
+ * @param {SelectorUbicacionMapaProps} props - Propiedades del componente.
+ */
+export default function SelectorUbicacionMapa({
   latitudCentro,
   longitudCentro,
   setLatitudCentro,
   setLongitudCentro,
   styles,
-}: MapaCentroSelectorProps) {
+}: SelectorUbicacionMapaProps) {
   const [LeafletComponents, setLeafletComponents] = useState<any>(null);
   const [isMounted, setIsMounted] = useState(false);
 
+  /**
+   * Efecto de inicialización que carga dinámicamente los estilos y componentes
+   * de Leaflet exclusivamente si se ejecuta en una plataforma web.
+   */
   useEffect(() => {
     setIsMounted(true);
     if (Platform.OS === "web") {
@@ -36,32 +56,55 @@ export default function MapaCentroSelector({
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
       }
-      import("react-leaflet").then((mod) => {
-        const L = require("leaflet");
-        delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-          iconUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-          shadowUrl:
-            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      import("react-leaflet")
+        .then((mod) => {
+          const L = require("leaflet");
+          delete L.Icon.Default.prototype._getIconUrl;
+          L.Icon.Default.mergeOptions({
+            iconRetinaUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+            iconUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+            shadowUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+          });
+          setLeafletComponents({
+            MapContainer: mod.MapContainer,
+            TileLayer: mod.TileLayer,
+            Marker: mod.Marker,
+            useMapEvents: mod.useMapEvents,
+            useMap: mod.useMap,
+          });
+        })
+        .catch((error: any) => {
+          mostrarError(
+            "Error al cargar los componentes del mapa interactivo: " + error,
+          );
         });
-        setLeafletComponents({
-          MapContainer: mod.MapContainer,
-          TileLayer: mod.TileLayer,
-          Marker: mod.Marker,
-          useMapEvents: mod.useMapEvents,
-          useMap: mod.useMap,
-        });
-      });
     }
   }, []);
 
-  const defaultLat = latitudCentro || 38.039878;
-  const defaultLng = longitudCentro || -1.673394;
+  const latitudPredeterminada = latitudCentro || 38.039878;
+  const longitudPredeterminada = longitudCentro || -1.673394;
 
   if (!isMounted) return <View style={{ height: 220 }} />;
+
+  const handleAbrirGoogleMaps = async () => {
+    try {
+      const url = `https://www.google.com/maps/search/?api=1&query=${latitudPredeterminada},${longitudPredeterminada}`;
+      const soportado = await Linking.canOpenURL(url);
+      if (soportado) {
+        await Linking.openURL(url);
+      } else {
+        mostrarMensaje(
+          "Alerta",
+          "No es posible abrir la aplicación de mapas en este dispositivo.",
+        );
+      }
+    } catch (error: any) {
+      mostrarError("Error al intentar abrir Google Maps: " + error);
+    }
+  };
 
   return (
     <View style={{ marginBottom: 16 }}>
@@ -80,17 +123,17 @@ export default function MapaCentroSelector({
       >
         {Platform.OS === "web" && LeafletComponents ? (
           <LeafletComponents.MapContainer
-            center={[defaultLat, defaultLng]}
+            center={[latitudPredeterminada, longitudPredeterminada]}
             zoom={15}
             style={{ width: "100%", height: "100%" }}
-            key={`${defaultLat}-${defaultLng}`}
+            key={`${latitudPredeterminada}-${longitudPredeterminada}`}
           >
-            <MapResizer />
+            <RedimensionadorMapa />
             <LeafletComponents.TileLayer
               attribution="&copy; OpenStreetMap contributors"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <ClickableMarkerInternal
+            <MarcadorInteractivoMapa
               LeafletComponents={LeafletComponents}
               setLatitudCentro={setLatitudCentro}
               setLongitudCentro={setLongitudCentro}
@@ -124,7 +167,7 @@ export default function MapaCentroSelector({
                 : "Sin coordenadas seleccionadas"}
             </Text>
 
-            {/* Inputs editables para latitud y longitud en móvil */}
+            {/* Inputs editables para latitud y longitud en dispositivos móviles */}
             <View
               style={{
                 flexDirection: "row",
@@ -141,7 +184,14 @@ export default function MapaCentroSelector({
                     { fontSize: 12, paddingVertical: 4, height: 32 },
                   ]}
                   value={latitudCentro ? latitudCentro.toString() : ""}
-                  onChangeText={(val) => setLatitudCentro(parseFloat(val) || 0)}
+                  onChangeText={(val) => {
+                    if (val === "" || val === "-") {
+                      setLatitudCentro(0);
+                      return;
+                    }
+                    const parsed = parseFloat(val);
+                    if (!isNaN(parsed)) setLatitudCentro(parsed);
+                  }}
                   keyboardType="numeric"
                   placeholder="Ej. 38.0398"
                 />
@@ -154,9 +204,14 @@ export default function MapaCentroSelector({
                     { fontSize: 12, paddingVertical: 4, height: 32 },
                   ]}
                   value={longitudCentro ? longitudCentro.toString() : ""}
-                  onChangeText={(val) =>
-                    setLongitudCentro(parseFloat(val) || 0)
-                  }
+                  onChangeText={(val) => {
+                    if (val === "" || val === "-") {
+                      setLongitudCentro(0);
+                      return;
+                    }
+                    const parsed = parseFloat(val);
+                    if (!isNaN(parsed)) setLongitudCentro(parsed);
+                  }}
                   keyboardType="numeric"
                   placeholder="Ej. -1.6733"
                 />
@@ -171,11 +226,7 @@ export default function MapaCentroSelector({
                 borderRadius: 6,
                 marginTop: 8,
               }}
-              onPress={() =>
-                Linking.openURL(
-                  `https://www.google.com/maps/search/?api=1&query=${defaultLat},${defaultLng}`,
-                )
-              }
+              onPress={handleAbrirGoogleMaps}
             >
               <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "600" }}>
                 Abrir en Google Maps
@@ -193,26 +244,49 @@ export default function MapaCentroSelector({
   );
 }
 
-function MapResizer() {
+/**
+ * Componente auxiliar interno para forzar la actualización del tamaño del mapa web.
+ */
+function RedimensionadorMapa() {
   const { useMap } = require("react-leaflet");
-  const map = useMap();
+  const mapa = useMap();
   useEffect(() => {
-    const timer = setTimeout(() => {
-      map.invalidateSize();
+    const temporizador = setTimeout(() => {
+      mapa.invalidateSize();
     }, 200);
-    return () => clearTimeout(timer);
-  }, [map]);
+    return () => clearTimeout(temporizador);
+  }, [mapa]);
   return null;
 }
 
-function ClickableMarkerInternal({
+/**
+ * Componente auxiliar interno para gestionar los eventos de clic sobre el mapa web y fijar coordenadas.
+ * Utiliza el hook `useMapEvents` de react-leaflet para escuchar clics del usuario.
+ *
+ * @component
+ * @param {Object} props - Propiedades del componente.
+ * @param {any} props.LeafletComponents - Objeto que contiene los componentes de react-leaflet cargados dinámicamente.
+ * @param {(val: number) => void} props.setLatitudCentro - Función para actualizar la latitud en el componente principal.
+ * @param {(val: number) => void} props.setLongitudCentro - Función para actualizar la longitud en el componente principal.
+ * @returns {null} Este componente no renderiza elementos visuales en pantalla.
+ */
+function MarcadorInteractivoMapa({
   LeafletComponents,
   setLatitudCentro,
   setLongitudCentro,
 }: any) {
+  // Suscripción a los eventos del mapa provistos por Leaflet
   LeafletComponents.useMapEvents({
+    /**
+     * Manejador que se ejecuta al hacer clic en cualquier punto del mapa.
+     * Extrae las coordenadas geográficas, las redondea a 6 decimales para mayor precisión y actualiza el estado.
+     *
+     * @param {Object} e - Evento de clic de Leaflet que contiene latlng.
+     */
     click(e: any) {
+      // Actualiza la latitud formateada a 6 decimales
       setLatitudCentro(Number(e.latlng.lat.toFixed(6)));
+      // Actualiza la longitud formateada a 6 decimales
       setLongitudCentro(Number(e.latlng.lng.toFixed(6)));
     },
   });

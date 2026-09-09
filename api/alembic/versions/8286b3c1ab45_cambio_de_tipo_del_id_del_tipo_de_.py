@@ -24,7 +24,8 @@ def upgrade() -> None:
     op.alter_column('fichajes', 'tipo_evento_id',
                existing_type=sa.SMALLINT(),
                type_=sa.Uuid(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='tipo_evento_id::text::uuid')
     # ### end Alembic commands ###
 
 
@@ -34,5 +35,6 @@ def downgrade() -> None:
     op.alter_column('fichajes', 'tipo_evento_id',
                existing_type=sa.Uuid(),
                type_=sa.SMALLINT(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='tipo_evento_id::text::smallint')
     # ### end Alembic commands ###

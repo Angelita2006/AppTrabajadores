@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from core.init_db import inicializar_roles_sistema
 from core.config import settings
 from core.database import SessionLocal, engine
 from routes import (
@@ -40,8 +41,19 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("startup")
 def startup_event():
     """
-    Inicializa tareas en segundo plano (como el cron de verificación de olvidos de fichaje) al arrancar la API.
+    Inicializa tareas en segundo plano y carga los datos semilla esenciales al arrancar la API.
     """
+    # 2. Inicializar los roles del sistema automáticamente en la BD
+    db = SessionLocal()
+    try:
+        inicializar_roles_sistema(db)
+        logger.info("Roles del sistema verificados/inicializados correctamente.")
+    except Exception as e:
+        logger.error(f"Error crítico al inicializar los roles del sistema: {e}")
+    finally:
+        db.close()
+
+    # Iniciar el cron de verificación de olvidos de fichaje
     iniciar_scheduler_fichajes()
 
 @app.middleware("http")

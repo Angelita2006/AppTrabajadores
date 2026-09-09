@@ -3,7 +3,18 @@ import api from "../../../service/api/api";
 import { Empresa, EmpresaUpdate } from "../types/empresa";
 
 /**
+ * Servicio de Gestión de Empresas (Tenants).
+ * Contiene todas las operaciones CRUD y lógicas de negocio para la consulta, registro, actualización de datos corporativos, gestión de logos y vinculación de trabajadores en la plataforma SaaS.
+ */
+
+/**
  * Obtiene el catálogo global de todas las empresas dadas de alta en la plataforma.
+ * URI: GET /api/empresas
+ *
+ * @async
+ * @function obtenerEmpresas
+ * @returns {Promise<Empresa[]>} Promesa con el listado completo de empresas.
+ * @throws {Error} Lanza un error si ocurre un fallo al obtener el catálogo de empresas.
  */
 export const obtenerEmpresas = async (): Promise<Empresa[]> => {
   try {
@@ -17,6 +28,13 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
 
 /**
  * Recupera la información detallada de una empresa específica mediante su ID único.
+ * URI: GET /api/empresas/{id_empresa}
+ *
+ * @async
+ * @function obtenerEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @returns {Promise<Empresa>} Promesa con los detalles de la empresa solicitada.
+ * @throws {Error} Lanza un error si la empresa no se encuentra o falla la recuperación.
  */
 export const obtenerEmpresa = async (idEmpresa: string): Promise<Empresa> => {
   try {
@@ -32,6 +50,13 @@ export const obtenerEmpresa = async (idEmpresa: string): Promise<Empresa> => {
 
 /**
  * Recupera la información detallada de una empresa específica mediante su CIF.
+ * URI: GET /api/empresas/cif/{cif_empresa}
+ *
+ * @async
+ * @function obtenerEmpresaPorCif
+ * @param {string} cifEmpresa - Código de Identificación Fiscal (CIF) de la empresa.
+ * @returns {Promise<Empresa>} Promesa con los detalles de la empresa encontrada.
+ * @throws {Error} Lanza un error si no se encuentra ninguna empresa con el CIF indicado.
  */
 export const obtenerEmpresaPorCif = async (
   cifEmpresa: string,
@@ -46,29 +71,14 @@ export const obtenerEmpresaPorCif = async (
 };
 
 /**
- * Crea una nueva estructura de datos de empresa en la base de datos real del backend.
- */
-export const crearEmpresa = async (data: {
-  razon_social: string;
-  cif: string;
-  nombre_comercial?: string | null;
-  zona_horaria?: string;
-  configuracion?: Record<string, any>;
-  codigo_cnae?: string | null;
-  convenio_colectivo?: string | null;
-  direccion_fiscal?: string | null;
-}): Promise<Empresa> => {
-  try {
-    const respuesta = await api.post<Empresa>("/api/empresas", data);
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al registrar la nueva empresa.");
-  }
-};
-
-/**
  * Recupera el listado completo de empleados vinculados a una empresa específica.
+ * URI: GET /api/empresas/{id_empresa}/trabajadores
+ *
+ * @async
+ * @function obtenerTrabajadoresEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @returns {Promise<any[]>} Promesa con el listado de trabajadores vinculados.
+ * @throws {Error} Lanza un error si ocurre un fallo al obtener los trabajadores de la empresa.
  */
 export const obtenerTrabajadoresEmpresa = async (
   idEmpresa: string,
@@ -87,7 +97,44 @@ export const obtenerTrabajadoresEmpresa = async (
 };
 
 /**
- * Modifica la razón social de una empresa existente mediante Query Params.
+ * Crea una nueva estructura de datos de empresa en la base de datos del backend.
+ * URI: POST /api/empresas
+ *
+ * @async
+ * @function crearEmpresa
+ * @param {object} payload - Objeto con los datos necesarios para registrar la nueva empresa.
+ * @returns {Promise<Empresa>} Promesa con la empresa recién creada.
+ * @throws {Error} Lanza un error si los datos no son válidos o falla el registro.
+ */
+export const crearEmpresa = async (payload: {
+  razon_social: string;
+  cif: string;
+  nombre_comercial?: string | null;
+  zona_horaria?: string;
+  configuracion?: Record<string, any>;
+  codigo_cnae?: string | null;
+  convenio_colectivo?: string | null;
+  direccion_fiscal?: string | null;
+}): Promise<Empresa> => {
+  try {
+    const respuesta = await api.post<Empresa>("/api/empresas", payload);
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al registrar la nueva empresa.");
+  }
+};
+
+/**
+ * Modifica la razón social de una empresa existente mediante parámetros en la URL (Query Params).
+ * URI: PUT /api/empresas/{id_empresa}/razon-social
+ *
+ * @async
+ * @function cambiarRazonSocialEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @param {string} nuevaRazonSocial - Nueva razón social a actualizar.
+ * @returns {Promise<Empresa>} Promesa con la empresa actualizada.
+ * @throws {Error} Lanza un error si el registro no existe o la API rechaza la actualización.
  */
 export const cambiarRazonSocialEmpresa = async (
   idEmpresa: string,
@@ -112,6 +159,14 @@ export const cambiarRazonSocialEmpresa = async (
 
 /**
  * Actualiza los datos de una empresa existente usando un objeto parcial de actualización.
+ * URI: PUT /api/empresas/{id_empresa}
+ *
+ * @async
+ * @function actualizarDatosEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @param {EmpresaUpdate} payload - Objeto con los campos parciales a actualizar según la interfaz EmpresaUpdate.
+ * @returns {Promise<Empresa>} Promesa con los datos de la empresa actualizados.
+ * @throws {Error} Lanza un error si los datos no son válidos o falla la actualización.
  */
 export const actualizarDatosEmpresa = async (
   idEmpresa: string,
@@ -132,11 +187,31 @@ export const actualizarDatosEmpresa = async (
 };
 
 /**
- * Guarda o actualiza de manera integral los datos corporativos, fiscales y de convenio de la empresa.
+ * Guarda o actualiza de manera integral los datos corporativos, fiscales y de convenio de la empresa,
+ * cumpliendo estrictamente con los campos requeridos y opcionales definidos en el esquema `EmpresaUpdate`.
+ * URI: PUT /api/empresas/{id_empresa}
+ *
+ * @async
+ * @function guardarDatosEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @param {string} razonSocial - Nueva razón social de la empresa.
+ * @param {string} cif - CIF actual o actualizado de la empresa.
+ * @param {string} zonaHoraria - Zona horaria configurada.
+ * @param {boolean} activo - Estado de activación de la empresa.
+ * @param {string} nombreComercial - Nombre comercial de la empresa.
+ * @param {string} convenioColectivo - Convenio colectivo aplicable.
+ * @param {string} codigoCnae - Código CNAE de la actividad.
+ * @param {string} direccionFiscal - Dirección fiscal completa.
+ * @returns {Promise<Empresa>} Promesa con los datos de la empresa guardados.
+ * @throws {Error} Lanza un error si ocurre un fallo al guardar los datos.
  */
 export const guardarDatosEmpresa = async (
   idEmpresa: string,
   razonSocial: string,
+  cif: string,
+  zonaHoraria: string,
+  activo: boolean,
+  nombreComercial: string,
   convenioColectivo: string,
   codigoCnae: string,
   direccionFiscal: string,
@@ -144,6 +219,10 @@ export const guardarDatosEmpresa = async (
   try {
     const payload: EmpresaUpdate = {
       razon_social: razonSocial,
+      cif: cif,
+      zona_horaria: zonaHoraria,
+      activo: activo,
+      nombre_comercial: nombreComercial,
       convenio_colectivo: convenioColectivo,
       codigo_cnae: codigoCnae,
       direccion_fiscal: direccionFiscal,
@@ -160,7 +239,15 @@ export const guardarDatosEmpresa = async (
 };
 
 /**
- * Actualiza específicamente el logo de una empresa existente.
+ * Actualiza específicamente el logo corporativo de una empresa existente mediante FormData.
+ * URI: PUT /api/empresas/{id_empresa}/logo
+ *
+ * @async
+ * @function actualizarLogoEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @param {string} fileUri - URI local o ruta del archivo de imagen del logo.
+ * @returns {Promise<Empresa>} Promesa con la empresa actualizada incluyendo la referencia del nuevo logo.
+ * @throws {Error} Lanza un error si la subida del archivo falla o la API rechaza la imagen.
  */
 export const actualizarLogoEmpresa = async (
   idEmpresa: string,
@@ -173,14 +260,11 @@ export const actualizarLogoEmpresa = async (
     const match = /\.(\w+)$/.exec(filename);
     const type = match ? `image/${match[1]}` : `image/jpeg`;
 
-    // 🌐 COMPATIBILIDAD WEB Y NATIVO (ANDROID/IOS)
     if (Platform.OS === "web") {
-      // En la web, fetch convierte la URI temporal de la galería en un Blob binario válido
       const response = await fetch(fileUri);
       const blob = await response.blob();
       formData.append("file", blob, filename);
     } else {
-      // En Android / iOS usamos el formato clásico de React Native
       formData.append("file", {
         uri: fileUri,
         name: filename,
@@ -192,44 +276,40 @@ export const actualizarLogoEmpresa = async (
       `/api/empresas/${idEmpresa}/logo`,
       formData,
       {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        ...(Platform.OS === "web"
+          ? { headers: { "Content-Type": "multipart/form-data" } }
+          : {}),
       },
     );
 
     return respuesta.data;
   } catch (error: any) {
-    // Captura segura del mensaje de error para evitar [object Object] en las alertas
-    const detalle = error?.response?.data?.detail;
-    const mensajeError =
-      typeof detalle === "string"
-        ? detalle
-        : error?.message || "Error de red al subir el logo";
-
-    console.error("Detalle completo del error de red:", error);
-    throw new Error(mensajeError);
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al actualizar el logo de la empresa.");
   }
 };
 
-// Puedes colocar esto en un archivo de utilidades o directamente en tu componente
+/**
+ * Construye y devuelve la URL absoluta accesible para visualizar el logo de la empresa según la plataforma (Web o Móvil).
+ *
+ * @function obtenerUrlLogo
+ * @param {string | null | undefined} logoUrl - Ruta o URL relativa del logo devuelta por el servidor.
+ * @returns {string | null} URL absoluta formateada del logo o null si no existe.
+ */
 export const obtenerUrlLogo = (logoUrl?: string | null): string | null => {
   if (!logoUrl) return null;
 
-  // Si ya viene con http completo, lo devolvemos limpio
   if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
-    if (Platform.OS === "web" && logoUrl.includes("10.0.2.2")) {
-      return logoUrl.replace("10.0.2.2", "localhost");
-    }
     return logoUrl;
   }
 
-  // Si estamos en Web, forzamos la ruta absoluta hacia el (puerto 8080)
   if (Platform.OS === "web") {
-    return `http://localhost:8080${logoUrl}`;
+    return `http://127.0.0.1:8080${logoUrl.startsWith("/") ? "" : "/"}${logoUrl}`;
   }
 
-  // Para Android / emulador
-  const baseURL = api.defaults.baseURL || "http://10.0.2.2:8080";
-  return `${baseURL}${logoUrl}`;
+  const baseURL = api.defaults.baseURL || "http://10.0.2.2:8000";
+  const cleanBase = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+  const cleanPath = logoUrl.startsWith("/") ? logoUrl : `/${logoUrl}`;
+
+  return `${cleanBase}${cleanPath}`;
 };

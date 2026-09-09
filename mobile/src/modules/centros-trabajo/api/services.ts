@@ -1,5 +1,4 @@
 import api from "@/src/service/api/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   CentroTrabajo,
   CentroTrabajoCreate,
@@ -7,17 +6,24 @@ import {
 } from "../types/centro-trabajo";
 
 /**
- * Registra un nuevo centro de trabajo.
+ * Registra un nuevo centro de trabajo o sede física en el sistema.
+ * URI: POST /api/centros-trabajo
+ *
+ * @async
+ * @function crearCentroTrabajo
+ * @param {CentroTrabajoCreate} payload - Objeto con los datos requeridos para dar de alta el centro de trabajo.
+ * @returns {Promise<CentroTrabajo>} Promesa con el objeto `CentroTrabajo` recién creado.
+ * @throws {Error} Lanza un error si falla la creación o existen inconsistencias en los datos proporcionados.
  */
 export const crearCentroTrabajo = async (
-  datosCentro: CentroTrabajoCreate,
+  payload: CentroTrabajoCreate,
 ): Promise<CentroTrabajo> => {
   try {
-    const respuesta = await api.post<CentroTrabajo>(
+    const response = await api.post<CentroTrabajo>(
       "/api/centros-trabajo",
-      datosCentro,
+      payload,
     );
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -27,92 +33,46 @@ export const crearCentroTrabajo = async (
 };
 
 /**
- * Actualiza los datos de un centro de trabajo existente.
- * URI: PUT /api/centros-trabajo/{id_centro}/editar
- * @param idCentro UUID del centro de trabajo a modificar
- * @param datos Objeto parcial con los campos a actualizar
+ * Obtiene el listado global de todos los centros de trabajo registrados en el sistema.
+ * URI: GET /api/centros-trabajo
+ *
+ * @async
+ * @function obtenerTodosLosCentrosTrabajo
+ * @returns {Promise<CentroTrabajo[]>} Promesa con el listado global de centros de trabajo.
+ * @throws {Error} Lanza un error si ocurre un fallo al realizar la consulta al servidor.
  */
-export const editarCentroTrabajo = async (
-  idCentro: string,
-  datos: CentroTrabajoUpdate,
-): Promise<CentroTrabajo> => {
+export const obtenerTodosLosCentrosTrabajo = async (): Promise<
+  CentroTrabajo[]
+> => {
   try {
-    const respuesta = await api.put<CentroTrabajo>(
-      `/api/centros-trabajo/${idCentro}/editar`,
-      datos,
-    );
-    return respuesta.data;
+    const response = await api.get<CentroTrabajo[]>("/api/centros-trabajo");
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || `Error al editar el centro de trabajo ${idCentro}.`,
+      apiMessage || "Error al obtener el listado global de centros de trabajo.",
     );
   }
 };
 
 /**
- * Cambia el estado (activo/inactivo) de un centro de trabajo.
+ * Recupera el listado de centros de trabajo asociados a una empresa u organización específica.
+ * URI: GET /api/centros-trabajo/empresa/{idEmpresa}
+ *
+ * @async
+ * @function obtenerCentrosTrabajoPorEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @returns {Promise<CentroTrabajo[]>} Promesa con la lista de centros vinculados a la empresa.
+ * @throws {Error} Lanza un error si falla la recuperación de los centros de la empresa.
  */
-export const cambiarEstadoCentroTrabajo = async (
-  idCentro: string,
-  activo: boolean,
-): Promise<CentroTrabajo> => {
-  try {
-    const respuesta = await api.put<CentroTrabajo>(
-      `/api/centros-trabajo/${idCentro}/estado`,
-      null,
-      {
-        params: { activo },
-      },
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        `Error al cambiar el estado del centro de trabajo ${idCentro}.`,
-    );
-  }
-};
-
-/**
- * Recupera un Centro de Trabajo específico desde PostgreSQL por su ID único.
- */
-export const obtenerCentroTrabajo = async (
-  centroTrabajoId: string,
-): Promise<CentroTrabajo> => {
-  try {
-    const respuesta = await api.get<CentroTrabajo>(
-      `/api/centros-trabajo/${centroTrabajoId}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        `Centro de trabajo con ID ${centroTrabajoId} no encontrado.`,
-    );
-  }
-};
-
-/**
- * Obtiene la lista de centros de trabajo vinculados a una empresa específica.
- */
-export const obtenerCentrosPorEmpresa = async (
+export const obtenerCentrosTrabajoPorEmpresa = async (
   idEmpresa: string,
 ): Promise<CentroTrabajo[]> => {
   try {
-    const token = await AsyncStorage.getItem("user_token");
-    const respuesta = await api.get<CentroTrabajo[]>(
+    const response = await api.get<CentroTrabajo[]>(
       `/api/centros-trabajo/empresa/${idEmpresa}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
     );
-
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -123,11 +83,112 @@ export const obtenerCentrosPorEmpresa = async (
 };
 
 /**
- * Elimina un centro de trabajo de la base de datos.
- * @param centroId - UUID del centro a eliminar.
+ * Recupera un centro de trabajo específico por su identificador único.
+ * URI: GET /api/centros-trabajo/{idCentro}
+ *
+ * @async
+ * @function obtenerCentroTrabajo
+ * @param {string} idCentro - Identificador UUID único del centro de trabajo.
+ * @returns {Promise<CentroTrabajo>} Promesa con la entidad `CentroTrabajo` encontrada.
+ * @throws {Error} Lanza un error si el centro no existe o falla la consulta.
+ */
+export const obtenerCentroTrabajo = async (
+  idCentro: string,
+): Promise<CentroTrabajo> => {
+  try {
+    const response = await api.get<CentroTrabajo>(
+      `/api/centros-trabajo/${idCentro}`,
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || `Centro de trabajo con ID ${idCentro} no encontrado.`,
+    );
+  }
+};
+
+/**
+ * Actualiza parcialmente los atributos de un centro de trabajo existente mediante su identificador único.
+ * URI: PUT /api/centros-trabajo/{idCentro}/editar
+ *
+ * @async
+ * @function actualizarCentroTrabajo
+ * @param {string} idCentro - Identificador UUID único del centro de trabajo a modificar.
+ * @param {CentroTrabajoUpdate} payload - Objeto con los parámetros opcionales a actualizar.
+ * @returns {Promise<CentroTrabajo>} Promesa con la entidad `CentroTrabajo` actualizada.
+ * @throws {Error} Lanza un error si el centro no existe o la actualización es rechazada.
+ */
+export const actualizarCentroTrabajo = async (
+  idCentro: string,
+  payload: CentroTrabajoUpdate,
+): Promise<CentroTrabajo> => {
+  try {
+    const response = await api.put<CentroTrabajo>(
+      `/api/centros-trabajo/${idCentro}/editar`,
+      payload,
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || `Error al editar el centro de trabajo ${idCentro}.`,
+    );
+  }
+};
+
+/**
+ * Cambia el estado de operatividad (activo/inactivo) de un centro de trabajo.
+ * URI: PUT /api/centros-trabajo/{idCentro}/estado?activo=...
+ *
+ * @async
+ * @function cambiarEstadoCentroTrabajo
+ * @param {string} idCentro - Identificador UUID único del centro de trabajo.
+ * @param {boolean} activo - Nuevo estado booleano a aplicar.
+ * @returns {Promise<CentroTrabajo>} Promesa con el centro de trabajo actualizado.
+ * @throws {Error} Lanza un error si ocurre un fallo durante el cambio de estado.
+ */
+export const cambiarEstadoCentroTrabajo = async (
+  idCentro: string,
+  activo: boolean,
+): Promise<CentroTrabajo> => {
+  try {
+    const response = await api.put<CentroTrabajo>(
+      `/api/centros-trabajo/${idCentro}/estado`,
+      null,
+      {
+        params: { activo },
+      },
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage ||
+        `Error al cambiar el estado del centro de trabajo ${idCentro}.`,
+    );
+  }
+};
+
+/**
+ * Elimina de forma definitiva un centro de trabajo por su identificador único.
+ * URI: DELETE /api/centros-trabajo/{idCentro}
+ *
+ * @async
+ * @function eliminarCentroTrabajo
+ * @param {string} idCentro - Identificador UUID único del centro a eliminar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar la eliminación.
+ * @throws {Error} Lanza un error si el centro no existe o falla la operación.
  */
 export const eliminarCentroTrabajo = async (
-  centroId: string,
+  idCentro: string,
 ): Promise<void> => {
-  await api.delete(`/api/centros-trabajo/${centroId}`);
+  try {
+    await api.delete(`/api/centros-trabajo/${idCentro}`);
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || `Error al eliminar el centro de trabajo ${idCentro}.`,
+    );
+  }
 };

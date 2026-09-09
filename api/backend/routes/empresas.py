@@ -16,15 +16,18 @@ import shutil
 import os
 from fastapi import UploadFile, File
 
+# APIRouter agrupa todos los endpoints relacionados con la gestión de empresas bajo el prefijo "/api/empresas".
+router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
+
+# Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
+# Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
+limiter = Limiter(key_func=get_remote_address)
+
 CARPETA_LOGOS = "static/logos" 
 os.makedirs(CARPETA_LOGOS, exist_ok=True)
 
-router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
-
-limiter = Limiter(key_func=get_remote_address)
-
-@router.post("", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("10/minute")  
+@router.post("", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED, summary="Crear empresa")
+@limiter.limit("10/minute")  # Limita este endpoint a un máximo de 10 peticiones por minuto por IP para evitar abusos.
 def crear_empresa(
     request: Request,
     obj_in: EmpresaCreate, 
@@ -32,15 +35,19 @@ def crear_empresa(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA]))
 ):
     """
-    URI: POST /api/empresas
+    **POST /api/empresas**
+    
     Registra una nueva empresa en el sistema (restringido a administradores de gestoría).
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de registro de empresa desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     try:
         empresa_existente = db.query(Empresas).filter(Empresas.cif == obj_in.cif).first()
         if empresa_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ya existe una empresa registrada con el CIF {obj_in.cif}."
+                detail=f"Ya existe una empresa registrada con el CIF ({obj_in.cif})."
             )
 
         nueva_empresa = Empresas(
@@ -69,103 +76,27 @@ def crear_empresa(
         )
 
 
-@router.get("", response_model=List[EmpresaResponse])
-def obtener_empresas(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    query = db.query(Empresas)
-    
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria:
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
-            )
-        query = query.filter(Empresas.id == usuario_actual.empresa_id)
-
-    return query.order_by(Empresas.nombre_comercial.asc()).all()
-
-
-@router.get("/{id_empresa}", response_model=EmpresaResponse)
-def obtener_empresa(
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los datos de esta empresa."
-        )
-
-    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID {id_empresa} no encontrada."
-        )
-    return empresa
-
-
-@router.get("/cif/{cif_empresa}", response_model=EmpresaResponse)
-def obtener_empresa_por_cif(
-    cif_empresa: str, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    empresa = db.query(Empresas).filter(Empresas.cif == cif_empresa).first()
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con CIF {cif_empresa} no encontrada."
-        )
-
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria and usuario_actual.empresa_id != empresa.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar esta empresa."
-        )
-
-    return empresa
-
-
-@router.get("/{id_empresa}/trabajadores", response_model=List[TrabajadorResponse])
-def obtener_trabajadores_empresa(
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los trabajadores de esta empresa."
-        )
-
-    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID {id_empresa} no encontrada."
-        )
-    return sorted(empresa.trabajadores, key=lambda t: t.nombre)
-
-
-@router.put("/{id_empresa}/razon-social", response_model=EmpresaResponse)
+@router.put("/{id_empresa}/razon-social", response_model=EmpresaResponse, summary="Cambiar razón social de empresa")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 def cambiar_razon_social_empresa(
+    request: Request,
     id_empresa: UUID, 
     nueva_razon_social: str, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
+    """
+    **PUT /api/empresas/{id_empresa}/razon-social**
+    
+    Modifica la razón social de una empresa existente.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de cambio de razón social para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar la razón social de esta empresa."
+            detail="Acceso denegado. No tienes permisos para modificar la razón social de esta empresa."
         )
 
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -173,28 +104,45 @@ def cambiar_razon_social_empresa(
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado ninguna empresa con el ID {id_empresa}."
+            detail=f"No se ha encontrado ninguna empresa con el ID ({id_empresa})."
         )
     
     setattr(empresa, "razon_social", nueva_razon_social)
     setattr(empresa, "updated_at", datetime.now())
     
-    db.commit()
-    db.refresh(empresa)
-    return empresa
+    try:
+        db.commit()
+        db.refresh(empresa)
+        return empresa
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar la razón social de la empresa: {str(error)}"
+        )
 
 
-@router.put("/{id_empresa}", response_model=EmpresaResponse)
+@router.put("/{id_empresa}", response_model=EmpresaResponse, summary="Actualizar datos de empresa")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 def actualizar_datos_empresa(
+    request: Request,
     id_empresa: UUID, 
     payload: EmpresaUpdate, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
+    """
+    **PUT /api/empresas/{id_empresa}**
+    
+    Actualiza los datos generales de una empresa en el sistema.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de actualización de datos para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para actualizar los datos de esta empresa."
+            detail="Acceso denegado. No tienes permisos para actualizar los datos de esta empresa."
         )
 
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -202,7 +150,7 @@ def actualizar_datos_empresa(
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado ninguna empresa con el ID {id_empresa}."
+            detail=f"No se ha encontrado ninguna empresa con el ID ({id_empresa})."
         )
     
     datos_actualizacion = payload.model_dump(exclude_unset=True)
@@ -216,14 +164,14 @@ def actualizar_datos_empresa(
         db.refresh(empresa)
         return empresa
     except Exception as error:
-      db.rollback()
-      raise HTTPException(
-          status_code=status.HTTP_400_BAD_REQUEST,
-          detail=f"Error al actualizar los datos de la empresa: {str(error)}"
-      )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar los datos de la empresa: {str(error)}"
+        )
 
-@router.put("/{id_empresa}/logo", response_model=EmpresaResponse)
-@limiter.limit("20/minute")
+@router.put("/{id_empresa}/logo", response_model=EmpresaResponse, summary="Actualizar logo de empresa")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 async def actualizar_logo_empresa(
     request: Request,
     id_empresa: UUID,
@@ -231,26 +179,49 @@ async def actualizar_logo_empresa(
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
+    """
+    **PUT /api/empresas/{id_empresa}/logo**
+    
+    Sube y actualiza el logotipo oficial de una empresa.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de actualización de logo para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No autorizado para modificar el logo de esta empresa."
+        )
 
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+        )
 
     assert file.filename is not None
-    extension = file.filename.split(".")[-1]
+
+    TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"]
+    
+    if file.content_type not in TIPOS_PERMITIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="El archivo seleccionado no es una imagen válida (solo se permiten formatos JPEG, PNG, WEBP o ICO)."
+        )
+
+    extension = file.filename.split(".")[-1].lower()
+    if extension not in ["png", "jpg", "jpeg", "webp", "ico", "svg"]:
+        extension = "png"
+
     nombre_archivo = f"logo_{id_empresa}.{extension}"
     ruta_destino = os.path.join(CARPETA_LOGOS, nombre_archivo)
 
-    # Guardar el archivo físicamente
     with open(ruta_destino, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Guardar SOLO la ruta relativa en la base de datos
     ruta_relativa = f"/static/logos/{nombre_archivo}"
 
-    # Actualizar en base de datos
     empresa.logo_url = ruta_relativa
     empresa.updated_at = datetime.now()
 
@@ -260,4 +231,131 @@ async def actualizar_logo_empresa(
         return empresa
     except Exception as error:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(error))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al guardar el logo de la empresa: {str(error)}"
+        )
+
+@router.get("", response_model=List[EmpresaResponse], summary="Obtener lista de empresas")
+@limiter.limit("60/minute")  # Limita las consultas masivas de listados de empresas para proteger el rendimiento
+def obtener_empresas(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/empresas**
+    
+    Devuelve el catálogo de organizaciones aplicando aislamiento multi-tenant.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de listado de empresas desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    query = db.query(Empresas)
+    
+    if usuario_actual.tipo_usuario != "Administrador":
+        if not usuario_actual.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+            )
+        query = query.filter(Empresas.id == usuario_actual.empresa_id)
+
+    return query.order_by(Empresas.nombre_comercial.asc()).all()
+
+
+@router.get("/{id_empresa}", response_model=EmpresaResponse, summary="Obtener empresa por ID")
+@limiter.limit("60/minute")  # Limita las consultas individuales de detalles de empresa
+def obtener_empresa(
+    request: Request,
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/empresas/{id_empresa}**
+    
+    Obtiene los detalles completos de una empresa a partir de su ID único universal.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de detalle de la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
+    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No tienes autorización para consultar los datos de esta empresa."
+        )
+
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+        )
+    return empresa
+
+
+@router.get("/cif/{cif_empresa}", response_model=EmpresaResponse, summary="Obtener empresa por CIF")
+@limiter.limit("60/minute")  # Limita las consultas de empresa por CIF
+def obtener_empresa_por_cif(
+    request: Request,
+    cif_empresa: str, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/empresas/cif/{cif_empresa}**
+    
+    Busca y devuelve los datos de una empresa filtrando directamente por su código CIF.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de empresa por CIF {cif_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    empresa = db.query(Empresas).filter(Empresas.cif == cif_empresa).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con CIF ({cif_empresa}) no encontrada."
+        )
+
+    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
+    if not es_admin_gestoria and usuario_actual.empresa_id != empresa.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No tienes autorización para consultar esta empresa."
+        )
+
+    return empresa
+
+
+@router.get("/{id_empresa}/trabajadores", response_model=List[TrabajadorResponse], summary="Obtener trabajadores de empresa")
+@limiter.limit("60/minute")  # Limita las consultas de listados de trabajadores asociados a una empresa
+def obtener_trabajadores_empresa(
+    request: Request,
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/empresas/{id_empresa}/trabajadores**
+    
+    Devuelve la lista de trabajadores vinculados a una empresa específica.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de listado de trabajadores para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
+    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. No tienes autorización para consultar los trabajadores de esta empresa."
+        )
+
+    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+        )
+    return sorted(empresa.trabajadores, key=lambda t: t.nombre)

@@ -4,11 +4,9 @@ import {
   obtenerFichajesHoy,
   registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
-import {
-  RegistroFichaje,
-  TipoFichaje,
-} from "@/src/modules/fichajes/types/registrofichaje";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
+import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
@@ -25,20 +23,16 @@ import {
 import SignatureCanvas from "react-native-signature-canvas";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
-import { ThemedText } from "../../src/shared/components/themed-text";
+import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
-import { IconSymbol } from "../../src/shared/ui/icon-symbol";
+import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function HomeScreen() {
-  const {
-    usuarioActual,
-    empresaSeleccionada,
-    contratoActual,
-    centroTrabajoActual,
-  } = useSesion();
+  const { usuarioActual, empresaActual, contratoActual, centroTrabajoActual } =
+    useSesion();
 
   const [horaActual, setHoraActual] = useState("");
-  const [estadoActual, setEstadoActual] = useState<Estado>(Estado.Activo);
+  const [estadoActual, setEstadoActual] = useState<Estado>(1);
   const [cargando, setCargando] = useState(true);
 
   const [segundosAcumuladosHoy, setSegundosAcumuladosHoy] = useState<number>(0);
@@ -47,14 +41,21 @@ export default function HomeScreen() {
     null,
   );
 
+  // Mapeo sincronizado de tipos de evento: { ENTRADA: "uuid-1", SALIDA: "uuid-2", ... }
+  const [mapaTiposEvento, setMapaTiposEvento] = useState<
+    Record<string, string>
+  >({});
+
   // Estados y referencias para la firma digital
   const [modalFirmaVisible, setModalFirmaVisible] = useState(false);
   const [accionPendiente, setAccionPendiente] = useState<{
     nuevoEstado: Estado;
-    tipoLabel: TipoFichaje;
+    tipoEventoCodigo: string;
+    tipoEventoId: string;
   } | null>(null);
   const signatureRef = useRef<any>(null);
   const webCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
 
   function obtenerFechaHoraCentroISO(zonaHoraria: string): string {
     const ahora = new Date();
@@ -73,8 +74,11 @@ export default function HomeScreen() {
       const dic = Object.fromEntries(partes.map((p) => [p.type, p.value]));
 
       return `${dic.year}-${dic.month}-${dic.day}T${dic.hour}:${dic.minute}:${dic.second}.000`;
-    } catch (error) {
-      console.error("Zona horaria inválida, usando UTC como fallback", error);
+    } catch (error: any) {
+      mostrarError(
+        "Error al calcular la fecha y hora ajustada a la zona horaria del centro: " +
+          error,
+      );
       return ahora.toISOString().replace("Z", "");
     }
   }
@@ -90,6 +94,28 @@ export default function HomeScreen() {
     return `${horas}:${minutos}:${segundos}`;
   };
 
+  const obtenerEtiquetaEstado = (estado: Estado): string => {
+    switch (estado) {
+      case 2:
+        return "Trabajando";
+      case 3:
+        return "En Descanso";
+      case 4:
+        return "Haciendo horas extra";
+      case 5:
+        return "De vacaciones";
+      case 6:
+        return "De baja";
+      case 1:
+        return "Activo";
+      case 0:
+        return "Inactivo";
+      default:
+        return "Desconocido";
+    }
+  };
+
+  // Reloj local de hora actual en el centro
   useEffect(() => {
     const actualizarHoraServidor = () => {
       const ahora = new Date();
@@ -115,21 +141,37 @@ export default function HomeScreen() {
     return () => clearInterval(intervaloReloj);
   }, [centroTrabajoActual?.id, centroTrabajoActual?.zona_horaria]);
 
+  // Sincronizar tipos de eventos y fichajes de hoy
   useEffect(() => {
+    let isMounted = true;
+
     async function sincronizarJornadaActual() {
       if (!usuarioActual?.trabajador_id) {
-        setCargando(false);
+        if (isMounted) setCargando(false);
         return;
       }
 
       try {
-        setCargando(true);
+        if (isMounted) setCargando(true);
+
+        // 1. Cargar y mapear los tipos de evento de fichaje
+        const tiposEvento = await obtenerTiposEventosEmpresa(empresaActual!.id);
+        const mapa: Record<string, string> = {};
+        tiposEvento.forEach((tipo: { id: string; codigo: string }) => {
+          mapa[tipo.codigo] = tipo.id;
+        });
+
+        if (isMounted) setMapaTiposEvento(mapa);
+
+        // 2. Obtener los fichajes del día
         const fichajesHoy: RegistroFichaje[] = await obtenerFichajesHoy(
           String(usuarioActual.trabajador_id),
         );
 
+        if (!isMounted) return;
+
         if (fichajesHoy.length === 0) {
-          setEstadoActual(Estado.Activo);
+          setEstadoActual(1);
           setSegundosAcumuladosHoy(0);
           setTiempoFormateado("00:00:00");
           setTimestampBaseActual(null);
@@ -148,9 +190,9 @@ export default function HomeScreen() {
         eventos.forEach((fichaje) => {
           const tMs = new Date(fichaje.fecha_hora).getTime();
 
-          if (fichaje.tipo_evento_id === TipoFichaje.ENTRADA) {
+          if (fichaje.tipo_evento_id === mapa["ENTRADA"]) {
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === TipoFichaje.INICIO_PAUSA) {
+          } else if (fichaje.tipo_evento_id === mapa["INICIO_PAUSA"]) {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.max(
                 0,
@@ -159,10 +201,10 @@ export default function HomeScreen() {
               marcaEntradaActiva = null;
             }
             marcaPausaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === TipoFichaje.FIN_PAUSA) {
+          } else if (fichaje.tipo_evento_id === mapa["FIN_PAUSA"]) {
             marcaPausaActiva = null;
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === TipoFichaje.SALIDA) {
+          } else if (fichaje.tipo_evento_id === mapa["SALIDA"]) {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.max(
                 0,
@@ -174,30 +216,30 @@ export default function HomeScreen() {
         });
 
         const ultimoFichaje = eventos[eventos.length - 1];
-        const ultimoEvento = ultimoFichaje.tipo_evento_id;
+        const ultimoEventoUuid = ultimoFichaje.tipo_evento_id;
 
-        if (ultimoEvento === TipoFichaje.SALIDA) {
-          setEstadoActual(Estado.Activo);
+        if (ultimoEventoUuid === mapa["SALIDA"]) {
+          setEstadoActual(1);
           setTimestampBaseActual(null);
-        } else if (ultimoEvento === TipoFichaje.INICIO_PAUSA) {
-          setEstadoActual(Estado.Descansando);
+        } else if (ultimoEventoUuid === mapa["INICIO_PAUSA"]) {
+          setEstadoActual(3);
           setTimestampBaseActual(marcaPausaActiva);
         } else {
-          setEstadoActual(Estado.Trabajando);
+          setEstadoActual(2);
           setTimestampBaseActual(marcaEntradaActiva);
         }
 
         setSegundosAcumuladosHoy(segundosCalculados);
 
         const timestampBase =
-          ultimoEvento === TipoFichaje.INICIO_PAUSA
+          ultimoEventoUuid === mapa["INICIO_PAUSA"]
             ? marcaPausaActiva
             : marcaEntradaActiva;
 
         if (
-          (ultimoEvento === TipoFichaje.ENTRADA ||
-            ultimoEvento === TipoFichaje.FIN_PAUSA ||
-            ultimoEvento === TipoFichaje.INICIO_PAUSA) &&
+          (ultimoEventoUuid === mapa["ENTRADA"] ||
+            ultimoEventoUuid === mapa["FIN_PAUSA"] ||
+            ultimoEventoUuid === mapa["INICIO_PAUSA"]) &&
           timestampBase !== null
         ) {
           const tramoActual = Math.max(
@@ -211,28 +253,27 @@ export default function HomeScreen() {
           setTiempoFormateado(formatearSegundos(segundosCalculados));
         }
       } catch (error: any) {
-        if (error?.response?.status === 403) return;
-        const mensajeAmigable = obtenerMensajeAmigableError(error);
-        console.error("Fallo de sincronización horaria:", error);
-        if (Platform.OS === "web") {
-          alert(`Fallo de sincronización horaria: ${mensajeAmigable}`);
-        } else {
-          Alert.alert("Error de Sincronización", mensajeAmigable);
-        }
+        mostrarError(
+          "Error al cargar los datos de la jornada actual: " + error,
+        );
       } finally {
-        setCargando(false);
+        if (isMounted) setCargando(false);
       }
     }
 
     sincronizarJornadaActual();
-  }, [usuarioActual]);
 
+    return () => {
+      isMounted = false;
+    };
+  }, [usuarioActual?.trabajador_id]);
+
+  // Actualizador diferencial de tiempo acumulado en pantalla
   useEffect(() => {
     let intervalo: any;
 
     const actualizarRelojDiferencial = () => {
-      if (estadoActual === Estado.Activo || timestampBaseActual === null)
-        return;
+      if (estadoActual === 1 || timestampBaseActual === null) return;
       const segundosTramoAbierto = Math.max(
         0,
         Math.floor((Date.now() - timestampBaseActual) / 1000),
@@ -242,11 +283,7 @@ export default function HomeScreen() {
       );
     };
 
-    if (
-      estadoActual !== Estado.Activo &&
-      !cargando &&
-      timestampBaseActual !== null
-    ) {
+    if (estadoActual !== 1 && !cargando && timestampBaseActual !== null) {
       actualizarRelojDiferencial();
       intervalo = setInterval(actualizarRelojDiferencial, 1000);
     }
@@ -266,52 +303,62 @@ export default function HomeScreen() {
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
-  // Intercepta el click del botón para abrir primero el modal de firma
-  const iniciarProcesoFichaje = (
-    nuevoEstado: Estado,
-    tipoLabel: TipoFichaje,
-  ) => {
+  const iniciarProcesoFichaje = (nuevoEstado: Estado, codigoEvento: string) => {
     if (
       !usuarioActual?.trabajador_id ||
-      !empresaSeleccionada?.id ||
+      !empresaActual?.id ||
       !centroTrabajoActual?.id
     ) {
-      if (Platform.OS === "web") {
-        alert(
-          "Expediente Incompleto: Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
-        );
-      } else {
-        Alert.alert(
-          "Expediente Incompleto",
-          "Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
-        );
-      }
+      mostrarMensaje(
+        "Expediente Incompleto",
+        "Selecciona una empresa y centro de trabajo válidos en tu Perfil antes de fichar.",
+      );
       return;
     }
 
-    setAccionPendiente({ nuevoEstado, tipoLabel });
+    const tipoEventoUuid = mapaTiposEvento[codigoEvento];
+
+    if (!tipoEventoUuid) {
+      mostrarMensaje(
+        "Configuración Faltante",
+        `El tipo de fichaje '${codigoEvento}' no se encuentra configurado. Contacte con administración.`,
+      );
+      return;
+    }
+
+    setAccionPendiente({
+      nuevoEstado,
+      tipoEventoCodigo: codigoEvento,
+      tipoEventoId: tipoEventoUuid,
+    });
     setModalFirmaVisible(true);
   };
 
-  // Se ejecuta cuando el usuario confirma la firma en el canvas
   const handleFirmaOK = async (signatureUri: string) => {
     setModalFirmaVisible(false);
     if (!accionPendiente) return;
 
-    const { nuevoEstado, tipoLabel } = accionPendiente;
-    await registrarMarcajeHorario(nuevoEstado, tipoLabel, signatureUri, false);
+    const { nuevoEstado, tipoEventoCodigo, tipoEventoId } = accionPendiente;
+    await registrarMarcajeHorario(
+      nuevoEstado,
+      tipoEventoCodigo,
+      tipoEventoId,
+      signatureUri,
+      false,
+    );
     setAccionPendiente(null);
   };
 
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
-    tipoLabel: TipoFichaje,
+    tipoEventoCodigo: string,
+    tipoEventoId: string,
     signatureUri: string,
     forzarExtra: boolean = false,
   ) => {
     if (
       !usuarioActual?.trabajador_id ||
-      !empresaSeleccionada?.id ||
+      !empresaActual?.id ||
       !centroTrabajoActual?.id
     ) {
       return;
@@ -348,44 +395,38 @@ export default function HomeScreen() {
       );
 
       if (!dispositivoEncontrado) {
-        const mensajeAviso =
-          "Dile al administrador de tu empresa que cree los dispositivos disponibles para fichar primero.";
-
-        if (Platform.OS === "web") {
-          alert(mensajeAviso);
-        } else {
-          Alert.alert("Dispositivos no configurados", mensajeAviso);
-        }
-
+        mostrarMensaje(
+          "Dispositivos no configurados",
+          "Dile al administrador de tu empresa que cree los dispositivos disponibles para fichar primero.",
+        );
         setCargando(false);
         return;
       }
 
       const dispositivoIdUuid = dispositivoEncontrado.id;
 
-      // 1. Crear el fichaje enviando el ID de tipo de evento
       const respuestaFichaje = await registrarFichaje({
         trabajador_id: String(usuarioActual.trabajador_id),
-        empresa_id: String(empresaSeleccionada.id),
+        empresa_id: String(empresaActual.id),
         centro_trabajo_id: String(centroTrabajoActual.id),
-        tipo_evento_id: tipoLabel,
+        tipo_evento_id: tipoEventoId,
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
         latitud: latitude,
         longitud: longitude,
         forzar_hora_extra: forzarExtra,
         dispositivo_id: dispositivoIdUuid,
+        firma_digital: signatureUri,
         observaciones:
-          tipoLabel === TipoFichaje.ENTRADA
+          tipoEventoCodigo === "ENTRADA"
             ? "Inicio de jornada"
-            : tipoLabel === TipoFichaje.SALIDA
+            : tipoEventoCodigo === "SALIDA"
               ? "Cierre de jornada"
-              : tipoLabel === TipoFichaje.INICIO_PAUSA
+              : tipoEventoCodigo === "INICIO_PAUSA"
                 ? "Inicio de descanso"
                 : "Descanso terminado",
       });
 
-      // 2. Extraer el ID del fichaje creado
       const fichajeId =
         respuestaFichaje?.id || (respuestaFichaje as any)?.fichaje_id;
 
@@ -400,9 +441,12 @@ export default function HomeScreen() {
             });
           }
           const rutaFirmaDestino = `${carpetaFirmas}firma_${fichajeId}.png`;
-          await FileSystem.copyAsync({
-            from: signatureUri,
-            to: rutaFirmaDestino,
+          const base64Clean = signatureUri.includes(",")
+            ? signatureUri.split(",")[1]
+            : signatureUri;
+
+          await FileSystem.writeAsStringAsync(rutaFirmaDestino, base64Clean, {
+            encoding: FileSystem.EncodingType.Base64,
           });
         }
       }
@@ -421,7 +465,7 @@ export default function HomeScreen() {
         });
       }
 
-      if (tipoLabel === TipoFichaje.SALIDA) {
+      if (tipoEventoCodigo === "SALIDA") {
         setTimestampBaseActual(null);
       } else {
         setTimestampBaseActual(ahoraMs);
@@ -439,22 +483,16 @@ export default function HomeScreen() {
         error?.message ||
         "";
 
-      console.log("Error interceptado en fichaje:", {
+      console.error("Error interceptado en fichaje:", {
         statusHttp,
         mensajeBackend,
         forzarExtra,
       });
 
       if (forzarExtra) {
-        const mensajeAmigable = obtenerMensajeAmigableError(error);
-        if (Platform.OS === "web") {
-          alert(`No se pudo forzar el fichaje: ${mensajeAmigable}`);
-        } else {
-          Alert.alert(
-            "Error",
-            `No se pudo forzar el fichaje: ${mensajeAmigable}`,
-          );
-        }
+        mostrarError(
+          "Error al registrar el fichaje como horas extra en festivo: " + error,
+        );
         return;
       }
 
@@ -468,7 +506,13 @@ export default function HomeScreen() {
             "No se puede fichar en un día festivo/no laborable.\n\n¿Aún así quiere fichar como horas extra en festivo?",
           );
           if (aceptarExtra && accionPendiente) {
-            registrarMarcajeHorario(nuevoEstado, tipoLabel, signatureUri, true);
+            registrarMarcajeHorario(
+              nuevoEstado,
+              tipoEventoCodigo,
+              tipoEventoId,
+              signatureUri,
+              true,
+            );
           }
         } else {
           Alert.alert(
@@ -484,7 +528,8 @@ export default function HomeScreen() {
                 onPress: () => {
                   registrarMarcajeHorario(
                     nuevoEstado,
-                    tipoLabel,
+                    tipoEventoCodigo,
+                    tipoEventoId,
                     signatureUri,
                     true,
                   );
@@ -494,12 +539,7 @@ export default function HomeScreen() {
           );
         }
       } else {
-        const mensajeAmigable = obtenerMensajeAmigableError(error);
-        if (Platform.OS === "web") {
-          alert(`Error de Fichaje: ${mensajeAmigable}`);
-        } else {
-          Alert.alert("Error de Fichaje", mensajeAmigable);
-        }
+        mostrarError("Error al procesar tu solicitud de fichaje: " + error);
       }
     }
   };
@@ -519,6 +559,42 @@ export default function HomeScreen() {
     );
   }
 
+  // Helper para interactuar con canvas en Web (Mouse y Touch)
+  const setupWebCanvasEvents = (canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const getPos = (e: MouseEvent | TouchEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX =
+        "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY =
+        "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height),
+      };
+    };
+
+    canvas.onmousedown = (e) => {
+      isDrawingRef.current = true;
+      const { x, y } = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    canvas.onmousemove = (e) => {
+      if (!isDrawingRef.current) return;
+      const { x, y } = getPos(e);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
+
+    window.onmouseup = () => {
+      isDrawingRef.current = false;
+    };
+  };
+
   return (
     <AppScreen
       title="Control de Jornada"
@@ -527,12 +603,8 @@ export default function HomeScreen() {
       <Row>
         <StatCard
           label="Tu Estado Actual"
-          value={
-            estadoActual === Estado.Descansando
-              ? "En Descanso"
-              : Estado[Number.parseInt(estadoActual.toString())]
-          }
-          tone={estadoActual === Estado.Trabajando ? "success" : "warning"}
+          value={obtenerEtiquetaEstado(estadoActual)}
+          tone={estadoActual === 2 ? "success" : "warning"}
         />
         <StatCard
           label="Puesto Asignado"
@@ -609,16 +681,14 @@ export default function HomeScreen() {
       </ThemedText>
 
       <View style={styles.panelAcciones}>
-        {estadoActual === Estado.Activo && (
+        {estadoActual === 1 && (
           <Pressable
             style={[
               styles.botonAccion,
               styles.botonEntrada,
               cargando && styles.botonDeshabilitado,
             ]}
-            onPress={() =>
-              iniciarProcesoFichaje(Estado.Trabajando, TipoFichaje.ENTRADA)
-            }
+            onPress={() => iniciarProcesoFichaje(2, "ENTRADA")}
             disabled={cargando}
           >
             <IconSymbol name="play-circle" size={24} color="#FFFFFF" />
@@ -626,52 +696,41 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {estadoActual !== Estado.Activo && (
+        {estadoActual !== 1 && (
           <Pressable
             style={[
               styles.botonAccion,
-              estadoActual === Estado.Descansando
-                ? styles.botonEntrada
-                : styles.botonPausa,
+              estadoActual === 3 ? styles.botonEntrada : styles.botonPausa,
               cargando && styles.botonDeshabilitado,
             ]}
             onPress={() => {
-              if (estadoActual === Estado.Descansando) {
-                iniciarProcesoFichaje(Estado.Trabajando, TipoFichaje.FIN_PAUSA);
+              if (estadoActual === 3) {
+                iniciarProcesoFichaje(2, "FIN_PAUSA");
               } else {
-                iniciarProcesoFichaje(
-                  Estado.Descansando,
-                  TipoFichaje.INICIO_PAUSA,
-                );
+                iniciarProcesoFichaje(3, "INICIO_PAUSA");
               }
             }}
             disabled={cargando}
           >
             <IconSymbol
-              name={
-                estadoActual === Estado.Descansando ? "play-circle" : "pause"
-              }
+              name={estadoActual === 3 ? "play-circle" : "pause"}
               size={24}
               color="#FFFFFF"
             />
             <ThemedText style={styles.textoBoton}>
-              {estadoActual === Estado.Descansando
-                ? "Reanudar Jornada"
-                : "Iniciar Descanso"}
+              {estadoActual === 3 ? "Reanudar Jornada" : "Iniciar Descanso"}
             </ThemedText>
           </Pressable>
         )}
 
-        {estadoActual !== Estado.Activo && (
+        {estadoActual !== 1 && (
           <Pressable
             style={[
               styles.botonAccion,
               styles.botonSalida,
               cargando && styles.botonDeshabilitado,
             ]}
-            onPress={() =>
-              iniciarProcesoFichaje(Estado.Activo, TipoFichaje.SALIDA)
-            }
+            onPress={() => iniciarProcesoFichaje(1, "SALIDA")}
             disabled={cargando}
           >
             <IconSymbol name="stop" size={24} color="#FFFFFF" />
@@ -680,12 +739,13 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Modal o sección de Firma Digital adaptado para Web y Móvil */}
+      {/* Modal de Firma Digital */}
       {modalFirmaVisible && (
         <Modal
           visible={modalFirmaVisible}
           transparent={true}
           animationType="slide"
+          onRequestClose={() => setModalFirmaVisible(false)}
         >
           <View style={styles.modalFondo}>
             <View style={styles.modalContenedor}>
@@ -698,11 +758,12 @@ export default function HomeScreen() {
 
               <View style={styles.canvasContainer}>
                 {Platform.OS === "web" ? (
-                  // Versión Web usando elemento nativo <canvas>
                   <View style={{ alignItems: "center", width: "100%" }}>
-                    {/* @ts-ignore */}
                     <canvas
-                      ref={webCanvasRef}
+                      ref={(ref) => {
+                        webCanvasRef.current = ref;
+                        if (ref) setupWebCanvasEvents(ref);
+                      }}
                       width={320}
                       height={230}
                       style={{
@@ -712,33 +773,9 @@ export default function HomeScreen() {
                         cursor: "crosshair",
                         touchAction: "none",
                       }}
-                      onMouseDown={(e) => {
-                        const canvas = webCanvasRef.current;
-                        if (!canvas) return;
-                        const ctx = canvas.getContext("2d");
-                        if (!ctx) return;
-                        const rect = canvas.getBoundingClientRect();
-                        ctx.beginPath();
-                        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-
-                        const onMouseMove = (ev: MouseEvent) => {
-                          ctx.lineTo(
-                            ev.clientX - rect.left,
-                            ev.clientY - rect.top,
-                          );
-                          ctx.stroke();
-                        };
-                        const onMouseUp = () => {
-                          window.removeEventListener("mousemove", onMouseMove);
-                          window.removeEventListener("mouseup", onMouseUp);
-                        };
-                        window.addEventListener("mousemove", onMouseMove);
-                        window.addEventListener("mouseup", onMouseUp);
-                      }}
                     />
                   </View>
                 ) : (
-                  // Versión Móvil usando SignatureCanvas / WebView
                   <SignatureCanvas
                     ref={signatureRef}
                     onOK={(sig: string) => handleFirmaOK(sig)}
@@ -840,7 +877,7 @@ const styles = StyleSheet.create({
   botonPausa: { backgroundColor: "#EA580C" },
   botonSalida: { backgroundColor: "#DC2626" },
   botonDeshabilitado: { opacity: 0.5 },
-  textoBoton: { color: "#FFFFFF", fontSize: "16", fontWeight: "700" } as any,
+  textoBoton: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   modalFondo: {
     flex: 1,
     justifyContent: "center",

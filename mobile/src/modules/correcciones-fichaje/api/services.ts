@@ -1,38 +1,28 @@
 import api from "@/src/service/api/api";
 import {
-  IncidenciaCreateRequest,
-  IncidenciaResponse,
+  CorreccionFichajeCreate,
+  CorreccionFichajeResponse,
 } from "../types/correccion";
 
 /**
- * Lista el histórico completo de solicitudes aplicando aislamiento multi-tenant.
+ * Registra una nueva solicitud de rectificación horaria en el sistema.
+ * URI: POST /api/correcciones
+ *
+ * @async
+ * @function crearCorreccion
+ * @param {CorreccionFichajeCreate} payload - Objeto con los datos necesarios para crear la solicitud de corrección.
+ * @returns {Promise<CorreccionFichajeResponse>} Promesa con el objeto `CorreccionFichajeResponse` recién creado.
+ * @throws {Error} Lanza un error si los datos no son válidos o falla el registro en el servidor.
  */
-export const obtenerTodasLasCorrecciones = async (): Promise<
-  IncidenciaResponse[]
-> => {
+export const crearCorreccion = async (
+  payload: CorreccionFichajeCreate,
+): Promise<CorreccionFichajeResponse> => {
   try {
-    const respuesta = await api.get<IncidenciaResponse[]>("/api/correcciones");
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al obtener el listado completo de correcciones.",
-    );
-  }
-};
-
-/**
- * Envía una solicitud de rectificación horaria a Recursos Humanos.
- */
-export const solicitarCorreccionHoraria = async (
-  data: IncidenciaCreateRequest,
-): Promise<IncidenciaResponse> => {
-  try {
-    const respuesta = await api.post<IncidenciaResponse>(
+    const response = await api.post<CorreccionFichajeResponse>(
       "/api/correcciones",
-      data,
+      payload,
     );
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -42,16 +32,47 @@ export const solicitarCorreccionHoraria = async (
 };
 
 /**
- * Filtra las peticiones dentro de un mismo tenant (útil para el panel de RRHH de la empresa).
+ * Obtiene el listado completo de solicitudes de corrección de fichaje en el sistema.
+ * URI: GET /api/correcciones
+ *
+ * @async
+ * @function obtenerTodasLasCorrecciones
+ * @returns {Promise<CorreccionFichajeResponse[]>} Promesa con el listado de todas las correcciones registradas.
+ * @throws {Error} Lanza un error si falla la consulta al servidor.
+ */
+export const obtenerTodasLasCorrecciones = async (): Promise<
+  CorreccionFichajeResponse[]
+> => {
+  try {
+    const response =
+      await api.get<CorreccionFichajeResponse[]>("/api/correcciones");
+    return response.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al obtener el listado completo de correcciones.",
+    );
+  }
+};
+
+/**
+ * Obtiene el listado de solicitudes de corrección asociadas a una empresa u organización específica.
+ * URI: GET /api/correcciones/empresa/{idEmpresa}
+ *
+ * @async
+ * @function obtenerCorreccionesPorEmpresa
+ * @param {string} idEmpresa - Identificador UUID único de la empresa.
+ * @returns {Promise<CorreccionFichajeResponse[]>} Promesa con el listado de correcciones de la empresa.
+ * @throws {Error} Lanza un error si ocurre un fallo al obtener las correcciones.
  */
 export const obtenerCorreccionesPorEmpresa = async (
   idEmpresa: string,
-): Promise<IncidenciaResponse[]> => {
+): Promise<CorreccionFichajeResponse[]> => {
   try {
-    const respuesta = await api.get<IncidenciaResponse[]>(
+    const response = await api.get<CorreccionFichajeResponse[]>(
       `/api/correcciones/empresa/${idEmpresa}`,
     );
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -62,16 +83,23 @@ export const obtenerCorreccionesPorEmpresa = async (
 };
 
 /**
- * Permite al empleado seguir el estado de sus peticiones enviadas desde la app móvil.
+ * Obtiene el histórico de peticiones de rectificación horaria realizadas por un trabajador específico.
+ * URI: GET /api/correcciones/trabajador/{idTrabajador}
+ *
+ * @async
+ * @function obtenerCorreccionesPorTrabajador
+ * @param {string} idTrabajador - Identificador UUID único del trabajador.
+ * @returns {Promise<CorreccionFichajeResponse[]>} Promesa con el listado de correcciones del trabajador.
+ * @throws {Error} Lanza un error si ocurre un fallo al obtener las correcciones.
  */
-export const obtenerCorreccionesTrabajador = async (
+export const obtenerCorreccionesPorTrabajador = async (
   idTrabajador: string,
-): Promise<IncidenciaResponse[]> => {
+): Promise<CorreccionFichajeResponse[]> => {
   try {
-    const respuesta = await api.get<IncidenciaResponse[]>(
+    const response = await api.get<CorreccionFichajeResponse[]>(
       `/api/correcciones/trabajador/${idTrabajador}`,
     );
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -82,43 +110,34 @@ export const obtenerCorreccionesTrabajador = async (
 };
 
 /**
- * Descarga el histórico de incidencias de un operario particular.
+ * Resuelve una solicitud de corrección cambiando su estado a 'Aprobada' o 'Rechazada'.
+ * URI: PUT /api/correcciones/{idCorreccion}/resolver
+ *
+ * @async
+ * @function resolverCorreccion
+ * @param {string} idCorreccion - Identificador UUID único de la solicitud de corrección.
+ * @param {"Aprobada" | "Rechazada"} nuevoEstado - Nuevo estado que se aplicará a la solicitud.
+ * @param {string} idUsuarioResolutor - Identificador UUID del usuario administrador que resuelve la incidencia.
+ * @returns {Promise<any>} Promesa con la respuesta de la operación.
+ * @throws {Error} Lanza un error si falla la actualización de la solicitud.
  */
-export const obtenerIncidenciasTrabajador = async (
-  idTrabajador: string,
-): Promise<IncidenciaResponse[]> => {
-  return obtenerCorreccionesTrabajador(idTrabajador);
-};
-
-/**
- * Recupera el registro de peticiones de rectificación horaria.
- */
-export const obtenerCorreccionesSolicitadasTrabajador = async (
-  idTrabajador: string,
-): Promise<IncidenciaResponse[]> => {
-  return obtenerCorreccionesTrabajador(idTrabajador);
-};
-
-/**
- * Resuelve una incidencia de fichaje cambiándola a 'Aprobada' o 'Rechazada'.
- */
-export const resolverSolicitudCorreccion = async (
+export const resolverCorreccion = async (
   idCorreccion: string,
   nuevoEstado: "Aprobada" | "Rechazada",
-  resolutorUsuarioId: string,
+  idUsuarioResolutor: string,
 ): Promise<any> => {
   try {
-    const respuesta = await api.put<any>(
+    const response = await api.put<any>(
       `/api/correcciones/${idCorreccion}/resolver`,
       null,
       {
         params: {
           nuevo_estado: nuevoEstado,
-          resolutor_usuario_id: resolutorUsuarioId,
+          resolutor_usuario_id: idUsuarioResolutor,
         },
       },
     );
-    return respuesta.data;
+    return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -129,9 +148,43 @@ export const resolverSolicitudCorreccion = async (
 };
 
 /**
- * Elimina físicamente un registro de solicitud de corrección por su ID.
+ * Restaura una incidencia y su fichaje afectado de vuelta al estado pendiente original.
+ * URI: PUT /api/correcciones/{idCorreccion}/restaurar-pendiente
+ *
+ * @async
+ * @function restaurarCorreccionPendiente
+ * @param {string} idCorreccion - Identificador UUID único de la solicitud de corrección.
+ * @returns {Promise<any>} Promesa con la respuesta de la operación.
+ * @throws {Error} Lanza un error si falla la restauración de la corrección.
  */
-export const eliminarSolicitudCorreccion = async (
+export const restaurarCorreccionPendiente = async (
+  idCorreccion: string,
+): Promise<any> => {
+  try {
+    const response = await api.put<any>(
+      `/api/correcciones/${idCorreccion}/restaurar-pendiente`,
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage ||
+        `Error al restaurar la corrección ${idCorreccion} a estado pendiente.`,
+    );
+  }
+};
+
+/**
+ * Elimina de forma definitiva un registro de solicitud de corrección por su identificador único.
+ * URI: DELETE /api/correcciones/{idCorreccion}
+ *
+ * @async
+ * @function eliminarCorreccion
+ * @param {string} idCorreccion - Identificador UUID único de la solicitud de corrección a eliminar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar el borrado.
+ * @throws {Error} Lanza un error si la corrección no existe o falla la operación.
+ */
+export const eliminarCorreccion = async (
   idCorreccion: string,
 ): Promise<void> => {
   try {
@@ -141,26 +194,6 @@ export const eliminarSolicitudCorreccion = async (
     throw new Error(
       apiMessage ||
         `Error al eliminar la solicitud de corrección ${idCorreccion}.`,
-    );
-  }
-};
-
-/**
- * Restaura una incidencia y su fichaje afectado al estado pendiente original.
- */
-export const restaurarCorreccionPendiente = async (
-  idCorreccion: string,
-): Promise<any> => {
-  try {
-    const respuesta = await api.put<any>(
-      `/api/correcciones/${idCorreccion}/restaurar-pendiente`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        `Error al restaurar la corrección ${idCorreccion} a estado pendiente.`,
     );
   }
 };

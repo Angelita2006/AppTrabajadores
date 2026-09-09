@@ -25,8 +25,8 @@ class Usuarios(Base):
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
-    empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, comment='NULL para usuarios de la gestoría con acceso potencial a varias empresas (ámbito real definido en usuarios_roles).')
-    trabajador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
+    empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='NULL para usuarios de la gestoría, administradores de empresa globales o auditores ITSS.')
+    trabajador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
     ultimo_acceso: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     
     codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)

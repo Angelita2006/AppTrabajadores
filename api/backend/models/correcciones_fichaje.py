@@ -15,12 +15,13 @@ class CorreccionesFichaje(Base):
         ForeignKeyConstraint(['fichaje_afectado_id'], ['fichajes.id'], ondelete='RESTRICT', name='correcciones_fichaje_fichaje_afectado_id_fkey'),
         ForeignKeyConstraint(['solicitado_por_usuario_id'], ['usuarios.id'], ondelete='RESTRICT', name='correcciones_fichaje_solicitado_por_usuario_id_fkey'),
         ForeignKeyConstraint(['trabajador_id'], ['trabajadores.id'], ondelete='RESTRICT', name='correcciones_fichaje_trabajador_id_fkey'),
+        ForeignKeyConstraint(['tipo_evento_id'], ['tipos_evento_fichaje.id'], ondelete='RESTRICT', name='correcciones_fichaje_tipo_evento_id_fkey'),
         PrimaryKeyConstraint('id', name='correcciones_fichaje_pkey'),
         Index('idx_correcciones_empresa_estado', 'empresa_id', 'estado'),
         Index('idx_correcciones_fichaje_afectado', 'fichaje_afectado_id'),
         {'comment': 'Flujo auditable de altas manuales, modificaciones y anulaciones '
-                'de fichajes. Esta tabla SÍ es mutable (estado pasa de pendiente a '
-                'aprobada/rechazada), a diferencia de fichajes.'}
+                    'de fichajes. Esta tabla SÍ es mutable (estado pasa de pendiente a '
+                    'aprobada/rechazada), a diferencia de fichajes.'}
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text('gen_random_uuid()'))
@@ -36,9 +37,11 @@ class CorreccionesFichaje(Base):
     valor_anterior: Mapped[Optional[dict]] = mapped_column(JSONB)
     aprobado_por_usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     fecha_resolucion: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    tipo_evento_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
 
     aprobado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[aprobado_por_usuario_id], back_populates='correcciones_fichaje_aprobado_por_usuario') # type: ignore
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='correcciones_fichaje') # type: ignore
     fichaje_afectado: Mapped[Optional['Fichajes']] = relationship('Fichajes', back_populates='correcciones_fichaje') # type: ignore
     solicitado_por_usuario: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[solicitado_por_usuario_id], back_populates='correcciones_fichaje_solicitado_por_usuario') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='correcciones_fichaje') # type: ignore
+    tipo_evento: Mapped[Optional['TiposEventoFichaje']] = relationship('TiposEventoFichaje', back_populates='correcciones_fichaje') # type: ignore

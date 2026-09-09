@@ -264,17 +264,17 @@
 -- );
 
 -- CREATE TABLE roles_permisos (
---     role_id     SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+--     rol_id     SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
 --     permiso_id  SMALLINT NOT NULL REFERENCES permisos(id) ON DELETE CASCADE,
---     PRIMARY KEY (role_id, permiso_id)
+--     PRIMARY KEY (rol_id, permiso_id)
 -- );
 
 -- CREATE TABLE usuarios_roles (
 --     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --     usuario_id  UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
---     role_id     SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+--     rol_id     SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
 --     empresa_id  UUID REFERENCES empresas(id) ON DELETE RESTRICT,
---     UNIQUE NULLS NOT DISTINCT (usuario_id, role_id, empresa_id)
+--     UNIQUE NULLS NOT DISTINCT (usuario_id, rol_id, empresa_id)
 -- );
 -- COMMENT ON COLUMN usuarios_roles.empresa_id IS 'Ámbito del rol. NULL = aplica a todas las empresas que gestiona el usuario (típico de personal de gestoría).';
 

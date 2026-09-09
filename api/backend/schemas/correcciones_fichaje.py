@@ -3,6 +3,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Any, Dict
 from uuid import UUID
 from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum
+from schemas.empresas import EmpresaResponse
+from schemas.trabajadores import TrabajadorSimpleResponse
+from schemas.usuarios import UsuarioSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CORRECCIONES
@@ -15,10 +18,13 @@ class CorreccionFichajeBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
     tipo_correccion: TipoCorreccionEnum = Field(..., description="Tipo de rectificación horaria solicitada")
+    tipo_evento_id: UUID = Field(..., description="ID único UUID del tipo de evento de fichaje correspondiente")
     fichaje_afectado_id: Optional[UUID] = Field(None, description="ID del fichaje original que se desea corregir o anular")
     valor_anterior: Optional[Dict[str, Any]] = Field(None, description="Valores previos almacenados en formato JSON")
     valor_nuevo: Optional[Dict[str, Any]] = Field(None, description="Nuevos valores propuestos en formato JSON")
     motivo: str = Field(..., min_length=2, description="Justificación detallada de la solicitud de corrección")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class CorreccionFichajeCreate(CorreccionFichajeBase):
     """
@@ -37,7 +43,7 @@ class CorreccionFichajeUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class CorreccionFichajeResponse(CorreccionFichajeBase):
+class CorreccionFichajeSimpleResponse(CorreccionFichajeBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la interfaz.
     """
@@ -47,5 +53,16 @@ class CorreccionFichajeResponse(CorreccionFichajeBase):
     aprobado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que aprobó/resolvió la incidencia")
     fecha_solicitud: datetime.datetime = Field(..., description="Fecha y hora de la solicitud")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha y hora de la resolución")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CorreccionFichajeResponse(CorreccionFichajeSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador afectado")
+    solicitado_por_usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario solicitante")
+    aprobado_por_usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario que aprobó la solicitud")
 
     model_config = ConfigDict(from_attributes=True)

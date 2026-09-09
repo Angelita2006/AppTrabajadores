@@ -1,94 +1,186 @@
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { Contrato } from "../../contratos/types/contrato";
-import { TipoUsuarioEnum } from "../../usuarios/types/usuario";
-
-export enum Estado {
-  Inactivo = 0,
-  Activo = 1,
-  Trabajando = 2,
-  Descansando = 3,
-  HorasExtra = 4,
-  Vacaciones = 5,
-  Baja = 6,
-}
+import { Empresa } from "../../empresas/types/empresa";
+import { Rol } from "../../roles/types/rol";
 
 /**
- * Interfaz oficial del Expediente Laboral (Tabla: trabajadores)
- * Mapeada exactamente con el modelo SQLAlchemy y Pydantic de la API.
+ * Listado estático de los diferentes estados operativos de un trabajador en la plataforma,
+ * mapeados a sus respectivos valores numéricos almacenados en la base de datos.
+ * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export interface Trabajador {
-  id: string; // Identificador UUID único (gen_random_uuid)
-  empresa_id: string; // Tenant de aislamiento multiempresa
-  nif_nie: string; // Identificación Fiscal oficial (Máx 15 chars)
-  nombre: string; // Nombre de pila del empleado
-  apellidos: string; // Apellidos del empleado
-  activo: boolean; // Estado operativo (true por defecto)
-  fecha_alta_empresa: string; // Fecha formal de contratación ("AAAA-MM-DD")
-  created_at: string; // Marca de tiempo de inserción real (ISO DateTime)
-  updated_at: string; // Marca de tiempo de última modificación (ISO DateTime)
-  email?: string | null; // Correo electrónico de contacto
-  telefono?: string | null; // Teléfono de contacto
-  numero_seguridad_social?: string | null; // Número de la Seguridad Social
-  fecha_nacimiento?: string | null; // Fecha de nacimiento ("AAAA-MM-DD")
-  fecha_baja_empresa?: string | null; // Fecha de baja laboral si aplica ("AAAA-MM-DD")
-}
+export const ESTADOS_TRABAJADOR = {
+  INACTIVO: 0,
+  ACTIVO: 1,
+  TRABAJANDO: 2,
+  DESCANSANDO: 3,
+  HORAS_EXTRA: 4,
+  VACACIONES: 5,
+  BAJA: 6,
+} as const;
 
 /**
- * Esquema para la creación/registro de un trabajador (POST /api/trabajadores)
+ * Tipo numérico de unión que representa los diferentes estados operativos de un trabajador en la plataforma.
+ */
+export type Estado =
+  (typeof ESTADOS_TRABAJADOR)[keyof typeof ESTADOS_TRABAJADOR];
+
+/**
+ * Esquema para la creación o registro de un nuevo trabajador (POST /api/trabajadores).
  */
 export interface TrabajadorCreate {
+  /** Identificador único de la empresa asociada (UUID). */
   empresa_id: string;
-  nif_nie: string;
+  /** Identificador único del rol asignado al trabajador. */
+  rol_id: string;
+  /** Identificación Fiscal oficial (DNI/NIF/NIE, 9 caracteres, 8 dígitos y 1 letra final). */
+  dni_nif_nie: string;
+  /** Nombre oficial del empleado. */
   nombre: string;
+  /** Apellidos del empleado. */
   apellidos: string;
+  /** Fecha de nacimiento del empleado en formato "AAAA-MM-DD". */
+  fecha_nacimiento: string;
+  /** Número de la Seguridad Social. */
+  numero_seguridad_social: string;
+  /** Correo electrónico de contacto. */
   email?: string | null;
+  /** Teléfono de contacto. */
   telefono?: string | null;
-  numero_seguridad_social?: string | null;
-  fecha_nacimiento?: string | null;
+  /** URL o ruta de la fotografía del trabajador. */
+  foto_url?: string | null;
 }
 
 /**
- * Esquema para la actualización parcial de un trabajador (PATCH /api/trabajadores/{id})
+ * Esquema para la actualización parcial de un trabajador existente (PATCH /api/trabajadores/{id}).
  */
 export interface TrabajadorUpdate {
+  /** Identificador único de la empresa asociada. */
   empresa_id?: string;
-  nif_nie?: string;
+  /** Identificador único del rol asignado al trabajador. */
+  rol_id?: string;
+  /** Identificación Fiscal oficial (DNI/NIF/NIE, 9 caracteres, 8 dígitos y 1 letra final). */
+  dni_nif_nie?: string;
+  /** Nombre de pila del empleado. */
   nombre?: string;
+  /** Apellidos del empleado. */
   apellidos?: string;
+  /** Fecha de nacimiento del empleado en formato "AAAA-MM-DD". */
+  fecha_nacimiento?: string;
+  /** Número de la Seguridad Social. */
+  numero_seguridad_social?: string;
+  /** Estado operativo del trabajador (true para activo, false para inactivo). */
   activo?: boolean;
-  email?: string | null;
-  telefono?: string | null;
-  numero_seguridad_social?: string | null;
-  fecha_nacimiento?: string | null;
+  /** Estado numérico complementario del trabajador. */
+  estado?: number | null;
+  /** Fecha de baja laboral de la empresa si aplica en formato "AAAA-MM-DD". */
   fecha_baja_empresa?: string | null;
+  /** Correo electrónico de contacto. */
+  email?: string | null;
+  /** Teléfono de contacto. */
+  telefono?: string | null;
+  /** URL o ruta de la fotografía del trabajador. */
+  foto_url?: string | null;
 }
 
 /**
- * Interfaz para la solicitud de asignación masiva de turnos a un trabajador (POST /api/trabajadores/{id}/turnos)
+ * Representa la definición base y completa del expediente laboral de un trabajador (Tabla: trabajadores).
+ */
+export interface Trabajador {
+  /** Identificador UUID único del trabajador (gen_random_uuid). */
+  id: string;
+  /** Identificador único de la empresa asociada (Tenant de aislamiento multiempresa). */
+  empresa_id: string;
+  /** Identificador único del rol asignado al trabajador. */
+  rol_id: string;
+  /** Identificación Fiscal oficial (DNI/NIF/NIE, 9 caracteres, 8 dígitos y 1 letra final). */
+  dni_nif_nie: string;
+  /** Nombre de pila del empleado. */
+  nombre: string;
+  /** Apellidos del empleado. */
+  apellidos: string;
+  /** Fecha de nacimiento del empleado en formato "AAAA-MM-DD". */
+  fecha_nacimiento: string;
+  /** Número de la Seguridad Social. */
+  numero_seguridad_social: string;
+  /** Estado operativo del trabajador (true por defecto). */
+  activo: boolean;
+  /** Estado numérico complementario del trabajador basado en el enum Estado. */
+  estado?: number;
+  /** Fecha formal de contratación en la empresa en formato "AAAA-MM-DD". */
+  fecha_alta_empresa: string;
+  /** Fecha de baja laboral de la empresa si aplica en formato "AAAA-MM-DD". */
+  fecha_baja_empresa?: string | null;
+  /** Correo electrónico de contacto. */
+  email?: string | null;
+  /** Teléfono de contacto. */
+  telefono?: string | null;
+  /** URL o ruta de la fotografía del trabajador. */
+  foto_url?: string | null;
+  /** Listado completo de contratos históricos o asociados al trabajador. */
+  contratos?: Contrato[];
+  /** Contrato laboral activo actual del trabajador, o null si no dispone de uno vigente. */
+  contratoActivo?: Contrato | null;
+  /** Turno asignado vigente del trabajador, o null si no tiene ninguno asignado actualmente. */
+  turnoAsignadoVigente?: AsignacionTurno | null;
+  /** Lista de asignaciones de turnos vigentes del trabajador, o null si no tiene ninguna asignada actualmente. */
+  turnosAsignadosVigentes?: AsignacionTurno[] | null;
+  /** Marca de tiempo de inserción real del registro en formato ISO DateTime. */
+  created_at: string;
+  /** Marca de tiempo de la última modificación en formato ISO DateTime. */
+  updated_at: string;
+
+  /** Detalles de la empresa asociada (relación anidada de Pydantic). */
+  empresa?: Empresa | null;
+  /** Detalles del rol asociado (relación anidada de Pydantic). */
+  rol?: Rol | null;
+}
+
+/**
+ * Interfaz extendida de un trabajador orientada a paneles de plantilla y gestión de personal.
+ */
+export interface TrabajadorPlantilla extends Trabajador {
+  /** Contrato laboral activo actual del trabajador, o null si no dispone de uno vigente. */
+  contratoActivo: Contrato | null;
+  /** Turno asignado vigente del trabajador, o null si no tiene ninguno asignado actualmente. */
+  turnoAsignadoVigente: AsignacionTurno | null;
+}
+
+/**
+ * Interfaz para la solicitud de asignación masiva de turnos a un trabajador (POST /api/trabajadores/{id}/turnos).
  */
 export interface AsignarTurnosRequest {
-  turnos: string[]; // Lista de UUIDs de turnos a asignar
+  /** Lista de identificadores únicos (UUIDs) de los turnos que se desea asignar. */
+  turnos: string[];
 }
 
 /**
- * Interfaz oficial de la Cuenta de Acceso (Tabla: usuarios)
- * Este es el objeto raíz que inyecta el backend tras el inicio de sesión exitoso.
+ * Estructura de datos del Trabajador gestionado en la ficha (Hereda directamente de Trabajador).
  */
-export interface UsuarioSesion {
-  id: string; // UUID de la cuenta de usuario
-  nombre: string;
-  email: string;
-  tipo_usuario: TipoUsuarioEnum;
-  mfa_habilitado: boolean;
-  activo: boolean;
-  created_at: string;
-  updated_at: string;
-  ultimo_acceso?: string | null;
-  empresa_id: string | null; // NULL para personal global de la gestoría
-  trabajador_id: string | null; // NULL si es un usuario administrador puro sin expediente
+export interface TrabajadorItem extends Trabajador {
+  /** Estado numérico operativo del trabajador. */
+  estado: number;
+  /** Contrato laboral activo actual del trabajador, o null si no dispone de uno vigente. */
+  contratoActivo: Contrato | null;
+  /** Lista de asignaciones de turnos vigentes del trabajador, o null si no tiene ninguna asignada actualmente. */
+  turnosAsignadosVigentes: AsignacionTurno[] | null;
 }
 
-export interface TrabajadorPlantilla extends Trabajador {
-  contratoActivo: Contrato | null;
-  turnoAsignadoVigente: AsignacionTurno | null;
+/**
+ * Propiedades del componente FichaTrabajador.
+ */
+export interface FichaTrabajadorProps {
+  /** Objeto de datos con la información completa del trabajador a renderizar. */
+  item: Trabajador;
+  /** Función ejecutada al seleccionar o interactuar con la tarjeta del trabajador. */
+  onSeleccionarTrabajador: () => void;
+  /** Función para actualizar el estado del modal activo a mostrar en pantalla. */
+  setModalActivo: (modal: string) => void;
+  /** Función disparada para abrir la interfaz de edición del contrato del trabajador. */
+  abrirEdicionContrato: (trabajador: Trabajador) => void;
+  /** Función para preparar los parámetros antes de asignar un turno nuevo. */
+  prepararAsignarTurno: (trabajador: Trabajador) => void;
+  /** Función manejadora para procesar la asignación directa de turnos al trabajador. */
+  handleAsignarTurnoTrabajador: () => void;
+  /** Diccionario de estilos visuales aplicados al componente. */
+  styles: Record<string, any>;
 }

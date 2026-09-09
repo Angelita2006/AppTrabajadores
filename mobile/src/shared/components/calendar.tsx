@@ -1,15 +1,19 @@
 import { Festivo } from "@/src/modules/festivos/types/festivo";
+import { formatearFecha } from "@/src/utils/formaters";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { ThemedText } from "./themed-text";
+import { ThemedText } from "./ThemedText";
 
-type Props = {
-  year: number;
+/**
+ * Propiedades de entrada para el componente CalendarLaboralAnual.
+ */
+type CalendarLaboralAnualProps = {
+  anio: number;
   festivos?: Festivo[];
   onDayPress?: (fechaStr: string, festivoExistente?: Festivo) => void;
 };
 
-const MESES = [
+const MESES_NOMBRES = [
   "Enero",
   "Febrero",
   "Marzo",
@@ -24,7 +28,7 @@ const MESES = [
   "Diciembre",
 ];
 
-const COLORS = {
+const COLORES_CALENDARIO = {
   nacional: "#FEE2E2",
   autonomico: "#FEF3C7",
   local: "#DBEAFE",
@@ -33,68 +37,78 @@ const COLORS = {
   hoyBorde: "#2563EB",
 };
 
-const formatDateQuery = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-export const CalendarLaboralAnual: React.FC<Props> = ({
-  year,
+/**
+ * Componente que renderiza un calendario laboral anual estructurado por meses,
+ * permitiendo visualizar festividades por tipo y gestionar eventos táctiles por día.
+ *
+ * @param props - Propiedades del componente (`year`, `festivos`, `onDayPress`).
+ * @returns Estructura visual completa del calendario anual en formato de rejilla por meses.
+ */
+export const CalendarLaboralAnual: React.FC<CalendarLaboralAnualProps> = ({
+  anio,
   festivos = [],
   onDayPress,
 }) => {
-  const todayStr = formatDateQuery(new Date());
+  const hoyStr = formatearFecha(new Date());
 
-  const generarMesCells = (monthIndex: number) => {
-    const list = [];
-    const firstDay = new Date(year, monthIndex, 1);
-    const lastDay = new Date(year, monthIndex + 1, 0);
-    const daysInMonth = lastDay.getDate();
+  /**
+   * Genera la matriz de celdas (días y espacios vacíos) para un mes específico,
+   * calculando el desplazamiento inicial y asignando colores según festividades.
+   *
+   * @param indexMes - Índice numérico del mes (0 para Enero, 11 para Diciembre).
+   * @returns Un arreglo de objetos con la metadata de cada celda para pintar la cuadrícula.
+   */
+  const generarCeldasMes = (indexMes: number) => {
+    const lista = [];
+    const primerDia = new Date(anio, indexMes, 1);
+    const ultimoDia = new Date(anio, indexMes + 1, 0);
+    const diasMes = ultimoDia.getDate();
 
-    let startDay = firstDay.getDay();
-    // Ajuste para semanas que empiezan en Lunes (1) en vez de Domingo (0)
-    const prefix = startDay === 0 ? 6 : startDay - 1;
+    let comienzoDia = primerDia.getDay();
+    // Ajuste de inicio de semana: Lunes (1) en vez de Domingo (0)
+    const prefix = comienzoDia === 0 ? 6 : comienzoDia - 1;
 
+    // Rellena los espacios vacíos previos al primer día del mes
     for (let i = 0; i < prefix; i++) {
-      list.push({
+      lista.push({
         date: null,
         color: "transparent",
         label: "",
-        uniqueKey: `empty-${monthIndex}-${i}`,
+        uniqueKey: `empty-${indexMes}-${i}`,
       });
     }
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const current = new Date(year, monthIndex, d);
-      const dateStr = formatDateQuery(current);
-      const festivoEncontrado = festivos.find((f) => f.fecha === dateStr);
+    // Rellena los días reales del mes y mapea sus festividades
+    for (let d = 1; d <= diasMes; d++) {
+      const hoy = new Date(anio, indexMes, d);
+      const fechaStr = formatearFecha(hoy);
+      const festivoEncontrado = festivos.find((f) => f.fecha === fechaStr);
 
-      let bgColor = COLORS.diaNormal;
+      let bgColor = COLORES_CALENDARIO.diaNormal;
       if (festivoEncontrado) {
-        if (festivoEncontrado.tipo === "Nacional") bgColor = COLORS.nacional;
+        if (festivoEncontrado.tipo === "Nacional")
+          bgColor = COLORES_CALENDARIO.nacional;
         else if (festivoEncontrado.tipo === "Autonómico")
-          bgColor = COLORS.autonomico;
-        else bgColor = COLORS.local;
+          bgColor = COLORES_CALENDARIO.autonomico;
+        else bgColor = COLORES_CALENDARIO.local;
       }
 
-      list.push({
-        date: current,
-        dateStr: dateStr,
+      lista.push({
+        date: hoy,
+        dateStr: fechaStr,
         color: bgColor,
         label: String(d),
         festivo: festivoEncontrado,
-        uniqueKey: dateStr,
+        uniqueKey: fechaStr,
       });
     }
-    return list;
+    return lista;
   };
 
   return (
     <View style={styles.containerAnual}>
-      {MESES.map((nombreMes, indiceMes) => {
-        const cells = generarMesCells(indiceMes);
+      {MESES_NOMBRES.map((nombreMes, indexMes) => {
+        const celdas = generarCeldasMes(indexMes);
 
         return (
           <View key={nombreMes} style={styles.contenedorMes}>
@@ -109,27 +123,28 @@ export const CalendarLaboralAnual: React.FC<Props> = ({
               ))}
             </View>
 
-            {/* Cuadrícula de días en una sola fila con Flex Wrap */}
+            {/* Cuadrícula de días con Flex Wrap */}
             <View style={styles.gridDias}>
-              {cells.map((cell) => {
-                const isToday = cell.dateStr === todayStr;
-                const esFestivo = !!cell.festivo;
+              {celdas.map((celda) => {
+                const isToday = celda.dateStr === hoyStr;
+                const esFestivo = !!celda.festivo;
 
                 return (
-                  <View key={cell.uniqueKey} style={styles.cellWrapper}>
+                  <View key={celda.uniqueKey} style={styles.cellWrapper}>
                     <TouchableOpacity
-                      disabled={!cell.date}
+                      disabled={!celda.date}
                       onPress={() =>
-                        cell.dateStr && onDayPress?.(cell.dateStr, cell.festivo)
+                        celda.dateStr &&
+                        onDayPress?.(celda.dateStr, celda.festivo)
                       }
                       style={[
                         styles.cell,
-                        { backgroundColor: cell.color },
+                        { backgroundColor: celda.color },
                         isToday && styles.todayCell,
-                        !cell.date && { backgroundColor: "transparent" },
+                        !celda.date && { backgroundColor: "transparent" },
                       ]}
                     >
-                      {cell.date && (
+                      {celda.date && (
                         <ThemedText
                           style={[
                             styles.cellText,
@@ -137,7 +152,7 @@ export const CalendarLaboralAnual: React.FC<Props> = ({
                             isToday && styles.cellTextHoy,
                           ]}
                         >
-                          {cell.label}
+                          {celda.label}
                         </ThemedText>
                       )}
                     </TouchableOpacity>
@@ -188,7 +203,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   weekLabelContainer: {
-    flexBasis: "14.28%", // División matemática perfecta entre 7 días
+    flexBasis: "14.28%", // División proporcional exacta para 7 días
     alignItems: "center",
   },
   weekLabel: {
@@ -201,9 +216,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   cellWrapper: {
-    flexBasis: "14.28%", // Asegura que entren exactamente 7 días por fila del contenedor
-    padding: 2, // Margen equilibrado interno
-    aspectRatio: 1, // Hace que cada celda sea perfectamente cuadrada de forma dinámica
+    flexBasis: "14.28%", // Garantiza 7 columnas exactas por fila
+    padding: 2,
+    aspectRatio: 1, // Mantiene celdas perfectamente cuadradas
   },
   cell: {
     flex: 1,
@@ -212,7 +227,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   todayCell: {
-    borderColor: COLORS.hoyBorde,
+    borderColor: COLORES_CALENDARIO.hoyBorde,
     borderWidth: 1.5,
     backgroundColor: "#EFF6FF",
   },
@@ -222,11 +237,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   cellTextFestivo: {
-    color: COLORS.textoFestivo,
+    color: COLORES_CALENDARIO.textoFestivo,
     fontWeight: "700",
   },
   cellTextHoy: {
-    color: COLORS.hoyBorde,
+    color: COLORES_CALENDARIO.hoyBorde,
     fontWeight: "700",
   },
 });

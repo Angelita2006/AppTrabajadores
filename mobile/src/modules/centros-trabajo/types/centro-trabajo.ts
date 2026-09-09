@@ -1,48 +1,76 @@
 import { Empresa } from "../../empresas/types/empresa";
 
 /**
- * Representa un centro de trabajo o sede física (Tabla: centros_trabajo)
+ * Representa la entidad completa de un centro de trabajo o sede física en el sistema.
+ * Sincronizado con la tabla 'centros_trabajo' de la base de datos PostgreSQL.
  */
 export interface CentroTrabajo {
-  id: string; // Mapea uuid.UUID (gen_random_uuid)
-  empresa_id: string; // Mapea uuid.UUID (tenant)
-  nombre: string; // Mapea String(255)
-  zona_horaria: string; // Mapea String(50), por defecto "Europe/Madrid"
-  activo: boolean; // Mapea Boolean
-  created_at: string; // Mapea DateTime(True) en formato ISO string
-  updated_at: string; // Mapea DateTime(True) en formato ISO string
-  codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
-  direccion?: string | null; // Dirección física o postal (opcional)
-  latitud: number; // Latitud geográfica
-  longitud: number; // Longitud geográfica
+  /** Identificador único universal (UUID v4) autogenerado para el centro de trabajo. */
+  id: string;
+  /** Identificador UUID único de la empresa u organización propietaria (tenant). */
+  empresa_id: string;
+  /** Nombre identificativo o descriptivo de la sede física. */
+  nombre: string;
+  /** Zona horaria aplicable al centro (por defecto "Europe/Madrid"). */
+  zona_horaria: string;
+  /** Indicador booleano que determina si el centro de trabajo se encuentra operativo. */
+  activo: boolean;
+  /** Marca de tiempo (ISO 8601 con zona horaria) de la fecha de creación del registro. */
+  created_at: string;
+  /** Marca de tiempo (ISO 8601 con zona horaria) de la última actualización del registro. */
+  updated_at: string;
+  /** Código de Cuenta de Cotización (CCC) asociado. */
+  codigo_ccc: string | null;
+  /** Dirección física o postal completa de la sede. */
+  direccion: string;
+  /** Coordenada de latitud geográfica para geolocalización. */
+  latitud: number;
+  /** Coordenada de longitud geográfica para geolocalización. */
+  longitud: number;
 
-  // Relación opcional para carga anidada (eager loading)
+  /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
 }
 
 /**
- * Esquema para la creación de un nuevo centro de trabajo
+ * Estructura de datos requerida para el registro o creación de un nuevo centro de trabajo.
+ * Sincronizado exactamente con el esquema del backend.
  */
 export interface CentroTrabajoCreate {
-  empresa_id: string; // Identificador UUID de la empresa (tenant)
-  nombre: string; // Nombre identificativo de la sede física
+  /** Identificador UUID único de la empresa u organización propietaria (tenant). */
+  empresa_id: string;
+  /** Nombre identificativo de la sede física. */
+  nombre: string;
+  /** Estado inicial de actividad del centro de trabajo. */
   activo: boolean;
-  zona_horaria?: string; // Zona horaria (por defecto "Europe/Madrid")
-  codigo_ccc?: string | null; // Código de Cuenta de Cotización (opcional)
-  direccion?: string | null; // Dirección física (opcional)
-  latitud: number; // Latitud geográfica
-  longitud: number; // Longitud geográfica
+  /** Zona horaria aplicable (por defecto "Europe/Madrid"). */
+  zona_horaria: string;
+  /** Código de Cuenta de Cotización (CCC). */
+  codigo_ccc: string;
+  /** Dirección física o postal completa de la sede. */
+  direccion: string;
+  /** Coordenada de latitud geográfica. */
+  latitud: number;
+  /** Coordenada de longitud geográfica. */
+  longitud: number;
 }
 
 /**
- * Esquema para la actualización parcial (patch) de un centro de trabajo
+ * Estructura de datos para la actualización parcial (patch) de los parámetros de un centro de trabajo existente.
  */
 export interface CentroTrabajoUpdate {
-  nombre?: string;
-  zona_horaria?: string;
-  activo?: boolean;
-  codigo_ccc?: string | null;
-  direccion?: string | null;
-  latitud?: number | null;
-  longitud?: number | null;
+  /** Nuevo nombre identificativo de la sede física. */
+  nombre: string;
+  /** Nueva zona horaria. */
+  zona_horaria: string;
+  /** Nuevo estado de operatividad del centro. */
+  activo: boolean;
+  /** Código de Cuenta de Cotización (CCC) actualizado. */
+  codigo_ccc: string;
+  /** Dirección física o postal actualizada. */
+  direccion: string;
+  /** Coordenada de latitud geográfica actualizada. */
+  latitud: number;
+  /** Coordenada de longitud geográfica actualizada. */
+  longitud: number;
 }

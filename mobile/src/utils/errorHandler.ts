@@ -1,33 +1,41 @@
-export const obtenerMensajeAmigableError = (error: any): string => {
-  const errorData = error?.response?.data;
+import { Alert, Platform } from "react-native";
 
-  if (errorData) {
-    // Si es un array de validaciones (ej. Pydantic)
-    if (Array.isArray(errorData.detail)) {
+/**
+ * Extrae y formatea mensajes de error amigables para el usuario a partir de respuestas HTTP o fallos de red.
+ *
+ * @param error - Objeto de error capturado (puede provenir de Axios, Fetch o excepciones genéricas).
+ * @returns Cadena de texto limpia y comprensible para mostrar al usuario final.
+ */
+export const obtenerMensajeAmigableError = (error: any): string => {
+  const mensaje = error?.response?.data;
+
+  if (mensaje) {
+    // Maneja arrays de validación uniendo los mensajes
+    if (Array.isArray(mensaje.detail)) {
       return (
-        errorData.detail.map((err: any) => err.msg).join(", ") ||
+        mensaje.detail.map((err: any) => err.msg).join(", ") ||
         "Error de validación en los datos."
       );
     }
 
-    // Si el backend envía un JSON con { "message": "Mensaje..." }
-    if (typeof errorData.message === "string") {
-      return errorData.message;
+    // Mensaje estructurado enviado como propiedad 'message' en JSON
+    if (typeof mensaje.message === "string") {
+      return mensaje.message;
     }
 
-    // Si el backend envía el error directamente como texto plano
-    if (typeof errorData === "string") {
-      return errorData;
+    // Respuesta de error directa en texto plano
+    if (typeof mensaje === "string") {
+      return mensaje;
     }
   }
 
-  // Errores de Red
-  if (error?.message === "Network Error" || !error?.response) {
+  // Identifica caídas de conexión o ausencia de respuesta del servidor
+  if (mensaje?.message === "Network Error" || !mensaje?.response) {
     return "No se pudo establecer conexión con el servidor. Comprueba tu conexión a internet.";
   }
 
-  // Fallbacks genéricos según el Status Code HTTP
-  const status = error?.response?.status;
+  // Traducción de códigos de estado HTTP a mensajes comprensibles
+  const status = mensaje?.response?.status;
   if (status) {
     switch (status) {
       case 400:
@@ -47,10 +55,38 @@ export const obtenerMensajeAmigableError = (error: any): string => {
       case 503:
         return "Hubo un fallo en los servidores. Por favor, inténtalo de nuevo más tarde.";
       default:
-        return `Ocurrió un error inesperado en el servidor.`;
+        return "Ocurrió un error inesperado en el servidor.";
     }
   }
 
-  // Mensaje por defecto final
+  // Mensaje genérico final si no se reconoce el tipo de error
   return error?.message || "Ocurrió un error desconocido. Inténtalo de nuevo.";
 };
+
+/**
+ * Muestra un mensaje informativo adaptado a la plataforma actual (alerta web con window.alert
+ * o cuadro de diálogo nativo en dispositivos móviles iOS y Android).
+ *
+ * @param mensaje - Texto informativo que se desea mostrar al usuario.
+ */
+export function mostrarMensaje(tipoMensaje: string, mensaje: any) {
+  if (Platform.OS == "web") {
+    alert(`${tipoMensaje}: ` + mensaje);
+  } else if (Platform.OS == "android" || Platform.OS == "ios") {
+    Alert.alert(tipoMensaje, mensaje);
+  }
+}
+
+/**
+ * Muestra una alerta de error adaptada a la plataforma en ejecución
+ * (ventana de alerta en web o componente nativo Alert en entornos móviles).
+ *
+ * @param error - Descripción o mensaje del error a reportar.
+ */
+export function mostrarError(error: any) {
+  if (Platform.OS == "web") {
+    alert("Error: " + error);
+  } else if (Platform.OS == "android" || Platform.OS == "ios") {
+    Alert.alert("Error", error);
+  }
+}

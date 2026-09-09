@@ -1,35 +1,30 @@
 import { ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { ThemedText } from "../components/themed-text";
+import { ThemedText } from "../components/ThemedText";
 
-// ==========================================
 // INTERFACES (TIPOS)
-// ==========================================
-
 interface AppScreenProps {
-  /** El título principal que se mostrará en el encabezado de la pantalla. */
+  // El título principal que se mostrará en el encabezado de la pantalla
   title: string;
-  /** Un subtítulo descriptivo opcional debajo del título principal. */
+  // Un subtítulo descriptivo opcional debajo del título principal
   subtitle?: string;
-  /** El contenido principal que se renderizará dentro de la pantalla. */
+  // El contenido principal que se renderizará dentro de la pantalla
   children: ReactNode;
 }
 
 interface StatCardProps {
-  /** La etiqueta o nombre del dato estadístico (ej: "Ventas"). */
+  // La etiqueta o nombre del dato estadístico (ej: "Ventas")
   label: string;
-  /** El valor numérico o texto principal a destacar (ej: "$2,500"). */
+  // El valor numérico o texto principal a destacar (ej: "$2,500")
   value: string;
-  /** El tono de color que define el estado visual de la tarjeta. Por defecto es "neutral". */
+  // El tono de color que define el estado visual de la tarjeta
+  // Por defecto es "neutral"
   tone?: "neutral" | "success" | "warning" | "danger";
 }
 
-// ==========================================
-// COMPONENTES
-// ==========================================
-
 /**
- * Pantalla base de la aplicación que incluye un encabezado estándar con scroll automático.
+ * Pantalla base de la aplicación que incluye un encabezado
+ * estándar con scroll automático
  */
 export function AppScreen({ title, subtitle, children }: AppScreenProps) {
   return (
@@ -55,21 +50,24 @@ export function AppScreen({ title, subtitle, children }: AppScreenProps) {
 }
 
 /**
- * Tarjeta contenedor blanca con bordes definidos para agrupar secciones de información.
+ * Tarjeta contenedor blanca con bordes definidos para agrupar
+ * secciones de información
  */
 export function Card({ children }: { children: ReactNode }) {
   return <View style={styles.card}>{children}</View>;
 }
 
 /**
- * Contenedor horizontal que alinea sus elementos en filas y salta de línea si no caben.
+ * Contenedor horizontal que alinea sus elementos en filas
+ * y salta de línea si no caben
  */
 export function Row({ children }: { children: ReactNode }) {
   return <View style={styles.row}>{children}</View>;
 }
 
 /**
- * Tarjeta de indicador o métrica clave que cambia su color de fondo según su estado emocional/tono.
+ * Tarjeta de indicador o métrica clave que cambia su
+ * color de fondo según su estado emocional/tono
  */
 export function StatCard({ label, value, tone = "neutral" }: StatCardProps) {
   return (

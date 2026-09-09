@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
 from core.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
+from schemas.tipos_evento_fichaje import TipoEventoFichajeSimpleResponse
+from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - FICHAJES
@@ -17,7 +19,7 @@ class FichajeBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador")
     centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo")
-    tipo_evento_id: int = Field(..., description="ID numérico del tipo de evento (SmallInteger)")
+    tipo_evento_id: UUID = Field(..., description="ID único UUID del tipo de evento")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Método utilizado para realizar el marcaje")
 
 class FichajeCreate(BaseModel):
@@ -43,10 +45,11 @@ class FichajeCreate(BaseModel):
     dispositivo_id: Optional[UUID] = Field(None, description="ID del dispositivo de fichaje")
     fecha_hora_dispositivo: Optional[datetime] = Field(None, description="Fecha y hora reportada por el dispositivo")
     observaciones: Optional[str] = Field(None, max_length=500, description="Observaciones adicionales")
+    firma_digital: Optional[str] = Field(None, description="Firma digitalizada codificada en Base64 o URL del almacenamiento")
 
     forzar_hora_extra: Optional[bool] = Field(False, description="Bandera para forzar fichaje en festivo como horas extra")
 
-class FichajeResponse(FichajeBase):
+class FichajeSimpleResponse(FichajeBase):
     """
     Esquema utilizado para estructurar las respuestas JSON que el servidor envía de vuelta.
     Incluye las propiedades generadas por triggers y valores predeterminados de la base de datos.
@@ -65,5 +68,15 @@ class FichajeResponse(FichajeBase):
     longitud: Optional[Decimal] = Field(None, description="Longitud")
     fichaje_sustituido_id: Optional[UUID] = Field(None, description="ID del fichaje anterior al que reemplaza este registro")
     observaciones: Optional[str] = Field(None, description="Observaciones adicionales")
+    firma_digital: Optional[str] = Field(None, description="Firma digitalizada almacenada")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FichajeResponse(FichajeSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    tipo_evento: Optional[TipoEventoFichajeSimpleResponse] = Field(None, description="Detalles del tipo de evento asociado")
+    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,16 +1,14 @@
-import { obtenerCentrosPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
-import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
-import { getUsuarioByEmailYPassword } from "@/src/modules/usuarios/api/services";
-import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
+import { obtenerEmpresaTrabajador } from "@/src/modules/trabajadores/api/services";
+import { iniciarSesion } from "@/src/modules/usuarios/api/services";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { setAuthToken } from "@/src/service/api/api";
-import LottieBackground from "@/src/shared/ui/LottieBackground";
-import VideoBackground from "@/src/shared/ui/VideoBackground";
+import LottieBackground from "@/src/shared/ui/Background.native";
+import VideoBackground from "@/src/shared/ui/Background.web";
+import { mostrarError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -25,10 +23,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { obtenerEmpresa } from "../src/modules/empresas/api/services";
-import { obtenerEmpresasTrabajador } from "../src/modules/trabajadores/api/services";
 import { useSesion } from "../src/modules/usuarios/store/SesionContext";
-import { ThemedText } from "../src/shared/components/themed-text";
-import { IconSymbol } from "../src/shared/ui/icon-symbol";
+import { ThemedText } from "../src/shared/components/ThemedText";
+import { IconSymbol } from "../src/shared/ui/IconSymbol";
 
 // Candado global para persistir el estado de autenticación entre renders
 let isAuthenticatingGlobal = false;
@@ -37,36 +34,18 @@ export default function RootIndexScreen() {
   const {
     usuarioActual,
     setUsuarioActual,
-    trabajadorActual,
-    empresas,
-    setEmpresas,
-    empresaSeleccionada,
-    setEmpresaSeleccionada,
-    contratoActual,
-    centroTrabajoActual,
-    setCentroTrabajoActual,
+    setEmpresaActual,
     cargandoSesionLocal,
   } = useSesion();
-
-  const esAdminGestoria =
-    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA;
-  const esAdminEmpresa =
-    usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA;
-  const esAdmin = esAdminGestoria || esAdminEmpresa;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const passwordInputRef = useRef<TextInput | null>(null);
   const [isObscured, setIsObscured] = useState(true);
   const [cargando, setCargando] = useState(false);
-  const [cargandoCentros, setCargandoCentros] = useState(false);
 
   const [errorEmail, setErrorEmail] = useState(false);
   const [errorPassword, setErrorPassword] = useState(false);
-
-  const [centrosDisponibles, setCentrosDisponibles] = useState<CentroTrabajo[]>(
-    [],
-  );
 
   const opacidadTarjeta = useSharedValue(0);
 
@@ -79,58 +58,16 @@ export default function RootIndexScreen() {
   }, [opacidadTarjeta, setUsuarioActual, usuarioActual]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const cargarCentrosDeLaEmpresa = async () => {
-      if (isAuthenticatingGlobal) return;
-
-      if (!empresaSeleccionada?.id) {
-        if (isMounted) {
-          setCentrosDisponibles([]);
-          setCentroTrabajoActual(null);
-        }
-        return;
-      }
-
-      try {
-        if (isMounted) setCargandoCentros(true);
-        const centros = await obtenerCentrosPorEmpresa(empresaSeleccionada.id);
-
-        if (!isMounted) return;
-
-        setCentrosDisponibles(centros ?? []);
-
-        if (centros && centros.length > 0) {
-          if (
-            !centroTrabajoActual ||
-            centroTrabajoActual.empresa_id !== empresaSeleccionada.id
-          ) {
-            setCentroTrabajoActual(centros[0]);
-          }
-        } else {
-          setCentroTrabajoActual(null);
-        }
-      } catch (err) {
-        console.error("Error al cargar centros de trabajo:", err);
-      } finally {
-        if (isMounted) setCargandoCentros(false);
-      }
-    };
-
-    cargarCentrosDeLaEmpresa();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [empresaSeleccionada?.id]);
-
-  useEffect(() => {
     const configurarNotificaciones = async () => {
       if (Platform.OS === "web") return;
       if (usuarioActual && !isAuthenticatingGlobal) {
-        const permitido = await NotificationService.requestPermissions();
-        if (permitido) {
-          await NotificationService.programarAlarmasTurno(usuarioActual.id);
+        try {
+          const permitido = await NotificationService.requestPermissions();
+          if (permitido) {
+            await NotificationService.programarAlarmasTurno(usuarioActual.id);
+          }
+        } catch (error: any) {
+          mostrarError("Error al configurar las notificaciones: " + error);
         }
       }
     };
@@ -154,10 +91,18 @@ export default function RootIndexScreen() {
     isAuthenticatingGlobal = true;
     try {
       setCargando(true);
-      const respuestaLogin = await getUsuarioByEmailYPassword(email, password);
+
+      let respuestaLogin;
+      try {
+        respuestaLogin = await iniciarSesion(email, password);
+      } catch (error: any) {
+        mostrarError("Error al iniciar sesión en el servidor: " + error);
+        return;
+      }
 
       if (!respuestaLogin) {
-        throw new Error("No se pudo obtener respuesta del servidor.");
+        mostrarError("Error: No se pudo obtener respuesta del servidor.");
+        return;
       }
 
       const { access_token, usuario } = respuestaLogin;
@@ -165,44 +110,33 @@ export default function RootIndexScreen() {
       setUsuarioActual(usuario);
 
       if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
-        const empresa = await obtenerEmpresa(usuario.empresa_id);
-        setEmpresas([empresa]);
-        setEmpresaSeleccionada(empresa);
+        try {
+          const empresa = await obtenerEmpresa(usuario.empresa_id);
+          setEmpresaActual(empresa);
+        } catch (error: any) {
+          mostrarError(
+            "Error al cargar los datos de la empresa administradora: " + error,
+          );
+        }
       } else if (usuario.trabajador_id) {
         try {
-          const empresasTrabajador = await obtenerEmpresasTrabajador(
+          const empresaTrabajador = await obtenerEmpresaTrabajador(
             usuario.trabajador_id,
             access_token,
           );
-          setEmpresas(empresasTrabajador ?? []);
-          if (empresasTrabajador && empresasTrabajador.length > 0) {
-            setEmpresaSeleccionada(empresasTrabajador[0]);
+          if (empresaTrabajador) {
+            setEmpresaActual(empresaTrabajador);
           }
-        } catch (errorEmpresa) {
-          console.log("Error al cargar empresas del trabajador:", errorEmpresa);
+        } catch (error: any) {
+          mostrarError("Error al cargar empresas del trabajador: " + error);
         }
       }
     } catch (error: any) {
-      const mensajeError = error?.message || "Ocurrió un error desconocido";
-
-      if (Platform.OS === "web") {
-        alert(`Fallo de Autenticación\n\n${mensajeError}`);
-      } else {
-        Alert.alert("Fallo de Autenticación", mensajeError);
-      }
+      mostrarError("Error general en el proceso de autenticación: " + error);
     } finally {
       setCargando(false);
       isAuthenticatingGlobal = false;
     }
-  };
-
-  const handleLogout = async () => {
-    setAuthToken("");
-    setEmpresaSeleccionada(null);
-    setCentroTrabajoActual(null);
-    setCentrosDisponibles([]);
-    setEmpresas([]);
-    setUsuarioActual(null);
   };
 
   const estiloTarjetaAnimada = useAnimatedStyle(() => {
@@ -228,6 +162,7 @@ export default function RootIndexScreen() {
       {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
       {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
@@ -368,9 +303,7 @@ export default function RootIndexScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() =>
-              router.push("/(authentication)/registro-organizacion")
-            }
+            onPress={() => router.push("/(authentication)/registro-empresa")}
             style={styles.organizationRegisterButton}
           >
             <IconSymbol
@@ -380,7 +313,29 @@ export default function RootIndexScreen() {
               style={{ marginRight: 6 }}
             />
             <ThemedText style={styles.organizationRegisterText}>
-              Quiero registrar mi organización / empresa
+              Quiero registrar mi empresa
+            </ThemedText>
+          </Pressable>
+
+          {/* Separador sutil opcional para diferenciar el acceso profesional */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <ThemedText style={styles.dividerText}>o</ThemedText>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Pressable
+            onPress={() => router.push("/(authentication)/registro-gestoria")}
+            style={styles.gestoriaRegisterButton}
+          >
+            <IconSymbol
+              name="briefcase.fill"
+              size={16}
+              color="#2563EB"
+              style={{ marginRight: 6 }}
+            />
+            <ThemedText style={styles.gestoriaRegisterText}>
+              ¿Eres una asesoría? Registrar gestoría
             </ThemedText>
           </Pressable>
         </Animated.View>
@@ -493,6 +448,40 @@ const styles = StyleSheet.create({
   },
   organizationRegisterText: {
     color: "#1E293B",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    marginVertical: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E2E8F0",
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  gestoriaRegisterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    padding: 10,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 12,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  gestoriaRegisterText: {
+    color: "#1D4ED8",
     fontSize: 13,
     fontWeight: "700",
   },

@@ -1,15 +1,9 @@
 import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
-import {
-  FontAwesome,
-  Ionicons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
-import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications"; // <--- Importante
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, useColorScheme, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -34,13 +28,6 @@ function InitialLayout() {
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
 
-  // Carga explícita de las fuentes de iconos para que se generen en el dist web
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-    ...FontAwesome.font,
-    ...MaterialCommunityIcons.font,
-  });
-
   // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,7 +42,7 @@ function InitialLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- EFECTO NUEVO: Registrar token push y escuchar notificaciones al iniciar sesión ---
+  // Registrar token push y escuchar notificaciones al iniciar sesión
   useEffect(() => {
     if (!usuarioActual?.id) return;
 
@@ -133,6 +120,7 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
+  const colorScheme = useColorScheme();
   return (
     <ProveedorSesion>
       <InitialLayout />

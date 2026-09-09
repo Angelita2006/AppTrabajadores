@@ -22,4 +22,4 @@ class CalendariosLaborales(Base):
 
     centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='calendarios_laborales') # type: ignore
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='calendarios_laborales') # type: ignore
-    festivos: Mapped[list['Festivos']] = relationship('Festivos', back_populates='calendario') # type: ignore
+    festivos: Mapped[list['Festivos']] = relationship('Festivos', back_populates='calendario', cascade='all, delete-orphan') # type: ignore

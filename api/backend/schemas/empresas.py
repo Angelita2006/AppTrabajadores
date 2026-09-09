@@ -7,6 +7,28 @@ from uuid import UUID
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - EMPRESAS
 # ==========================================
 
+class EmpresaBase(BaseModel):
+    """
+    Propiedades comunes compartidas para la validación de una empresa cliente
+    basada en el modelo relacional mapeado por sqlacodegen.
+    """
+    razon_social: str = Field(..., min_length=2, max_length=255, description="Razón social o denominación legal")
+    cif: str = Field(..., min_length=5, max_length=20, description="Código de Identificación Fiscal único")
+    zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria por defecto para los centros de trabajo")
+    configuracion: dict = Field(default_factory=dict, description="Ajustes y parámetros específicos en formato JSON")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class EmpresaCreate(EmpresaBase):
+    """
+    Esquema utilizado para recibir los datos de registro de una empresa desde el cliente.
+    Contiene campos opcionales del expediente fiscal que pueden omitirse temporalmente.
+    """
+    nombre_comercial: Optional[str] = Field(None, max_length=255, description="Nombre de marca o comercial")
+    codigo_cnae: Optional[str] = Field(None, max_length=10, description="Clasificación Nacional de Actividades Económicas")
+    convenio_colectivo: Optional[str] = Field(None, max_length=255, description="Convenio de aplicación sectorial")
+    direccion_fiscal: Optional[str] = Field(None, description="Domicilio social o fiscal de la empresa")
+
 class EmpresaUpdate(BaseModel):
     """
     Esquema para la actualización de los datos de una empresa.
@@ -24,26 +46,6 @@ class EmpresaUpdate(BaseModel):
     logo_url: Optional[str] = Field(None, description="Ruta o URL del logotipo corporativo") 
 
     model_config = ConfigDict(from_attributes=True)
-
-class EmpresaBase(BaseModel):
-    """
-    Propiedades comunes compartidas para la validación de una empresa cliente
-    basada en el modelo relacional mapeado por sqlacodegen.
-    """
-    razon_social: str = Field(..., min_length=2, max_length=255, description="Razón social o denominación legal")
-    cif: str = Field(..., min_length=5, max_length=20, description="Código de Identificación Fiscal único")
-    zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria por defecto para los centros de trabajo")
-    configuracion: dict = Field(default_factory=dict, description="Ajustes y parámetros específicos en formato JSON")
-
-class EmpresaCreate(EmpresaBase):
-    """
-    Esquema utilizado para recibir los datos de registro de una empresa desde el cliente.
-    Contiene campos opcionales del expediente fiscal que pueden omitirse temporalmente.
-    """
-    nombre_comercial: Optional[str] = Field(None, max_length=255, description="Nombre de marca o comercial")
-    codigo_cnae: Optional[str] = Field(None, max_length=10, description="Clasificación Nacional de Actividades Económicas")
-    convenio_colectivo: Optional[str] = Field(None, max_length=255, description="Convenio de aplicación sectorial")
-    direccion_fiscal: Optional[str] = Field(None, description="Domicilio social o fiscal de la empresa")
 
 class EmpresaResponse(EmpresaBase):
     """

@@ -3,6 +3,9 @@ from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Optional
 from uuid import UUID
 from core.enums import EstadoAusenciaEnum, TipoAusenciaEnum
+from schemas.empresas import EmpresaResponse
+from schemas.trabajadores import TrabajadorSimpleResponse
+from schemas.usuarios import UsuarioSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUSENCIAS
@@ -18,6 +21,8 @@ class AusenciaBase(BaseModel):
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la ausencia (AAAA-MM-DD)")
     fecha_fin: datetime.date = Field(..., description="Fecha de finalización de la ausencia (AAAA-MM-DD)")
     motivo: str = Field(..., min_length=2, max_length=1000, description="Justificación detallada de la solicitud")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class AusenciaCreate(AusenciaBase):
     """
@@ -35,7 +40,7 @@ class AusenciaCreate(AusenciaBase):
             raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio.")
         return self
 
-class AusenciaResponse(AusenciaBase):
+class AusenciaSimpleResponse(AusenciaBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la aplicación móvil o web.
     """
@@ -48,5 +53,15 @@ class AusenciaResponse(AusenciaBase):
     validado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que validó la ausencia")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha de resolución de la solicitud")
     observaciones_admin: Optional[str] = Field(None, max_length=1000, description="Notas añadidas por el validador")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AusenciaResponse(AusenciaSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador afectado")
+    validado_por_usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario que validó la ausencia")
 
     model_config = ConfigDict(from_attributes=True)

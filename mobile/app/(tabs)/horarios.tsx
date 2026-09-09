@@ -3,55 +3,27 @@ import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignaci
 import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
   DIAS_SEMANA,
-  EstadoFichaje,
-  RegistroFichaje
+  RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
-import { obtenerTurno } from "@/src/modules/turnos/api/services";
+import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
-import { TipoUsuarioEnum } from "@/src/modules/usuarios/types/usuario";
-import { ThemedText } from "@/src/shared/components/themed-text";
+import { ThemedText } from "@/src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
-import { IconSymbol } from "@/src/shared/ui/icon-symbol";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { IconSymbol } from "@/src/shared/ui/IconSymbol";
+import { mostrarError } from "@/src/utils/errorHandler";
+import {
+  formatearAHorasYMinutos,
+  horaAMinutos,
+  obtenerMinutosFichaje,
+} from "@/src/utils/formaters";
+import { cumpleDiasSemana } from "@/src/utils/validators";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
-const cumpleDiasSemana = (
-  fecha: Date,
-  diasPermitidosStr: number[],
-): boolean => {
-  const diaSemana = fecha.getDay();
-  return diasPermitidosStr.includes(diaSemana);
-};
-
-const aMinutos = (horaStr: string): number => {
-  if (!horaStr) return 0;
-  const [h, m] = horaStr.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
-};
-
-const obtenerMinutosFichaje = (fechaHoraIso: string): number => {
-  const partes = fechaHoraIso.split("T");
-  if (!partes[1]) return 0;
-  const horaLimpia = partes[1].substring(0, 5);
-  return aMinutos(horaLimpia);
-};
-
-const formatearAHorasYMinutos = (minutosTotales: number): string => {
-  const hrs = Math.floor(minutosTotales / 60);
-  const mins = minutosTotales % 60;
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-};
 export default function HorariosScreen() {
-  const { usuarioActual, empresaSeleccionada } = useSesion();
+  const { usuarioActual, empresaActual } = useSesion();
   const [cuadrante, setCuadrante] = useState<Turno[]>([]);
   const [fichajesRealizados, setFichajesRealizados] = useState<
     RegistroFichaje[]
@@ -64,8 +36,8 @@ export default function HorariosScreen() {
     const cargarPlanificacionYFichajes = async () => {
       if (
         !usuarioActual?.trabajador_id &&
-        (usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_EMPRESA ||
-          usuarioActual?.tipo_usuario === TipoUsuarioEnum.ADMIN_GESTORIA)
+        (usuarioActual?.tipo_usuario === "Admin_empresa" ||
+          usuarioActual?.tipo_usuario === "Admin_gestoría")
       ) {
         if (isMounted) setCargando(false);
         return;
@@ -85,23 +57,8 @@ export default function HorariosScreen() {
           obtenerFichajesTurnoActual(trabajadorId),
         ]);
 
-        const fichajesFormateados: RegistroFichaje[] = todosLosFichajes.map(
-          (f: Record<string, any>) => ({
-            id: f.id,
-            fecha_hora: f.fecha_hora,
-            tipo_evento_id: f.tipo_evento_id ?? f.tipo_evento,
-            // Guardamos también el código normalizado en mayúsculas por si viene directo del backend (ej: f.codigo o f.tipo_base)
-            codigo_evento: (f.codigo_evento ?? f.codigo ?? "").toUpperCase(),
-            estado: f.estado,
-            trabajador_id: f.trabajador_id ?? trabajadorId,
-            trabajador_nombre: f.trabajador_nombre ?? "",
-            turno_nombre: f.turno_nombre ?? "",
-            metodo_fichaje: f.metodo_fichaje ?? "",
-          }),
-        );
-
         if (!isMounted) return;
-        setFichajesRealizados(fichajesFormateados);
+        setFichajesRealizados(todosLosFichajes);
 
         let turnos: Turno[] = [];
         const hoy = new Date();
@@ -124,7 +81,7 @@ export default function HorariosScreen() {
 
           if (fecha_fin < hoy) continue;
 
-          const turnoData = await obtenerTurno(asignacion_turno.turno_id);
+          const turnoData = await obtenerTurnoPorId(asignacion_turno.turno_id);
           if (!turnoData) continue;
 
           const diasLaborables = turnoData.dias_semana;
@@ -146,7 +103,6 @@ export default function HorariosScreen() {
                 hora_inicio: turnoData.hora_inicio,
                 hora_fin: turnoData.hora_fin,
                 duracion_pausa_minutos: turnoData.duracion_pausa_minutos,
-                color_hex: turnoData.color_hex || "#2563EB",
                 dias_semana: diasLaborables,
                 created_at: turnoData.created_at || new Date().toISOString(),
                 fecha_real: fechaLocalStr,
@@ -169,13 +125,10 @@ export default function HorariosScreen() {
         });
 
         if (isMounted) setCuadrante(turnos);
-      } catch (error: unknown) {
-        const mensajeAmigable = obtenerMensajeAmigableError(error);
-        if (Platform.OS === "web") {
-          window.alert(`Error de Sincronización: ${mensajeAmigable}`);
-        } else {
-          Alert.alert("Error de Sincronización", mensajeAmigable);
-        }
+      } catch (error: any) {
+        mostrarError(
+          "Error al cargar los centros de trabajo de la empresa: " + error,
+        );
       } finally {
         if (isMounted) setCargando(false);
       }
@@ -191,7 +144,7 @@ export default function HorariosScreen() {
   return (
     <AppScreen
       title="Mi Planificación"
-      subtitle={`Calendario oficial asignado por: ${empresaSeleccionada?.nombre_comercial ?? "Tu Organización"}`}
+      subtitle={`Calendario oficial asignado por: ${empresaActual?.nombre_comercial ?? "Tu Organización"}`}
     >
       <Row>
         <StatCard label="Turnos Vigentes" value={cuadrante.length.toString()} />
@@ -220,8 +173,8 @@ export default function HorariosScreen() {
             const horaFinTurno = item.hora_fin?.substring(0, 5) || "00:00";
             const fechaRealStr = (item as Turno & { fecha_real: string })
               .fecha_real;
-            const minInicio = aMinutos(horaInicioTurno);
-            let minFin = aMinutos(horaFinTurno);
+            const minInicio = horaAMinutos(horaInicioTurno);
+            let minFin = horaAMinutos(horaFinTurno);
 
             const esNocturno = minFin < minInicio;
             if (esNocturno) minFin += 24 * 60;
@@ -231,18 +184,15 @@ export default function HorariosScreen() {
             const limiteSuperiorMins = minFin + TOLERANCIA_MINS;
 
             const marcajesDelDia = fichajesRealizados.filter(
-              (fichaje: Record<string, any>) => {
-                if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
-                  return false;
+              (fichaje: RegistroFichaje) => {
+                const estadoValido =
+                  fichaje.estado?.localeCompare("Válido") === 0;
+                if (!estadoValido) return false;
+
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
                 if (fechaFichajeStr !== fechaRealStr) return false;
 
-                // Comprobamos robustamente el código fijo (ENTRADA o SALIDA)
-                const codigo = (
-                  fichaje.codigo_evento ||
-                  fichaje.tipo_evento_id ||
-                  ""
-                ).toUpperCase();
+                const codigo = fichaje.tipo_evento?.codigo;
                 const esEntrada = codigo === "ENTRADA";
                 const esSalida = codigo === "SALIDA";
 
@@ -267,18 +217,16 @@ export default function HorariosScreen() {
             );
 
             const pausasDelDia = fichajesRealizados.filter(
-              (fichaje: Record<string, any>) => {
-                if (fichaje.estado?.localeCompare(EstadoFichaje.VALIDO) !== 0)
-                  return false;
+              (fichaje: RegistroFichaje) => {
+                const estadoValido =
+                  fichaje.estado?.toLowerCase() === "valido" ||
+                  fichaje.estado?.localeCompare("Valido") === 0;
+                if (!estadoValido) return false;
+
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
                 if (fechaFichajeStr !== fechaRealStr) return false;
 
-                // Comprobamos el código fijo para las pausas
-                const codigo = (
-                  fichaje.codigo_evento ||
-                  fichaje.tipo_evento_id ||
-                  ""
-                ).toUpperCase();
+                const codigo = fichaje.tipo_evento?.codigo;
                 const esPausa =
                   codigo === "INICIO_PAUSA" || codigo === "FIN_PAUSA";
 
@@ -304,13 +252,9 @@ export default function HorariosScreen() {
             );
 
             let marcaInicioPausa: number | null = null;
-            pausasOrdenadas.forEach((fichaje: Record<string, any>) => {
+            pausasOrdenadas.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const codigo = (
-                fichaje.codigo_evento ||
-                fichaje.tipo_evento_id ||
-                ""
-              ).toUpperCase();
+              const codigo = fichaje.tipo_evento?.codigo;
 
               if (codigo === "INICIO_PAUSA") {
                 marcaInicioPausa = tMs;
@@ -325,13 +269,9 @@ export default function HorariosScreen() {
             let minutosTrabajadosReales = 0;
             let marcaEntradaTurno: number | null = null;
 
-            marcajesDelDia.forEach((fichaje: Record<string, any>) => {
+            marcajesDelDia.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const codigo = (
-                fichaje.codigo_evento ||
-                fichaje.tipo_evento_id ||
-                ""
-              ).toUpperCase();
+              const codigo = fichaje.tipo_evento?.codigo;
               const esEntrada = codigo === "ENTRADA";
 
               if (esEntrada) {
@@ -369,12 +309,7 @@ export default function HorariosScreen() {
             return (
               <Card key={item.id}>
                 <View style={styles.filaAsignacion}>
-                  <View
-                    style={[
-                      styles.barraColor,
-                      { backgroundColor: item.color_hex || "#2563EB" },
-                    ]}
-                  />
+                  <View style={[styles.barraColor]} />
                   <View style={styles.cuerpoTarjeta}>
                     <View style={styles.headerTarjeta}>
                       <View>
@@ -450,16 +385,12 @@ export default function HorariosScreen() {
                         <ThemedText style={styles.tituloFichajesSeccion}>
                           Marcajes en este turno:
                         </ThemedText>
-                        {marcajesDelDia.map((fichaje: Record<string, any>) => {
+                        {marcajesDelDia.map((fichaje: RegistroFichaje) => {
                           const partes = fichaje.fecha_hora.split("T");
                           const horaLimpia = partes[1]
                             ? partes[1].substring(0, 5)
                             : "00:00";
-                          const codigo = (
-                            fichaje.codigo_evento ||
-                            fichaje.tipo_evento_id ||
-                            ""
-                          ).toUpperCase();
+                          const codigo = fichaje.tipo_evento?.codigo;
                           const esEntrada = codigo === "ENTRADA";
 
                           return (

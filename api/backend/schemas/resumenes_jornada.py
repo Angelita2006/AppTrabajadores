@@ -2,6 +2,8 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
+from schemas.empresas import EmpresaResponse
+from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - RESÚMENES DE JORNADA
@@ -16,6 +18,8 @@ class ResumenJornadaBase(BaseModel):
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador asociado")
     fecha: datetime.date = Field(..., description="Fecha del día computado en formato AAAA-MM-DD")
 
+    model_config = ConfigDict(from_attributes=True)
+
 class ResumenJornadaCreate(ResumenJornadaBase):
     """
     Esquema utilizado por procesos automáticos o tareas cron (jobs) del backend
@@ -29,7 +33,21 @@ class ResumenJornadaCreate(ResumenJornadaBase):
     hora_entrada: Optional[datetime.datetime] = Field(None, description="Primer marcaje de entrada registrado en el día")
     hora_salida: Optional[datetime.datetime] = Field(None, description="Último marcaje de salida registrado en el día")
 
-class ResumenJornadaResponse(ResumenJornadaBase):
+class ResumenJornadaUpdate(BaseModel):
+    """
+    Esquema para la actualización parcial o total de un resumen de jornada.
+    """
+    minutos_trabajados: Optional[int] = Field(None, ge=0, description="Total de minutos efectivos laborados")
+    minutos_pausa: Optional[int] = Field(None, ge=0, description="Total de minutos de pausa")
+    minutos_extra: Optional[int] = Field(None, ge=0, description="Total de minutos extra")
+    tiene_incidencia: Optional[bool] = Field(None, description="Estado de incidencia diaria")
+    cerrado: Optional[bool] = Field(None, description="Estado de cierre diario")
+    hora_entrada: Optional[datetime.datetime] = Field(None, description="Primer marcaje de entrada registrado")
+    hora_salida: Optional[datetime.datetime] = Field(None, description="Último marcaje de salida registrado")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ResumenJornadaSimpleResponse(ResumenJornadaBase):
     """
     Esquema utilizado para estructurar las respuestas JSON que alimentan los cuadros de mando,
     paneles de analítica y listados rápidos en la aplicación móvil o web.
@@ -44,5 +62,14 @@ class ResumenJornadaResponse(ResumenJornadaBase):
     
     hora_entrada: Optional[datetime.datetime] = Field(None, description="Primer marcaje de entrada registrado en el día")
     hora_salida: Optional[datetime.datetime] = Field(None, description="Último marcaje de salida registrado en el día")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ResumenJornadaResponse(ResumenJornadaSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
 
     model_config = ConfigDict(from_attributes=True)

@@ -3,71 +3,48 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { registrarTokenDispositivo } from "../../another-services/services";
 import {
   LoginResponse,
-  UsuarioCreateRequest,
   UsuarioRegisterRequest,
   UsuarioResponse,
 } from "../types/usuario";
 
 /**
- * Inicia sesión. Valida el correo y la contraseña contra la base de datos de producción y almacena el token JWT.
- * @param email Correo electrónico
- * @param password Contraseña en texto plano
+ * Servicio de Autenticación y Gestión de Usuarios.
+ * Contiene todas las peticiones HTTP contra la API de usuarios y control de acceso.
  */
-export const getUsuarioByEmailYPassword = async (
-  email: string,
-  password: string,
-): Promise<LoginResponse> => {
-  try {
-    const respuesta = await api.post<LoginResponse>("/api/usuarios/login", {
-      email,
-      password,
-    });
-
-    if (respuesta.data?.access_token) {
-      await AsyncStorage.setItem("user_token", respuesta.data.access_token);
-      api.defaults.headers.common["Authorization"] =
-        `Bearer ${respuesta.data.access_token}`;
-
-      // --- AQUÍ LLAMAS AL REGISTRO PUSH ---
-      // Asegúrate de importar la función que creamos antes
-      if (respuesta.data.usuario?.id) {
-        await registrarTokenDispositivo(respuesta.data.usuario.id);
-      }
-    }
-
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
-  }
-};
 
 /**
- * Recupera la información del usuario asociado a un trabajador específico.
- * @param idTrabajador Identificador único de tipo UUID (string)
+ * Obtiene el listado completo de todas las cuentas de usuario registradas en el sistema.
+ * URI: GET /api/usuarios
+ * *Nota: Requiere privilegios de rol de Administrador.*
+ *
+ * @async
+ * @function obtenerTodosLosUsuarios
+ * @returns {Promise<UsuarioResponse[]>} Un array con la lista de todos los usuarios de la plataforma.
+ * @throws {Error} Lanza un error si el usuario no tiene permisos o si ocurre un fallo de red.
  */
-export const getUsuarioByIdTrabajador = async (
-  idTrabajador: string,
-): Promise<UsuarioResponse> => {
+export const obtenerTodosLosUsuarios = async (): Promise<UsuarioResponse[]> => {
   try {
-    const respuesta = await api.get<UsuarioResponse>(
-      `/api/usuarios/trabajador/${idTrabajador}`,
-    );
+    const respuesta = await api.get<UsuarioResponse[]>("/api/usuarios");
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage ||
-        "Error al recuperar la cuenta de usuario vinculada al trabajador.",
+      apiMessage || "Error al listar los usuarios de la plataforma.",
     );
   }
 };
 
 /**
- * Recupera la información del usuario mediante su ID único.
- * @param idUsuario Identificador único de tipo UUID (string)
+ * Busca y recupera la información de un usuario mediante su ID único de cuenta.
+ * URI: GET /api/usuarios/{id_usuario}
+ *
+ * @async
+ * @function obtenerUsuarioPorId
+ * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
+ * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario solicitado.
+ * @throws {Error} Lanza un error si el ID no es válido o no se encuentra el registro.
  */
-export const getUsuarioById = async (
+export const obtenerUsuarioPorId = async (
   idUsuario: string,
 ): Promise<UsuarioResponse> => {
   try {
@@ -84,47 +61,49 @@ export const getUsuarioById = async (
 };
 
 /**
- * Obtiene el listado completo de cuentas de usuario (Requiere rol de Administrador).
+ * Recupera la información de la cuenta de usuario vinculada a un trabajador específico.
+ * URI: GET /api/usuarios/trabajador/{id_trabajador}
+ *
+ * @async
+ * @function obtenerUsuarioPorTrabajador
+ * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+ * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario asociado.
+ * @throws {Error} Lanza un error si el trabajador no existe o falla la comunicación con el servidor.
  */
-export const obtenerTodosLosUsuarios = async (): Promise<UsuarioResponse[]> => {
-  try {
-    const respuesta = await api.get<UsuarioResponse[]>("/api/usuarios");
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al listar los usuarios de la plataforma.",
-    );
-  }
-};
-
-/**
- * Registra una nueva cuenta de usuario directamente en el sistema (Requiere rol de Administrador).
- */
-export const crearUsuarioCuenta = async (
-  data: UsuarioCreateRequest,
+export const obtenerUsuarioPorTrabajador = async (
+  idTrabajador: string,
 ): Promise<UsuarioResponse> => {
   try {
-    const respuesta = await api.post<UsuarioResponse>("/api/usuarios", data);
+    const respuesta = await api.get<UsuarioResponse>(
+      `/api/usuarios/trabajador/${idTrabajador}`,
+    );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail;
     throw new Error(
-      apiMessage || "Error al registrar la nueva cuenta de usuario.",
+      apiMessage ||
+        "Error al recuperar la cuenta de usuario vinculada al trabajador.",
     );
   }
 };
 
 /**
- * Registra un nuevo usuario de acceso mediante validación de NIF/NIE y empresa.
+ * Registra una nueva cuenta de usuario de acceso en la plataforma mediante validación previa.
+ * URI: POST /api/usuarios/registro
+ *
+ * @async
+ * @function registrarUsuarioAcceso
+ * @param {UsuarioRegisterRequest} payload - Objeto con los datos necesarios para el registro (NIF/NIE, credenciales, empresa, etc.).
+ * @returns {Promise<UsuarioResponse>} Datos del usuario recién creado.
+ * @throws {Error} Lanza un error si los datos son incorrectos o ya existe el registro.
  */
 export const registrarUsuarioAcceso = async (
-  data: UsuarioRegisterRequest,
+  payload: UsuarioRegisterRequest,
 ): Promise<UsuarioResponse> => {
   try {
     const respuesta = await api.post<UsuarioResponse>(
       "/api/usuarios/registro",
-      data,
+      payload,
     );
     return respuesta.data;
   } catch (error: any) {
@@ -136,7 +115,54 @@ export const registrarUsuarioAcceso = async (
 };
 
 /**
- * Permite activar o desactivar una cuenta de usuario bloqueando su acceso (Requiere Admin).
+ * Inicia sesión validando las credenciales del usuario y gestionando el token de acceso.
+ * URI: POST /api/usuarios/login
+ *
+ * @async
+ * @function iniciarSesion
+ * @param {string} email - Correo electrónico registrado del usuario.
+ * @param {string} password - Contraseña en texto plano del usuario.
+ * @returns {Promise<LoginResponse>} Objeto con la respuesta del login que incluye el token de acceso y los datos del usuario.
+ * @throws {Error} Lanza un error si la autenticación falla o si la API devuelve un mensaje de error personalizado.
+ */
+export const iniciarSesion = async (
+  email: string,
+  password: string,
+): Promise<LoginResponse> => {
+  try {
+    const respuesta = await api.post<LoginResponse>("/api/usuarios/login", {
+      email,
+      password,
+    });
+
+    if (respuesta.data?.access_token) {
+      await AsyncStorage.setItem("user_token", respuesta.data.access_token);
+      api.defaults.headers.common["Authorization"] =
+        `Bearer ${respuesta.data.access_token}`;
+
+      if (respuesta.data.usuario?.id) {
+        await registrarTokenDispositivo(respuesta.data.usuario.id);
+      }
+    }
+
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
+  }
+};
+
+/**
+ * Modifica el estado de activación de una cuenta de usuario permitiendo o bloqueando su acceso.
+ * URI: PUT /api/usuarios/{id_usuario}/estado
+ * *Nota: Requiere permisos de administrador.*
+ *
+ * @async
+ * @function cambiarEstadoUsuario
+ * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
+ * @param {boolean} activo - Estado booleano al que se desea cambiar (true para activar, false para bloquear).
+ * @returns {Promise<UsuarioResponse>} Datos actualizados del usuario modificado.
+ * @throws {Error} Lanza un error si no se tienen permisos o la operación falla.
  */
 export const cambiarEstadoUsuario = async (
   idUsuario: string,
@@ -154,7 +180,16 @@ export const cambiarEstadoUsuario = async (
 };
 
 /**
- * Permite cambiar la contraseña validando la contraseña actual.
+ * Permite cambiar la contraseña de acceso de un usuario tras validar su contraseña actual.
+ * URI: PUT /api/usuarios/{id_usuario}/password
+ *
+ * @async
+ * @function cambiarPasswordUsuario
+ * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
+ * @param {string} antiguaPassword - Contraseña actual en texto plano para verificación.
+ * @param {string} nuevaPassword - Nueva contraseña que se desea establecer.
+ * @returns {Promise<UsuarioResponse>} Datos del usuario con la confirmación del cambio.
+ * @throws {Error} Lanza un error si la contraseña antigua no coincide o la nueva no cumple los requisitos.
  */
 export const cambiarPasswordUsuario = async (
   idUsuario: string,

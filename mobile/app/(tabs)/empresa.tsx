@@ -1,6 +1,6 @@
-import { obtenerCalendariosYFestivos } from "@/src/modules/calendarios-laborales/api/services";
+import { obtenerCalendariosFestivosPorEmpresa } from "@/src/modules/calendarios-laborales/api/services";
 import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/calendario";
-import { obtenerCentrosPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
+import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
@@ -12,29 +12,25 @@ import {
   obtenerEmpresas,
   obtenerUrlLogo,
 } from "@/src/modules/empresas/api/services";
-import TabCalendario from "@/src/modules/empresas/components/CalendariosTab";
-import TabCentros from "@/src/modules/empresas/components/CentrosTab";
-import TabDepartamentos from "@/src/modules/empresas/components/DepartamentosTab";
-import TabDispositivos from "@/src/modules/empresas/components/DispositivosTab";
-import TabFiscal from "@/src/modules/empresas/components/FiscalTab";
-import TabRoles from "@/src/modules/empresas/components/RolesTab";
-import TabTipoEventos from "@/src/modules/empresas/components/TiposFichajesTab";
-import TabTurnos from "@/src/modules/empresas/components/TurnosTab";
-import { obtenerRolesEmpresa } from "@/src/modules/roles/api/services";
+import TabCalendario from "@/src/modules/empresas/components/tabs/CalendariosTab";
+import TabCentros from "@/src/modules/empresas/components/tabs/CentrosTab";
+import TabDepartamentos from "@/src/modules/empresas/components/tabs/DepartamentosTab";
+import TabDispositivos from "@/src/modules/empresas/components/tabs/DispositivosTab";
+import TabFiscal from "@/src/modules/empresas/components/tabs/FiscalTab";
+import TabTipoEventos from "@/src/modules/empresas/components/tabs/TiposFichajesTab";
+import TabTurnos from "@/src/modules/empresas/components/tabs/TurnosTab";
 import { Rol } from "@/src/modules/roles/types/rol";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
-import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -42,7 +38,7 @@ import {
 } from "react-native";
 import { Empresa } from "../../src/modules/empresas/types/empresa";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
-import { ThemedText } from "../../src/shared/components/themed-text";
+import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
 type TabConfig =
@@ -52,12 +48,10 @@ type TabConfig =
   | "departamentos"
   | "calendario"
   | "dispositivos"
-  | "tipoeventos"
-  | "roles";
+  | "tipoeventos";
 
 export default function EmpresasScreen() {
-  const { usuarioActual, empresaSeleccionada, setEmpresaSeleccionada } =
-    useSesion();
+  const { usuarioActual, empresaActual, setEmpresaActual } = useSesion();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   const [cargando, setCargando] = useState(true);
@@ -88,7 +82,7 @@ export default function EmpresasScreen() {
   const [direccionInput, setDireccionInput] = useState("");
 
   // ESTADOS PARA CALENDARIO
-  const [calendarioSeleccionado, setCalendarioSeleccionado] =
+  const [calendarioActual, setCalendarioActual] =
     useState<CalendarioFestivo | null>(null);
   const [editAnio, setEditAnio] = useState("");
   const [editNombre, setEditNombre] = useState("");
@@ -97,17 +91,18 @@ export default function EmpresasScreen() {
   // Estados para roles
   const esGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
-  const esAutorizado = esGestoria || esAdminEmpresa;
+  const esRRHH = usuarioActual?.tipo_usuario === "Rrhh";
+  const esAutorizado = esGestoria || esAdminEmpresa || esRRHH;
 
   // Estados para la gestión de la entidad y su logo corporativo
   const [logoUrlInput, setLogoUrlInput] = useState("");
 
   // Sincronizar el input del logo cada vez que cambie la empresa seleccionada
   useEffect(() => {
-    if (empresaSeleccionada) {
-      setLogoUrlInput(empresaSeleccionada.logo_url || "");
+    if (empresaActual) {
+      setLogoUrlInput(empresaActual.logo_url || "");
     }
-  }, [empresaSeleccionada]);
+  }, [empresaActual]);
 
   useEffect(() => {
     if (esAutorizado) {
@@ -116,15 +111,15 @@ export default function EmpresasScreen() {
   }, [esAutorizado]);
 
   useEffect(() => {
-    if (empresaSeleccionada) {
-      setRazonSocialInput(empresaSeleccionada.razon_social || "");
-      setConvenioInput(empresaSeleccionada.convenio_colectivo || "");
-      setCnaeInput(empresaSeleccionada.codigo_cnae || "");
-      setDireccionInput(empresaSeleccionada.direccion_fiscal || "");
+    if (empresaActual) {
+      setRazonSocialInput(empresaActual.razon_social || "");
+      setConvenioInput(empresaActual.convenio_colectivo || "");
+      setCnaeInput(empresaActual.codigo_cnae || "");
+      setDireccionInput(empresaActual.direccion_fiscal || "");
 
-      cargarDatosEmpresa(empresaSeleccionada.id);
+      cargarDatosEmpresa(empresaActual.id);
     }
-  }, [empresaSeleccionada]);
+  }, [empresaActual]);
 
   const cargarDatosEmpresa = async (empresaId: string) => {
     try {
@@ -136,15 +131,13 @@ export default function EmpresasScreen() {
         datosDepartamentos,
         datosDispositivos,
         datosTiposEventos,
-        datosRoles,
       ] = await Promise.all([
-        obtenerCentrosPorEmpresa(empresaId),
-        obtenerCalendariosYFestivos(empresaId),
+        obtenerCentrosTrabajoPorEmpresa(empresaId),
+        obtenerCalendariosFestivosPorEmpresa(empresaId),
         obtenerTurnosEmpresa(empresaId),
         obtenerDepartamentosEmpresa(empresaId),
         obtenerDispositivosEmpresa(empresaId),
         obtenerTiposEventosEmpresa(empresaId),
-        obtenerRolesEmpresa(empresaId),
       ]);
 
       setCentrosEmpresa(datosCentros);
@@ -153,22 +146,19 @@ export default function EmpresasScreen() {
       setDepartamentosEmpresa(datosDepartamentos);
       setDispositivosEmpresa(datosDispositivos);
       setTiposEventosEmpresa(datosTiposEventos);
-      setRolesEmpresa(datosRoles);
 
       if (datosCalendarios.length > 0) {
         const primerCalendario: CalendarioFestivo = datosCalendarios[0];
-        setCalendarioSeleccionado(primerCalendario);
+        setCalendarioActual(primerCalendario);
         setEditAnio(primerCalendario.anio.toString());
         setEditNombre(primerCalendario.nombre || "");
         setEditCentroId(primerCalendario.centro_trabajo_id || "");
       }
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Error al cargar datos de empresa: ${error}`);
-      } else {
-        Alert.alert("Error de Carga", mensajeAmigable);
-      }
+      mostrarError(
+        "Error al cargar la información operativa y estructural de la empresa: " +
+          error,
+      );
     } finally {
       setCargando(false);
     }
@@ -185,45 +175,42 @@ export default function EmpresasScreen() {
           );
 
       setEmpresas(empresasPermitidas);
-      if (
-        empresasPermitidas.length > 0 &&
-        !empresaSeleccionada &&
-        setEmpresaSeleccionada
-      ) {
-        setEmpresaSeleccionada(empresasPermitidas[0]);
+      if (empresasPermitidas.length > 0 && !empresaActual && setEmpresaActual) {
+        setEmpresaActual(empresasPermitidas[0]);
       }
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Error Saas: ${mensajeAmigable}`);
-      } else {
-        Alert.alert("Error Saas", mensajeAmigable);
-      }
+      mostrarError(
+        "Error al obtener el catálogo de empresas autorizadas: " + error,
+      );
     } finally {
       setCargando(false);
     }
   };
 
   const handleGuardarDatosEmpresa = async () => {
-    if (!empresaSeleccionada) return;
+    if (!empresaActual) return;
     try {
       setGuardando(true);
       await guardarDatosEmpresa(
-        empresaSeleccionada.id,
+        empresaActual.id,
         razonSocialInput.trim(),
+        empresaActual.cif,
+        empresaActual.zona_horaria,
+        empresaActual.activa,
+        empresaActual.nombre_comercial,
         convenioInput.trim(),
         cnaeInput.trim(),
         direccionInput.trim(),
       );
-      Alert.alert("Éxito", "Parámetros fiscales actualizados correctamente.");
+      mostrarMensaje(
+        "Éxito",
+        "Parámetros fiscales actualizados correctamente.",
+      );
       await cargarCatalogoEmpresas();
     } catch (error: any) {
-      const mensajeAmigable = obtenerMensajeAmigableError(error);
-      if (Platform.OS === "web") {
-        alert(`Error: ${mensajeAmigable}`);
-      } else {
-        Alert.alert("Error", mensajeAmigable);
-      }
+      mostrarError(
+        "Error al guardar los datos fiscales de la empresa: " + error,
+      );
     } finally {
       setGuardando(false);
     }
@@ -234,7 +221,10 @@ export default function EmpresasScreen() {
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permissionResult.granted) {
-      alert("Se requieren permisos para acceder a la galería de fotos.");
+      mostrarMensaje(
+        "Alerta",
+        "Se requieren permisos para acceder a la galería de fotos.",
+      );
       return;
     }
 
@@ -267,22 +257,13 @@ export default function EmpresasScreen() {
         );
 
         // 2. Actualizamos el estado seleccionado si existe
-        if (setEmpresaSeleccionada) {
-          setEmpresaSeleccionada(empresaActualizada);
+        if (empresaActual) {
+          setEmpresaActual(empresaActualizada);
         }
 
-        if (Platform.OS === "web") {
-          alert("¡Logo actualizado correctamente!");
-        } else {
-          Alert.alert("Éxito", "¡Logo actualizado correctamente!");
-        }
+        mostrarMensaje("Éxito", "¡Logo actualizado correctamente!");
       } catch (error: any) {
-        const mensajeBackend =
-          error?.response?.data?.detail ||
-          error?.message ||
-          error ||
-          "Error desconocido de red";
-        alert("No se pudo subir la imagen al servidor. " + mensajeBackend);
+        mostrarError("Error al actualizar el logotipo corporativo: " + error);
       }
     }
   };
@@ -325,7 +306,13 @@ export default function EmpresasScreen() {
           />
           <StatCard
             label="Rol de Gestión"
-            value={esGestoria ? "Gestoría" : "Admin"}
+            value={
+              esGestoria
+                ? "Gestoría"
+                : esAdminEmpresa
+                  ? "Administrador"
+                  : "RRHH"
+            }
             tone="success"
           />
         </Row>
@@ -348,12 +335,12 @@ export default function EmpresasScreen() {
             keyExtractor={(item: Empresa) => item.id}
             scrollEnabled={false}
             renderItem={({ item }) => {
-              const estaSeleccionada = empresaSeleccionada?.id === item.id;
+              const estaSeleccionada = empresaActual?.id === item.id;
               return (
                 <Pressable
                   onPress={
                     esGestoria && empresas.length > 1
-                      ? () => setEmpresaSeleccionada?.(item)
+                      ? () => setEmpresaActual?.(item)
                       : undefined
                   }
                   style={[
@@ -420,7 +407,7 @@ export default function EmpresasScreen() {
         {/* ======================================================== */}
         {/* PESTAÑAS DE NAVEGACIÓN (TABS) */}
         {/* ======================================================== */}
-        {empresaSeleccionada && (
+        {empresaActual && (
           <View style={styles.contenedorTabs}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {[
@@ -431,7 +418,6 @@ export default function EmpresasScreen() {
                 { key: "calendario", label: "Calendario Laboral" },
                 { key: "dispositivos", label: "Dispositivos" },
                 { key: "tipoeventos", label: "Tipos de Fichaje" },
-                { key: "roles", label: "Roles" },
               ].map((tab) => (
                 <Pressable
                   key={tab.key}
@@ -458,7 +444,7 @@ export default function EmpresasScreen() {
         {/* ======================================================== */}
         {/* CONTENIDO DINÁMICO DE LAS TABS (MODULARIZADO) */}
         {/* ======================================================== */}
-        {empresaSeleccionada && (
+        {empresaActual && (
           <View style={{ marginTop: 14 }}>
             <Card>
               {tabActiva === "fiscal" && (
@@ -484,7 +470,7 @@ export default function EmpresasScreen() {
                   {...{
                     centrosEmpresa,
                     setCentrosEmpresa,
-                    empresaSeleccionada,
+                    empresaActual,
                     guardando,
                     setGuardando,
                     styles,
@@ -497,7 +483,7 @@ export default function EmpresasScreen() {
                   {...{
                     turnosEmpresa,
                     setTurnosEmpresa,
-                    empresaSeleccionada,
+                    empresaActual,
                     guardando,
                     setGuardando,
                     styles,
@@ -510,7 +496,8 @@ export default function EmpresasScreen() {
                   {...{
                     departamentosEmpresa,
                     setDepartamentosEmpresa,
-                    empresaSeleccionada,
+                    centrosEmpresa,
+                    empresaActual,
                     guardando,
                     setGuardando,
                     styles,
@@ -524,9 +511,9 @@ export default function EmpresasScreen() {
                     calendariosEmpresa,
                     setCalendariosEmpresa,
                     centrosEmpresa,
-                    empresaSeleccionada,
-                    calendarioSeleccionado,
-                    setCalendarioSeleccionado,
+                    empresaActual,
+                    calendarioActual,
+                    setCalendarioActual,
                     editAnio,
                     editNombre,
                     editCentroId,
@@ -543,9 +530,10 @@ export default function EmpresasScreen() {
               {tabActiva === "dispositivos" && (
                 <TabDispositivos
                   {...{
+                    centrosEmpresa,
                     dispositivosEmpresa,
                     setDispositivosEmpresa,
-                    empresaSeleccionada,
+                    empresaActual,
                     guardando,
                     setGuardando,
                     styles,
@@ -558,20 +546,7 @@ export default function EmpresasScreen() {
                   {...{
                     tiposEventosEmpresa,
                     setTiposEventosEmpresa,
-                    empresaSeleccionada,
-                    guardando,
-                    setGuardando,
-                    styles,
-                  }}
-                />
-              )}
-
-              {tabActiva === "roles" && (
-                <TabRoles
-                  {...{
-                    rolesEmpresa,
-                    setRolesEmpresa,
-                    empresaSeleccionada,
+                    empresaActual,
                     guardando,
                     setGuardando,
                     styles,

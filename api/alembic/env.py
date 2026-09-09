@@ -1,5 +1,4 @@
 import sys
-import os
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
@@ -13,7 +12,7 @@ from models import ( # type: ignore
     asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales,
     centros_trabajo, contratos, correcciones_fichaje, departamentos,
     dispositivos_fichaje, dispositivos_push, empresas,  festivos, fichajes, motivos_pausa,
-    permisos, politicas_retencion, resumenes_jornada, roles,
+    permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
     tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios, vistas
 )
 
@@ -22,7 +21,7 @@ _modelos = [
     fichajes, auditoria_accesos, vistas, calendarios_laborales, centros_trabajo,
     contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, dispositivos_push,
     festivos, motivos_pausa, permisos, politicas_retencion,
-    resumenes_jornada, roles, tipos_evento_fichaje, usuarios_roles, usuarios
+    resumenes_jornada, roles_permisos, roles, tipos_evento_fichaje, usuarios_roles, usuarios
 ]
 
 for modelo in _modelos:

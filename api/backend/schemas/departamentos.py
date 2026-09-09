@@ -2,6 +2,8 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
+from schemas.centros_trabajo import CentroTrabajoSimpleResponse
+from schemas.empresas import EmpresaResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - DEPARTAMENTOS
@@ -14,6 +16,8 @@ class DepartamentoBase(BaseModel):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     nombre: str = Field(..., min_length=2, max_length=255, description="Nombre descriptivo del departamento")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class DepartamentoCreate(DepartamentoBase):
     """
@@ -31,7 +35,7 @@ class DepartamentoUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class DepartamentoResponse(DepartamentoBase):
+class DepartamentoSimpleResponse(DepartamentoBase):
     """
     Esquema utilizado para moldear las respuestas JSON que el servidor envía a la app.
     Incluye las propiedades automáticas y metadatos de auditoría temporal del sistema.
@@ -40,5 +44,14 @@ class DepartamentoResponse(DepartamentoBase):
     created_at: datetime.datetime = Field(..., description="Fecha de inserción real calculada por el servidor (now)")
     updated_at: datetime.datetime = Field(..., description="Fecha de la última modificación efectuada (now)")
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo asociado si aplica")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DepartamentoResponse(DepartamentoSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)

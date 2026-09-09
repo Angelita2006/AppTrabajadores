@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 import httpx
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from core.utils import obtener_coordenadas
 from models.contratos import Contratos
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
@@ -15,26 +16,15 @@ from models.centros_trabajo import CentrosTrabajo
 from models.usuarios import Usuarios
 from schemas.centros_trabajo import CentroTrabajoCreate, CentroTrabajoResponse, CentroTrabajoUpdate
 
+# APIRouter agrupa todos los endpoints relacionados con la gestión de centros de trabajo bajo el prefijo "/api/centros-trabajo".
 router = APIRouter(prefix="/api/centros-trabajo", tags=["Centros de Trabajo"])
 
+# Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-async def obtener_coordenadas(direccion: str):
-    """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": direccion, "format": "json", "limit": 1}
-    headers = {"User-Agent": "TuAppDeFichajes/1.0"} # Nominatim exige un User-Agent válido
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                return float(data[0]["lat"]), float(data[0]["lon"])
-    return None, None
 
-@router.post("", response_model=CentroTrabajoResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("20/minute")
+@router.post("", response_model=CentroTrabajoResponse, status_code=status.HTTP_201_CREATED, summary="Crear centro de trabajo")
+@limiter.limit("20/minute")  # Protegido frente a la creación masiva o automatizada
 async def crear_centro_trabajo(
     request: Request,
     obj_in: CentroTrabajoCreate, 
@@ -42,9 +32,13 @@ async def crear_centro_trabajo(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: POST /api/centros-trabajo
+    **POST /api/centros-trabajo**
+    
     Registra una nueva sede física vinculada a una empresa cliente (tenant) validando los datos con Pydantic.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de creación de centro de trabajo desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -60,7 +54,7 @@ async def crear_centro_trabajo(
                 detail=f"Empresa ({obj_in.empresa_id}) no encontrada."
             )
 
-        # 2. Mapea los datos del esquema directamente al modelo físico de SQLAlchemy
+        # 2. Mapea los datos del esquema directamente al modelo físico de SQLAlchemy y consulta coordenadas si faltan
         latitud, longitud = obj_in.latitud, obj_in.longitud
         if obj_in.direccion and (latitud is None or longitud is None):
             latitud, longitud = await obtener_coordenadas(obj_in.direccion)
@@ -78,8 +72,12 @@ async def crear_centro_trabajo(
         
         db.add(nuevo_centro)
         db.commit()
-        db.refresh(nuevo_centro)
-        return nuevo_centro
+        
+        centro_creado = db.query(CentrosTrabajo).options(
+            joinedload(CentrosTrabajo.empresa)
+        ).filter(CentrosTrabajo.id == nuevo_centro.id).first()
+        
+        return centro_creado
 
     except HTTPException as http_error:
         raise http_error
@@ -90,8 +88,9 @@ async def crear_centro_trabajo(
             detail=f"Ha ocurrido un error al crear el centro de trabajo: {str(error)}"
         )
 
-@router.put("/{id_centro}/estado", response_model=CentroTrabajoResponse)
-@limiter.limit("20/minute")
+
+@router.put("/{id_centro}/estado", response_model=CentroTrabajoResponse, summary="Cambiar estado de centro de trabajo")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 def cambiar_estado_centro(
     request: Request,
     id_centro: UUID, 
@@ -100,9 +99,13 @@ def cambiar_estado_centro(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: PUT /api/centros-trabajo/{id_centro}/estado?activo=false
+    **PUT /api/centros-trabajo/{id_centro}/estado?activo=false**
+    
     Permite activar o desactivar (dar de baja lógica) una sede sin destruir los registros históricos.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de cambio de estado del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
     if not centro:
         raise HTTPException(
@@ -121,12 +124,16 @@ def cambiar_estado_centro(
     setattr(centro, "updated_at", datetime.now())
     
     db.commit()
-    db.refresh(centro)
-    return centro
+    
+    centro_actualizado = db.query(CentrosTrabajo).options(
+        joinedload(CentrosTrabajo.empresa)
+    ).filter(CentrosTrabajo.id == id_centro).first()
+    
+    return centro_actualizado
 
 
-@router.put("/{id_centro}/editar", response_model=CentroTrabajoResponse)
-@limiter.limit("20/minute")
+@router.put("/{id_centro}/editar", response_model=CentroTrabajoResponse, summary="Editar centro de trabajo")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 async def editar_centro(
     request: Request,
     id_centro: UUID, 
@@ -135,9 +142,13 @@ async def editar_centro(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: PUT /api/centros-trabajo/{id_centro}/editar
+    **PUT /api/centros-trabajo/{id_centro}/editar**
+    
     Permite editar los datos del centro de trabajo y recalcula las coordenadas si es necesario.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de edición del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
     if not centro:
         raise HTTPException(
@@ -175,8 +186,12 @@ async def editar_centro(
         setattr(centro, "updated_at", datetime.now())
         
         db.commit()
-        db.refresh(centro)
-        return centro
+        
+        centro_editado = db.query(CentrosTrabajo).options(
+            joinedload(CentrosTrabajo.empresa)
+        ).filter(CentrosTrabajo.id == id_centro).first()
+        
+        return centro_editado
 
     except Exception as error:
         db.rollback()
@@ -186,8 +201,8 @@ async def editar_centro(
         )
 
 
-@router.delete("/{id_centro}", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("20/minute")
+@router.delete("/{id_centro}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar centro de trabajo")
+@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
 def eliminar_centro_trabajo(
     request: Request,
     id_centro: UUID, 
@@ -195,9 +210,13 @@ def eliminar_centro_trabajo(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: DELETE /api/centros-trabajo/{id_centro}
+    **DELETE /api/centros-trabajo/{id_centro}**
+    
     Elimina físicamente una sede de la base de datos previa validación de contratos activos.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de eliminación del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
     if not centro:
         raise HTTPException(
@@ -232,40 +251,63 @@ def eliminar_centro_trabajo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "No se puede eliminar el centro de trabajo porque contiene registros "
-                f"históricos vinculados (fichajes u otras dependencias). Error: {str(error)}"
+                f"históricos vinculados (fichajes u otras dependencias)."
             )
         )
 
-@router.get("/empresa/{id_empresa}", response_model=List[CentroTrabajoResponse])
+
+@router.get("/empresa/{id_empresa}", response_model=List[CentroTrabajoResponse], summary="Obtener centros de trabajo por empresa")
+@limiter.limit("60/minute")  # Limita las consultas masivas de listados
 def obtener_centros_empresa(
+    request: Request,
     id_empresa: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
-    URI: GET /api/centros-trabajo/empresa/{id_empresa}
+    **GET /api/centros-trabajo/empresa/{id_empresa}**
+    
     Recupera de forma aislada las sedes físicas dadas de alta por una organización concreta (tenant).
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de centros para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para consultar los centros de trabajo de esta empresa."
         )
 
-    return db.query(CentrosTrabajo).filter(CentrosTrabajo.empresa_id == id_empresa).all()
+    return (
+        db.query(CentrosTrabajo)
+        .options(joinedload(CentrosTrabajo.empresa))
+        .filter(CentrosTrabajo.empresa_id == id_empresa)
+        .all()
+    )
 
 
-@router.get("/{id_centro}", response_model=CentroTrabajoResponse)
+@router.get("/{id_centro}", response_model=CentroTrabajoResponse, summary="Obtener centro de trabajo por ID")
+@limiter.limit("60/minute")  # Limita las consultas individuales frecuentes
 def obtener_centro_trabajo(
+    request: Request,
     id_centro: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
-    URI: GET /api/centros-trabajo/{id_centro}
+    **GET /api/centros-trabajo/{id_centro}**
+    
     Busca la información de una sede mediante su identificador único UUID.
     """
-    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    centro = (
+        db.query(CentrosTrabajo)
+        .options(joinedload(CentrosTrabajo.empresa))
+        .filter(CentrosTrabajo.id == id_centro)
+        .first()
+    )
     if not centro:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from uuid import UUID
 from slowapi import Limiter
@@ -12,12 +12,95 @@ from models.politicas_retencion import PoliticasRetencion
 from models.usuarios import Usuarios
 from schemas.politicas_retencion import PoliticaRetencionCreate, PoliticaRetencionResponse
 
+# Configuración del enrutador para la gestión de políticas de retención de datos y cumplimiento legal
 router = APIRouter(prefix="/api/politicas-retencion", tags=["Políticas de Retención"])
 
+# Configuración del limitador de tasa de peticiones por IP para prevenir abusos y ataques de denegación
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=PoliticaRetencionResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("15/minute")  # Protegido frente a la creación masiva de directivas de retención
+
+@router.get("/global", response_model=Optional[PoliticaRetencionResponse], summary="Obtener política global por defecto")
+@limiter.limit("60/minute") # Limita las consultas masivas de directivas globales para proteger el rendimiento
+def obtener_politica_global_defecto(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/politicas-retencion/global**
+    
+    Recupera la directiva general del sistema bajo autenticación activa.
+    """
+    # Registrar la dirección IP del cliente y trazas de auditoría de acceso
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de política global de retención desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    if not usuario_actual.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta de usuario se encuentra inactiva."
+        )
+
+    politica_global = db.query(PoliticasRetencion).options(
+        joinedload(PoliticasRetencion.empresa)
+    ).filter(PoliticasRetencion.empresa_id == None).first()
+    
+    if not politica_global:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se ha configurado ninguna política de retención global por defecto en el servidor."
+        )
+    return politica_global
+
+
+@router.get("/empresa/{id_empresa}", response_model=PoliticaRetencionResponse, summary="Obtener política aplicable a empresa")
+@limiter.limit("60/minute") # Limita las consultas individuales de políticas por empresa
+def obtener_politica_aplicable_empresa(
+    request: Request,
+    id_empresa: UUID, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+):
+    """
+    **GET /api/politicas-retencion/empresa/{id_empresa}**
+    
+    Busca la directiva de una empresa validando que el usuario tenga acceso a dicho tenant.
+    """
+    # Registrar la dirección IP del cliente y trazas de auditoría
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de política de retención para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    if not usuario_actual.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta de usuario se encuentra inactiva."
+        )
+
+    if usuario_actual.empresa_id != id_empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes autorización para consultar la política de retención de esta empresa."
+        )
+
+    politica = db.query(PoliticasRetencion).options(
+        joinedload(PoliticasRetencion.empresa)
+    ).filter(PoliticasRetencion.empresa_id == id_empresa).first()
+    
+    if not politica:
+        politica = db.query(PoliticasRetencion).options(
+            joinedload(PoliticasRetencion.empresa)
+        ).filter(PoliticasRetencion.empresa_id == None).first()
+        
+    if not politica:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se ha encontrado ninguna política aplicable (ni personalizada ni global) para esta empresa."
+        )
+    return politica
+
+
+@router.post("", response_model=PoliticaRetencionResponse, status_code=status.HTTP_201_CREATED, summary="Crear política de retención")
+@limiter.limit("15/minute") # Protegido frente a la creación masiva de directivas de retención
 def crear_politica_retencion(
     request: Request,
     obj_in: PoliticaRetencionCreate, 
@@ -25,9 +108,14 @@ def crear_politica_retencion(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: POST /api/politicas-retencion
+    **POST /api/politicas-retencion**
+    
     Establece una nueva directiva de retención validando permisos de administrador y tenant.
     """
+    # Registrar metadatos de red y auditoría de la creación
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de creación de política de retención desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if not usuario_actual.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -67,8 +155,12 @@ def crear_politica_retencion(
         
         db.add(nueva_politica)
         db.commit()
-        db.refresh(nueva_politica)
-        return nueva_politica
+        
+        politica_creada = db.query(PoliticasRetencion).options(
+            joinedload(PoliticasRetencion.empresa)
+        ).filter(PoliticasRetencion.id == nueva_politica.id).first()
+        
+        return politica_creada
 
     except HTTPException as http_error:
         raise http_error
@@ -80,9 +172,8 @@ def crear_politica_retencion(
         )
 
 
-
-@router.put("/{id_politica}", response_model=PoliticaRetencionResponse)
-@limiter.limit("15/minute")  # Protegido frente a modificaciones masivas no deseadas de plazos legales
+@router.put("/{id_politica}", response_model=PoliticaRetencionResponse, summary="Actualizar años de retención")
+@limiter.limit("15/minute") # Protegido frente a modificaciones masivas no deseadas de plazos legales
 def actualizar_anios_retencion(
     request: Request,
     id_politica: UUID, 
@@ -91,9 +182,14 @@ def actualizar_anios_retencion(
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
 ):
     """
-    URI: PUT /api/politicas-retencion/{id_politica}?nuevos_anios=5
+    **PUT /api/politicas-retencion/{id_politica}?nuevos_anios=5**
+    
     Modifica la cantidad de años vigilando el cumplimiento legal y la autorización del tenant.
     """
+    # Registrar metadatos de red y auditoría de la actualización
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de actualización de la política {id_politica} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
     if not usuario_actual.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -121,95 +217,17 @@ def actualizar_anios_retencion(
         
     setattr(politica, "anios_conservacion", nuevos_anios)
     
-    db.commit()
-    db.refresh(politica)
-    return politica
-
-
-@router.get("", response_model=List[PoliticaRetencionResponse])
-def obtener_todas_las_politicas(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
-):
-    """
-    URI: GET /api/politicas-retencion
-    Devuelve la lista completa de directivas aplicando aislamiento estricto por tenant.
-    """
-    if not usuario_actual.activo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="La cuenta de usuario se encuentra inactiva."
-        )
-
-    query = db.query(PoliticasRetencion)
-
-    if not usuario_actual.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No estás vinculado a ninguna empresa."
-        )
-    query = query.filter(
-        (PoliticasRetencion.empresa_id == None) | 
-        (PoliticasRetencion.empresa_id == usuario_actual.empresa_id)
-    )
-
-    return query.all()
-
-
-@router.get("/global", response_model=Optional[PoliticaRetencionResponse])
-def obtener_politica_global_defecto(
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    URI: GET /api/politicas-retencion/global
-    Recupera la directiva general del sistema bajo autenticación activa.
-    """
-    if not usuario_actual.activo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="La cuenta de usuario se encuentra inactiva."
-        )
-
-    politica_global = db.query(PoliticasRetencion).filter(PoliticasRetencion.empresa_id == None).first()
-    if not politica_global:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se ha configurado ninguna política de retención global por defecto en el servidor."
-        )
-    return politica_global
-
-
-@router.get("/empresa/{id_empresa}", response_model=PoliticaRetencionResponse)
-def obtener_politica_aplicable_empresa(
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
-):
-    """
-    URI: GET /api/politicas-retencion/empresa/{id_empresa}
-    Busca la directiva de una empresa validando que el usuario tenga acceso a dicho tenant.
-    """
-    if not usuario_actual.activo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="La cuenta de usuario se encuentra inactiva."
-        )
-
-    if usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar la política de retención de esta empresa."
-        )
-
-    politica = db.query(PoliticasRetencion).filter(PoliticasRetencion.empresa_id == id_empresa).first()
-    
-    if not politica:
-        politica = db.query(PoliticasRetencion).filter(PoliticasRetencion.empresa_id == None).first()
+    try:
+        db.commit()
         
-    if not politica:
+        politica_actualizada = db.query(PoliticasRetencion).options(
+            joinedload(PoliticasRetencion.empresa)
+        ).filter(PoliticasRetencion.id == id_politica).first()
+        
+        return politica_actualizada
+    except Exception as error:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se ha encontrado ninguna política aplicable (ni personalizada ni global) para esta empresa."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error al actualizar la política de retención: {str(error)}"
         )
-    return politica

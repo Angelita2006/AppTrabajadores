@@ -49,6 +49,7 @@ class Fichajes(Base):
     ip_address: Mapped[Optional[Any]] = mapped_column(INT)
     fichaje_sustituido_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     observaciones: Mapped[Optional[str]] = mapped_column(Text)
+    firma_digital: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='Firma digitalizada en Base64 o URL del archivo.')
 
     centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='fichajes') # type: ignore
     dispositivo: Mapped[Optional['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='fichajes') # type: ignore

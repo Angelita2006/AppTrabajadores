@@ -1,81 +1,40 @@
 import datetime
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from core.utils import enviar_correo_recuperacion
 from schemas.auth import ConfirmarPasswordRequest, EmailRecuperacionRequest
 from core.database import get_db
 from core.security import get_password_hash
 from models.usuarios import Usuarios
-from core.config import settings
 import random
 from datetime import timedelta, timezone
 
+# APIRouter agrupa todos los endpoints relacionados con la autenticación bajo el prefijo "/api/auth".
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
+# Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-# Configuración
-SMTP_SERVER = settings.SMTP_SERVER
-SMTP_PORT = settings.SMTP_PORT
-SMTP_USER = settings.SMTP_USER
-SMTP_PASSWORD = settings.SMTP_PASSWORD
-EMAILS_FROM = settings.EMAILS_FROM
-
-def enviar_correo_recuperacion(destinatario: str, codigo: str):
-    """Función auxiliar para enviar el correo mediante SMTP"""
-    try:
-        mensaje = MIMEMultipart("alternative")
-        mensaje.add_header("Subject", "Código de recuperación de contraseña - FichApp")
-        mensaje["From"] = EMAILS_FROM
-        mensaje["To"] = destinatario
-
-        html = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 5px;">
-              <h2 style="color: #2563EB;">Recuperación de Contraseña</h2>
-              <p>Has solicitado restablecer tu contraseña en <strong>Fichapp</strong>.</p>
-              <p>Tu código de verificación de 6 dígitos es:</p>
-              <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1f2937; border-radius: 4px;">
-                {codigo}
-              </div>
-              <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
-            </div>
-          </body>
-        </html>
-        """
-
-        mensaje.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
-            servidor.starttls()
-            servidor.login(SMTP_USER, SMTP_PASSWORD)
-            servidor.sendmail(SMTP_USER, destinatario, mensaje.as_string())
-            
-    except Exception as e:
-        print(f"Error al enviar el correo SMTP: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se pudo enviar el correo electrónico de recuperación. Inténtalo más tarde."
-        )
-
-@router.post("/recuperar-password", status_code=status.HTTP_200_OK)
-@limiter.limit("5/minute")
+@router.post("/recuperar-password", status_code=status.HTTP_200_OK, summary="Solicitar recuperación de contraseña")
+@limiter.limit("5/minute")  # Limita este endpoint a un máximo de 5 peticiones por minuto por IP para prevenir abuso
 def solicitar_recuperacion_password(
     request: Request,
     payload: EmailRecuperacionRequest, 
     db: Session = Depends(get_db),
 ):
     """
-    URI: POST /api/auth/recuperar-password
+    **POST /api/auth/recuperar-password**
+    
     Valida el correo en PostgreSQL, genera un código aleatorio de 6 dígitos y lo guarda en la BD.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de recuperación de contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
+
     usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
     if not usuario:
+        print(f"Intento de recuperación fallido: El correo '{payload.email}' no está registrado en el sistema.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No consta ninguna cuenta registrada con esa dirección de correo electrónico."
@@ -91,8 +50,10 @@ def solicitar_recuperacion_password(
 
         db.add(usuario)
         db.commit()
+        print(f"Código de recuperación generado y persistido para el usuario ID: {usuario.id}")
     except Exception as e:
         db.rollback()
+        print(f"Error en base de datos al guardar código de recuperación para '{payload.email}': {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al procesar la solicitud de recuperación."
@@ -106,19 +67,24 @@ def solicitar_recuperacion_password(
         "message": "Se ha enviado un código de verificación a tu correo electrónico."
     }
 
-@router.post("/confirmar-password", status_code=status.HTTP_200_OK)
-@limiter.limit("5/minute")
+@router.post("/confirmar-password", status_code=status.HTTP_200_OK, summary="Confirmar nueva contraseña")
+@limiter.limit("5/minute")  # Limita este endpoint a un máximo de 5 peticiones por minuto por IP
 def confirmar_password(
     request: Request,
     payload: ConfirmarPasswordRequest, 
     db: Session = Depends(get_db),
 ):
     """
-    URI: POST /api/auth/confirmar-password
+    **POST /api/auth/confirmar-password**
+    
     Valida el código de recuperación persistido en la BD y actualiza la contraseña.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
+
     usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
     if not usuario:
+        print(f"Intento de confirmación fallido: Usuario con correo '{payload.email}' no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El usuario especificado no existe."
@@ -126,6 +92,7 @@ def confirmar_password(
 
     # 1. Validación estricta del código registrado
     if not usuario.codigo_recuperacion or payload.codigo_verificacion != usuario.codigo_recuperacion:
+        print(f"Código de verificación inválido o ausente para el usuario ID: {usuario.id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El código de verificación introducido es incorrecto."
@@ -133,6 +100,7 @@ def confirmar_password(
 
     # 2. Validar si el código ha expirado (comparando ambos con zona horaria UTC)
     if usuario.codigo_expira_at and datetime.datetime.now(timezone.utc) > usuario.codigo_expira_at:
+        print(f"El código de recuperación ha expirado para el usuario ID: {usuario.id}")
         usuario.codigo_recuperacion = None
         usuario.codigo_expira_at = None
         db.commit()
@@ -155,6 +123,7 @@ def confirmar_password(
             
         db.add(usuario) 
         db.commit()
+        print(f"Contraseña actualizada exitosamente para el usuario ID: {usuario.id}")
         
         return {
             "status": "success",
@@ -163,6 +132,7 @@ def confirmar_password(
 
     except Exception as e:
         db.rollback()
+        print(f"Error interno al actualizar la contraseña del usuario ID {usuario.id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno al actualizar la contraseña: {str(e)}"

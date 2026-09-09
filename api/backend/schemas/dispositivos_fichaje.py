@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 from core.enums import MetodoFichajeEnum
+from schemas.centros_trabajo import CentroTrabajoSimpleResponse
+from schemas.empresas import EmpresaResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - DISPOSITIVOS DE FICHAJE
@@ -14,6 +16,8 @@ class DispositivoFichajeBase(BaseModel):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     tipo_dispositivo: MetodoFichajeEnum = Field(..., description="Método o tipo de dispositivo (RFID, app, QR, etc.)")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class DispositivoFichajeCreate(DispositivoFichajeBase):
     """
@@ -33,7 +37,7 @@ class DispositivoFichajeUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class DispositivoFichajeResponse(DispositivoFichajeBase):
+class DispositivoFichajeSimpleResponse(DispositivoFichajeBase):
     """
     Esquema utilizado para empaquetar las respuestas JSON destinadas a la consulta de dispositivos.
     """
@@ -44,5 +48,14 @@ class DispositivoFichajeResponse(DispositivoFichajeBase):
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última actualización de datos")
     
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo físico asignado")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DispositivoFichajeResponse(DispositivoFichajeSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)

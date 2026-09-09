@@ -2,6 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
+from schemas.empresas import EmpresaResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - CENTROS DE TRABAJO
@@ -15,6 +16,8 @@ class CentroTrabajoBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     nombre: str = Field(..., min_length=2, max_length=255, description="Nombre identificativo del centro de trabajo")
     zona_horaria: str = Field("Europe/Madrid", min_length=2, max_length=50, description="Zona horaria específica del centro de trabajo")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class CentroTrabajoCreate(CentroTrabajoBase):
     """
@@ -41,7 +44,7 @@ class CentroTrabajoUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class CentroTrabajoResponse(CentroTrabajoBase):
+class CentroTrabajoSimpleResponse(CentroTrabajoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la interfaz móvil o web.
     Muestra la vigencia operativa y los metadatos de auditoría temporal del sistema.
@@ -54,5 +57,13 @@ class CentroTrabajoResponse(CentroTrabajoBase):
     direccion: Optional[str] = Field(None, description="Dirección postal")
     latitud: Optional[float] = Field(None, description="Latitud geográfica") 
     longitud: Optional[float] = Field(None, description="Longitud geográfica")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CentroTrabajoResponse(CentroTrabajoSimpleResponse):
+    """
+    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
+    """
+    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
 
     model_config = ConfigDict(from_attributes=True)

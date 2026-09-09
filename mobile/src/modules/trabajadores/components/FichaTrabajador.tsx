@@ -1,63 +1,191 @@
-import { ThemedText } from "@/src/shared/components/themed-text";
+import { ThemedText } from "@/src/shared/components/ThemedText";
 import { Card } from "@/src/shared/ui/AppSurface";
+import { mostrarError } from "@/src/utils/errorHandler";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Image, Pressable, View } from "react-native";
+import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
+import { obtenerContratoActivoTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
-import { obtenerTurno } from "../../turnos/api/services";
+import { obtenerUrlLogo } from "../../empresas/api/services";
+import { obtenerRolPorId } from "../../roles/api/services";
+import { obtenerTurnoPorId } from "../../turnos/api/services";
 import { Turno } from "../../turnos/types/turno";
+import { ESTADOS_TRABAJADOR, FichaTrabajadorProps } from "../types/trabajador";
 
-export const FichaTrabajador = ({
+/**
+ * Mapeo de los estados del trabajador a un texto legible para mostrar en pantalla.
+ */
+const TEXTO_ESTADOS_TRABAJADOR: Record<number, string> = {
+  [ESTADOS_TRABAJADOR.INACTIVO]: "Inactivo",
+  [ESTADOS_TRABAJADOR.ACTIVO]: "Activo",
+  [ESTADOS_TRABAJADOR.TRABAJANDO]: "Trabajando",
+  [ESTADOS_TRABAJADOR.DESCANSANDO]: "Descansando",
+  [ESTADOS_TRABAJADOR.HORAS_EXTRA]: "Horas Extra",
+  [ESTADOS_TRABAJADOR.VACACIONES]: "Vacaciones",
+  [ESTADOS_TRABAJADOR.BAJA]: "Baja",
+};
+
+/**
+ * Componente de tarjeta informativa que representa la ficha de un trabajador.
+ */
+export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
   item,
   onSeleccionarTrabajador,
   setModalActivo,
-  styles,
   abrirEdicionContrato,
-  handleAsignarTurnoTrabajador,
   prepararAsignarTurno,
-}: any) => {
+  handleAsignarTurnoTrabajador,
+  styles,
+}) => {
   const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [nombreRol, setNombreRol] = useState<string>("Sin rol");
 
-  const contratoActivoDelTrabajador: Contrato = item.contratoActivo;
+  // Como Trabajador base no incluye estas propiedades por defecto,
+  // inicializamos los estados de forma segura (null / array vacío).
+  const [contratoActivo, setContratoActivo] = useState<Contrato | null>(null);
+  const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
+    [],
+  );
 
-  // Las asignaciones de turno ya vienen directamente en el item
-  const asignacionesTurno: AsignacionTurno[] = item.asignacionesTurno || [];
+  const fechaHoy = new Date().toLocaleDateString("en-CA");
 
-  // Buscamos la información de los turnos usando el turno_id de las asignaciones del item
+  const esAsignacionVigente = (asignacion: AsignacionTurno): boolean => {
+    if (!asignacion) return false;
+    const fechaInicio = asignacion.fecha_inicio
+      ? asignacion.fecha_inicio.split("T")[0]
+      : null;
+    const fechaFin = asignacion.fecha_fin
+      ? asignacion.fecha_fin.split("T")[0]
+      : null;
+
+    if (fechaInicio && fechaInicio > fechaHoy) return false;
+    if (fechaFin && fechaFin < fechaHoy) return false;
+    return true;
+  };
+
+  const asignacionesVigentes = asignacionesTurno.filter(esAsignacionVigente);
+
+  // Efecto para buscar el nombre del rol usando el id
   useEffect(() => {
+    let isMounted = true;
+
+    const cargarRol = async () => {
+      if (!item.rol_id) {
+        if (isMounted) setNombreRol("Sin rol");
+        return;
+      }
+      try {
+        const rolData = await obtenerRolPorId(item.rol_id);
+        if (isMounted) {
+          setNombreRol(
+            rolData?.nombre.toUpperCase().replace("_", " ") ||
+              "Rol desconocido",
+          );
+        }
+      } catch (error) {
+        if (isMounted) {
+          setNombreRol("Error al cargar rol");
+        }
+      }
+    };
+
+    cargarRol();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.rol_id]);
+
+  // Efecto para buscar los datos relacionales (Contrato y Turnos) al montar o cambiar de trabajador
+  useEffect(() => {
+    let isMounted = true;
+
+    const cargarDatosTrabajador = async () => {
+      try {
+        const [asignacionesData, contratoData] = await Promise.all([
+          obtenerAsignacionesTurnoTrabajador(item.id),
+          obtenerContratoActivoTrabajador(item.id, item.empresa_id).catch(
+            () => null,
+          ),
+        ]);
+
+        if (isMounted) {
+          setAsignacionesTurno(asignacionesData || []);
+          setContratoActivo(contratoData);
+        }
+      } catch (error) {
+        mostrarError("Error al cargar los datos del trabajador: " + error);
+      }
+    };
+
+    cargarDatosTrabajador();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.id, item.empresa_id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
     const cargarNombresTurnos = async () => {
-      if (asignacionesTurno.length === 0) {
-        setTurnos([]);
+      if (asignacionesVigentes.length === 0) {
+        if (isMounted) setTurnos([]);
         return;
       }
 
       try {
-        const promesasTurnos = asignacionesTurno.map((at: AsignacionTurno) =>
-          obtenerTurno(at.turno_id),
+        const promesasTurnos = asignacionesVigentes.map((asignacion) =>
+          obtenerTurnoPorId(asignacion.turno_id),
         );
         const turnosObtenidos = await Promise.all(promesasTurnos);
-        setTurnos(turnosObtenidos);
+        if (isMounted) setTurnos(turnosObtenidos.filter(Boolean) as Turno[]);
       } catch (error) {
-        console.error("Error cargando detalles de los turnos:", error);
+        mostrarError("Error al cargar los nombres de los turnos: " + error);
       }
     };
 
     cargarNombresTurnos();
-  }, [asignacionesTurno]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [asignacionesVigentes.length]);
+
+  // Obtener la representación textual del estado usando el const
+  const textoEstado =
+    TEXTO_ESTADOS_TRABAJADOR[
+      item.estado as keyof typeof TEXTO_ESTADOS_TRABAJADOR
+    ] ?? "Desconocido";
 
   return (
     <Card>
+      {/* Cabecera de la Ficha: Foto, Nombre completo y Estado Laboral */}
       <View style={styles.cardHeader}>
-        <View style={styles.avatarCirculo}>
-          <ThemedText style={styles.avatarTexto}>
-            {item.nombre?.charAt(0)}
-            {item.apellidos?.charAt(0)}
-          </ThemedText>
-        </View>
-        <View style={{ flex: 1 }}>
+        {item.foto_url ? (
+          <Image
+            source={{ uri: obtenerUrlLogo(item.foto_url) || undefined }}
+            style={[
+              styles.avatarCirculo,
+              { width: 40, height: 40, borderRadius: 20 },
+            ]}
+          />
+        ) : (
+          <View style={styles.avatarCirculo}>
+            <ThemedText style={styles.avatarTexto}>
+              {item.nombre?.charAt(0)}
+              {item.apellidos?.charAt(0)}
+            </ThemedText>
+          </View>
+        )}
+        <View style={{ flex: 1, marginLeft: 8 }}>
           <ThemedText style={styles.nombreEmpleado}>
             {item.nombre} {item.apellidos}
+          </ThemedText>
+          <ThemedText style={{ fontSize: 11, color: "#64748B" }}>
+            Rol: {nombreRol} | Estado: {textoEstado}
           </ThemedText>
         </View>
         <View
@@ -79,13 +207,13 @@ export const FichaTrabajador = ({
 
       <View style={styles.separador} />
 
-      {/* DETALLES */}
+      {/* Cuadrícula de datos personales e identificación */}
       <View style={styles.gridDetalles}>
         <View style={styles.bloqueDato}>
           <ThemedText style={styles.labelDato}>
             Documento de Identidad
           </ThemedText>
-          <ThemedText style={styles.valorDato}>{item.nif_nie}</ThemedText>
+          <ThemedText style={styles.valorDato}>{item.dni_nif_nie}</ThemedText>
         </View>
         <View style={styles.bloqueDato}>
           <ThemedText style={styles.labelDato}>Número Seg. Social</ThemedText>
@@ -95,11 +223,27 @@ export const FichaTrabajador = ({
         </View>
       </View>
 
+      {/* Cuadrícula de contacto, fechas y detalles adicionales */}
       <View style={[styles.gridDetalles, { marginTop: 8 }]}>
         <View style={styles.bloqueDato}>
           <ThemedText style={styles.labelDato}>Teléfono Móvil</ThemedText>
           <ThemedText style={styles.valorDato}>
             {item.telefono ?? "No registrado"}
+          </ThemedText>
+        </View>
+        <View style={styles.bloqueDato}>
+          <ThemedText style={styles.labelDato}>Correo Electrónico</ThemedText>
+          <ThemedText style={styles.valorDato}>
+            {item.email ?? "No registrado"}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={[styles.gridDetalles, { marginTop: 8 }]}>
+        <View style={styles.bloqueDato}>
+          <ThemedText style={styles.labelDato}>Fecha de Nacimiento</ThemedText>
+          <ThemedText style={styles.valorDato}>
+            {item.fecha_nacimiento}
           </ThemedText>
         </View>
         <View style={styles.bloqueDato}>
@@ -112,36 +256,35 @@ export const FichaTrabajador = ({
 
       <View style={styles.separadorDashed} />
 
-      {/* AUDITORÍA Y ACCIONES */}
+      {/* Sección de Auditoría y Gestión de Contrato */}
       <View style={styles.contenedorAuditoria}>
         <View style={styles.filaAuditoriaItem}>
           <FontAwesome5
             name="file-contract"
             size={13}
-            color={contratoActivoDelTrabajador ? "#16803D" : "#EA580C"}
+            color={contratoActivo ? "#16803D" : "#EA580C"}
           />
           <View style={{ flex: 1, marginLeft: 6 }}>
             <ThemedText
               style={[
                 styles.textoAuditoria,
-                { color: contratoActivoDelTrabajador ? "#16803D" : "#EA580C" },
+                { color: contratoActivo ? "#16803D" : "#EA580C" },
               ]}
             >
-              {contratoActivoDelTrabajador
+              {contratoActivo
                 ? "Contrato en vigor registrado"
                 : "⚠️ Alerta: El trabajador carece de contrato activo"}
             </ThemedText>
-            {contratoActivoDelTrabajador && (
+            {contratoActivo && (
               <ThemedText
                 style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}
               >
-                {"Tipo: " + contratoActivoDelTrabajador.tipo_contrato}
+                {"Tipo: " + (contratoActivo.tipo_contrato || "N/A")}
               </ThemedText>
             )}
 
-            {/* BOTONES CONTRATO */}
             <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
-              {contratoActivoDelTrabajador ? (
+              {contratoActivo ? (
                 <>
                   <Pressable
                     style={[
@@ -149,9 +292,8 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#EFF6FF" },
                     ]}
                     onPress={() => {
-                      onSeleccionarTrabajador(item);
-                      setModalActivo("editar_contrato");
-                      abrirEdicionContrato();
+                      onSeleccionarTrabajador();
+                      abrirEdicionContrato(item);
                     }}
                   >
                     <FontAwesome5 name="edit" size={10} color="#2563EB" />
@@ -172,7 +314,7 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#FEF2F2" },
                     ]}
                     onPress={() => {
-                      onSeleccionarTrabajador(item);
+                      onSeleccionarTrabajador();
                       setModalActivo("rescindir_contrato");
                     }}
                   >
@@ -200,8 +342,8 @@ export const FichaTrabajador = ({
                     { backgroundColor: "#2563EB" },
                   ]}
                   onPress={() => {
-                    onSeleccionarTrabajador(item);
-                    setModalActivo("nuevo_contrato");
+                    onSeleccionarTrabajador();
+                    abrirEdicionContrato(item);
                   }}
                 >
                   <FontAwesome5 name="plus" size={10} color="#FFFFFF" />
@@ -223,26 +365,29 @@ export const FichaTrabajador = ({
 
         <View style={[styles.separador, { marginVertical: 12 }]} />
 
-        {/* SECCIÓN TURNOS */}
+        {/* Sección de Cuadrante y Gestión de Turnos */}
         <View style={styles.filaAuditoriaItem}>
           <MaterialCommunityIcons
             name="calendar-clock"
             size={15}
-            color={asignacionesTurno.length > 0 ? "#16803D" : "#EA580C"}
+            color={asignacionesVigentes.length > 0 ? "#16803D" : "#EA580C"}
           />
           <View style={{ flex: 1, marginLeft: 6 }}>
             <ThemedText
               style={[
                 styles.textoAuditoria,
-                { color: asignacionesTurno.length > 0 ? "#16803D" : "#EA580C" },
+                {
+                  color:
+                    asignacionesVigentes.length > 0 ? "#16803D" : "#EA580C",
+                },
               ]}
             >
-              {asignacionesTurno.length > 0
+              {asignacionesVigentes.length > 0
                 ? "Turnos asignados en cuadrante"
                 : "⚠️ Sin asignaciones horarias de turnos vigentes"}
             </ThemedText>
 
-            {asignacionesTurno.length > 0 && (
+            {asignacionesVigentes.length > 0 && (
               <ThemedText
                 style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}
               >
@@ -255,7 +400,7 @@ export const FichaTrabajador = ({
             )}
 
             <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
-              {asignacionesTurno.length > 0 ? (
+              {asignacionesVigentes.length > 0 ? (
                 <>
                   <Pressable
                     style={[
@@ -263,8 +408,7 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#FDF4FF" },
                     ]}
                     onPress={() => {
-                      onSeleccionarTrabajador(item);
-                      setModalActivo("reasignar_turno");
+                      onSeleccionarTrabajador();
                       prepararAsignarTurno(item);
                     }}
                   >
@@ -281,7 +425,7 @@ export const FichaTrabajador = ({
                         marginLeft: 4,
                       }}
                     >
-                      Reasignar
+                      Reasignar Turnos
                     </ThemedText>
                   </Pressable>
                   <Pressable
@@ -290,7 +434,7 @@ export const FichaTrabajador = ({
                       { backgroundColor: "#FFF5EB" },
                     ]}
                     onPress={() => {
-                      onSeleccionarTrabajador(item);
+                      onSeleccionarTrabajador();
                       setModalActivo("eliminar_turno");
                     }}
                   >
@@ -318,8 +462,8 @@ export const FichaTrabajador = ({
                     { backgroundColor: "#16A34A" },
                   ]}
                   onPress={() => {
-                    onSeleccionarTrabajador(item);
-                    handleAsignarTurnoTrabajador();
+                    onSeleccionarTrabajador();
+                    setModalActivo("asignar_turno");
                   }}
                 >
                   <MaterialCommunityIcons
@@ -344,7 +488,7 @@ export const FichaTrabajador = ({
         </View>
       </View>
 
-      {/* BAJA */}
+      {/* Acciones Generales del Expediente */}
       {item.activo && (
         <View
           style={{
@@ -357,10 +501,9 @@ export const FichaTrabajador = ({
             gap: 8,
           }}
         >
-          {/* Botón Editar Datos */}
           <Pressable
             onPress={() => {
-              onSeleccionarTrabajador(item);
+              onSeleccionarTrabajador();
               setModalActivo("editar_trabajador");
             }}
             style={{
@@ -387,10 +530,9 @@ export const FichaTrabajador = ({
             </ThemedText>
           </Pressable>
 
-          {/* Botón Tramitar Baja */}
           <Pressable
             onPress={() => {
-              onSeleccionarTrabajador(item);
+              onSeleccionarTrabajador();
               setModalActivo("baja_trabajador");
             }}
             style={{
@@ -419,7 +561,7 @@ export const FichaTrabajador = ({
         </View>
       )}
 
-      {/* REACTIVACIÓN */}
+      {/* Acción de Reactivación si el trabajador se encuentra dado de baja */}
       {!item.activo && (
         <View
           style={{
@@ -433,7 +575,7 @@ export const FichaTrabajador = ({
           <Pressable
             style={styles.botonReactivarEmpresa}
             onPress={() => {
-              onSeleccionarTrabajador(item);
+              onSeleccionarTrabajador();
               setModalActivo("reactivar_trabajador");
             }}
           >

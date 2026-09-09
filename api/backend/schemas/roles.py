@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 # ==========================================
@@ -12,12 +12,24 @@ class RolBase(BaseModel):
     basado en el modelo relacional mapeado por sqlacodegen.
     """
     nombre: str = Field(..., min_length=2, max_length=100, description="Nombre único del rol (Ej: 'admin_empresa', 'trabajador')")
+    descripcion: Optional[str] = Field(None, max_length=255, description="Explicación detallada de las funciones de este rol")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class RolCreate(RolBase):
     """
     Esquema utilizado para recibir los datos al registrar un nuevo rol en la plataforma.
     """
+    pass
+
+class RolUpdate(BaseModel):
+    """
+    Esquema para la actualización parcial o total de los datos de un rol.
+    """
+    nombre: Optional[str] = Field(None, min_length=2, max_length=100, description="Nombre único del rol")
     descripcion: Optional[str] = Field(None, max_length=255, description="Explicación detallada de las funciones de este rol")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class RolResponse(RolBase):
     """
@@ -25,6 +37,5 @@ class RolResponse(RolBase):
     para mapear los perfiles de usuario.
     """
     id: UUID = Field(..., description="Identificador único UUID del rol")
-    descripcion: Optional[str] = Field(None, description="Explicación detallada de las funciones de este rol")
 
     model_config = ConfigDict(from_attributes=True)

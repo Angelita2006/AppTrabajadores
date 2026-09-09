@@ -20,3 +20,4 @@ class TiposEventoFichaje(Base):
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='tipos_evento_fichaje') # type: ignore
     fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='tipo_evento') # type: ignore
+    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='tipo_evento') # type: ignore

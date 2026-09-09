@@ -106,7 +106,7 @@ def verificar_rol_requerido(roles_permitidos: list[str]):
             UsuariosRoles.usuario_id == usuario_actual.id
         ).all()
 
-        nombres_roles_usuario = [asig.role.nombre for asig in asignaciones if asig.role]
+        nombres_roles_usuario = [asig.rol.nombre for asig in asignaciones if asig.rol]
 
         # Comprobar si alguno coincide con los permitidos
         tiene_permiso = any(rol in roles_permitidos for rol in nombres_roles_usuario)
