@@ -111,35 +111,6 @@ export const solicitarAusencia = async (
 };
 
 /**
- * Actualiza de forma básica el estado de una ausencia.
- * URI: PUT /api/ausencias/{id_ausencia}/estado
- *
- * @async
- * @function actualizarEstadoAusencia
- * @param {string} idAusencia - Identificador único universal (UUID) de la ausencia.
- * @param {EstadoAusencia} nuevoEstado - El nuevo estado que se aplicará (`EstadoAusencia`).
- * @returns {Promise<AusenciaResponse>} Promesa con la ausencia actualizada.
- * @throws {Error} Lanza un error si la actualización no se puede completar.
- */
-export const actualizarEstadoAusencia = async (
-  idAusencia: string,
-  nuevoEstado: EstadoAusencia,
-): Promise<AusenciaResponse> => {
-  const url = `/api/ausencias/${idAusencia}/estado?nuevo_estado=${nuevoEstado}`;
-
-  try {
-    const respuesta = await api.put<AusenciaResponse>(url);
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        `Error al actualizar el estado de la ausencia ${idAusencia}.`,
-    );
-  }
-};
-
-/**
  * Tramita de forma avanzada la resolución (aprobación o rechazo) de una solicitud de ausencia,
  * permitiendo adjuntar observaciones y el identificador del usuario administrador resolutor.
  * URI: PUT /api/ausencias/{id_ausencia}/resolver

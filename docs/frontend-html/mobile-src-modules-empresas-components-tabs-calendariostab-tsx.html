@@ -1,0 +1,74 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CalendariosTab.tsx · Fichapp</title><style>
+:root{color-scheme:light;--ink:#18212f;--muted:#667085;--line:#d9e0e8;--paper:#fff;--wash:#f4f6f8;--navy:#132238;--accent:#b44a2d;--accent-wash:#fff1ec;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font-size:16px;line-height:1.65}a{color:#8d341f;text-decoration:none}a:hover{text-decoration:underline}.top{background:var(--navy);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:28px}.brand{font-size:1.45rem;font-weight:700;letter-spacing:.02em}.top small{color:#b9c4d3}.layout{display:grid;grid-template-columns:275px minmax(0,900px);max-width:1240px;margin:0 auto;min-height:calc(100vh - 70px)}aside{padding:30px 22px;border-right:1px solid var(--line);background:#eef1f4;position:sticky;top:0;height:calc(100vh - 70px);overflow:auto}aside h3{font:700 .75rem/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:22px 0 8px}nav a{display:block;padding:5px 9px;border-radius:4px;font:14px/1.45 Arial,sans-serif;color:#344054}nav a:hover{background:#dfe5eb;text-decoration:none}.search{width:100%;border:1px solid #c5ced9;border-radius:4px;padding:9px 10px;background:#fff;font:14px Arial,sans-serif}.content{background:var(--paper);padding:54px clamp(24px,6vw,76px) 90px}h1,h2,h3{font-weight:700;line-height:1.2}h1{font-size:2.55rem;margin:0 0 14px;color:var(--navy)}h2{font-size:1.6rem;margin:48px 0 18px;border-bottom:1px solid var(--line);padding-bottom:9px}h3{font-size:1.15rem;margin:0 0 4px}.lead{font-size:1.16rem;color:#4b5565;max-width:720px}.eyebrow{font:700 .74rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:30px 0}.stat,.item{border:1px solid var(--line);padding:16px;background:#fff}.stat strong{display:block;font-size:1.8rem;color:var(--accent)}.stat span,.meta{font:13px Arial,sans-serif;color:var(--muted)}.item{margin:12px 0}.item code,.path,code{font-family:'Cascadia Code',Consolas,monospace;font-size:.88em}.path{color:var(--muted);margin-bottom:16px}.entry{border-top:1px solid var(--line);padding:22px 0}.entry pre{white-space:pre-wrap;margin:10px 0 0;padding:14px;background:#f7f8fa;border-left:3px solid #d9a08f;font:14px/1.6 'Cascadia Code',Consolas,monospace;color:#344054}.tag{display:inline-block;background:var(--accent-wash);color:#8d341f;padding:2px 7px;margin-right:7px;font:12px Arial,sans-serif;border-radius:3px}@media(max-width:760px){.layout{display:block}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.content{padding:34px 22px 60px}h1{font-size:2rem}.top{padding:15px 18px}}
+</style></head><body><header class="top"><div class="brand">Fichapp</div><small>Documentación del frontend</small></header><div class="layout"><aside><input class="search" type="search" placeholder="Buscar en la documentación" data-search><h3>Guía</h3><nav><a href="index.html">Inicio</a><a href="architecture.html">Arquitectura</a><a href="routes.html">Rutas</a><a href="modules.html">Módulos</a></nav><h3>Módulos</h3><nav><a href="modules.html#another-services">another-services</a><a href="modules.html#asignaciones-turno">asignaciones-turno</a><a href="modules.html#ausencias">ausencias</a><a href="modules.html#calendarios-laborales">calendarios-laborales</a><a href="modules.html#centros-trabajo">centros-trabajo</a><a href="modules.html#contratos">contratos</a><a href="modules.html#correcciones-fichaje">correcciones-fichaje</a><a href="modules.html#departamentos">departamentos</a><a href="modules.html#dispositivos-fichaje">dispositivos-fichaje</a><a href="modules.html#empresas">empresas</a><a href="modules.html#festivos">festivos</a><a href="modules.html#fichajes">fichajes</a><a href="modules.html#permisos">permisos</a><a href="modules.html#resumenes-jornada">resumenes-jornada</a><a href="modules.html#roles">roles</a><a href="modules.html#tipos_eventos_fichaje">tipos_eventos_fichaje</a><a href="modules.html#trabajadores">trabajadores</a><a href="modules.html#turnos">turnos</a><a href="modules.html#usuarios">usuarios</a><a href="modules.html#usuarios_roles">usuarios_roles</a></nav></aside><main class="content"><p class="eyebrow">Referencia de código</p><h1>CalendariosTab.tsx</h1><p class="path">mobile/src/modules/empresas/components/tabs/CalendariosTab.tsx</p><article class="entry"><h3><span class="tag">interface</span>UseTabCalendarioProps</h3><pre>Propiedades requeridas para el funcionamiento del custom hook useTabCalendario.
+Define todas las variables de estado global y funciones de actualización necesarias
+para la gestión de calendarios y días festivos.</pre></article><article class="entry"><h3><span class="tag">function</span>useTabCalendario</h3><pre>Lista completa de calendarios festivos asociados a la empresa actual. */
+  calendariosEmpresa: CalendarioFestivo[];
+  /** Función para actualizar el estado del listado de calendarios de la empresa. */
+  setCalendariosEmpresa: React.Dispatch&lt;
+    React.SetStateAction&lt;CalendarioFestivo[]&gt;
+  &gt;;
+  /** Listado de centros de trabajo disponibles para asociar a los calendarios. */
+  centrosEmpresa: CentroTrabajo[];
+  /** Empresa que se encuentra seleccionada en el contexto actual de la aplicación. */
+  empresaActual: Empresa;
+  /** Calendario laboral que el usuario ha seleccionado para visualizar o editar. */
+  calendarioActual: CalendarioFestivo | null;
+  /** Función para actualizar el calendario seleccionado actualmente. */
+  setCalendarioActual: (calendario: CalendarioFestivo | null) =&gt; void;
+  /** Valor en texto del año en curso para el formulario de edición. */
+  editAnio: string;
+  /** Valor en texto del nombre descriptivo para el formulario de edición. */
+  editNombre: string;
+  /** Identificador del centro de trabajo asociado en el modo de edición. */
+  editCentroId: string | null;
+  /** Función para actualizar el año en el formulario de edición. */
+  setEditAnio: (anio: string) =&gt; void;
+  /** Función para actualizar el nombre en el formulario de edición. */
+  setEditNombre: (nombre: string) =&gt; void;
+  /** Función para actualizar el identificador del centro en el modo de edición. */
+  setEditCentroId: (centroId: string | null) =&gt; void;
+  /** Estado booleano que indica si se está ejecutando una operación asíncrona de guardado. */
+  guardando: boolean;
+  /** Función para actualizar el estado booleano de guardado. */
+  setGuardando: (guardando: boolean) =&gt; void;
+}
+
+/**
+Hook personalizado que encapsula toda la lógica de negocio, manejo de estados,
+llamadas a servicios y validaciones para la gestión de calendarios laborales.
+
+@param props - Propiedades de configuración y estados compartidos del componente padre.
+@returns Objeto con estados locales y funciones manejadoras de acciones de calendario.</pre></article><article class="entry"><h3><span class="tag">const</span>handleCrearCalendario</h3><pre>Efecto para sincronizar el centro de trabajo por defecto al actualizar la lista de centros.
+/
+  useEffect(() =&gt; {
+    const centrosActivos = centrosEmpresa.filter(
+      (centro) =&gt; centro.activo === true,
+    );
+    if (centrosActivos.length &gt; 0) {
+      setCentroNuevoCalendario(centrosActivos[0].id);
+    } else {
+      setCentroNuevoCalendario(&quot;&quot;);
+    }
+  }, [centrosEmpresa]);
+
+  /**
+Efecto para actualizar los campos de edición cuando se selecciona un calendario diferente.
+/
+  useEffect(() =&gt; {
+    if (calendarioActual) {
+      setEditAnio(String(calendarioActual.anio));
+      setEditNombre(calendarioActual.nombre);
+      setEditCentroId(calendarioActual.centro_trabajo_id);
+    }
+  }, [calendarioActual]);
+
+  const tieneCentrosValidos = centrosEmpresa.some(
+    (centro) =&gt; centro.activo === true,
+  );
+
+  /**
+Valida los datos introducidos y ejecuta la petición para registrar un nuevo calendario laboral.</pre></article><article class="entry"><h3><span class="tag">const</span>handleEditarCalendario</h3><pre>Actualiza la información descriptiva y de asignación del calendario laboral seleccionado actualmente.</pre></article><article class="entry"><h3><span class="tag">const</span>ejecutarEliminacion</h3><pre>Realiza la llamada asíncrona para eliminar el calendario seleccionado y actualiza el estado local.</pre></article><article class="entry"><h3><span class="tag">const</span>handleEliminarCalendario</h3><pre>Muestra un cuadro de diálogo de confirmación adaptado a la plataforma (Web o Nativa) para borrar el calendario.</pre></article><article class="entry"><h3><span class="tag">const</span>handleDayPress</h3><pre>Maneja la interacción al presionar un día específico en el componente de calendario visual.
+
+@param fechaStr - Fecha seleccionada en formato string YYYY-MM-DD.
+@param festivoExistente - Datos del festivo si ya existía registrado en dicha fecha.</pre></article><article class="entry"><h3><span class="tag">const</span>handleGuardarFestivoContextual</h3><pre>Guarda o actualiza la información de un día festivo contextual asociado al calendario activo.</pre></article><article class="entry"><h3><span class="tag">const</span>handleImportarCalendarioPDF</h3><pre>Permite seleccionar un archivo PDF mediante el selector de documentos y procesa su importación masiva de festivos.</pre></article><article class="entry"><h3><span class="tag">interface</span>TabCalendarioProps</h3><pre>Propiedades extendidas para el componente visual TabCalendario.</pre></article></main></div><script>const q=document.querySelector('[data-search]');q?.addEventListener('input',e=>{const value=e.target.value.toLowerCase();document.querySelectorAll('.item,.entry').forEach(el=>el.hidden=value&&!el.textContent.toLowerCase().includes(value))});</script></body></html>

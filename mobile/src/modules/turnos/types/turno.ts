@@ -32,6 +32,8 @@ export interface TurnoUpdate {
   duracion_pausa_minutos?: number;
   /** Días de la semana aplicables al turno (1=lunes ... 7=domingo). */
   dias_semana?: number[];
+  /** Estado de activación del turno. */
+  activo?: boolean;
 }
 
 /**
@@ -52,6 +54,8 @@ export interface Turno {
   duracion_pausa_minutos: number;
   /** Días de la semana aplicables al turno (1=lunes ... 7=domingo). */
   dias_semana: number[];
+  /** Indica si el turno está activo. */
+  activo: boolean;
   /** Timestamp fecha y hora de la creación del turno. */
   created_at: string;
 

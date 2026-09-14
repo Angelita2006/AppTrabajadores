@@ -30,7 +30,8 @@ import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrab
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -46,6 +47,7 @@ import {
   actualizarAsignacionTurno,
   actualizarTrabajador,
   asignarTurnosTrabajador,
+  tramitarBajaTotalTrabajador,
 } from "../../src/modules/trabajadores/api/services";
 import { Trabajador } from "../../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -139,6 +141,8 @@ function PlantillaScreen() {
     inputRefs,
   } = usePlantillaFormularios(usuarioActual!, cargarPlantilla);
 
+  const { mostrarError } = useAppModal();
+
   useEffect(() => {
     if (usuarioActual?.empresa_id) {
       Promise.all([
@@ -217,7 +221,7 @@ function PlantillaScreen() {
     string[] | null
   >(null);
 
-  // Solución al waterfall: Extraer todos los IDs únicos de roles y consultarlos en paralelo con Promise.all
+  // Extraer todos los IDs únicos de roles y consultarlos en paralelo con Promise.all
   useEffect(() => {
     let isMounted = true;
     async function filtrarAdminsDePlantilla() {
@@ -323,7 +327,7 @@ function PlantillaScreen() {
       await cargarPlantilla();
       cerrarModales();
     } catch (error: any) {
-      mostrarError("Error al actualizar el contrato: " + error);
+      mostrarError("Error al actualizar el contrato: " + error.message);
     } finally {
       setProcesando(false);
     }
@@ -397,7 +401,7 @@ function PlantillaScreen() {
       cerrarModales();
       setTurnosSeleccionados([]);
     } catch (error: any) {
-      mostrarError("Error al asignar el turno al trabajador: " + error);
+      mostrarError("Error al asignar el turno al trabajador: " + error.message);
     } finally {
       setProcesando(false);
     }
@@ -447,7 +451,9 @@ function PlantillaScreen() {
       setTrabajadorActual(trabajador);
       setModalActivo("reasignar_turno");
     } catch (error: any) {
-      mostrarError("Error al preparar la asignación de turno: " + error);
+      mostrarError(
+        "Error al preparar la asignación de turno: " + error.message,
+      );
     } finally {
       setCargandoSelectores(false);
     }
@@ -520,7 +526,7 @@ function PlantillaScreen() {
       await cargarPlantilla();
       cerrarModales();
     } catch (error: any) {
-      mostrarError("Error al rescindir el contrato: " + error);
+      mostrarError("Error al rescindir el contrato: " + error.message);
     } finally {
       setProcesando(false);
     }
@@ -530,26 +536,13 @@ function PlantillaScreen() {
     if (!trabajadorActual) return;
     try {
       setProcesando(true);
-      const fechaBaja = new Date().toISOString().split("T")[0];
-      await rescindirContratoActivoTrabajador(
-        trabajadorActual.id,
-        trabajadorActual.empresa_id,
-      );
-      await actualizarTrabajador(trabajadorActual.id, {
-        empresa_id: trabajadorActual.empresa_id,
-        rol_id: tipoRol,
-        dni_nif_nie: trabajadorActual.dni_nif_nie,
-        nombre: trabajadorActual.nombre,
-        apellidos: trabajadorActual.apellidos,
-        fecha_nacimiento: trabajadorActual.fecha_nacimiento,
-        numero_seguridad_social: trabajadorActual.numero_seguridad_social,
-        activo: false,
-        fecha_baja_empresa: fechaBaja,
-      });
+      await tramitarBajaTotalTrabajador(trabajadorActual.id);
       await cargarPlantilla();
       cerrarModales();
     } catch (error: any) {
-      mostrarError("Error al tramitar la baja total del trabajador: " + error);
+      mostrarError(
+        "Error al tramitar la baja total del trabajador: " + error.message,
+      );
     } finally {
       setProcesando(false);
     }
@@ -573,7 +566,7 @@ function PlantillaScreen() {
       await cargarPlantilla();
       cerrarModales();
     } catch (error: any) {
-      mostrarError("Error al reactivar al trabajador: " + error);
+      mostrarError("Error al reactivar al trabajador: " + error.message);
     } finally {
       setProcesando(false);
     }

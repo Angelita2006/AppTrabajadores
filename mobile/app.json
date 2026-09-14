@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "FICHAPP",
-    "slug": "FICHAPP",
+    "name": "Fichapp",
+    "slug": "Fichapp",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/foreground-image.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
@@ -28,7 +28,8 @@
         "android.permission.WRITE_CALENDAR",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM"
-      ]
+      ],
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",

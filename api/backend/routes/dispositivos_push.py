@@ -24,7 +24,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/", response_model=DispositivoPushResponse, status_code=status.HTTP_201_CREATED, summary="Registrar o actualizar dispositivo push")
-@limiter.limit("30/minute")  # Limita este endpoint a un máximo de 30 peticiones por minuto por IP
+@limiter.limit("30/minute")  
 def registrar_o_actualizar_dispositivo_push(
     request: Request,
     data: DispositivoPushCreate, 
@@ -121,12 +121,12 @@ def registrar_o_actualizar_dispositivo_push(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al registrar el dispositivo push: {str(error)}"
+            detail=f"No se ha podido registrar el dispositivo push: {str(error)}"
         )
 
 
 @router.delete("/{id_dispositivo}", status_code=status.HTTP_200_OK, summary="Eliminar dispositivo push")
-@limiter.limit("30/minute")  # Limita este endpoint a un máximo de 30 peticiones por minuto por IP
+@limiter.limit("30/minute")  
 def eliminar_dispositivo_push(
     request: Request,
     id_dispositivo: uuid.UUID, 
@@ -179,12 +179,12 @@ def eliminar_dispositivo_push(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al eliminar el dispositivo push: {str(error)}"
+            detail=f"No se ha podido eliminar el dispositivo push: {str(error)}"
         )
 
 
 @router.get("/usuario/{usuario_id}", response_model=List[DispositivoPushResponse], summary="Obtener dispositivos push por usuario")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de dispositivos push por usuario
+@limiter.limit("60/minute") 
 def obtener_dispositivos_por_usuario(
     request: Request,
     usuario_id: uuid.UUID, 
@@ -227,5 +227,5 @@ def obtener_dispositivos_por_usuario(
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al recuperar los dispositivos del usuario: {str(error)}"
+            detail=f"No se ha podido recuperar los dispositivos del usuario: {str(error)}"
         )

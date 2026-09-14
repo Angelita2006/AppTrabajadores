@@ -15,6 +15,17 @@ export const TIPOS_AUSENCIA = {
 } as const;
 
 /**
+ * Diccionario de etiquetas legibles para los tipos de ausencia.
+ */
+export const TIPOS_AUSENCIA_LABELS: Record<TipoAusencia, string> = {
+  [TIPOS_AUSENCIA.VACACIONES]: "Vacaciones",
+  [TIPOS_AUSENCIA.BAJA_TEMPORAL]: "Baja Temporal",
+  [TIPOS_AUSENCIA.MATERNIDAD_PATERNIDAD]: "Maternidad / Paternidad",
+  [TIPOS_AUSENCIA.PERMISO_RETRIBUIDO]: "Permiso Retribuido",
+  [TIPOS_AUSENCIA.AUSENCIA_INJUSTIFICADA]: "Ausencia Injustificada",
+};
+
+/**
  * Tipo de unión que define los tipos disponibles de ausencias laborales registrables en el sistema.
  */
 export type TipoAusencia = (typeof TIPOS_AUSENCIA)[keyof typeof TIPOS_AUSENCIA];

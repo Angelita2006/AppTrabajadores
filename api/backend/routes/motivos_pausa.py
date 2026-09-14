@@ -11,6 +11,8 @@ from models.empresas import Empresas
 from models.motivos_pausa import MotivosPausa
 from models.usuarios import Usuarios
 from schemas.motivos_pausa import MotivoPausaCreate, MotivoPausaResponse
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # Configuración del enrutador para la gestión de motivos de pausa y descanso laboral
 router = APIRouter(prefix="/api/motivos-pausa", tags=["Motivos de Pausa"])
@@ -20,12 +22,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[MotivoPausaResponse], summary="Obtener motivos de pausa disponibles por empresa")
-@limiter.limit("60/minute") # Limita las consultas masivas de listados de motivos para proteger el rendimiento
+@limiter.limit("60/minute")
 def obtener_motivos_disponibles_empresa(
     request: Request,
     id_empresa: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **GET /api/motivos-pausa/empresa/{id_empresa}**
@@ -33,7 +35,6 @@ def obtener_motivos_disponibles_empresa(
     Recupera los motivos de descanso utilizables por una empresa: los comunes globales (NULL) 
     y los personalizados propios de esta organización.
     """
-    # Registrar la dirección IP del cliente y trazas de auditoría de acceso
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de listado de motivos de pausa para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -49,27 +50,38 @@ def obtener_motivos_disponibles_empresa(
             detail="No tienes permisos para ver los motivos de pausa de esta empresa."
         )
 
-    return db.query(MotivosPausa).options(
+    resultados = db.query(MotivosPausa).options(
         joinedload(MotivosPausa.empresa)
     ).filter(
         (MotivosPausa.empresa_id == id_empresa) | (MotivosPausa.empresa_id == None)
     ).order_by(MotivosPausa.nombre.asc()).all()
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "motivos_pausa", "accion": "consultar_por_empresa", "entidad_id": str(id_empresa), "detalles": f"Se consultaron los motivos de pausa disponibles para la empresa {id_empresa}"}
+    )
+    db.commit()
+
+    return resultados
+
 
 @router.get("/{id_motivo}", response_model=MotivoPausaResponse, summary="Obtener motivo de pausa por ID")
-@limiter.limit("60/minute") # Limita las consultas individuales de detalles de motivos de pausa
+@limiter.limit("60/minute") 
 def obtener_motivo_pausa(
     request: Request,
     id_motivo: int, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **GET /api/motivos-pausa/{id_motivo}**
     
     Busca un motivo de pausa específico mediante su identificador numérico (SmallInteger).
     """
-    # Registrar la dirección IP del cliente y trazas de auditoría
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de detalle del motivo de pausa {id_motivo} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -95,23 +107,32 @@ def obtener_motivo_pausa(
             detail="No tienes permisos para acceder a este motivo de pausa."
         )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=motivo.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "motivos_pausa", "accion": "consultar_por_id", "entidad_id": str(id_motivo), "detalles": f"Se consultó el detalle del motivo de pausa {id_motivo}"}
+    )
+    db.commit()
+
     return motivo
 
 
 @router.post("", response_model=MotivoPausaResponse, status_code=status.HTTP_201_CREATED, summary="Crear motivo de pausa")
-@limiter.limit("15/minute") # Protegido frente a la creación masiva no deseada de tipologías de pausa
+@limiter.limit("15/minute") 
 def crear_motivo_pausa(
     request: Request,
     obj_in: MotivoPausaCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **POST /api/motivos-pausa**
     
     Registra una nueva tipología de descanso, ya sea global o específica de un tenant.
     """
-    # Registrar metadatos de red y auditoría de la creación
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de creación de motivo de pausa desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -144,6 +165,16 @@ def crear_motivo_pausa(
         )
         
         db.add(nuevo_motivo)
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "motivos_pausa", "accion": "crear_motivo_pausa", "entidad_id": str(nuevo_motivo.id), "detalles": f"Se ha registrado un nuevo motivo de pausa para la empresa {obj_in.empresa_id}"}
+        )
+
         db.commit()
         
         motivo_creado = db.query(MotivosPausa).options(
@@ -158,5 +189,5 @@ def crear_motivo_pausa(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ha ocurrido un error al crear el motivo de pausa: {str(error)}"
+            detail=f"No se ha podido crear el motivo de pausa: {str(error)}"
         )

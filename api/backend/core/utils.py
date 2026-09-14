@@ -8,7 +8,7 @@ import os
 import smtplib
 import uuid
 from datetime import datetime
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 from google import genai
 from google.genai import types
 import httpx
@@ -23,9 +23,6 @@ SMTP_PORT = settings.SMTP_PORT
 SMTP_USER = settings.SMTP_USER
 SMTP_PASSWORD = settings.SMTP_PASSWORD
 EMAILS_FROM = settings.EMAILS_FROM
-
-CARPETA_FIRMAS = "static/firmas"
-os.makedirs(CARPETA_FIRMAS, exist_ok=True)
 
 def calcular_distancia_metros(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calcula la distancia en metros entre dos puntos geográficos usando Haversine."""
@@ -77,12 +74,12 @@ def procesar_y_guardar_firma(data_firma: str) -> str:
     bytes_imagen = base64.b64decode(data_encoded)
 
     nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
-    ruta_destino = os.path.join(CARPETA_FIRMAS, nombre_archivo)
+    ruta_destino = os.path.join("/api/archivos/firmas", nombre_archivo)
 
     with open(ruta_destino, "wb") as buffer:
         buffer.write(bytes_imagen)
 
-    return f"/static/firmas/{nombre_archivo}"
+    return f"/api/archivos/firmas/{nombre_archivo}"
 
 async def obtener_coordenadas(direccion: str):
     """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""

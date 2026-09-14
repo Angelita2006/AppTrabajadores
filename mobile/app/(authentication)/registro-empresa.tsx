@@ -18,10 +18,11 @@ import Animated, {
 
 import { registrarOrganizacionCompleta } from "@/src/modules/another-services/services";
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import {
   validarCifNifOrganizacion,
   validarDniEspanol,
@@ -34,6 +35,9 @@ import {
  * Componente principal que renderiza el formulario de alta de organización, trabajador admin y usuario.
  */
 export default function RegistroOrganizacionScreen() {
+  // Campo de Licencia
+  const [codigoLicencia, setCodigoLicencia] = useState("");
+
   // Campos de Empresa
   const [razonSocial, setRazonSocial] = useState("");
   const [nombreComercial, setNombreComercial] = useState("");
@@ -57,6 +61,8 @@ export default function RegistroOrganizacionScreen() {
   const [mostrarFondo, setMostrarVideo] = useState(false);
 
   // Referencias para navegación entre inputs
+  const licenciaRef = useRef<TextInput>(null);
+  const razonSocialRef = useRef<TextInput>(null);
   const nombreComercialRef = useRef<TextInput>(null);
   const cifRef = useRef<TextInput>(null);
   const direccionFiscalRef = useRef<TextInput>(null);
@@ -65,13 +71,14 @@ export default function RegistroOrganizacionScreen() {
   const nombreAdminRef = useRef<TextInput>(null);
   const apellidosAdminRef = useRef<TextInput>(null);
   const dniAdminRef = useRef<TextInput>(null);
-  const emailAdminRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
   const telefonoAdminRef = useRef<TextInput>(null);
   const nssAdminRef = useRef<TextInput>(null);
   const fechaNacimientoAdminRef = useRef<TextInput>(null);
+  const emailAdminRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   // Estados de errores
+  const [errorLicencia, setErrorLicencia] = useState(false);
   const [errorRazonSocial, setErrorRazonSocial] = useState(false);
   const [errorCif, setErrorCif] = useState(false);
   const [errorDniAdmin, setErrorDniAdmin] = useState(false);
@@ -81,6 +88,8 @@ export default function RegistroOrganizacionScreen() {
   const [errorPassword, setErrorPassword] = useState(false);
 
   const opacidadTarjeta = useSharedValue(0);
+
+  const { mostrarError } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
@@ -93,6 +102,7 @@ export default function RegistroOrganizacionScreen() {
   }, [opacidadTarjeta]);
 
   const validarFormulario = () => {
+    const esLicenciaValida = validarTextoObligatorio(codigoLicencia, 3);
     const esRazonValida = validarTextoObligatorio(razonSocial, 3);
     const esCifValido = validarCifNifOrganizacion(cif);
     const esNombreAdminValido = validarTextoObligatorio(nombreAdmin, 2);
@@ -101,6 +111,7 @@ export default function RegistroOrganizacionScreen() {
     const esEmailValido = validarEmail(emailAdmin);
     const esPasswordValido = validarPassword(password, 6);
 
+    setErrorLicencia(!esLicenciaValida);
     setErrorRazonSocial(!esRazonValida);
     setErrorCif(!esCifValido);
     setErrorNombreAdmin(!esNombreAdminValido);
@@ -110,6 +121,7 @@ export default function RegistroOrganizacionScreen() {
     setErrorPassword(!esPasswordValido);
 
     return (
+      esLicenciaValida &&
       esRazonValida &&
       esCifValido &&
       esNombreAdminValido &&
@@ -121,12 +133,95 @@ export default function RegistroOrganizacionScreen() {
   };
 
   const handleRegistroOrganizacion = async () => {
-    if (!validarFormulario()) return;
+    // 1. Validar Licencia obligatoria
+    if (!validarTextoObligatorio(codigoLicencia, 3)) {
+      mostrarError(
+        "Por favor, introduce un código de licencia válido (mínimo 3 caracteres).",
+      );
+      return;
+    }
 
+    // 2. Validar Razón Social
+    if (!validarTextoObligatorio(razonSocial, 3)) {
+      mostrarError(
+        "Por favor, introduce la razón social de la empresa (mínimo 3 caracteres).",
+      );
+      return;
+    }
+
+    // 3. Validar CIF de la organización
+    if (!cif || cif.trim() === "") {
+      mostrarError("Por favor, introduce el CIF de la empresa.");
+      return;
+    }
+    if (!validarCifNifOrganizacion(cif)) {
+      mostrarError("El formato del CIF introducido no es válido.");
+      return;
+    }
+
+    // 4. Validar Administrador - Nombre y Apellidos
+    if (!validarTextoObligatorio(nombreAdmin, 2)) {
+      mostrarError(
+        "Por favor, introduce el nombre del administrador (mínimo 2 caracteres).",
+      );
+      return;
+    }
+    if (!validarTextoObligatorio(apellidosAdmin, 2)) {
+      mostrarError(
+        "Por favor, introduce los apellidos del administrador (mínimo 2 caracteres).",
+      );
+      return;
+    }
+
+    // 5. Validar DNI / NIF del Administrador
+    if (!dniAdmin || dniAdmin.trim() === "") {
+      mostrarError("Por favor, introduce el DNI/NIE del administrador.");
+      return;
+    }
+    if (!validarDniEspanol(dniAdmin)) {
+      mostrarError(
+        "El DNI del administrador debe tener 8 dígitos seguidos de una letra válida (ej: 12345678Z).",
+      );
+      return;
+    }
+
+    // 6. Validar Fecha de Nacimiento (si se introduce, verificar formato YYYY-MM-DD)
+    if (fechaNacimientoAdmin && fechaNacimientoAdmin.trim() !== "") {
+      const fechaRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+      if (!fechaRegex.test(fechaNacimientoAdmin.trim())) {
+        mostrarError(
+          "La fecha de nacimiento debe tener el formato YYYY-MM-DD (ej: 1990-01-01).",
+        );
+        return;
+      }
+    }
+
+    // 7. Validar Email del Administrador
+    if (!emailAdmin || emailAdmin.trim() === "") {
+      mostrarError(
+        "Por favor, introduce el correo electrónico del administrador.",
+      );
+      return;
+    }
+    if (!validarEmail(emailAdmin)) {
+      mostrarError(
+        "El formato del correo electrónico introducido no es válido.",
+      );
+      return;
+    }
+
+    // 8. Validar Contraseña
+    if (!validarPassword(password, 6)) {
+      mostrarError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    // Si todo es correcto, procedemos con el registro en el backend
     try {
       setCargando(true);
 
       await registrarOrganizacionCompleta({
+        codigo_licencia: codigoLicencia.trim().toUpperCase(),
         razon_social: razonSocial.trim(),
         nombre_comercial: nombreComercial.trim(),
         cif: cif.trim().toUpperCase(),
@@ -196,6 +291,52 @@ export default function RegistroOrganizacionScreen() {
             </ThemedText>
           </View>
 
+          {/* SECCIÓN: DATOS DE LICENCIA */}
+          <ThemedText style={styles.seccionSubtitulo}>
+            Licencia de Activación
+          </ThemedText>
+
+          <View style={styles.field}>
+            <ThemedText style={styles.label}>Código de Licencia *</ThemedText>
+            <View
+              style={[
+                styles.inputWrapper,
+                errorLicencia && styles.inputWrapperError,
+              ]}
+            >
+              <IconSymbol
+                name="vpn-key"
+                size={20}
+                color="#94A3B8"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                ref={licenciaRef}
+                value={codigoLicencia}
+                textContentType="none"
+                autoCapitalize="characters"
+                onChangeText={(text) => {
+                  setCodigoLicencia(text.toUpperCase());
+                  if (errorLicencia) setErrorLicencia(false);
+                }}
+                style={styles.inputContainer}
+                placeholder="Introduce tu código de licencia"
+                placeholderTextColor="#94A3B8"
+                editable={!cargando}
+                returnKeyType="next"
+                onSubmitEditing={() => razonSocialRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+            </View>
+            {errorLicencia && (
+              <ThemedText style={styles.errorText}>
+                El código de licencia es obligatorio.
+              </ThemedText>
+            )}
+          </View>
+
+          <View style={styles.divisor} />
+
           {/* SECCIÓN: DATOS DE LA EMPRESA */}
           <ThemedText style={styles.seccionSubtitulo}>
             Datos de la Empresa
@@ -217,6 +358,7 @@ export default function RegistroOrganizacionScreen() {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={razonSocialRef}
                 value={razonSocial}
                 onChangeText={(text) => {
                   setRazonSocial(text);
@@ -240,9 +382,7 @@ export default function RegistroOrganizacionScreen() {
 
           {/* Campo: Nombre Comercial */}
           <View style={styles.field}>
-            <ThemedText style={styles.label}>
-              Nombre Comercial (Opcional)
-            </ThemedText>
+            <ThemedText style={styles.label}>Nombre Comercial *</ThemedText>
             <View style={styles.inputWrapper}>
               <IconSymbol
                 name="store"
@@ -496,7 +636,7 @@ export default function RegistroOrganizacionScreen() {
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
                 returnKeyType="next"
-                onSubmitEditing={() => emailAdminRef.current?.focus()}
+                onSubmitEditing={() => telefonoAdminRef.current?.focus()}
                 blurOnSubmit={false}
               />
             </View>
@@ -703,6 +843,20 @@ export default function RegistroOrganizacionScreen() {
               ¿Ya tienes cuenta?{" "}
               <ThemedText style={styles.loginRedirectHighlight}>
                 Inicia Sesión
+              </ThemedText>
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            style={{ alignSelf: "center", marginTop: 20 }}
+          >
+            <ThemedText
+              style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}
+            >
+              Al registrar tu empresa, aceptas nuestra{" "}
+              <ThemedText style={{ color: "#2563EB", fontWeight: "700" }}>
+                Política de Privacidad
               </ThemedText>
             </ThemedText>
           </Pressable>

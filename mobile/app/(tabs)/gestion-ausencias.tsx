@@ -1,24 +1,24 @@
-import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
-import { obtenerRolPorId } from "@/src/modules/roles/api/services";
-import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
-import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import {
   obtenerAusenciasEmpresa,
   resolverSolicitudAusencia,
   solicitarAusencia,
-} from "@/src/modules/vacaciones/api/services";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+} from "@/src/modules/ausencias/api/services";
+import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
+import { obtenerRolPorId } from "@/src/modules/roles/api/services";
+import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
+import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import {
   AusenciaCreateRequest,
   AusenciaResponse,
@@ -26,7 +26,9 @@ import {
   ItemAusencia,
   TipoAusencia,
   TIPOS_AUSENCIA,
-} from "../../src/modules/vacaciones/types/ausencia";
+  TIPOS_AUSENCIA_LABELS,
+} from "../../src/modules/ausencias/types/ausencia";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row } from "../../src/shared/ui/AppSurface";
 
@@ -44,7 +46,7 @@ export default function GestionAusenciasScreen() {
     "pendientes",
   );
 
-  // Form states
+  // Estados para el formulario de creación de solicitudes de ausencia
   const [tipoAusencia, setTipoAusencia] = useState<TipoAusencia>("Vacaciones");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -57,24 +59,24 @@ export default function GestionAusenciasScreen() {
     return { pendientes, aprobadas, rechazadas };
   }, [ausencias]);
 
-  // Cargar lista de trabajadores de la empresa para el selector de RRHH
+  const { mostrarError } = useAppModal();
+
+  // Carga optimizada de trabajadores
   useEffect(() => {
     async function cargarTrabajadores() {
       if (!empresaActual?.id) return;
       try {
         const lista = await obtenerTrabajadoresEmpresa(empresaActual.id);
         if (Array.isArray(lista)) {
-          const trabajadoresFiltrados = (
+          const trabajadoresSinAdmin = (
             await Promise.all(
               lista.map(async (t: Trabajador) => {
-                if (!t.rol_id) return t; // Si no tiene rol, se mantiene
+                if (!t.rol_id) return t;
                 try {
                   const rol = await obtenerRolPorId(t.rol_id);
-                  // Comprueba si el rol corresponde a un administrador
                   const esAdmin =
-                    rol?.nombre.toLowerCase() == "admin_empresa" ||
-                    rol?.nombre.toLowerCase() == "admin_gestoría";
-
+                    rol?.nombre?.toLowerCase() === "admin_empresa" ||
+                    rol?.nombre?.toLowerCase() === "admin_gestoría";
                   return esAdmin ? null : t;
                 } catch {
                   return t;
@@ -83,6 +85,16 @@ export default function GestionAusenciasScreen() {
             )
           ).filter(Boolean) as Trabajador[];
 
+          const trabajadoresFiltrados = trabajadoresSinAdmin.sort((a, b) => {
+            const nombreA = `${a.nombre ?? ""} ${a.apellidos ?? ""}`
+              .trim()
+              .toLowerCase();
+            const nombreB = `${b.nombre ?? ""} ${b.apellidos ?? ""}`
+              .trim()
+              .toLowerCase();
+            return nombreA.localeCompare(nombreB);
+          });
+
           setTrabajadores(trabajadoresFiltrados);
           if (trabajadoresFiltrados.length > 0 && !trabajadorSeleccionadoId) {
             setTrabajadorSeleccionadoId(trabajadoresFiltrados[0].id);
@@ -90,7 +102,8 @@ export default function GestionAusenciasScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar la lista de trabajadores de la empresa: " + error,
+          "Error al cargar la lista de trabajadores de la empresa: " +
+            error.message,
         );
       }
     }
@@ -105,7 +118,6 @@ export default function GestionAusenciasScreen() {
 
     try {
       setCargando(true);
-
       const datosGlobales = await obtenerAusenciasEmpresa(empresaActual.id);
       const ausenciasConTrabajador = await Promise.all(
         (datosGlobales || []).map(async (ausencia: ItemAusencia) => {
@@ -127,7 +139,9 @@ export default function GestionAusenciasScreen() {
 
       setAusencias(ausenciasConTrabajador as AusenciaResponse[]);
     } catch (error: any) {
-      mostrarError("Error al cargar las ausencias de la empresa: " + error);
+      mostrarError(
+        "Error al cargar las ausencias de la empresa: " + error.message,
+      );
     } finally {
       setCargando(false);
     }
@@ -177,7 +191,9 @@ export default function GestionAusenciasScreen() {
       setFechaInicio("");
       setFechaFin("");
     } catch (error: any) {
-      mostrarError("Error al solicitar o asignar la ausencia: " + error);
+      mostrarError(
+        "Error al solicitar o asignar la ausencia: " + error.message,
+      );
     } finally {
       setCargando(false);
     }
@@ -323,66 +339,72 @@ export default function GestionAusenciasScreen() {
           </ThemedText>
           <Card>
             <View style={styles.contenedorForm}>
-              {/* Selector de Trabajador */}
               <ThemedText style={styles.label}>
                 1. Seleccionar Trabajador
               </ThemedText>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6, paddingBottom: 8 }}
-                style={{ marginBottom: 12 }}
-              >
-                {trabajadores.map((t: Trabajador) => (
-                  <Pressable
-                    key={t.id}
-                    style={[
-                      styles.opcionTrabajador,
-                      trabajadorSeleccionadoId === t.id &&
-                        styles.opcionTrabajadorActiva,
-                    ]}
-                    onPress={() => setTrabajadorSeleccionadoId(t.id)}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.textoTrabajador,
-                        trabajadorSeleccionadoId === t.id &&
-                          styles.textoTrabajadorActiva,
-                      ]}
-                    >
-                      {t.nombre} {t.apellidos ?? ""}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={trabajadorSeleccionadoId}
+                  onValueChange={(val) => setTrabajadorSeleccionadoId(val)}
+                  style={styles.picker}
+                >
+                  <Picker.Item
+                    label="Selecciona un trabajador"
+                    value=""
+                    enabled={false}
+                  />
+                  {trabajadores.map((t) => (
+                    <Picker.Item
+                      key={t.id}
+                      label={`${t.nombre} ${t.apellidos ?? ""}`.trim()}
+                      value={t.id}
+                    />
+                  ))}
+                </Picker>
+              </View>
 
               <ThemedText style={styles.label}>2. Tipo de Ausencia</ThemedText>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 6, paddingBottom: 8 }}
-                style={{ marginBottom: 12 }}
+              {/* Selector visual estilo píldoras */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginBottom: 12,
+                  marginTop: 4,
+                }}
               >
-                {Object.values(TIPOS_AUSENCIA).map((tipo) => (
-                  <Pressable
-                    key={tipo}
-                    style={[
-                      styles.opcionTrabajador,
-                      tipoAusencia === tipo && styles.opcionTrabajadorActiva,
-                    ]}
-                    onPress={() => setTipoAusencia(tipo)}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.textoTrabajador,
-                        tipoAusencia === tipo && styles.textoTrabajadorActiva,
-                      ]}
-                    >
-                      {tipo.replace(/_/g, " ")}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </ScrollView>
+                {(Object.values(TIPOS_AUSENCIA) as TipoAusencia[]).map(
+                  (tipo) => {
+                    const seleccionado = tipoAusencia === tipo;
+                    return (
+                      <Pressable
+                        key={tipo}
+                        onPress={() => setTipoAusencia(tipo)}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: seleccionado ? "#0284C7" : "#CBD5E1",
+                          backgroundColor: seleccionado ? "#E0F2FE" : "#F8FAFC",
+                        }}
+                      >
+                        <ThemedText
+                          style={{
+                            fontSize: 12,
+                            color: seleccionado ? "#0369A1" : "#334155",
+                            fontWeight: seleccionado ? "bold" : "normal",
+                          }}
+                        >
+                          {TIPOS_AUSENCIA_LABELS?.[tipo] ||
+                            tipo.replace(/_/g, " ")}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  },
+                )}
+              </View>
 
               <View style={styles.filaCampos}>
                 <View style={{ flex: 1 }}>
@@ -414,7 +436,7 @@ export default function GestionAusenciasScreen() {
                 value={comentario}
                 onChangeText={setComentario}
                 style={[styles.input, styles.textArea]}
-                placeholder="Introduce las razones del ajuste o notas de aprobación..."
+                placeholder="Introduce las razones del ajuste..."
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
               />
@@ -474,10 +496,19 @@ export default function GestionAusenciasScreen() {
                   </View>
 
                   <ThemedText style={styles.nombreTrabajador}>
-                    👤 Trabajador: {item.trabajador_id ?? "N/A"}
+                    👤 Trabajador:{" "}
+                    {item.trabajador?.nombre.concat(
+                      " ",
+                      item.trabajador.apellidos,
+                      " ",
+                      item.trabajador.dni_nif_nie,
+                    ) ?? "N/A"}
                   </ThemedText>
                   <ThemedText style={styles.itemTipo}>
-                    Tipo: {item.tipo_ausencia?.replace(/_/g, " ")}
+                    Tipo:{" "}
+                    {TIPOS_AUSENCIA_LABELS?.[
+                      item.tipo_ausencia as TipoAusencia
+                    ] || item.tipo_ausencia?.replace(/_/g, " ")}
                   </ThemedText>
                   <ThemedText style={styles.itemMotivo}>
                     Motivo: "{item.motivo}"
@@ -684,4 +715,48 @@ const styles = StyleSheet.create({
   botonRechazar: { backgroundColor: "#DC2626" },
   botonAprobar: { backgroundColor: "#16A34A" },
   textoBotonResolutor: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  picker: { height: 50, width: "100%", color: "#0F172A" },
+  botonAccionHeader: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textoBotonGuardar: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  contenedorFormDesplegado: {
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 16,
+  },
+  formularioTitulo: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 12,
+  },
+  campoFormulario: {
+    marginBottom: 12,
+  },
+  labelInput: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 4,
+  },
 });

@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
+import base64
+import os
+import uuid
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from typing import List, Any
@@ -17,6 +20,9 @@ from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.fichajes import Fichajes
 from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFichajeResponse
+from core.jornada import recalcular_resumen_jornada
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de correcciones de fichaje bajo el prefijo "/api/correcciones".
 router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
@@ -25,8 +31,22 @@ router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
 # Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
 
+def guardar_firma(data_firma: str | None) -> str | None:
+    if not data_firma:
+        return None
+    try:
+        data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
+        bytes_imagen = base64.b64decode(data_encoded)
+        nombre_archivo = f"firma_correccion_{uuid.uuid4().hex}.png"
+        os.makedirs("static/firmas", exist_ok=True)
+        with open(os.path.join("static/firmas", nombre_archivo), "wb") as buffer:
+            buffer.write(bytes_imagen)
+        return f"/api/archivos/firmas/{nombre_archivo}"
+    except Exception as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se pudo procesar la firma: {error}")
+
 @router.post("", response_model=CorreccionFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Solicitar corrección")
-@limiter.limit("20/minute")  # Protegido frente a peticiones masivas o automatizadas
+@limiter.limit("20/minute")  
 def solicitar_correccion(
     request: Request,
     obj_in: CorreccionFichajeCreate, 
@@ -61,11 +81,10 @@ def solicitar_correccion(
             detail=f"Trabajador con ID ({obj_in.trabajador_id}) no encontrado."
         )
 
-    usuario = db.query(Usuarios).filter(Usuarios.id == obj_in.solicitado_por_usuario_id).first()
-    if not usuario:
+    if not obj_in.firma_solicitante:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"Usuario solicitante con ID ({obj_in.solicitado_por_usuario_id}) no encontrado."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La solicitud de corrección debe incluir la firma digital de quien la presenta.",
         )
 
     if obj_in.fichaje_afectado_id:
@@ -83,9 +102,10 @@ def solicitar_correccion(
         tipo_evento_id=obj_in.tipo_evento_id,
         valor_nuevo=obj_in.valor_nuevo,
         motivo=obj_in.motivo,
-        solicitado_por_usuario_id=obj_in.solicitado_por_usuario_id,
+        solicitado_por_usuario_id=usuario_actual.id,
         fichaje_afectado_id=obj_in.fichaje_afectado_id,
         valor_anterior=obj_in.valor_anterior,
+        firma_solicitante=guardar_firma(obj_in.firma_solicitante),
         estado=EstadoCorreccionEnum.PENDIENTE
     )
 
@@ -100,30 +120,35 @@ def solicitar_correccion(
             joinedload(CorreccionesFichaje.aprobado_por_usuario)
         ).filter(CorreccionesFichaje.id == nueva_correccion.id).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "correcciones_fichaje", "accion": "crear", "entidad_id": str(nueva_correccion.id), "detalles": f"Se creó la solicitud de corrección {nueva_correccion.id}"}
+        )
+        
         return correccion_creada
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al registrar la solicitud de corrección: {str(error)}"
+            detail=f"No se ha podido registrar la solicitud de corrección: {str(error)}"
         )
 
 
 @router.put("/{id_correccion}/resolver", response_model=CorreccionFichajeResponse, summary="Resolver incidencia de corrección")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def resolver_incidencia(
     request: Request,
     id_correccion: UUID, 
     nuevo_estado: EstadoCorreccionEnum, 
     resolutor_usuario_id: UUID, 
+    firma_resolutor: str = Body(..., embed=True),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
-    """
-    **PUT /api/correcciones/{id_correccion}/resolver**
-    
-    Permite aprobar o rechazar una solicitud de corrección pendiente, aplicando los cambios necesarios en los fichajes.
-    """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de resolución de incidencia {id_correccion} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -152,29 +177,27 @@ def resolver_incidencia(
             detail="Acción bloqueada: Esta incidencia ya fue resuelta previamente."
         )
 
+    if not firma_resolutor:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La resolución debe incluir la firma digital de quien la valida o rechaza.",
+        )
+
     try:
         incidencia.estado = nuevo_estado
-        incidencia.aprobado_por_usuario_id = resolutor_usuario_id  
+        incidencia.aprobado_por_usuario_id = usuario_actual.id  
         incidencia.fecha_resolucion = datetime.now()
+        incidencia.firma_resolutor = guardar_firma(firma_resolutor)
+
+        fecha_hora_propuesta: datetime | None = None
 
         if nuevo_estado == EstadoCorreccionEnum.APROBADA:
             fichaje_original = db.query(Fichajes).filter(Fichajes.id == incidencia.fichaje_afectado_id).first()
-            
-            if incidencia.tipo_correccion in [TipoCorreccionEnum.ANULACION, TipoCorreccionEnum.MODIFICACION]:
-                if fichaje_original:
-                    fichaje_original.estado = EstadoFichajeEnum.PENDIENTE_REVISION
-                    fichaje_original.hash_integridad = calcular_hash_fichaje(
-                        trabajador_id=str(fichaje_original.trabajador_id),
-                        empresa_id=str(fichaje_original.empresa_id),
-                        tipo_evento_id=str(fichaje_original.tipo_evento_id),
-                        fecha_iso=fichaje_original.fecha_hora.isoformat()
-                    )
             
             if incidencia.tipo_correccion in [TipoCorreccionEnum.MODIFICACION, TipoCorreccionEnum.ALTA_MANUAL]:
                 v_nuevo = incidencia.valor_nuevo or {}
                 fecha_str = v_nuevo.get("fecha_descuadre")   
                 hora_str = v_nuevo.get("hora_propuesta")    
-                evento_input: Any = v_nuevo.get("evento_solicitado") 
 
                 if not fecha_str or not hora_str:
                     raise HTTPException(
@@ -228,18 +251,43 @@ def resolver_incidencia(
                     latitud=latitud,      
                     longitud=longitud,    
                     fichaje_sustituido_id=incidencia.fichaje_afectado_id, 
+                    firma_digital=incidencia.firma_solicitante,
                     observaciones=f"Fichaje corrector mediante incidencia: {incidencia.motivo}"
                 )
                 db.add(nuevo_fichaje)
 
+            if fichaje_original is not None and getattr(fichaje_original, 'fecha_hora', None):
+                fecha_resumen = fichaje_original.fecha_hora.date()
+                setattr(fichaje_original, 'estado', EstadoFichajeEnum.PENDIENTE_REVISION)
+            elif fecha_hora_propuesta is not None:
+                fecha_resumen = fecha_hora_propuesta.date()
+            else:
+                fecha_resumen = datetime.now().date()
+
+            recalcular_resumen_jornada(
+                db,
+                incidencia.empresa_id,
+                incidencia.trabajador_id,
+                fecha_resumen,
+            )
+
         db.commit()
-        
+
         incidencia_actualizada = db.query(CorreccionesFichaje).options(
             joinedload(CorreccionesFichaje.empresa),
             joinedload(CorreccionesFichaje.trabajador),
             joinedload(CorreccionesFichaje.solicitado_por_usuario),
             joinedload(CorreccionesFichaje.aprobado_por_usuario)
         ).filter(CorreccionesFichaje.id == id_correccion).first()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=incidencia.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "correcciones_fichaje", "accion": "resolver", "entidad_id": str(id_correccion), "detalles": f"Se resolvió la incidencia {id_correccion} con estado {nuevo_estado}"}
+        )
         
         return incidencia_actualizada
 
@@ -250,17 +298,16 @@ def resolver_incidencia(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al resolver la corrección de fichajes: {str(e)}"
+            detail=f"No se ha podido resolver la corrección de fichajes: {str(e)}"
         )
-    
 
 @router.delete("/{id_correccion}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar solicitud de corrección")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def eliminar_solicitud_correccion(
     request: Request,
     id_correccion: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **DELETE /api/correcciones/{id_correccion}**
@@ -286,19 +333,30 @@ def eliminar_solicitud_correccion(
             )
 
     try:
+        empresa_id_solicitud = solicitud.empresa_id
         db.delete(solicitud)
         db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=empresa_id_solicitud,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={"recurso": "correcciones_fichaje", "accion": "eliminar", "entidad_id": str(id_correccion), "detalles": f"Se eliminó la solicitud de corrección {id_correccion}"}
+        )
+
         return
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al eliminar la solicitud de corrección: {str(error)}"
+            detail=f"No se ha podido eliminar la solicitud de corrección: {str(error)}"
         )
 
 
 @router.get("/empresa/{id_empresa}", response_model=List[CorreccionFichajeResponse], summary="Obtener correcciones por empresa")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de correcciones por empresa
+@limiter.limit("60/minute") 
 def obtener_correcciones_por_empresa(
     request: Request,
     id_empresa: UUID, 
@@ -319,7 +377,7 @@ def obtener_correcciones_por_empresa(
             detail="Acceso denegado. No tienes autorización para consultar las correcciones de esta empresa."
         )
 
-    return (
+    resultados = (
         db.query(CorreccionesFichaje)
         .options(
             joinedload(CorreccionesFichaje.empresa),
@@ -330,10 +388,21 @@ def obtener_correcciones_por_empresa(
         .filter(CorreccionesFichaje.empresa_id == id_empresa)
         .all()
     )
+    
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "correcciones_fichaje", "accion": "consultar_por_empresa", "detalles": f"Se consultaron las correcciones de la empresa {id_empresa}"}
+    )
+    
+    return resultados
 
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[CorreccionFichajeResponse], summary="Obtener correcciones por trabajador")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de correcciones por trabajador
+@limiter.limit("60/minute")  
 def obtener_correcciones_por_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -362,7 +431,7 @@ def obtener_correcciones_por_trabajador(
                 detail="Acceso denegado. No tienes permisos para consultar las correcciones de este trabajador."
             )
 
-    return (
+    resultados = (
         db.query(CorreccionesFichaje)
         .options(
             joinedload(CorreccionesFichaje.empresa),
@@ -373,3 +442,14 @@ def obtener_correcciones_por_trabajador(
         .filter(CorreccionesFichaje.trabajador_id == id_trabajador)
         .all()
     )
+    
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "correcciones_fichaje", "accion": "consultar_por_trabajador", "entidad_id": str(id_trabajador), "detalles": f"Se consultaron las correcciones del trabajador {id_trabajador}"}
+    )
+    
+    return resultados

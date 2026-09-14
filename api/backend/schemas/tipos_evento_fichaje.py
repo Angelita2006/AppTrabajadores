@@ -30,6 +30,7 @@ class TipoEventoFichajeUpdate(BaseModel):
     codigo: Optional[str] = Field(None, max_length=30)
     descripcion: Optional[str] = Field(None, max_length=150)
     computa_como_trabajo: Optional[bool] = None
+    activo: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,6 +40,7 @@ class TipoEventoFichajeSimpleResponse(TipoEventoFichajeBase):
     """
     id: Optional[uuid.UUID] = None
     empresa_id: Optional[uuid.UUID] = None
+    activo: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 

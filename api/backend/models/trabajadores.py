@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, CheckConstraint, text
+from sqlalchemy import Boolean, Date, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, CheckConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 
@@ -12,6 +12,7 @@ class Trabajadores(Base):
         ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='SET NULL', name='trabajadores_rol_id_fkey'),
         PrimaryKeyConstraint('id', name='trabajadores_pkey'),
         UniqueConstraint('empresa_id', 'dni_nif_nie', name='trabajadores_empresa_id_dni_nif_nie_key'),
+        Index('trabajadores_email_activo_key', 'email', unique=True, postgresql_where=text('activo IS TRUE AND email IS NOT NULL')),
         CheckConstraint("dni_nif_nie ~ '^[XYZ0-9][0-9]{7}[A-Za-z]$'", name='check_dni_nif_nie_formato_valido'),
         CheckConstraint("email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'", name='check_email_formato_valido'),
         {'comment': 'Trabajadores de cada empresa cliente. El derecho de supresión '

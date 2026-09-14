@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -11,6 +11,8 @@ from models.empresas import Empresas
 from models.politicas_retencion import PoliticasRetencion
 from models.usuarios import Usuarios
 from schemas.politicas_retencion import PoliticaRetencionCreate, PoliticaRetencionResponse
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # Configuración del enrutador para la gestión de políticas de retención de datos y cumplimiento legal
 router = APIRouter(prefix="/api/politicas-retencion", tags=["Políticas de Retención"])
@@ -20,7 +22,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.get("/global", response_model=Optional[PoliticaRetencionResponse], summary="Obtener política global por defecto")
-@limiter.limit("60/minute") # Limita las consultas masivas de directivas globales para proteger el rendimiento
+@limiter.limit("60/minute") 
 def obtener_politica_global_defecto(
     request: Request,
     db: Session = Depends(get_db),
@@ -31,7 +33,6 @@ def obtener_politica_global_defecto(
     
     Recupera la directiva general del sistema bajo autenticación activa.
     """
-    # Registrar la dirección IP del cliente y trazas de auditoría de acceso
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de política global de retención desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -50,11 +51,22 @@ def obtener_politica_global_defecto(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No se ha configurado ninguna política de retención global por defecto en el servidor."
         )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=usuario_actual.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "politicas_retencion", "accion": "obtener_global", "entidad_id": str(politica_global.id), "detalles": "Se consultó la política de retención global por defecto"}
+    )
+    db.commit()
+
     return politica_global
 
 
 @router.get("/empresa/{id_empresa}", response_model=PoliticaRetencionResponse, summary="Obtener política aplicable a empresa")
-@limiter.limit("60/minute") # Limita las consultas individuales de políticas por empresa
+@limiter.limit("60/minute") 
 def obtener_politica_aplicable_empresa(
     request: Request,
     id_empresa: UUID, 
@@ -66,7 +78,6 @@ def obtener_politica_aplicable_empresa(
     
     Busca la directiva de una empresa validando que el usuario tenga acceso a dicho tenant.
     """
-    # Registrar la dirección IP del cliente y trazas de auditoría
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de política de retención para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -96,11 +107,22 @@ def obtener_politica_aplicable_empresa(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No se ha encontrado ninguna política aplicable (ni personalizada ni global) para esta empresa."
         )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "politicas_retencion", "accion": "obtener_por_empresa", "entidad_id": str(politica.id), "detalles": f"Se consultó la política de retención aplicable para la empresa {id_empresa}"}
+    )
+    db.commit()
+
     return politica
 
 
 @router.post("", response_model=PoliticaRetencionResponse, status_code=status.HTTP_201_CREATED, summary="Crear política de retención")
-@limiter.limit("15/minute") # Protegido frente a la creación masiva de directivas de retención
+@limiter.limit("15/minute") 
 def crear_politica_retencion(
     request: Request,
     obj_in: PoliticaRetencionCreate, 
@@ -112,7 +134,6 @@ def crear_politica_retencion(
     
     Establece una nueva directiva de retención validando permisos de administrador y tenant.
     """
-    # Registrar metadatos de red y auditoría de la creación
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de creación de política de retención desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -154,6 +175,16 @@ def crear_politica_retencion(
         )
         
         db.add(nueva_politica)
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "politicas_retencion", "accion": "crear_politica", "entidad_id": str(nueva_politica.id), "detalles": f"Se creó una nueva política de retención para la empresa {obj_in.empresa_id}"}
+        )
+
         db.commit()
         
         politica_creada = db.query(PoliticasRetencion).options(
@@ -168,12 +199,12 @@ def crear_politica_retencion(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ha ocurrido un error al guardar la política de retención: {str(error)}"
+            detail=f"No se ha podido guardar la política de retención: {str(error)}"
         )
 
 
 @router.put("/{id_politica}", response_model=PoliticaRetencionResponse, summary="Actualizar años de retención")
-@limiter.limit("15/minute") # Protegido frente a modificaciones masivas no deseadas de plazos legales
+@limiter.limit("15/minute") 
 def actualizar_anios_retencion(
     request: Request,
     id_politica: UUID, 
@@ -186,7 +217,6 @@ def actualizar_anios_retencion(
     
     Modifica la cantidad de años vigilando el cumplimiento legal y la autorización del tenant.
     """
-    # Registrar metadatos de red y auditoría de la actualización
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de actualización de la política {id_politica} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -218,6 +248,15 @@ def actualizar_anios_retencion(
     setattr(politica, "anios_conservacion", nuevos_anios)
     
     try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=politica.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "politicas_retencion", "accion": "actualizar_anios", "entidad_id": str(id_politica), "detalles": f"Se actualizaron los años de retención a {nuevos_anios} para la política {id_politica}"}
+        )
+
         db.commit()
         
         politica_actualizada = db.query(PoliticasRetencion).options(
@@ -229,5 +268,5 @@ def actualizar_anios_retencion(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar la política de retención: {str(error)}"
+            detail=f"No se ha podido actualizar la política de retención: {str(error)}"
         )

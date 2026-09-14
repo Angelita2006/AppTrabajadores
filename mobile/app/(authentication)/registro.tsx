@@ -1,5 +1,6 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -48,6 +49,7 @@ export default function RegistroScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const opacidadTarjeta = useSharedValue(0);
+  const { mostrarError } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
@@ -107,7 +109,8 @@ export default function RegistroScreen() {
       }
     } catch (error: any) {
       mostrarError(
-        "Error al completar el registro y vinculación del usuario: " + error,
+        "Error al completar el registro y vinculación del usuario: " +
+          error.message,
       );
     } finally {
       setCargando(false);
@@ -344,6 +347,20 @@ export default function RegistroScreen() {
               ¿Ya tienes cuenta?{" "}
               <ThemedText style={{ color: "#2563EB" }}>
                 Inicia Sesión
+              </ThemedText>
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            style={{ alignSelf: "center", marginTop: 20 }}
+          >
+            <ThemedText
+              style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}
+            >
+              Al registrarte, aceptas nuestra{" "}
+              <ThemedText style={{ color: "#2563EB", fontWeight: "700" }}>
+                Política de Privacidad
               </ThemedText>
             </ThemedText>
           </Pressable>

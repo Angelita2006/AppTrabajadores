@@ -57,10 +57,17 @@ export default function TabDepartamentos({
   styles,
 }: TabDepartamentosProps) {
   const [mostrarFormDepartamento, setMostrarFormDepartamento] = useState(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState(false);
   const [nombreDepto, setNombreDepto] = useState("");
   const [departamentoEnEdicion, setDepartamentoEnEdicion] =
     useState<Departamento | null>(null);
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
+  const departamentosActivos = departamentosEmpresa.filter(
+    (departamento) => departamento.activo !== false,
+  );
+  const departamentosInactivos = departamentosEmpresa.filter(
+    (departamento) => departamento.activo === false,
+  );
 
   // ==========================================
   // CREACIÓN DE DEPARTAMENTOS
@@ -88,7 +95,7 @@ export default function TabDepartamentos({
       setMostrarFormDepartamento(false);
       mostrarMensaje("Éxito", "Departamento creado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el departamento: " + error);
+      mostrarError("Error al crear el departamento: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -129,7 +136,7 @@ export default function TabDepartamentos({
       setNombreDepto("");
       setCentroTrabajoId("");
     } catch (error: any) {
-      mostrarError("Error al actualizar el departamento: " + error);
+      mostrarError("Error al actualizar el departamento: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -147,11 +154,15 @@ export default function TabDepartamentos({
         setGuardando(true);
         await eliminarDepartamento(departamentoId);
         setDepartamentosEmpresa((prev: Departamento[]) =>
-          prev.filter((d: Departamento) => d.id !== departamentoId),
+          prev.map((d: Departamento) =>
+            d.id === departamentoId ? { ...d, activo: false } : d,
+          ),
         );
-        mostrarMensaje("Éxito", "Departamento eliminado correctamente.");
+        mostrarMensaje("Éxito", "Departamento enviado a la papelera.");
       } catch (error: any) {
-        mostrarError("Error al eliminar el departamento: " + error);
+        mostrarError("Error al eliminar el departamento: " + error.message);
+      } finally {
+        setGuardando(false);
       }
     };
 
@@ -175,6 +186,25 @@ export default function TabDepartamentos({
           },
         ],
       );
+    }
+  };
+
+  const handleReactivarDepartamento = async (departamentoId: string) => {
+    try {
+      setGuardando(true);
+      await editarDepartamento(departamentoId, { activo: true });
+      setDepartamentosEmpresa((prev) =>
+        prev.map((departamento) =>
+          departamento.id === departamentoId
+            ? { ...departamento, activo: true }
+            : departamento,
+        ),
+      );
+      mostrarMensaje("Éxito", "Departamento reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError("Error al reactivar el departamento: " + error.message);
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -228,9 +258,11 @@ export default function TabDepartamentos({
               enabled={!guardando}
             >
               <Picker.Item label="Seleccionar centro..." value="" />
-              {centrosEmpresa.map((ct: CentroTrabajo) => (
-                <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
-              ))}
+              {centrosEmpresa
+                .filter((ct) => ct.activo === true)
+                .map((ct: CentroTrabajo) => (
+                  <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
+                ))}
             </Picker>
           </View>
           <Pressable
@@ -257,7 +289,7 @@ export default function TabDepartamentos({
         Departamentos Activos
       </ThemedText>
 
-      {departamentosEmpresa.map((dept: Departamento) => {
+      {departamentosActivos.map((dept: Departamento) => {
         const centro: CentroTrabajo | undefined = centrosEmpresa.find(
           (c: CentroTrabajo) => c.id === dept.centro_trabajo_id,
         );
@@ -348,9 +380,15 @@ export default function TabDepartamentos({
                   enabled={!guardando}
                 >
                   <Picker.Item label="Seleccionar centro..." value="" />
-                  {centrosEmpresa.map((ct: CentroTrabajo) => (
-                    <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
-                  ))}
+                  {centrosEmpresa
+                    .filter((ct) => ct.activo === true)
+                    .map((ct: CentroTrabajo) => (
+                      <Picker.Item
+                        key={ct.id}
+                        label={ct.nombre}
+                        value={ct.id}
+                      />
+                    ))}
                 </Picker>
                 <Pressable
                   style={[
@@ -390,6 +428,39 @@ export default function TabDepartamentos({
           </View>
         );
       })}
+
+      {departamentosInactivos.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable
+            style={[styles.botonAccionHeader, { backgroundColor: "#64748B" }]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+            disabled={guardando}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${departamentosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+          {mostrarPapelera &&
+            departamentosInactivos.map((departamento) => (
+              <View key={departamento.id} style={styles.itemListaEstructural}>
+                <ThemedText style={styles.nombreElementoLista}>
+                  {departamento.nombre}
+                </ThemedText>
+                <Pressable
+                  style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
+                  onPress={() => handleReactivarDepartamento(departamento.id)}
+                  disabled={guardando}
+                >
+                  <ThemedText style={styles.textoBotonGuardar}>
+                    ↻ Reactivar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+        </View>
+      )}
     </View>
   );
 }

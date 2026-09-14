@@ -1,5 +1,5 @@
 import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
 
@@ -24,6 +24,7 @@ class EmpresaCreate(EmpresaBase):
     Esquema utilizado para recibir los datos de registro de una empresa desde el cliente.
     Contiene campos opcionales del expediente fiscal que pueden omitirse temporalmente.
     """
+    codigo_licencia: str = Field(..., min_length=4, max_length=50, description="Código de licencia de activación para el registro")
     nombre_comercial: Optional[str] = Field(None, max_length=255, description="Nombre de marca o comercial")
     codigo_cnae: Optional[str] = Field(None, max_length=10, description="Clasificación Nacional de Actividades Económicas")
     convenio_colectivo: Optional[str] = Field(None, max_length=255, description="Convenio de aplicación sectorial")
@@ -64,5 +65,32 @@ class EmpresaResponse(EmpresaBase):
     direccion_fiscal: Optional[str] = Field(None, description="Dirección fiscal")
     fecha_baja: Optional[datetime.date] = Field(None, description="Fecha de baja del cliente si aplica")
     logo_url: Optional[str] = Field(None, description="Ruta o URL del logotipo corporativo") 
+
+    model_config = ConfigDict(from_attributes=True)
+
+class RegistroOrganizacionCompletaDTO(BaseModel):
+    codigo_licencia: str
+    razon_social: str
+    nombre_comercial: Optional[str] = None
+    cif: str
+    direccion_fiscal: str
+    codigo_cnae: Optional[str] = None
+    convenio_colectivo: Optional[str] = None
+    logo_url: Optional[str] = None
+    
+    # Datos del Administrador / Primer Trabajador
+    nombre_admin: str
+    apellidos_admin: str
+    dni_nif_nie_admin: str
+    email_admin: EmailStr
+    password_raw: str
+    telefono_admin: Optional[str] = None
+    nss_admin: Optional[str] = None
+    fecha_nacimiento_admin: Optional[datetime.date] = None
+
+class RespuestaRegistroCompletoDTO(BaseModel):
+    empresa: dict
+    trabajador: dict
+    usuario: dict
 
     model_config = ConfigDict(from_attributes=True)

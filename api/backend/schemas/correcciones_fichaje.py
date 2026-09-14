@@ -30,7 +30,7 @@ class CorreccionFichajeCreate(CorreccionFichajeBase):
     """
     Esquema utilizado para recibir los datos al solicitar una nueva corrección.
     """
-    solicitado_por_usuario_id: UUID = Field(..., description="ID del usuario que realiza la petición")
+    firma_solicitante: Optional[str] = Field(None, description="Firma digital del usuario que solicita la corrección")
 
 class CorreccionFichajeUpdate(BaseModel):
     """
@@ -53,6 +53,8 @@ class CorreccionFichajeSimpleResponse(CorreccionFichajeBase):
     aprobado_por_usuario_id: Optional[UUID] = Field(None, description="ID del usuario que aprobó/resolvió la incidencia")
     fecha_solicitud: datetime.datetime = Field(..., description="Fecha y hora de la solicitud")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha y hora de la resolución")
+    firma_solicitante: Optional[str] = Field(None, description="Ruta de la firma del solicitante")
+    firma_resolutor: Optional[str] = Field(None, description="Ruta de la firma del resolutor")
 
     model_config = ConfigDict(from_attributes=True)
 

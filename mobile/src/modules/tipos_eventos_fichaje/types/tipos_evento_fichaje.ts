@@ -42,6 +42,8 @@ export interface TipoEventoFichaje {
   descripcion: string;
   /** Indicador booleano que determina si el evento computa como tiempo efectivo de trabajo. */
   computa_como_trabajo: boolean;
+  /** Indicador booleano que determina si el tipo de evento se encuentra activo. */
+  activo?: boolean;
 
   /** Detalles de la empresa asociada (relación anidada opcional). */
   empresa?: Empresa | null;
@@ -59,16 +61,20 @@ export interface TipoEventoFichajeCreate {
   descripcion: string;
   /** Indicador booleano opcional que determina si el evento computa como tiempo efectivo de trabajo. */
   computa_como_trabajo: boolean;
+  /** Indicador booleano opcional que determina si el tipo de evento se encuentra activo. */
+  activo?: boolean;
 }
 
 /**
- * Esquema para la actualización parcial de un tipo de evento de fichaje existente (PATCH /api/tipos-evento-fichaje/{id}).
+ * Esquema para la actualización parcial de un tipo de evento de fichaje existente (PUT /api/tipos-evento-fichaje/{id}).
  */
 export interface TipoEventoFichajeUpdate {
   /** Código único identificativo del tipo de evento a modificar. */
-  codigo: string;
+  codigo?: string;
   /** Descripción detallada del tipo de evento de fichaje. */
-  descripcion: string;
+  descripcion?: string;
   /** Indicador booleano que determina si el evento computa como tiempo efectivo de trabajo. */
-  computa_como_trabajo: boolean;
+  computa_como_trabajo?: boolean;
+  /** Indicador booleano opcional que determina si el tipo de evento se encuentra activo. */
+  activo?: boolean;
 }

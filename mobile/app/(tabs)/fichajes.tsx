@@ -3,6 +3,7 @@ import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignaci
 import { obtenerCalendarioLaboral } from "@/src/modules/calendarios-laborales/api/services";
 import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/calendario";
 import { obtenerContratoActivoTrabajador } from "@/src/modules/contratos/api/services";
+import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
 import { obtenerFichajesEmpresaPorFecha } from "@/src/modules/fichajes/api/services";
 import {
   DIAS_SEMANA,
@@ -18,7 +19,8 @@ import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import {
   capitalizar,
   extraerHora,
@@ -35,13 +37,14 @@ import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
+  Image,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
+
 export interface TurnoConAsignacion extends Turno {
   turno_id: string;
   fecha_real: string;
@@ -57,6 +60,7 @@ export interface DetalleDiaTrabajador {
 export interface TrabajadorConFichajesSemanales extends Partial<Trabajador> {
   id: string;
   nombre: string;
+  apellidos?: string;
   tipoJornada?: string;
   tipoContrato?: string;
   diasAsignados?: string | string[] | number[];
@@ -65,6 +69,23 @@ export interface TrabajadorConFichajesSemanales extends Partial<Trabajador> {
   calendario_id?: string | null;
   dias: Record<string, DetalleDiaTrabajador>;
 }
+
+const escaparHtml = (valor: unknown): string =>
+  String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const firmaComoHtml = (firma?: string | null): string => {
+  if (!firma) return '<span class="sin-firma">Sin firma</span>';
+
+  const urlFirma = obtenerUrlLogo(firma);
+  if (!urlFirma) return '<span class="sin-firma">Sin firma</span>';
+
+  return `<img class="firma-fichaje" src="${escaparHtml(urlFirma)}" alt="Firma del trabajador" />`;
+};
 
 export default function FichajesHistorialScreen() {
   const { empresaActual, usuarioActual } = useSesion();
@@ -76,19 +97,20 @@ export default function FichajesHistorialScreen() {
   }>({});
   const [tiposEventosEmpresa, setTiposEventosEmpresa] =
     useState<TipoEventoFichaje[]>();
-  const [calendariosFestivos, setCalendariosFestivos] = useState<
-    CalendarioFestivo[]
-  >([]);
+  const [, setCalendariosFestivos] = useState<CalendarioFestivo[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [fechaReferencia, setFechaReferencia] = useState<Date>(new Date());
   const [mapaTurnosObjetos, setMapaTurnosObjetos] = useState<{
     [key: string]: TurnoConAsignacion[];
   }>({});
+
+  const { mostrarError } = useAppModal();
+
   const [
     trabajadoresSeleccionadosParaPdf,
     setTrabajadoresSeleccionadosParaPdf,
   ] = useState<string[]>([]);
-  const [cargandoPdf, setCargandoPdf] = useState(false);
+  const [cargandoPdf] = useState(false);
 
   const lunesSemanaActual = useMemo(() => {
     const d = new Date(fechaReferencia);
@@ -118,10 +140,9 @@ export default function FichajesHistorialScreen() {
         usuarioActual?.tipo_usuario !== "Admin_empresa" &&
         usuarioActual?.tipo_usuario !== "Admin_gestoría" &&
         usuarioActual?.tipo_usuario !== "Auditor_itss" &&
-        usuarioActual?.tipo_usuario != "Rrhh"
+        usuarioActual?.tipo_usuario !== "Rrhh"
       )
         return;
-
       setCargando(true);
       const promesasFichajes = [];
       for (let i = 0; i < 6; i++) {
@@ -133,29 +154,41 @@ export default function FichajesHistorialScreen() {
         )
           .toISOString()
           .split("T")[0];
-
         promesasFichajes.push(
-          obtenerFichajesEmpresaPorFecha(
+          await obtenerFichajesEmpresaPorFecha(
             empresaActual?.id || "",
             fechaLocalStr,
           ).catch((error: any) => {
             mostrarError(
-              `No se pudieron obtener fichajes para la fecha ${fechaLocalStr} (${fechaLocalStr}): ` +
-                error,
+              `No se pudieron obtener fichajes para la fecha ${fechaLocalStr}: ` +
+                error.message,
             );
             return [];
           }),
         );
       }
+      const todosLosFichajes: RegistroFichaje[] = promesasFichajes.flat();
+      const idsFichajesSustituidos = new Set(
+        todosLosFichajes
+          .map((fichaje) => fichaje.fichaje_sustituido_id)
+          .filter((id): id is string => Boolean(id)),
+      );
 
-      const resultadosDias = await Promise.all(promesasFichajes);
-      const todosLosFichajes: RegistroFichaje[] = resultadosDias.flat();
+      // let mensaje = "";
+
+      // todosLosFichajes.forEach((f) => {
+      //   mensaje += f.id + " ";
+      // });
+
+      // console.error(mensaje);
 
       const fichajesValidos = todosLosFichajes.filter((f: RegistroFichaje) => {
         const estadoLimpio = f.estado?.trim().toLowerCase() || "";
-        return estadoLimpio === "válido" || estadoLimpio === "valido";
+        return (
+          (estadoLimpio === "válido" || estadoLimpio === "valido") &&
+          !idsFichajesSustituidos.has(f.id)
+        );
       });
-
       setFichajesSemanales(fichajesValidos);
 
       const tiposEventosEmpresaData = await obtenerTiposEventosEmpresa(
@@ -171,7 +204,6 @@ export default function FichajesHistorialScreen() {
         {};
       const nuevoMapaDatosFiscales: { [key: string]: any } = {};
       const todosLosCalendariosRecogidos: CalendarioFestivo[] = [];
-
       const lunesStr = new Date(
         lunesSemanaActual.getTime() -
           lunesSemanaActual.getTimezoneOffset() * 60000,
@@ -197,7 +229,6 @@ export default function FichajesHistorialScreen() {
         const fechaFin = asignacion.fecha_fin
           ? asignacion.fecha_fin.split("T")[0]
           : null;
-
         if (fechaInicio && fechaInicio > sabadoStr) return false;
         if (fechaFin && fechaFin < lunesStr) return false;
         return true;
@@ -210,7 +241,6 @@ export default function FichajesHistorialScreen() {
             idTrabajador,
             empresaActual!.id,
           );
-
           let calendarioIdAsociado = null;
           if (contratoActivo?.calendario_laboral_id) {
             try {
@@ -220,18 +250,16 @@ export default function FichajesHistorialScreen() {
               todosLosCalendariosRecogidos.push(calendarioConFestivos);
             } catch (error: any) {
               mostrarError(
-                `No se pudo obtener el calendario asociado al contrato para el trabajador ${idTrabajador} (${idTrabajador}): ` +
-                  error,
+                `No se pudo obtener el calendario para el trabajador ${idTrabajador}: ` +
+                  error.message,
               );
             }
           }
-
           const asignacionesTurno: AsignacionTurno[] =
             await obtenerAsignacionesTurnoTrabajador(idTrabajador);
           const asignacionesVigentes = Array.isArray(asignacionesTurno)
             ? asignacionesTurno.filter(esAsignacionVigenteEnSemana)
             : [];
-
           const conjuntoDias = new Set<string>();
           if (asignacionesVigentes.length > 0) {
             for (const asig of asignacionesVigentes) {
@@ -246,7 +274,6 @@ export default function FichajesHistorialScreen() {
               }
             }
           }
-
           const diasOrdenados = DIAS_SEMANA.filter((dia) =>
             conjuntoDias.has(dia),
           );
@@ -262,8 +289,11 @@ export default function FichajesHistorialScreen() {
             horas_semana: capitalizar(
               contratoActivo?.horas_semana?.toString().substring(0, 2) || "40",
             ),
-            nif_nie: trabajador?.dni_nif_nie || "",
+            dni_nif_nie: trabajador?.dni_nif_nie || "",
             numero_seguridad_social: trabajador?.numero_seguridad_social || "",
+            nombre: trabajador?.nombre || "",
+            apellidos: trabajador?.apellidos || "",
+            foto_url: trabajador?.foto_url || "",
             calendario_id: calendarioIdAsociado || null,
           };
 
@@ -293,17 +323,18 @@ export default function FichajesHistorialScreen() {
           }
         } catch (error: any) {
           mostrarError(
-            `Error procesando datos del trabajador ${idTrabajador} (${idTrabajador}): ` +
-              error,
+            `Error procesando datos del trabajador ${idTrabajador}: ` +
+              error.message,
           );
         }
       }
-
       setCalendariosFestivos(todosLosCalendariosRecogidos);
       setMapaDatosFiscales(nuevoMapaDatosFiscales);
       setMapaTurnosObjetos(nuevoMapaObjetosTurnos);
     } catch (error: any) {
-      mostrarError("Error general al cargar fichajes y turnos: " + error);
+      mostrarError(
+        "Error general al cargar fichajes y turnos: " + error.message,
+      );
     } finally {
       setCargando(false);
     }
@@ -325,7 +356,6 @@ export default function FichajesHistorialScreen() {
       lunesSemanaActual.getMonth(),
       lunesSemanaActual.getDate() + 6,
     );
-
     const listaFiltrada = lista.filter((t: TurnoConAsignacion) => {
       if (!t.fecha_asignacion_inicio) return false;
       const partesInicio = t.fecha_asignacion_inicio.split("T")[0].split("-");
@@ -334,7 +364,6 @@ export default function FichajesHistorialScreen() {
         parseInt(partesInicio[1], 10) - 1,
         parseInt(partesInicio[2], 10),
       );
-
       let finTurno = finSemana.getTime();
       if (t.fecha_asignacion_fin) {
         const partesFin = t.fecha_asignacion_fin.split("T")[0].split("-");
@@ -344,16 +373,13 @@ export default function FichajesHistorialScreen() {
           parseInt(partesFin[2], 10),
         ).getTime();
       }
-
       return (
         inicioTurno.getTime() <= finSemana.getTime() &&
         finTurno >= inicioSemana.getTime()
       );
     });
-
     if (!listaFiltrada || listaFiltrada.length === 0)
       return "Sin turno asignado esta semana";
-
     return listaFiltrada
       .map((t) => {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
@@ -371,19 +397,20 @@ export default function FichajesHistorialScreen() {
     useMemo(() => {
       const mapa: { [trabajadorId: string]: TrabajadorConFichajesSemanales } =
         {};
-
       fichajesSemanales.forEach((f: RegistroFichaje) => {
         if (!mapa[f.trabajador_id]) {
           const fiscal = mapaDatosFiscales[f.trabajador_id] || {};
           const turnosTrabajador = mapaTurnosObjetos[f.trabajador_id] || [];
           const turnoActivo = turnosTrabajador[0];
 
+          const nombreTrabajador = f.trabajador?.nombre || fiscal?.nombre || "";
+          const apellidosTrabajador =
+            f.trabajador?.apellidos || fiscal?.apellidos || "";
+
           mapa[f.trabajador_id] = {
             id: f.trabajador_id,
-            nombre:
-              (f as any).trabajador?.nombre ||
-              fiscal?.nombre ||
-              `Trabajador (${f.trabajador_id.substring(0, 6)})`,
+            nombre: nombreTrabajador,
+            apellidos: apellidosTrabajador,
             tipoJornada: fiscal?.jornada,
             tipoContrato: fiscal?.tipo_contrato,
             diasAsignados: turnoActivo?.dias_semana,
@@ -393,6 +420,7 @@ export default function FichajesHistorialScreen() {
             calendario_id: fiscal?.calendario_id,
             turnoResumen: mapearTurnoUIString(f.trabajador_id),
             dias: {},
+            foto_url: fiscal?.foto_url || "",
           };
         }
       });
@@ -402,7 +430,6 @@ export default function FichajesHistorialScreen() {
           (f) => f.trabajador_id === trabajadorId,
         );
         const turnosDelTrabajador = mapaTurnosObjetos[trabajadorId] || [];
-
         fichajesDelTrabajador.forEach((f: RegistroFichaje) => {
           const fechaFichajeLimpia = f.fecha_hora.includes("T")
             ? f.fecha_hora.split("T")[0]
@@ -414,21 +441,17 @@ export default function FichajesHistorialScreen() {
                 ? new Date().getDay()
                 : objetoFecha.getDay()
             ];
-
           if (nombreDia === "Domingo") return;
-
           if (!mapa[trabajadorId].dias[fechaFichajeLimpia]) {
             mapa[trabajadorId].dias[fechaFichajeLimpia] = {
               nombreDia: `${nombreDia} (${fechaFichajeLimpia.split("-").reverse().slice(0, 2).join("/")})`,
               turnos: {},
             };
           }
-
           const horaFichajeMinutos = horaAMinutos(
             extraerHora(f.fecha_hora, false),
           );
           let turnoAsignadoKey = "Turno General";
-
           for (const turno of turnosDelTrabajador) {
             const inicioMinutos = horaAMinutos(turno.hora_inicio) - 60;
             const finMinutos = horaAMinutos(turno.hora_fin) + 60;
@@ -440,7 +463,6 @@ export default function FichajesHistorialScreen() {
               break;
             }
           }
-
           if (
             !mapa[trabajadorId].dias[fechaFichajeLimpia].turnos[
               turnoAsignadoKey
@@ -450,7 +472,6 @@ export default function FichajesHistorialScreen() {
               turnoAsignadoKey
             ] = [];
           }
-
           mapa[trabajadorId].dias[fechaFichajeLimpia].turnos[
             turnoAsignadoKey
           ].push(f);
@@ -466,7 +487,6 @@ export default function FichajesHistorialScreen() {
           });
         });
       });
-
       return Object.values(mapa);
     }, [fichajesSemanales, mapaTurnosObjetos, mapaDatosFiscales]);
 
@@ -529,9 +549,12 @@ export default function FichajesHistorialScreen() {
               let salidaMinutos = 0;
               let aPausaInicio: Date | null = null;
               let tiempoPausasMinutos = 0;
-              let firmaHtml = "";
-
+              const firmasHtml: string[] = [];
+              const eventosFirma: string[] = [];
               const listaEventos = Array.isArray(eventos) ? eventos : [];
+              const correccionesAprobadas = listaEventos
+                .map((evento) => evento.correccion_aprobada)
+                .filter(Boolean);
               for (const m of listaEventos) {
                 const hora = extraerHora(m.fecha_hora, false);
                 let tipoCodigo = "";
@@ -575,12 +598,10 @@ export default function FichajesHistorialScreen() {
                   );
                   aPausaInicio = null;
                 }
-                if (m.firma_digital && !firmaHtml) {
-                  const srcFirma = m.firma_digital.startsWith("data:")
-                    ? m.firma_digital
-                    : `data:image/png;base64,${m.firma_digital}`;
-                  firmaHtml = `<img src="${srcFirma}" style="max-height: 28px; max-width: 90px; object-fit: contain;" />`;
-                }
+                firmasHtml.push(firmaComoHtml(m.firma_digital));
+                eventosFirma.push(
+                  `${tipoCodigo || "Evento"} · ${new Date(m.fecha_hora).toLocaleString("es-ES")}`,
+                );
               }
 
               let minutesTrabajadosHoy = 0;
@@ -608,17 +629,53 @@ export default function FichajesHistorialScreen() {
               const pausasTexto =
                 tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
 
-              filasCalendarioHtml += `
+              let correccionFichaje = null;
+
+              for (const correccion of correccionesAprobadas) {
+                if (!correccion) continue;
+                correccionFichaje = correccion;
+              }
+
+              if (correccionFichaje) {
+                const valorNuevo = correccionFichaje.valor_nuevo || {};
+                const fechaNueva =
+                  valorNuevo.fecha_descuadre || fechaFormateada;
+                const horaNueva = valorNuevo.hora_propuesta || "-";
+                if (horaNueva && horaNueva !== "") entrada = horaNueva;
+
+                filasCalendarioHtml += `
                 <tr>
-                  <td><small style="font-size:13px;"><strong>${nombreDiaReal} (${fechaFormateada})</strong></small><br/><small style="color:#555;">${nombreTurno}</small></td>
+                  <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td>
                   <td>${entrada}</td>
                   <td>${salida}</td>
                   <td style="width:10px">${pausasTexto}</td>
                   <td style="font-weight: bold;">${horasHoyTexto}</td>
                   <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
-                  <td class="celda-firma">${firmaHtml}</td>
+                  <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td>
                 </tr>
               `;
+
+                filasCalendarioHtml += `
+                  <tr class="fila-correccion">
+                    <td colspan="2"><strong>CORRECCIÓN APROBADA</strong><br/><small>${escaparHtml(correccionFichaje.tipo_correccion)}<br/>${escaparHtml(fechaNueva)} ${escaparHtml(horaNueva)}</small></td>
+                    <td colspan="2"><small>Solicita: ${escaparHtml(correccionFichaje.solicitante || "Usuario identificado")} (${escaparHtml(correccionFichaje.solicitante_tipo || "Usuario")})</small><br/>${firmaComoHtml(correccionFichaje.firma_solicitante)}</td>
+                    <td colspan="2"><small>Aprueba: ${escaparHtml(correccionFichaje.resolutor || "Usuario identificado")} (${escaparHtml(correccionFichaje.resolutor_tipo || "Usuario")})</small><br/>${firmaComoHtml(correccionFichaje.firma_resolutor)}</td>
+                    <td class="celda-firma"><small>${escaparHtml("Fecha y hora de corrección")}<br>${escaparHtml(correccionFichaje.fecha_resolucion?.substring(0, 10).concat(" ", correccionFichaje.fecha_resolucion.substring(11, 16)) || "")}</small></td>
+                  </tr>
+                `;
+              } else {
+                filasCalendarioHtml += `
+                <tr>
+                  <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td>
+                  <td>${entrada}</td>
+                  <td>${salida}</td>
+                  <td style="width:10px">${pausasTexto}</td>
+                  <td style="font-weight: bold;">${horasHoyTexto}</td>
+                  <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
+                  <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td>
+                </tr>
+              `;
+              }
             }
           } else {
             const esSabado = nombreDiaReal === "Sábado";
@@ -637,14 +694,15 @@ export default function FichajesHistorialScreen() {
           }
         }
 
-        const rSocial =
-          (empresaActual?.nombre_comercial || "") +
-          " " +
-          (empresaActual?.razon_social || "Sin Identificar");
+        const nombreEmpresa =
+          empresaActual?.nombre_comercial || "Sin identificar";
+        const razonSocial = empresaActual?.razon_social || "Sin identificar";
         const cifEmpresa = empresaActual?.cif || "-";
-        const cnaeEmpresa = empresaActual?.codigo_cnae
-          ? ` / CNAE: ${empresaActual.codigo_cnae}`
-          : "";
+        const direccionEmpresa = empresaActual?.direccion_fiscal || "No consta";
+        const cnaeEmpresa = empresaActual?.codigo_cnae || "No consta";
+        const convenioEmpresa =
+          empresaActual?.convenio_colectivo || "No consta";
+        const logoEmpresa = obtenerUrlLogo(empresaActual?.logo_url);
         const fiscal = mapaDatosFiscales[t.id];
         const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
         const nssTrabajador = fiscal?.numero_seguridad_social || "-";
@@ -658,29 +716,40 @@ export default function FichajesHistorialScreen() {
 
         return `
           <div class="hoja-trabajador">
+            <header class="cabecera-documento">
+              <div class="marca-empresa">${logoEmpresa ? `<img src="${escaparHtml(logoEmpresa)}" alt="Logo de ${escaparHtml(nombreEmpresa)}" />` : ""}<div><h1>${escaparHtml(nombreEmpresa)}</h1><p>${escaparHtml(razonSocial)}</p></div></div>
+              <div class="titulo-documento"><strong>REGISTRO DIARIO DE JORNADA</strong><span>Resumen semanal de control horario</span></div>
+            </header>
             <div class="caja-legal">
-              <strong>REGISTRO COMPLEMENTARIO DE JORNADA LABORAL SEMANAL</strong><br/>
-              <span style="font-size: 10px;">Cumplimiento obligatorio de control horario según Real Decreto-ley 8/2019 de 8 de marzo (Art. 34.9 ET)</span>
+              Registro conforme al artículo 34.9 del Estatuto de los Trabajadores y al Real Decreto-ley 8/2019, de 8 de marzo. Conservar durante cuatro años a disposición de las personas trabajadoras, sus representantes y la Inspección de Trabajo.
             </div>
             <table class="tabla-datos">
               <tr>
-                <td><strong>Empresa / Razón Social:</strong> ${rSocial}</td>
-                <td><strong>CIF / NIF Empresa:</strong> ${cifEmpresa}${cnaeEmpresa}</td>
+                <td><strong>Razón social:</strong> ${escaparHtml(razonSocial)}</td>
+                <td><strong>CIF/NIF:</strong> ${escaparHtml(cifEmpresa)}</td>
               </tr>
               <tr>
-                <td><strong>Nombre del Trabajador:</strong> ${t.nombre}</td>
-                <td><strong>NIF / DNI / NIE Trabajador:</strong> ${dniTrabajador}</td>
+                <td><strong>Nombre comercial:</strong> ${escaparHtml(nombreEmpresa)}</td>
+                <td><strong>Domicilio fiscal:</strong> ${escaparHtml(direccionEmpresa)}</td>
               </tr>
               <tr>
-                <td><strong>Nº Afiliación Seguridad Social (NSS):</strong> ${nssTrabajador}</td>
-                <td><strong>Contrato / Tipo Jornada:</strong> <span style="color:#1E3A8A; font-weight:bold;">${relacionLaboralTexto}</span></td>
+                <td><strong>CNAE:</strong> ${escaparHtml(cnaeEmpresa)}</td>
+                <td><strong>Convenio colectivo:</strong> ${escaparHtml(convenioEmpresa)}</td>
               </tr>
               <tr>
-                <td><strong>Horario Asignado en la Semana:</strong> <span style="font-weight: 600; color: #334155;">${horarioVigenteTexto}</span></td>
-                <td><strong>Días Planificados:</strong> ${diasAsignadosTexto}</td>
+                <td><strong>Trabajador:</strong> ${escaparHtml(`${t.nombre || ""} ${t.apellidos || ""}`.trim())}</td>
+                <td><strong>DNI/NIE/NIF:</strong> ${escaparHtml(dniTrabajador)}</td>
               </tr>
               <tr>
-                <td colspan="2"><strong>Período de Liquidación / Registro Evaluado:</strong> <strong>${rangoSemanaStr}</strong></td>
+                <td><strong>Nº Seguridad Social:</strong> ${escaparHtml(nssTrabajador)}</td>
+                <td><strong>Contrato/Jornada:</strong> ${escaparHtml(relacionLaboralTexto)}</td>
+              </tr>
+              <tr>
+                <td><strong>Horario planificado:</strong> ${escaparHtml(horarioVigenteTexto)}</td>
+                <td><strong>Periodo:</strong> ${escaparHtml(rangoSemanaStr)}</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Días planificados:</strong> ${escaparHtml(diasAsignadosTexto)}</td>
               </tr>
             </table>
             <table class="tabla-registro">
@@ -692,7 +761,7 @@ export default function FichajesHistorialScreen() {
                   <th>Interrupciones / Pausas</th>
                   <th>Horas Computadas</th>
                   <th>Estado</th>
-                  <th>Firma Trabajador</th>
+                  <th>Firma y trazabilidad del fichaje</th>
                 </tr>
               </thead>
               <tbody>
@@ -728,14 +797,31 @@ export default function FichajesHistorialScreen() {
         <head>
           <meta charset="utf-8">
           <style>
-            body { font-family: 'Arial', sans-serif; padding: 10px; color: #000; font-size: 11px; }
-            .caja-legal { border: 2px solid #000; padding: 10px; text-align: center; margin-bottom: 15px; font-size: 12px; }
+            body { font-family: 'Arial', sans-serif; padding: 10px; color: #172033; font-size: 10px; }
+            .cabecera-documento { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; margin-bottom: 10px; }
+            .marca-empresa { display: flex; align-items: center; gap: 10px; max-width: 55%; }
+            .marca-empresa img { max-width: 105px; max-height: 48px; object-fit: contain; }
+            .marca-empresa h1 { font-size: 16px; margin: 0; color: #1E3A8A; }
+            .marca-empresa p { margin: 2px 0 0; font-size: 9px; color: #475569; }
+            .titulo-documento { text-align: right; color: #1E3A8A; }
+            .titulo-documento strong, .titulo-documento span { display: block; }
+            .titulo-documento strong { font-size: 13px; }
+            .titulo-documento span { font-size: 9px; color: #475569; margin-top: 3px; }
+            .caja-legal { border: 1px solid #64748B; padding: 7px; text-align: center; margin-bottom: 12px; font-size: 9px; }
             .tabla-datos { width: 100%; margin-bottom: 15px; border-collapse: collapse; }
             .tabla-datos td { padding: 6px; border: 1px solid #000; background-color: #F9F9F9; }
             .tabla-registro { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .tabla-registro th, .tabla-registro td { border: 1px solid #000; padding: 6px; text-align: center; vertical-align: middle; }
-            .tabla-registro th { background-color: #EAEAEA; font-size: 10px; text-transform: uppercase; }
-            .celda-firma { width: 110px; height: 32px; padding: 2px !important; }
+            .tabla-registro th, .tabla-registro td { border: 1px solid #94A3B8; padding: 4px; text-align: center; vertical-align: middle; }
+            .tabla-registro th { background-color: #E2E8F0; font-size: 9px; text-transform: uppercase; }
+            .fila-correccion { background-color: #EFF6FF; }
+            .fila-correccion td { border-top: 0; color: #1E3A8A; }
+            .celda-firma { width: 145px; padding: 4px !important; vertical-align: middle; text-align: center; }
+            .registro-firma { border-bottom: 1px dotted #94A3B8; padding: 4px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            .registro-firma:last-child { border-bottom: 0; }
+            .registro-firma small { display: block; font-size: 7px; color: #475569; margin-bottom: 2px; text-align: center; }
+            .firma-fichaje { display: block; width: 100%; max-height: 35px; object-fit: contain; image-rendering: -webkit-optimize-contrast; }
+            .sin-firma { color: #64748B; font-size: 8px; }
+            .texto-secundario { color: #475569; }
             .firmas-bloque { margin-top: 20px; width: 100%; }
             .firma-caja { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 50px; font-weight: bold; }
             .page-break { page-break-after: always; }
@@ -803,9 +889,7 @@ export default function FichajesHistorialScreen() {
             <FontAwesome5 name="building" size={13} color="#475569" />
             <ThemedText style={styles.textoInfoEmpresa}>
               <ThemedText style={styles.negrita}>CIF:</ThemedText>{" "}
-              {empresaActual.cif}{" "}
-              {empresaActual.codigo_cnae &&
-                ` | CNAE: ${empresaActual.codigo_cnae}`}
+              {empresaActual.cif}
             </ThemedText>
           </View>
         </View>
@@ -856,8 +940,7 @@ export default function FichajesHistorialScreen() {
       </Row>
 
       <ThemedText style={styles.sectionTitle}>
-        {" "}
-        Panel de Control Semanal{" "}
+        Panel de Control Semanal
       </ThemedText>
 
       {cargando ? (
@@ -876,13 +959,29 @@ export default function FichajesHistorialScreen() {
                 <Card key={trabajador.id}>
                   <View style={styles.headerTrabajador}>
                     <View style={styles.avatarCirculo}>
-                      <ThemedText style={styles.avatarTexto}>
-                        {trabajador.nombre.charAt(0)}
-                      </ThemedText>
+                      {trabajador.foto_url ? (
+                        <Image
+                          source={{
+                            uri:
+                              obtenerUrlLogo(trabajador.foto_url) || undefined,
+                          }}
+                          style={[
+                            styles.avatarCirculo,
+                            { width: 40, height: 40, borderRadius: 20 },
+                          ]}
+                        />
+                      ) : (
+                        <View style={styles.avatarCirculo}>
+                          <ThemedText style={styles.avatarTexto}>
+                            {trabajador.nombre?.charAt(0)}
+                          </ThemedText>
+                        </View>
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <ThemedText style={styles.nombreTrabajador}>
-                        {trabajador.nombre}
+                        {`${trabajador.nombre || ""} ${trabajador.apellidos || ""} ${trabajador.dni_nif_nie || ""}`.trim() ||
+                          "N/A"}
                       </ThemedText>
                       <ThemedText
                         style={styles.turnoTrabajador}
@@ -936,78 +1035,68 @@ export default function FichajesHistorialScreen() {
                         const nombreDiaReal =
                           nombresDiasSemana[fechaObjeto.getDay()];
                         const fechaFormateada = `${dia}/${mes}`;
-
                         return (
                           <View key={fechaKey} style={styles.contenedorDia}>
                             <ThemedText style={styles.tituloDia}>
                               {nombreDiaReal} ({fechaFormateada})
                             </ThemedText>
-                            {Object.entries(
-                              datosDia.turnos as Record<
-                                string,
-                                RegistroFichaje[]
-                              >,
-                            ).map(([nombreTurno, eventos]) => (
-                              <View
-                                key={nombreTurno}
-                                style={styles.bloqueTurnoEspecial}
-                              >
-                                <View style={styles.badgeTurno}>
-                                  <FontAwesome5
-                                    name="clock"
-                                    size={9}
-                                    color="#475569"
-                                    style={{ marginRight: 3 }}
-                                  />
-                                  <ThemedText style={styles.textoBadgeTurno}>
-                                    {nombreTurno}
-                                  </ThemedText>
-                                </View>
-                                <View style={{ gap: 4, marginTop: 2 }}>
-                                  {eventos.map((item: RegistroFichaje) => {
-                                    const tipoEvento:
-                                      | TipoEventoFichaje
-                                      | undefined = tiposEventosEmpresa!.find(
-                                      (t: TipoEventoFichaje) =>
-                                        t.id == item.tipo_evento_id,
-                                    );
-                                    const config =
-                                      obtenerConfiguracionEvento(tipoEvento);
-                                    const horaLimpia = extraerHora(
-                                      item.fecha_hora,
-                                      false,
-                                    );
-                                    return (
-                                      <View
-                                        key={item.id}
-                                        style={styles.filaFichaje}
-                                      >
-                                        <MaterialCommunityIcons
-                                          name={config.icono as any}
-                                          size={13}
-                                          color={config.color}
-                                        />
-                                        <View style={{ flex: 1 }}>
-                                          <ThemedText
-                                            style={[
-                                              styles.textoEvento,
-                                              { color: config.color },
-                                            ]}
-                                          >
-                                            {config.texto}{" "}
-                                            {config.texto.includes("PAUSA") &&
-                                            Platform.OS !== "web"
-                                              ? "\n" + horaLimpia
-                                              : horaLimpia}{" "}
-                                            hs
-                                          </ThemedText>
+                            {Object.entries(datosDia.turnos).map(
+                              ([nombreTurno, eventos]) => (
+                                <View
+                                  key={nombreTurno}
+                                  style={styles.bloqueTurnoEspecial}
+                                >
+                                  <View style={styles.badgeTurno}>
+                                    <FontAwesome5
+                                      name="clock"
+                                      size={9}
+                                      color="#475569"
+                                      style={{ marginRight: 3 }}
+                                    />
+                                    <ThemedText style={styles.textoBadgeTurno}>
+                                      {nombreTurno}
+                                    </ThemedText>
+                                  </View>
+                                  <View style={{ gap: 4, marginTop: 2 }}>
+                                    {eventos.map((item: RegistroFichaje) => {
+                                      const tipoEvento =
+                                        tiposEventosEmpresa?.find(
+                                          (t: TipoEventoFichaje) =>
+                                            t.id == item.tipo_evento_id,
+                                        );
+                                      const config =
+                                        obtenerConfiguracionEvento(tipoEvento);
+                                      const horaLimpia = extraerHora(
+                                        item.fecha_hora,
+                                        false,
+                                      );
+                                      return (
+                                        <View
+                                          key={item.id}
+                                          style={styles.filaFichaje}
+                                        >
+                                          <MaterialCommunityIcons
+                                            name={config.icono as any}
+                                            size={13}
+                                            color={config.color}
+                                          />
+                                          <View style={{ flex: 1 }}>
+                                            <ThemedText
+                                              style={[
+                                                styles.textoEvento,
+                                                { color: config.color },
+                                              ]}
+                                            >
+                                              {config.texto} {horaLimpia} hs
+                                            </ThemedText>
+                                          </View>
                                         </View>
-                                      </View>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </View>
                                 </View>
-                              </View>
-                            ))}
+                              ),
+                            )}
                           </View>
                         );
                       },
@@ -1159,6 +1248,6 @@ const styles = StyleSheet.create({
     gap: 4,
     marginVertical: 1,
   },
-  textoEvento: { fontSize: 10, fontWeight: "700" },
+  textoEvento: { fontSize: 9, fontWeight: "700" },
   empty: { textAlign: "center", color: "#64748B", marginTop: 20 },
 });

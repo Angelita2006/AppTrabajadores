@@ -6,7 +6,8 @@ import {
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const [timestampBaseActual, setTimestampBaseActual] = useState<number | null>(
     null,
   );
+  const { mostrarError } = useAppModal();
 
   // Mapeo sincronizado de tipos de evento: { ENTRADA: "uuid-1", SALIDA: "uuid-2", ... }
   const [mapaTiposEvento, setMapaTiposEvento] = useState<
@@ -77,7 +79,7 @@ export default function HomeScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al calcular la fecha y hora ajustada a la zona horaria del centro: " +
-          error,
+          error.message,
       );
       return ahora.toISOString().replace("Z", "");
     }
@@ -165,7 +167,7 @@ export default function HomeScreen() {
 
         // 2. Obtener los fichajes del día
         const fichajesHoy: RegistroFichaje[] = await obtenerFichajesHoy(
-          String(usuarioActual.trabajador_id),
+          usuarioActual.trabajador_id,
         );
 
         if (!isMounted) return;
@@ -254,7 +256,7 @@ export default function HomeScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los datos de la jornada actual: " + error,
+          "Error al cargar los datos de la jornada actual: " + error.message,
         );
       } finally {
         if (isMounted) setCargando(false);
@@ -412,6 +414,7 @@ export default function HomeScreen() {
         tipo_evento_id: tipoEventoId,
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
+        estado: "Válido",
         latitud: latitude,
         longitud: longitude,
         forzar_hora_extra: forzarExtra,
@@ -481,17 +484,25 @@ export default function HomeScreen() {
         error?.response?.data?.detail ||
         error?.response?.data?.message ||
         error?.message ||
+        error.toString() ||
         "";
-
-      console.error("Error interceptado en fichaje:", {
-        statusHttp,
-        mensajeBackend,
-        forzarExtra,
-      });
 
       if (forzarExtra) {
         mostrarError(
-          "Error al registrar el fichaje como horas extra en festivo: " + error,
+          "Error al registrar el fichaje como horas extra en festivo: " +
+            error.message,
+        );
+        return;
+      }
+
+      const esAusencia =
+        typeof mensajeBackend === "string" &&
+        mensajeBackend.toLowerCase().includes("ausencia");
+
+      if (esAusencia) {
+        mostrarError(
+          mensajeBackend ||
+            "No se puede registrar el fichaje porque existe una ausencia o periodo vacacional asignado para este día.",
         );
         return;
       }
@@ -503,7 +514,8 @@ export default function HomeScreen() {
       ) {
         if (Platform.OS === "web") {
           const aceptarExtra = window.confirm(
-            "No se puede fichar en un día festivo/no laborable.\n\n¿Aún así quiere fichar como horas extra en festivo?",
+            mensajeBackend ||
+              "No se puede fichar en un día festivo/no laborable.\n\n¿Aún así quiere fichar como horas extra en festivo?",
           );
           if (aceptarExtra && accionPendiente) {
             registrarMarcajeHorario(
@@ -517,7 +529,8 @@ export default function HomeScreen() {
         } else {
           Alert.alert(
             "Día Festivo / No Laborable",
-            "No se puede fichar en un día festivo/no laborable. ¿Aún así quiere fichar como horas extra en festivo?",
+            mensajeBackend ||
+              "No se puede fichar en un día festivo/no laborable. ¿Aún así quiere fichar como horas extra en festivo?",
             [
               {
                 text: "Cancelar",
@@ -539,7 +552,9 @@ export default function HomeScreen() {
           );
         }
       } else {
-        mostrarError("Error al procesar tu solicitud de fichaje: " + error);
+        mostrarError(
+          "Error al procesar tu solicitud de fichaje: " + error.message,
+        );
       }
     }
   };
@@ -908,7 +923,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   canvasContainer: {
-    height: 250,
+    height: 140,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 8,

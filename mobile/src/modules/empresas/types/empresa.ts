@@ -10,6 +10,8 @@ export interface Empresa {
   id: string;
   /** Indicador booleano que determina si la empresa se encuentra activa en el sistema. */
   activa: boolean;
+  /** Indicador booleano que determina si la organización creada actúa como gestoría matriz. */
+  es_gestoria: boolean;
   /** Razón social oficial y legal de la empresa. */
   razon_social: string;
   /** Código de Identificación Fiscal (CIF) de la empresa. */
@@ -55,6 +57,8 @@ export interface EmpresaUpdate {
   configuracion?: Record<string, any> | null;
   /** Nuevo estado de activación de la empresa. */
   activo: boolean;
+  /** Nuevo indicador de gestoría. */
+  es_gestoria?: boolean;
   /** Nuevo nombre comercial a actualizar. */
   nombre_comercial: string;
   /** Nuevo código CNAE a actualizar. */
@@ -74,6 +78,8 @@ export interface EmpresaUpdate {
  * Sincronizado con el backend para el alta completa de empresa, primer trabajador y usuario administrador.
  */
 export interface RegistroOrganizacionDTO {
+  /** Código de licencia de activación corporativa. */
+  codigo_licencia: string;
   /** Nombre comercial o marca de la nueva organización. */
   nombre_comercial: string;
   /** Código de Identificación Fiscal (CIF) de la organización. */
@@ -86,6 +92,8 @@ export interface RegistroOrganizacionDTO {
   convenio_colectivo: string;
   /** Dirección fiscal o postal completa de la organización. */
   direccion_fiscal: string;
+  /** Indica si la organización a registrar opera como una gestoría. */
+  es_gestoria?: boolean;
   /** Nombre del usuario administrador inicial. */
   nombre_admin: string;
   /** Apellidos del usuario administrador inicial. */

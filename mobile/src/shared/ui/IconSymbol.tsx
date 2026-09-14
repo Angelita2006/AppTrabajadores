@@ -35,6 +35,7 @@ const MAPPING = {
   work: "work",
   "location-on": "location-on",
   store: "store",
+  "vpn-key": "vpn-key",
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

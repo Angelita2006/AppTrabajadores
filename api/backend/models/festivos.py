@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, Date, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 
@@ -17,6 +17,7 @@ class Festivos(Base):
     calendario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     fecha: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     tipo: Mapped[str] = mapped_column(String(30), nullable=False, server_default=text("'nacional'::character varying"))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     descripcion: Mapped[Optional[str]] = mapped_column(String(255))
 
     calendario: Mapped['CalendariosLaborales'] = relationship('CalendariosLaborales', back_populates='festivos') # type: ignore

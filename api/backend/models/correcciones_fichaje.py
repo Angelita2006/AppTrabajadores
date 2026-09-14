@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyConstraint, Text, Uuid, text
+from sqlalchemy import DateTime, Enum, ForeignKey, ForeignKeyConstraint, Index, PrimaryKeyConstraint, Text, Uuid, text
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -37,7 +37,9 @@ class CorreccionesFichaje(Base):
     valor_anterior: Mapped[Optional[dict]] = mapped_column(JSONB)
     aprobado_por_usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     fecha_resolucion: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
-    tipo_evento_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
+    firma_solicitante: Mapped[Optional[str]] = mapped_column(Text, comment='Ruta de la firma digital de quien solicita la corrección.')
+    firma_resolutor: Mapped[Optional[str]] = mapped_column(Text, comment='Ruta de la firma digital de quien resuelve la corrección.')
+    tipo_evento_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('tipos_evento_fichaje.id', ondelete='RESTRICT'), nullable=False)
 
     aprobado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[aprobado_por_usuario_id], back_populates='correcciones_fichaje_aprobado_por_usuario') # type: ignore
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='correcciones_fichaje') # type: ignore

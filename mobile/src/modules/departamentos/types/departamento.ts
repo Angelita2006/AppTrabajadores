@@ -23,6 +23,8 @@ export interface DepartamentoUpdate {
   nombre?: string;
   /** Nuevo identificador del centro de trabajo vinculado (UUID). */
   centro_trabajo_id?: string;
+  /** Estado de activación del departamento. */
+  activo?: boolean;
 }
 
 /**
@@ -36,6 +38,8 @@ export interface DepartamentoSimpleResponse {
   empresa_id: string;
   /** Nombre descriptivo asignado al departamento. */
   nombre: string;
+  /** Indica si el departamento está activo. */
+  activo: boolean;
   /** Identificador del centro de trabajo vinculado al departamento. */
   centro_trabajo_id: string;
   /** Marca de tiempo de cuándo fue creado el departamento en el sistema en formato ISO DateTime. */

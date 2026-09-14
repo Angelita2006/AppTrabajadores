@@ -110,25 +110,25 @@ export const editarFestivo = async (
 };
 
 /**
- * Elimina un día festivo del calendario laboral de forma definitiva.
- * URI: DELETE /api/festivos/{id_festivo}
+ * Da de baja lógica un día festivo del calendario laboral.
+ * URI: PUT /api/festivos/{idFestivo}/desactivar
  *
  * @async
  * @function eliminarFestivo
- * @param {string} idFestivo - Identificador UUID único del festivo a eliminar.
- * @returns {Promise<{ detail: string }>} Promesa con el mensaje de confirmación de la eliminación.
+ * @param {string} idFestivo - Identificador UUID único del festivo a desactivar.
+ * @returns {Promise<{ detail: string }>} Promesa con el mensaje de confirmación de la desactivación.
  * @throws {Error} Lanza un error si el festivo no se encuentra o falla la operación.
  */
 export const eliminarFestivo = async (
   idFestivo: string,
 ): Promise<{ detail: string }> => {
   try {
-    const response = await api.delete<{ detail: string }>(
-      `/api/festivos/${idFestivo}`,
+    const response = await api.put<{ detail: string }>(
+      `/api/festivos/${idFestivo}/desactivar`,
     );
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al eliminar el día festivo.");
+    throw new Error(apiMessage || "Error al desactivar el día festivo.");
   }
 };

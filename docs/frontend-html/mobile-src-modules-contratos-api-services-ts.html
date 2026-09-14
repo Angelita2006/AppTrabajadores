@@ -1,0 +1,63 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>services.ts · Fichapp</title><style>
+:root{color-scheme:light;--ink:#18212f;--muted:#667085;--line:#d9e0e8;--paper:#fff;--wash:#f4f6f8;--navy:#132238;--accent:#b44a2d;--accent-wash:#fff1ec;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font-size:16px;line-height:1.65}a{color:#8d341f;text-decoration:none}a:hover{text-decoration:underline}.top{background:var(--navy);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:28px}.brand{font-size:1.45rem;font-weight:700;letter-spacing:.02em}.top small{color:#b9c4d3}.layout{display:grid;grid-template-columns:275px minmax(0,900px);max-width:1240px;margin:0 auto;min-height:calc(100vh - 70px)}aside{padding:30px 22px;border-right:1px solid var(--line);background:#eef1f4;position:sticky;top:0;height:calc(100vh - 70px);overflow:auto}aside h3{font:700 .75rem/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:22px 0 8px}nav a{display:block;padding:5px 9px;border-radius:4px;font:14px/1.45 Arial,sans-serif;color:#344054}nav a:hover{background:#dfe5eb;text-decoration:none}.search{width:100%;border:1px solid #c5ced9;border-radius:4px;padding:9px 10px;background:#fff;font:14px Arial,sans-serif}.content{background:var(--paper);padding:54px clamp(24px,6vw,76px) 90px}h1,h2,h3{font-weight:700;line-height:1.2}h1{font-size:2.55rem;margin:0 0 14px;color:var(--navy)}h2{font-size:1.6rem;margin:48px 0 18px;border-bottom:1px solid var(--line);padding-bottom:9px}h3{font-size:1.15rem;margin:0 0 4px}.lead{font-size:1.16rem;color:#4b5565;max-width:720px}.eyebrow{font:700 .74rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:30px 0}.stat,.item{border:1px solid var(--line);padding:16px;background:#fff}.stat strong{display:block;font-size:1.8rem;color:var(--accent)}.stat span,.meta{font:13px Arial,sans-serif;color:var(--muted)}.item{margin:12px 0}.item code,.path,code{font-family:'Cascadia Code',Consolas,monospace;font-size:.88em}.path{color:var(--muted);margin-bottom:16px}.entry{border-top:1px solid var(--line);padding:22px 0}.entry pre{white-space:pre-wrap;margin:10px 0 0;padding:14px;background:#f7f8fa;border-left:3px solid #d9a08f;font:14px/1.6 'Cascadia Code',Consolas,monospace;color:#344054}.tag{display:inline-block;background:var(--accent-wash);color:#8d341f;padding:2px 7px;margin-right:7px;font:12px Arial,sans-serif;border-radius:3px}@media(max-width:760px){.layout{display:block}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.content{padding:34px 22px 60px}h1{font-size:2rem}.top{padding:15px 18px}}
+</style></head><body><header class="top"><div class="brand">Fichapp</div><small>Documentación del frontend</small></header><div class="layout"><aside><input class="search" type="search" placeholder="Buscar en la documentación" data-search><h3>Guía</h3><nav><a href="index.html">Inicio</a><a href="architecture.html">Arquitectura</a><a href="routes.html">Rutas</a><a href="modules.html">Módulos</a></nav><h3>Módulos</h3><nav><a href="modules.html#another-services">another-services</a><a href="modules.html#asignaciones-turno">asignaciones-turno</a><a href="modules.html#ausencias">ausencias</a><a href="modules.html#calendarios-laborales">calendarios-laborales</a><a href="modules.html#centros-trabajo">centros-trabajo</a><a href="modules.html#contratos">contratos</a><a href="modules.html#correcciones-fichaje">correcciones-fichaje</a><a href="modules.html#departamentos">departamentos</a><a href="modules.html#dispositivos-fichaje">dispositivos-fichaje</a><a href="modules.html#empresas">empresas</a><a href="modules.html#festivos">festivos</a><a href="modules.html#fichajes">fichajes</a><a href="modules.html#permisos">permisos</a><a href="modules.html#resumenes-jornada">resumenes-jornada</a><a href="modules.html#roles">roles</a><a href="modules.html#tipos_eventos_fichaje">tipos_eventos_fichaje</a><a href="modules.html#trabajadores">trabajadores</a><a href="modules.html#turnos">turnos</a><a href="modules.html#usuarios">usuarios</a><a href="modules.html#usuarios_roles">usuarios_roles</a></nav></aside><main class="content"><p class="eyebrow">Referencia de código</p><h1>services.ts</h1><p class="path">mobile/src/modules/contratos/api/services.ts</p><article class="entry"><h3><span class="tag">const</span>crearContrato</h3><pre>Registra un nuevo contrato laboral asociándolo al expediente del empleado en el sistema.
+URI: POST /api/contratos
+
+@async
+@function crearContrato
+@param {Object} payload - Objeto con los datos requeridos para dar de alta el contrato laboral.
+@returns {Promise&lt;Contrato&gt;} Promesa con el objeto `Contrato` recién creado.
+@throws {Error} Lanza un error si falla la creación o existen inconsistencias en los datos proporcionados.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerTodosLosContratos</h3><pre>Obtiene el listado global de todos los contratos registrados en el sistema aplicando aislamiento multi-tenant.
+URI: GET /api/contratos
+
+@async
+@function obtenerTodosLosContratos
+@returns {Promise&lt;Contrato[]&gt;} Promesa con el listado global de contratos.
+@throws {Error} Lanza un error si ocurre un fallo al realizar la consulta al servidor.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerContratosPorEmpresa</h3><pre>Recupera el listado de contratos asociados a una empresa u organización específica.
+URI: GET /api/contratos/empresa/{idEmpresa}
+
+@async
+@function obtenerContratosPorEmpresa
+@param {string} idEmpresa - Identificador UUID único de la empresa.
+@returns {Promise&lt;Contrato[]&gt;} Promesa con la lista de contratos vinculados a la empresa.
+@throws {Error} Lanza un error si falla la recuperación de los contratos de la empresa.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerContratosPorTrabajador</h3><pre>Recupera el historial o secuencia de contratos asociados a un trabajador específico.
+URI: GET /api/contratos/trabajador/{idTrabajador}
+
+@async
+@function obtenerContratosPorTrabajador
+@param {string} idTrabajador - Identificador UUID único del trabajador.
+@returns {Promise&lt;Contrato[]&gt;} Promesa con la lista histórica de contratos del trabajador.
+@throws {Error} Lanza un error si ocurre un problema durante la consulta.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerContratoActivoTrabajador</h3><pre>Recupera el contrato actualmente activo de un empleado en una empresa determinada.
+URI: GET /api/contratos/trabajador/{idTrabajador}/empresa/{idEmpresa}/activo
+
+@async
+@function obtenerContratoActivoTrabajador
+@param {string} idTrabajador - Identificador UUID único del trabajador.
+@param {string} idEmpresa - Identificador UUID único de la empresa.
+@returns {Promise&lt;Contrato | null&gt;} Promesa con el contrato activo o `null` si no tiene ninguno vigente.
+@throws {Error} Lanza un error si falla la comunicación con el servidor (excluyendo el estado HTTP 404).</pre></article><article class="entry"><h3><span class="tag">const</span>actualizarContrato</h3><pre>Actualiza parcialmente los atributos de un contrato existente mediante su identificador único.
+URI: PUT /api/contratos/{idContrato}
+
+@async
+@function actualizarContrato
+@param {string} idContrato - Identificador UUID único del contrato a modificar.
+@param {Object} payload - Objeto con los parámetros opcionales a actualizar en el contrato.
+@returns {Promise&lt;Contrato&gt;} Promesa con la entidad `Contrato` actualizada.
+@throws {Error} Lanza un error si el contrato no existe o la actualización es rechazada.</pre></article><article class="entry"><h3><span class="tag">const</span>rescindirContratoActivoTrabajador</h3><pre>Rescinde o da de baja el contrato laboral activo de un empleado en la empresa seleccionada.
+URI: PUT /api/contratos/{idContrato}/dar-baja?fecha_fin=...
+
+@async
+@function rescindirContratoActivoTrabajador
+@param {string} idTrabajador - Identificador UUID único del trabajador.
+@param {string} idEmpresa - Identificador UUID único de la empresa.
+@param {string} [fechaFinPersonalizada] - Fecha de cese opcional en formato &quot;AAAA-MM-DD&quot; (por defecto la fecha actual).
+@returns {Promise&lt;Contrato | null&gt;} Promesa con el contrato rescindido o `null` si no tenía un contrato activo.
+@throws {Error} Lanza un error si ocurre un fallo durante la tramitación de la baja.</pre></article><article class="entry"><h3><span class="tag">const</span>eliminarTodosLosContratosTrabajador</h3><pre>Elimina de forma masiva todos los registros contractuales de un trabajador dentro de una empresa concreta.
+URI: DELETE /api/contratos/empresa/{idEmpresa}/trabajador/{idTrabajador}
+
+@async
+@function eliminarTodosLosContratosTrabajador
+@param {string} idEmpresa - Identificador UUID único de la empresa.
+@param {string} idTrabajador - Identificador UUID único del trabajador.
+@returns {Promise&lt;void&gt;} Promesa que se resuelve al completar la eliminación de los contratos.
+@throws {Error} Lanza un error si falla el borrado en el servidor.</pre></article></main></div><script>const q=document.querySelector('[data-search]');q?.addEventListener('input',e=>{const value=e.target.value.toLowerCase();document.querySelectorAll('.item,.entry').forEach(el=>el.hidden=value&&!el.textContent.toLowerCase().includes(value))});</script></body></html>

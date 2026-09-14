@@ -74,6 +74,8 @@ export interface CorreccionFichajeBase {
 export interface CorreccionFichajeCreate extends CorreccionFichajeBase {
   /** ID del usuario que realiza la petición. */
   solicitado_por_usuario_id: string;
+  /** Firma digital del usuario solicitante en Base64 o data URL. */
+  firma_solicitante?: string | null;
 }
 
 /**
@@ -104,6 +106,10 @@ export interface CorreccionFichajeSimpleResponse extends CorreccionFichajeBase {
   fecha_solicitud: string;
   /** Fecha y hora de la resolución en formato ISO DateTime. */
   fecha_resolucion?: string | null;
+  /** Ruta de la firma persistida del solicitante. */
+  firma_solicitante?: string | null;
+  /** Ruta de la firma persistida del resolutor. */
+  firma_resolutor?: string | null;
 }
 
 /**

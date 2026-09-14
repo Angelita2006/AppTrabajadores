@@ -78,7 +78,8 @@ export default function SelectorUbicacionMapa({
         })
         .catch((error: any) => {
           mostrarError(
-            "Error al cargar los componentes del mapa interactivo: " + error,
+            "Error al cargar los componentes del mapa interactivo: " +
+              error.message,
           );
         });
     }
@@ -102,7 +103,7 @@ export default function SelectorUbicacionMapa({
         );
       }
     } catch (error: any) {
-      mostrarError("Error al intentar abrir Google Maps: " + error);
+      mostrarError("Error al intentar abrir Google Maps: " + error.message);
     }
   };
 

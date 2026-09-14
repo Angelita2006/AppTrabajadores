@@ -11,7 +11,8 @@ import {
   obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,6 +30,7 @@ import {
   TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -64,6 +66,13 @@ export default function IncidenciasScreen() {
     useState<string>("");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
+  const [firmaSolicitante, setFirmaSolicitante] = useState<string | null>(null);
+  const [capturandoFirma, setCapturandoFirma] = useState(false);
+  const [correccionResolviendo, setCorreccionResolviendo] = useState<{
+    id: string;
+    decision: "Aprobada" | "Rechazada";
+  } | null>(null);
+  const { mostrarError } = useAppModal();
 
   const esAdmin = useMemo(() => {
     return (
@@ -155,7 +164,8 @@ export default function IncidenciasScreen() {
       }
     } catch (error: any) {
       mostrarError(
-        "Error al cargar los centros de trabajo de la empresa: " + error,
+        "Error al cargar los centros de trabajo de la empresa: " +
+          error.message,
       );
     } finally {
       setCargando(false);
@@ -196,6 +206,14 @@ export default function IncidenciasScreen() {
       return;
     }
 
+    if (!firmaSolicitante) {
+      mostrarMensaje(
+        "Firma requerida",
+        "Debes firmar la solicitud de corrección antes de enviarla.",
+      );
+      return;
+    }
+
     if (tipoCorreccion !== "Anulación") {
       if (!fechaAfectada.trim() || !horaRealPropuesta.trim()) {
         mostrarMensaje(
@@ -225,6 +243,7 @@ export default function IncidenciasScreen() {
         tipo_correccion: tipoCorreccion,
         tipo_evento_id: tipoEventoIdSolicitado,
         solicitado_por_usuario_id: usuarioActual.id,
+        firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:
           tipoCorreccion !== "Alta_manual" ? fichajeAfectadoId : null,
@@ -251,7 +270,8 @@ export default function IncidenciasScreen() {
       setFechaAfectada("");
     } catch (error: any) {
       mostrarError(
-        "Error al cargar los centros de trabajo de la empresa: " + error,
+        "Error al cargar los centros de trabajo de la empresa: " +
+          error.message,
       );
     } finally {
       setCargando(false);
@@ -264,6 +284,7 @@ export default function IncidenciasScreen() {
     horaRealPropuesta,
     tipoEventoIdSolicitado,
     horaAnterior,
+    firmaSolicitante,
     usuarioActual,
     trabajadorActual,
     empresaActual,
@@ -271,27 +292,36 @@ export default function IncidenciasScreen() {
 
   const handleResolverIncidencia = useCallback(
     async (idCorreccion: string, decision: "Aprobada" | "Rechazada") => {
-      try {
-        setCargando(true);
-        if (!usuarioActual?.id) return;
-
-        const resuelta = await resolverCorreccion(
-          idCorreccion,
-          decision,
-          usuarioActual.id,
-        );
-        setIncidencias((prev) =>
-          prev.map((item) => (item.id === idCorreccion ? resuelta : item)),
-        );
-      } catch (error: any) {
-        mostrarError(
-          "Error al cargar los centros de trabajo de la empresa: " + error,
-        );
-      } finally {
-        setCargando(false);
-      }
+      if (!usuarioActual?.id) return;
+      setCorreccionResolviendo({ id: idCorreccion, decision });
     },
     [usuarioActual?.id],
+  );
+
+  const resolverConFirma = useCallback(
+    async (firma: string) => {
+      if (!usuarioActual?.id || !correccionResolviendo) return;
+      try {
+        setCargando(true);
+        const resuelta = await resolverCorreccion(
+          correccionResolviendo.id,
+          correccionResolviendo.decision,
+          usuarioActual.id,
+          firma,
+        );
+        setIncidencias((prev) =>
+          prev.map((item) =>
+            item.id === correccionResolviendo.id ? resuelta : item,
+          ),
+        );
+      } catch (error: any) {
+        mostrarError("Error al resolver la corrección: " + error.message);
+      } finally {
+        setCargando(false);
+        setCorreccionResolviendo(null);
+      }
+    },
+    [correccionResolviendo, usuarioActual?.id],
   );
 
   const getColoresEstado = (estado: EstadoCorreccion) => {
@@ -485,6 +515,16 @@ export default function IncidenciasScreen() {
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
               />
+              <Pressable
+                style={styles.signatureButton}
+                onPress={() => setCapturandoFirma(true)}
+              >
+                <ThemedText style={styles.signatureButtonText}>
+                  {firmaSolicitante
+                    ? "Firma guardada · cambiar"
+                    : "Firmar solicitud"}
+                </ThemedText>
+              </Pressable>
             </View>
             <Pressable
               style={[styles.submitButton, cargando && styles.disabled]}
@@ -502,6 +542,27 @@ export default function IncidenciasScreen() {
           </Card>
         </>
       )}
+
+      <SignatureCapture
+        visible={capturandoFirma || correccionResolviendo !== null}
+        title={
+          correccionResolviendo
+            ? `Firma para ${correccionResolviendo.decision.toLowerCase()} la corrección`
+            : "Firma de la persona solicitante"
+        }
+        onCancel={() => {
+          setCapturandoFirma(false);
+          setCorreccionResolviendo(null);
+        }}
+        onConfirm={(firma) => {
+          if (correccionResolviendo) {
+            void resolverConFirma(firma);
+          } else {
+            setFirmaSolicitante(firma);
+            setCapturandoFirma(false);
+          }
+        }}
+      />
 
       <ThemedText style={styles.sectionTitle}>
         {esAdmin
@@ -671,6 +732,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  signatureButton: {
+    alignItems: "center",
+    paddingVertical: 11,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  signatureButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "700" },
   disabled: { opacity: 0.6 },
   submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
   itemCard: { width: "100%", paddingVertical: 2 },

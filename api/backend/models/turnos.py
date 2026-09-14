@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from sqlalchemy import ARRAY, CheckConstraint, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, DateTime, Time, Uuid, text
+from sqlalchemy import ARRAY, Boolean, CheckConstraint, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, DateTime, Time, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 
@@ -20,6 +20,7 @@ class Turnos(Base):
     hora_fin: Mapped[datetime.time] = mapped_column(Time, nullable=False)
     duracion_pausa_minutos: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text('0'))
     dias_semana: Mapped[list[int]] = mapped_column(ARRAY(SmallInteger()), nullable=False, comment='Días de la semana en que aplica el turno: 1=lunes ... 7=domingo.')
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='turnos') # type: ignore

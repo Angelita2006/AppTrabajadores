@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from core.enums import TipoUsuarioEnum
@@ -12,8 +12,11 @@ class Usuarios(Base):
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='usuarios_empresa_id_fkey'),
         ForeignKeyConstraint(['trabajador_id'], ['trabajadores.id'], ondelete='RESTRICT', name='usuarios_trabajador_id_fkey'),
         PrimaryKeyConstraint('id', name='usuarios_pkey'),
-        UniqueConstraint('email', name='usuarios_email_key'),
         UniqueConstraint('trabajador_id', name='usuarios_trabajador_id_key')
+    )
+
+    __table_args__ += (
+        Index('usuarios_email_activo_key', 'email', unique=True, postgresql_where=text('activo IS TRUE')),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text('gen_random_uuid()'))

@@ -21,6 +21,7 @@ class Empresas(Base):
     configuracion: Mapped[dict] = mapped_column(JSON, nullable=False, server_default=text("'{}'::jsonb"))
     fecha_alta: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'))
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
+    es_gestoria: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('false'))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     nombre_comercial: Mapped[Optional[str]] = mapped_column(String(255))
@@ -47,3 +48,4 @@ class Empresas(Base):
     correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='empresa') # type: ignore
     ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='empresa') # type: ignore
     tipos_evento_fichaje: Mapped[list['TiposEventoFichaje']] = relationship('TiposEventoFichaje', back_populates='empresa') # type: ignore
+    licencia: Mapped[Optional['Licencias']] = relationship('Licencias', uselist=False, back_populates='empresa') # type: ignore

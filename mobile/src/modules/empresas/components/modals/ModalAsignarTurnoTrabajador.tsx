@@ -159,38 +159,40 @@ export const ModalAsignarTurnoTrabajador: React.FC<
 
         <View style={styles.contenedorSelectorScroll}>
           <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
-            {turnosEmpresa.map((turno: Turno) => {
-              const estaSeleccionado = turnosSeleccionados.some(
-                (t) => t.id === turno.id,
-              );
-              return (
-                <Pressable
-                  key={turno.id}
-                  style={[
-                    styles.opcionSelector,
-                    estaSeleccionado && styles.opcionSelectorSeleccionada,
-                  ]}
-                  onPress={() => {
-                    setTurnosSeleccionados(
-                      estaSeleccionado
-                        ? turnosSeleccionados.filter((t) => t.id !== turno.id)
-                        : [...turnosSeleccionados, turno],
-                    );
-                  }}
-                >
-                  <ThemedText style={{ color: "#222222" }}>
-                    {turno.nombre}
-                  </ThemedText>
-                  {estaSeleccionado && (
-                    <FontAwesome5
-                      name="check-square"
-                      size={16}
-                      color="#2563EB"
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
+            {turnosEmpresa
+              .filter((turno) => turno.activo === true)
+              .map((turno: Turno) => {
+                const estaSeleccionado = turnosSeleccionados.some(
+                  (t) => t.id === turno.id,
+                );
+                return (
+                  <Pressable
+                    key={turno.id}
+                    style={[
+                      styles.opcionSelector,
+                      estaSeleccionado && styles.opcionSelectorSeleccionada,
+                    ]}
+                    onPress={() => {
+                      setTurnosSeleccionados(
+                        estaSeleccionado
+                          ? turnosSeleccionados.filter((t) => t.id !== turno.id)
+                          : [...turnosSeleccionados, turno],
+                      );
+                    }}
+                  >
+                    <ThemedText style={{ color: "#222222" }}>
+                      {turno.nombre}
+                    </ThemedText>
+                    {estaSeleccionado && (
+                      <FontAwesome5
+                        name="check-square"
+                        size={16}
+                        color="#2563EB"
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
           </ScrollView>
         </View>
       </View>

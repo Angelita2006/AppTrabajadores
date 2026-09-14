@@ -1,0 +1,107 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>empresa.ts · Fichapp</title><style>
+:root{color-scheme:light;--ink:#18212f;--muted:#667085;--line:#d9e0e8;--paper:#fff;--wash:#f4f6f8;--navy:#132238;--accent:#b44a2d;--accent-wash:#fff1ec;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font-size:16px;line-height:1.65}a{color:#8d341f;text-decoration:none}a:hover{text-decoration:underline}.top{background:var(--navy);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:28px}.brand{font-size:1.45rem;font-weight:700;letter-spacing:.02em}.top small{color:#b9c4d3}.layout{display:grid;grid-template-columns:275px minmax(0,900px);max-width:1240px;margin:0 auto;min-height:calc(100vh - 70px)}aside{padding:30px 22px;border-right:1px solid var(--line);background:#eef1f4;position:sticky;top:0;height:calc(100vh - 70px);overflow:auto}aside h3{font:700 .75rem/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:22px 0 8px}nav a{display:block;padding:5px 9px;border-radius:4px;font:14px/1.45 Arial,sans-serif;color:#344054}nav a:hover{background:#dfe5eb;text-decoration:none}.search{width:100%;border:1px solid #c5ced9;border-radius:4px;padding:9px 10px;background:#fff;font:14px Arial,sans-serif}.content{background:var(--paper);padding:54px clamp(24px,6vw,76px) 90px}h1,h2,h3{font-weight:700;line-height:1.2}h1{font-size:2.55rem;margin:0 0 14px;color:var(--navy)}h2{font-size:1.6rem;margin:48px 0 18px;border-bottom:1px solid var(--line);padding-bottom:9px}h3{font-size:1.15rem;margin:0 0 4px}.lead{font-size:1.16rem;color:#4b5565;max-width:720px}.eyebrow{font:700 .74rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:30px 0}.stat,.item{border:1px solid var(--line);padding:16px;background:#fff}.stat strong{display:block;font-size:1.8rem;color:var(--accent)}.stat span,.meta{font:13px Arial,sans-serif;color:var(--muted)}.item{margin:12px 0}.item code,.path,code{font-family:'Cascadia Code',Consolas,monospace;font-size:.88em}.path{color:var(--muted);margin-bottom:16px}.entry{border-top:1px solid var(--line);padding:22px 0}.entry pre{white-space:pre-wrap;margin:10px 0 0;padding:14px;background:#f7f8fa;border-left:3px solid #d9a08f;font:14px/1.6 'Cascadia Code',Consolas,monospace;color:#344054}.tag{display:inline-block;background:var(--accent-wash);color:#8d341f;padding:2px 7px;margin-right:7px;font:12px Arial,sans-serif;border-radius:3px}@media(max-width:760px){.layout{display:block}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.content{padding:34px 22px 60px}h1{font-size:2rem}.top{padding:15px 18px}}
+</style></head><body><header class="top"><div class="brand">Fichapp</div><small>Documentación del frontend</small></header><div class="layout"><aside><input class="search" type="search" placeholder="Buscar en la documentación" data-search><h3>Guía</h3><nav><a href="index.html">Inicio</a><a href="architecture.html">Arquitectura</a><a href="routes.html">Rutas</a><a href="modules.html">Módulos</a></nav><h3>Módulos</h3><nav><a href="modules.html#another-services">another-services</a><a href="modules.html#asignaciones-turno">asignaciones-turno</a><a href="modules.html#ausencias">ausencias</a><a href="modules.html#calendarios-laborales">calendarios-laborales</a><a href="modules.html#centros-trabajo">centros-trabajo</a><a href="modules.html#contratos">contratos</a><a href="modules.html#correcciones-fichaje">correcciones-fichaje</a><a href="modules.html#departamentos">departamentos</a><a href="modules.html#dispositivos-fichaje">dispositivos-fichaje</a><a href="modules.html#empresas">empresas</a><a href="modules.html#festivos">festivos</a><a href="modules.html#fichajes">fichajes</a><a href="modules.html#permisos">permisos</a><a href="modules.html#resumenes-jornada">resumenes-jornada</a><a href="modules.html#roles">roles</a><a href="modules.html#tipos_eventos_fichaje">tipos_eventos_fichaje</a><a href="modules.html#trabajadores">trabajadores</a><a href="modules.html#turnos">turnos</a><a href="modules.html#usuarios">usuarios</a><a href="modules.html#usuarios_roles">usuarios_roles</a></nav></aside><main class="content"><p class="eyebrow">Referencia de código</p><h1>empresa.ts</h1><p class="path">mobile/src/modules/empresas/types/empresa.ts</p><article class="entry"><h3><span class="tag">interface</span>Empresa</h3><pre>Representa el modelo de una Empresa cliente (Tenant) en el frontend,
+sincronizado exactamente con el esquema de respuesta del backend (EmpresaResponse).</pre></article><article class="entry"><h3><span class="tag">interface</span>EmpresaUpdate</h3><pre>Identificador UUID único de la empresa. */
+  id: string;
+  /** Indicador booleano que determina si la empresa se encuentra activa en el sistema. */
+  activa: boolean;
+  /** Indicador booleano que determina si la organización creada actúa como gestoría matriz. */
+  es_gestoria: boolean;
+  /** Razón social oficial y legal de la empresa. */
+  razon_social: string;
+  /** Código de Identificación Fiscal (CIF) de la empresa. */
+  cif: string;
+  /** Zona horaria configurada para la organización (ej. Europe/Madrid). */
+  zona_horaria: string;
+  /** Objeto de configuración general con parámetros personalizados del tenant. */
+  configuracion: Record&lt;string, any&gt;;
+  /** Nombre comercial de la empresa. */
+  nombre_comercial: string;
+  /** Código Nacional de Actividad Económica (CNAE). */
+  codigo_cnae: string | null;
+  /** Convenio colectivo aplicable a la organización. */
+  convenio_colectivo: string | null;
+  /** Dirección fiscal completa de la empresa. */
+  direccion_fiscal: string | null;
+  /** URL o ruta del logo corporativo de la empresa, si aplica. */
+  logo_url?: string | null;
+  /** Fecha en la que se dio de alta la empresa en formato &quot;AAAA-MM-DD&quot;. */
+  fecha_alta: string;
+  /** Fecha en la que se dio de baja la empresa en formato &quot;AAAA-MM-DD&quot;, si aplica. */
+  fecha_baja?: string | null;
+  /** Marca de tiempo de creación del registro en formato ISO 8601. */
+  created_at: string;
+  /** Marca de tiempo de la última actualización del registro en formato ISO 8601. */
+  updated_at: string;
+  /** Listado de identificadores de trabajadores vinculados a la empresa. */
+  trabajadores: string[];
+}
+
+/**
+Esquema para la actualización parcial de los datos de una empresa,
+sincronizado con el modelo `EmpresaUpdate`.</pre></article><article class="entry"><h3><span class="tag">interface</span>RegistroOrganizacionDTO</h3><pre>Nueva razón social a actualizar. */
+  razon_social: string;
+  /** Nuevo CIF a actualizar, si aplica. */
+  cif: string;
+  /** Nueva zona horaria a configurar. */
+  zona_horaria: string;
+  /** Nuevos parámetros de configuración personalizados, si aplica. */
+  configuracion?: Record&lt;string, any&gt; | null;
+  /** Nuevo estado de activación de la empresa. */
+  activo: boolean;
+  /** Nuevo indicador de gestoría. */
+  es_gestoria?: boolean;
+  /** Nuevo nombre comercial a actualizar. */
+  nombre_comercial: string;
+  /** Nuevo código CNAE a actualizar. */
+  codigo_cnae: string;
+  /** Nuevo convenio colectivo a actualizar. */
+  convenio_colectivo: string;
+  /** Nueva dirección fiscal a actualizar. */
+  direccion_fiscal: string;
+  /** Nueva URL o ruta del logo corporativo, si aplica. */
+  logo_url?: string | null;
+  /** Nueva fecha de baja en formato &quot;AAAA-MM-DD&quot;, si aplica. */
+  fecha_baja?: string | null;
+}
+
+/**
+Esquema de transferencia de datos (DTO) para el registro inicial de una nueva organización (Tenant) y su administrador.
+Sincronizado con el backend para el alta completa de empresa, primer trabajador y usuario administrador.</pre></article><article class="entry"><h3><span class="tag">interface</span>RespuestaRegistroCompleto</h3><pre>Código de licencia de activación corporativa. */
+  codigo_licencia: string;
+  /** Nombre comercial o marca de la nueva organización. */
+  nombre_comercial: string;
+  /** Código de Identificación Fiscal (CIF) de la organización. */
+  cif: string;
+  /** Razón social oficial de la organización. */
+  razon_social: string;
+  /** Código Nacional de Actividades Económicas (CNAE) de la empresa. */
+  codigo_cnae: string;
+  /** Convenio colectivo aplicable a la organización. */
+  convenio_colectivo: string;
+  /** Dirección fiscal o postal completa de la organización. */
+  direccion_fiscal: string;
+  /** Indica si la organización a registrar opera como una gestoría. */
+  es_gestoria?: boolean;
+  /** Nombre del usuario administrador inicial. */
+  nombre_admin: string;
+  /** Apellidos del usuario administrador inicial. */
+  apellidos_admin: string;
+  /** Número de identificación fiscal o documento de identidad (DNI/NIF/NIE) del administrador. */
+  dni_nif_nie_admin: string;
+  /** Teléfono de contacto del administrador. */
+  telefono_admin: string;
+  /** Correo electrónico principal de contacto o acceso del administrador. */
+  email_admin: string;
+  /** Número de la Seguridad Social (NSS) del administrador. */
+  nss_admin: string;
+  /** Fecha de nacimiento del administrador en formato estándar &quot;AAAA-MM-DD&quot;. */
+  fecha_nacimiento_admin: string;
+  /** Contraseña en texto plano para el alta inicial del usuario administrador. */
+  password_raw: string;
+  /** URL o ruta del logo corporativo para el registro inicial, o nula si no aplica. */
+  logo_url?: string | null;
+}
+
+/**
+Representa la estructura de respuesta completa tras llevar a cabo el registro exitoso de una organización.</pre></article></main></div><script>const q=document.querySelector('[data-search]');q?.addEventListener('input',e=>{const value=e.target.value.toLowerCase();document.querySelectorAll('.item,.entry').forEach(el=>el.hidden=value&&!el.textContent.toLowerCase().includes(value))});</script></body></html>

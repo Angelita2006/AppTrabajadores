@@ -2,85 +2,60 @@ import api from "@/src/service/api/api";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { obtenerEmpresaPorCif } from "../empresas/api/services";
 import {
   RegistroOrganizacionDTO,
   RespuestaRegistroCompleto,
 } from "../empresas/types/empresa";
-import { Trabajador } from "../trabajadores/types/trabajador";
-import { UsuarioSesion } from "../usuarios/types/usuario";
 
 /**
- * Registra en cadena una nueva empresa, su primer expediente de trabajador y la cuenta de usuario de sesión (con rol admin_empresa) vinculada.
- * URI: POST /api/empresas, GET /api/empresas/cif/{cif}, POST /api/trabajadores, POST /api/usuarios
+ * Registra de forma atómica una nueva empresa o gestoría, su primer expediente de trabajador y la cuenta de usuario de sesión vinculada.
+ * URI: POST /api/empresas/registro-completo
  *
  * @async
  * @function registrarOrganizacionCompleta
- * @param {RegistroOrganizacionDTO} payload - Objeto con los datos necesarios para el alta de la organización y el administrador.
+ * @param {RegistroOrganizacionDTO} payload - Objeto con los datos necesarios para el alta de la organización, el administrador y el indicador de gestoría.
  * @returns {Promise<RespuestaRegistroCompleto>} Promesa con los datos completos de la empresa, trabajador y usuario creados.
- * @throws {Error} Lanza un error si falla alguna de las peticiones en cadena o la creación de la organización.
+ * @throws {Error} Lanza un error si falla la transacción atómica en el servidor.
  */
 export const registrarOrganizacionCompleta = async (
   payload: RegistroOrganizacionDTO,
 ): Promise<RespuestaRegistroCompleto> => {
   try {
-    // 1. Crear la empresa
-    await api.post("/api/empresas", {
-      nombre_comercial: payload.nombre_comercial,
-      razon_social: payload.razon_social,
-      cif: payload.cif,
-      zona_horaria: "Europe/Madrid",
-      configuracion: {},
-      codigo_cnae: payload.codigo_cnae ? String(payload.codigo_cnae) : null,
-      convenio_colectivo: payload.convenio_colectivo,
-      direccion_fiscal: payload.direccion_fiscal,
-      logo_url: payload.logo_url || null,
-    });
+    // Petición única y atómica al backend que maneja el rollback automático si algo falla
+    const response = await api.post<RespuestaRegistroCompleto>(
+      "/api/empresas/registro-completo",
+      {
+        codigo_licencia: payload.codigo_licencia,
+        nombre_comercial: payload.nombre_comercial,
+        razon_social: payload.razon_social,
+        cif: payload.cif,
+        zona_horaria: "Europe/Madrid",
+        configuracion: {},
+        codigo_cnae: payload.codigo_cnae ? String(payload.codigo_cnae) : null,
+        convenio_colectivo: payload.convenio_colectivo,
+        direccion_fiscal: payload.direccion_fiscal,
+        logo_url: payload.logo_url || null,
+        es_gestoria: payload.es_gestoria ?? false,
 
-    // 2. Recuperar la empresa recién creada utilizando el método por CIF
-    const empresaCreada = await obtenerEmpresaPorCif(payload.cif);
+        // Datos del administrador / trabajador inicial
+        nombre_admin: payload.nombre_admin,
+        apellidos_admin: payload.apellidos_admin,
+        dni_nif_nie_admin: payload.dni_nif_nie_admin,
+        email_admin: payload.email_admin,
+        password_raw: payload.password_raw,
+        telefono_admin: payload.telefono_admin
+          ? String(payload.telefono_admin)
+          : null,
+        nss_admin: payload.nss_admin ? String(payload.nss_admin) : null,
+        fecha_nacimiento_admin: payload.fecha_nacimiento_admin,
+      },
+    );
 
-    if (!empresaCreada || !empresaCreada.id) {
-      throw new Error(
-        "No se pudo obtener el identificador de la empresa registrada.",
-      );
-    }
-
-    // 3. Crear el trabajador asociado usando el ID obtenido
-    const responseTrabajador = await api.post<Trabajador>("/api/trabajadores", {
-      empresa_id: empresaCreada.id,
-      dni_nif_nie: payload.dni_nif_nie_admin,
-      nombre: payload.nombre_admin,
-      apellidos: payload.apellidos_admin,
-      email: payload.email_admin,
-      telefono: payload.telefono_admin ? String(payload.telefono_admin) : null,
-      numero_seguridad_social: payload.nss_admin
-        ? String(payload.nss_admin)
-        : null,
-      fecha_nacimiento: payload.fecha_nacimiento_admin,
-    });
-
-    const trabajadorCreado = responseTrabajador.data;
-
-    // 4. Crear el usuario administrador vinculado (asignando el trabajador_id generado)
-    const responseUsuario = await api.post<UsuarioSesion>("/api/usuarios", {
-      nombre: `${payload.nombre_admin} ${payload.apellidos_admin}`,
-      email: payload.email_admin,
-      password_raw: payload.password_raw,
-      tipo_usuario: "Admin_empresa",
-      empresa_id: empresaCreada.id,
-      trabajador_id: trabajadorCreado?.id || null,
-    });
-
-    const usuarioCreado = responseUsuario.data;
-
-    return {
-      empresa: empresaCreada,
-      trabajador: trabajadorCreado,
-      usuario: usuarioCreado,
-    };
+    return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    // Capturamos el detalle exacto que arroje FastAPI en el HTTPException (detail) o un mensaje genérico
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Ha ocurrido un error inesperado al procesar el alta de organización.",

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import {
   actualizarCentroTrabajo,
+  cambiarEstadoCentroTrabajo,
   crearCentroTrabajo,
   eliminarCentroTrabajo,
 } from "../../../centros-trabajo/api/services";
@@ -54,6 +55,7 @@ export default function TabCentros({
   styles,
 }: TabCentrosProps) {
   const [mostrarFormCentro, setMostrarFormCentro] = useState(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState(false);
 
   const [nombreCentro, setNombreCentro] = useState("");
   const [direccionCentro, setDireccionCentro] = useState("");
@@ -65,6 +67,12 @@ export default function TabCentros({
   );
   const [latitudCentro, setLatitudCentro] = useState(0.0);
   const [longitudCentro, setLongitudCentro] = useState(0.0);
+  const centrosActivos = centrosEmpresa.filter(
+    (centro) => centro.activo !== false,
+  );
+  const centrosInactivos = centrosEmpresa.filter(
+    (centro) => centro.activo === false,
+  );
 
   // ==========================================
   // CREACIÓN DE CENTROS DE TRABAJO
@@ -103,7 +111,7 @@ export default function TabCentros({
       setLongitudCentro(0);
       mostrarMensaje("Éxito", "Centro de trabajo creado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el centro de trabajo: " + error);
+      mostrarError("Error al crear el centro de trabajo: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -153,7 +161,9 @@ export default function TabCentros({
       mostrarMensaje("Éxito", "Centro de trabajo actualizado.");
       setCentroEnEdicion(null);
     } catch (error: any) {
-      mostrarError("Error al actualizar el centro de trabajo: " + error);
+      mostrarError(
+        "Error al actualizar el centro de trabajo: " + error.message,
+      );
     } finally {
       setGuardando(false);
     }
@@ -171,9 +181,11 @@ export default function TabCentros({
         setGuardando(true);
         await eliminarCentroTrabajo(centroId);
         setCentrosEmpresa((prev: CentroTrabajo[]) =>
-          prev.filter((c: CentroTrabajo) => c.id !== centroId),
+          prev.map((c: CentroTrabajo) =>
+            c.id === centroId ? { ...c, activo: false } : c,
+          ),
         );
-        mostrarMensaje("Éxito", "Centro de trabajo eliminado correctamente.");
+        mostrarMensaje("Éxito", "Centro de trabajo enviado a la papelera.");
       } catch (error: any) {
         mostrarMensaje(
           "Acción Bloqueada",
@@ -205,6 +217,23 @@ export default function TabCentros({
           },
         ],
       );
+    }
+  };
+
+  const handleReactivarCentro = async (centroId: string) => {
+    try {
+      setGuardando(true);
+      await cambiarEstadoCentroTrabajo(centroId, true);
+      setCentrosEmpresa((prev) =>
+        prev.map((centro) =>
+          centro.id === centroId ? { ...centro, activo: true } : centro,
+        ),
+      );
+      mostrarMensaje("Éxito", "Centro de trabajo reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError("Error al reactivar el centro de trabajo: " + error.message);
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -318,11 +347,9 @@ export default function TabCentros({
         </View>
       )}
 
-      <ThemedText style={styles.subseccionTitulo}>
-        Centros Registrados
-      </ThemedText>
+      <ThemedText style={styles.subseccionTitulo}>Centros Activos</ThemedText>
 
-      {centrosEmpresa.map((centro: CentroTrabajo) => (
+      {centrosActivos.map((centro: CentroTrabajo) => (
         <View key={centro.id}>
           <View
             style={[
@@ -511,6 +538,39 @@ export default function TabCentros({
           )}
         </View>
       ))}
+
+      {centrosInactivos.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable
+            style={[styles.botonAccionHeader, { backgroundColor: "#64748B" }]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+            disabled={guardando}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${centrosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+          {mostrarPapelera &&
+            centrosInactivos.map((centro) => (
+              <View key={centro.id} style={styles.itemListaEstructural}>
+                <ThemedText style={styles.nombreElementoLista}>
+                  {centro.nombre}
+                </ThemedText>
+                <Pressable
+                  style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
+                  onPress={() => handleReactivarCentro(centro.id)}
+                  disabled={guardando}
+                >
+                  <ThemedText style={styles.textoBotonGuardar}>
+                    ↻ Reactivar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+        </View>
+      )}
     </View>
   );
 }

@@ -158,24 +158,25 @@ export const importarCalendarioPDF = async (
 };
 
 /**
- * Elimina de forma definitiva un calendario laboral por su identificador único.
- * URI: DELETE /api/calendarios-laborales/{idCalendario}
+ * Da de baja un calendario laboral por su identificador único.
+ * URI: PUT /api/calendarios-laborales/{idCalendario}/desactivar
  *
  * @async
  * @function eliminarCalendarioLaboral
- * @param {string} idCalendario - Identificador UUID único del calendario a eliminar.
- * @returns {Promise<void>} Promesa que se resuelve al completar la eliminación.
+ * @param {string} idCalendario - Identificador UUID único del calendario a desactivar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar la desactivación.
  * @throws {Error} Lanza un error si el calendario no existe o falla la operación.
  */
 export const eliminarCalendarioLaboral = async (
   idCalendario: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/calendarios-laborales/${idCalendario}`);
+    await api.put(`/api/calendarios-laborales/${idCalendario}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || `Error al eliminar el calendario laboral ${idCalendario}.`,
+      apiMessage ||
+        `Error al desactivar el calendario laboral ${idCalendario}.`,
     );
   }
 };

@@ -1,7 +1,7 @@
 import api from "@/src/service/api/api";
 import {
-  CorreccionFichajeCreate,
-  CorreccionFichajeResponse,
+    CorreccionFichajeCreate,
+    CorreccionFichajeResponse,
 } from "../types/correccion";
 
 /**
@@ -125,11 +125,12 @@ export const resolverCorreccion = async (
   idCorreccion: string,
   nuevoEstado: "Aprobada" | "Rechazada",
   idUsuarioResolutor: string,
+  firmaResolutor: string,
 ): Promise<any> => {
   try {
     const response = await api.put<any>(
       `/api/correcciones/${idCorreccion}/resolver`,
-      null,
+      { firma_resolutor: firmaResolutor },
       {
         params: {
           nuevo_estado: nuevoEstado,

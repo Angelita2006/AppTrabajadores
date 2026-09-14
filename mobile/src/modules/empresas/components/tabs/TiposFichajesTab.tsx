@@ -42,7 +42,7 @@ interface TabTipoEventosProps {
 
 /**
  * Componente que gestiona la pestaña de tipos de eventos de fichaje de una empresa,
- * permitiendo listar, crear, editar y eliminar los tipos de eventos personalizados.
+ * permitiendo listar, crear, editar, eliminar y gestionar la papelera de eventos inactivos.
  *
  * @component
  * @param {TabTipoEventosProps} props - Propiedades del componente.
@@ -57,6 +57,7 @@ export default function TabTipoEventos({
   const { empresaActual } = useSesion();
   const [mostrarFormTipoEvento, setMostrarFormTipoEvento] =
     useState<boolean>(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState<boolean>(false);
   const [codigoTipoEvento, setCodigoTipoEvento] = useState<string>("");
   const [descripcionTipoEvento, setDescripcionTipoEvento] =
     useState<string>("");
@@ -64,6 +65,15 @@ export default function TabTipoEventos({
     useState<boolean>(true);
   const [tipoEventoEnEdicion, setTipoEventoEnEdicion] =
     useState<TipoEventoFichaje | null>(null);
+
+  // Separación de eventos activos e inactivos (Papelera)
+  // Asumimos que un evento inactivo tiene activo === false o un indicador equivalente.
+  const eventosActivos = tiposEventosEmpresa.filter(
+    (t: any) => t.activo !== false,
+  );
+  const eventosInactivos = tiposEventosEmpresa.filter(
+    (t: any) => t.activo === false,
+  );
 
   /**
    * Valida de forma integral los campos del formulario de tipos de eventos de fichaje.
@@ -78,7 +88,7 @@ export default function TabTipoEventos({
     }
     const valoresValidos = Object.values(CATEGORIAS_EVENTO) as string[];
     if (!valoresValidos.includes(codigoTipoEvento.trim())) {
-      return "El tipo base seleccionado no es válido.";
+      return "El tipo base seleccionado não es válido.";
     }
     if (!descripcionTipoEvento || descripcionTipoEvento.trim() === "") {
       return "La descripción personalizada es obligatoria.";
@@ -118,7 +128,9 @@ export default function TabTipoEventos({
       setMostrarFormTipoEvento(false);
       mostrarMensaje("Éxito", "Tipo de evento registrado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el tipo de evento de fichaje: " + error);
+      mostrarError(
+        "Error al crear el tipo de evento de fichaje: " + error.message,
+      );
     } finally {
       setGuardando(false);
     }
@@ -160,7 +172,7 @@ export default function TabTipoEventos({
       mostrarMensaje("Éxito", "Tipo de evento actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar el tipo de evento de fichaje: " + error,
+        "Error al actualizar el tipo de evento de fichaje: " + error.message,
       );
     } finally {
       setGuardando(false);
@@ -176,13 +188,19 @@ export default function TabTipoEventos({
       try {
         setGuardando(true);
         await eliminarTipoEventoFichaje(tipoId);
+        // Dependiendo de si la API elimina o marca como inactivo, actualizamos el estado:
+        // Si es un borrado lógico, marcamos activo: false. Si es físico, filtramos fuera.
+        // Aquí asumiremos marcado como inactivo para que aparezca en la papelera, o filtrado si se borra por completo.
         setTiposEventosEmpresa((prev: TipoEventoFichaje[]) =>
-          prev.filter((t: TipoEventoFichaje) => t.id !== tipoId),
+          prev.map((t: any) => (t.id === tipoId ? { ...t, activo: false } : t)),
         );
-        mostrarMensaje("Éxito", "Tipo de evento eliminado correctamente.");
+        mostrarMensaje(
+          "Éxito",
+          "Tipo de evento enviado a la papelera correctamente.",
+        );
       } catch (error: any) {
         mostrarError(
-          "Error al eliminar el tipo de evento de fichaje: " + error,
+          "Error al eliminar el tipo de evento de fichaje: " + error.message,
         );
       } finally {
         setGuardando(false);
@@ -190,13 +208,13 @@ export default function TabTipoEventos({
     };
 
     if (Platform.OS === "web") {
-      if (window.confirm("¿Deseas eliminar este tipo de evento de fichaje?")) {
+      if (window.confirm("¿Deseas enviar este tipo de evento a la papelera?")) {
         ejecutarEliminacion();
       }
     } else {
       Alert.alert(
         "Confirmar eliminación",
-        "¿Deseas eliminar este tipo de evento de fichaje?",
+        "¿Deseas enviar este tipo de evento a la papelera?",
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -206,6 +224,28 @@ export default function TabTipoEventos({
           },
         ],
       );
+    }
+  };
+
+  /**
+   * Reactiva un tipo de evento previamente inactivo desde la papelera.
+   * @param {string} tipoId - ID único del tipo de evento a reactivar.
+   */
+  const handleReactivarTipoEvento = async (tipoId: string) => {
+    try {
+      setGuardando(true);
+      await actualizarTipoEventoFichaje(tipoId, { activo: true });
+
+      setTiposEventosEmpresa((prev: TipoEventoFichaje[]) =>
+        prev.map((t: any) => (t.id === tipoId ? { ...t, activo: true } : t)),
+      );
+      mostrarMensaje("Éxito", "Tipo de evento reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError(
+        "Error al reactivar el tipo de evento de fichaje: " + error.message,
+      );
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -339,8 +379,8 @@ export default function TabTipoEventos({
         Tipos de Eventos Permitidos
       </ThemedText>
 
-      {/* Listado dinámico de tipos de eventos configurados */}
-      {tiposEventosEmpresa?.map((tipo: TipoEventoFichaje) => (
+      {/* Listado dinámico de tipos de eventos activos configurados */}
+      {eventosActivos?.map((tipo: TipoEventoFichaje) => (
         <View key={tipo.id}>
           <View
             style={[
@@ -513,6 +553,81 @@ export default function TabTipoEventos({
           )}
         </View>
       ))}
+
+      {/* Apartado de Papelera (Eventos inactivos) */}
+      {eventosInactivos.length > 0 && (
+        <View style={{ marginTop: 20 }}>
+          <Pressable
+            style={[
+              styles.botonAccionHeader,
+              { backgroundColor: "#334155", marginTop: 10 },
+            ]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${eventosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+
+          {mostrarPapelera && (
+            <View style={{ marginTop: 10 }}>
+              <ThemedText style={styles.subseccionTitulo}>
+                Papelera - Tipos de Eventos Inactivos
+              </ThemedText>
+              {eventosInactivos.map((tipoInactivo: TipoEventoFichaje) => (
+                <View
+                  key={tipoInactivo.id}
+                  style={[
+                    styles.itemListaEstructural,
+                    {
+                      marginBottom: 10,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      backgroundColor: "#F1F5F9",
+                      opacity: 0.8,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText
+                      style={[styles.nombreElementoLista, { color: "#64748B" }]}
+                    >
+                      {tipoInactivo.descripcion}{" "}
+                      <ThemedText style={{ fontSize: 10, color: "#94A3B8" }}>
+                        ({tipoInactivo.codigo.replace("_", " ").toUpperCase()})
+                      </ThemedText>
+                    </ThemedText>
+                    <ThemedText style={styles.subtextoElementoLista}>
+                      Inactivo ⚠️
+                    </ThemedText>
+                  </View>
+
+                  <View style={{ flexDirection: "row" }}>
+                    {/* Botón para reactivar */}
+                    <Pressable
+                      style={{
+                        backgroundColor: "#dcfce7",
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 16,
+                      }}
+                      onPress={() => handleReactivarTipoEvento(tipoInactivo.id)}
+                      disabled={guardando}
+                    >
+                      <ThemedText style={{ color: "#16a34a" }}>
+                        ♻️ Reactivar
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }

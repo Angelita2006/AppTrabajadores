@@ -8,6 +8,8 @@ from schemas.auth import ConfirmarPasswordRequest, EmailRecuperacionRequest
 from core.database import get_db
 from core.security import get_password_hash
 from models.usuarios import Usuarios
+from core.enums import AccionAuditoriaEnum
+from core.auditoria import registrar_auditoria
 import random
 from datetime import timedelta, timezone
 
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/recuperar-password", status_code=status.HTTP_200_OK, summary="Solicitar recuperación de contraseña")
-@limiter.limit("5/minute")  # Limita este endpoint a un máximo de 5 peticiones por minuto por IP para prevenir abuso
+@limiter.limit("5/minute")  
 def solicitar_recuperacion_password(
     request: Request,
     payload: EmailRecuperacionRequest, 
@@ -32,7 +34,10 @@ def solicitar_recuperacion_password(
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de recuperación de contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
 
-    usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
+    usuario = db.query(Usuarios).filter(
+        Usuarios.email == payload.email.lower().strip(),
+        Usuarios.activo.is_(True),
+    ).first()
     if not usuario:
         print(f"Intento de recuperación fallido: El correo '{payload.email}' no está registrado en el sistema.")
         raise HTTPException(
@@ -50,13 +55,23 @@ def solicitar_recuperacion_password(
 
         db.add(usuario)
         db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario,
+            empresa_id=usuario.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "auth", "accion": "solicitar_recuperacion_password"}
+        )
+        
         print(f"Código de recuperación generado y persistido para el usuario ID: {usuario.id}")
     except Exception as e:
         db.rollback()
-        print(f"Error en base de datos al guardar código de recuperación para '{payload.email}': {str(e)}")
+        print(f"No se ha podido guardar el código de recuperación para '{payload.email}': {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al procesar la solicitud de recuperación."
+            detail="No se ha podido procesar la solicitud de recuperación."
         )
 
     # 3. Envío real del correo electrónico
@@ -68,7 +83,7 @@ def solicitar_recuperacion_password(
     }
 
 @router.post("/confirmar-password", status_code=status.HTTP_200_OK, summary="Confirmar nueva contraseña")
-@limiter.limit("5/minute")  # Limita este endpoint a un máximo de 5 peticiones por minuto por IP
+@limiter.limit("5/minute")  
 def confirmar_password(
     request: Request,
     payload: ConfirmarPasswordRequest, 
@@ -82,7 +97,10 @@ def confirmar_password(
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
 
-    usuario = db.query(Usuarios).filter(Usuarios.email == payload.email.lower().strip()).first()
+    usuario = db.query(Usuarios).filter(
+        Usuarios.email == payload.email.lower().strip(),
+        Usuarios.activo.is_(True),
+    ).first()
     if not usuario:
         print(f"Intento de confirmación fallido: Usuario con correo '{payload.email}' no encontrado.")
         raise HTTPException(
@@ -123,6 +141,16 @@ def confirmar_password(
             
         db.add(usuario) 
         db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario,
+            empresa_id=usuario.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "auth", "accion": "confirmar_password"}
+        )
+        
         print(f"Contraseña actualizada exitosamente para el usuario ID: {usuario.id}")
         
         return {
@@ -132,8 +160,8 @@ def confirmar_password(
 
     except Exception as e:
         db.rollback()
-        print(f"Error interno al actualizar la contraseña del usuario ID {usuario.id}: {str(e)}")
+        print(f"No se ha podido actualizar la contraseña del usuario ID {usuario.id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno al actualizar la contraseña: {str(e)}"
+            detail=f"No se ha podido actualizar la contraseña: {str(e)}"
         )

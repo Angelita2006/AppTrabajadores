@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from core import archivos
 from core.init_db import inicializar_roles_sistema
 from core.config import settings
 from core.database import SessionLocal, engine
@@ -17,7 +18,6 @@ from core.fichajes_scheduler import iniciar_scheduler_fichajes
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from fastapi.staticfiles import StaticFiles
 
 # 1. Configurar el sistema de logs del servidor
 logging.basicConfig(
@@ -26,8 +26,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 1. Asegurar que la carpeta física exista al arrancar el servidor
+# 1. Asegurar que las carpetas físicas existan al arrancar el servidor
 os.makedirs("static/logos", exist_ok=True)
+os.makedirs("static/fotos_trabajador", exist_ok=True)
+os.makedirs("static/firmas", exist_ok=True)
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
@@ -35,8 +37,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# 2. Montar la carpeta estática para que sea accesible públicamente por HTTP
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.on_event("startup")
 def startup_event():
@@ -114,13 +114,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 # GESTIÓN DE CORS SEGURA PARA PRODUCCIÓN
 origins_env = os.getenv("ALLOWED_ORIGINS", "")
+# Si estamos en desarrollo local y no defines nada, puedes acotar a localhost o vaciarlo. 
+# Para producción, obligamos a que se definan dominios seguros.
 origins = [origin.strip() for origin in origins_env.split(",")] if origins_env else []
+
+if not origins:
+    # Bloqueo estricto por defecto: si no hay dominios permitidos configurados, 
+    # no se permite ningún origen externo para evitar brechas de seguridad accidentales.
+    origins = ["http://localhost:8080", "http://localhost:8081", "http://localhost:8082", "http://127.0.0.1:8081"] 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],  # Si hay variable definida usa esa, de lo contrario flexible para desarrollo local
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
@@ -153,7 +160,14 @@ app.include_router(turnos.router)
 app.include_router(usuarios_roles.router)
 app.include_router(usuarios.router) 
 app.include_router(auth.router)
+app.include_router(archivos.router)
+# app.include_router(licencias.router)
 
-@app.get("/api")
+@app.get(
+    "/api",
+    summary="Comprobar disponibilidad de la API",
+    description="Devuelve un mensaje sencillo para verificar que el servicio está disponible.",
+)
 def read_root():
+    """Comprueba que la API está arrancada y responde correctamente."""
     return {"mensaje": "¡API de FICHAPP funcionando en producción!"}

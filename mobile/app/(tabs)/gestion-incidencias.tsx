@@ -7,13 +7,15 @@ import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services"
 import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 // Ya no necesitamos obtenerRolPorId ni obtenerTrabajador uno a uno si el backend puede devolver los datos poblados o si filtramos por rol_id directamente si viene incluido en el objeto Trabajador.
+import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import {
   obtenerTipoEventoPorId,
   obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -31,6 +33,7 @@ import {
   TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -73,6 +76,12 @@ export default function GestionIncidenciasScreen() {
     useState<string>("");
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
+  const [firmaSolicitante, setFirmaSolicitante] = useState<string | null>(null);
+  const [capturandoFirma, setCapturandoFirma] = useState(false);
+  const [correccionResolviendo, setCorreccionResolviendo] = useState<{
+    id: string;
+    decision: "Aprobada" | "Rechazada";
+  } | null>(null);
 
   const conteoEstados = useMemo(() => {
     const pendientes = incidencias.filter(
@@ -84,17 +93,33 @@ export default function GestionIncidenciasScreen() {
     ).length;
     return { pendientes, aprobadas, rechazadas };
   }, [incidencias]);
+  const { mostrarError } = useAppModal();
 
-  // 1. Carga optimizada de trabajadores (Evita N peticiones de roles si el worker ya trae la info o si se gestiona en una sola llamada)
+  // 1. Carga optimizada de trabajadores
   useEffect(() => {
     async function cargarTrabajadores() {
       if (!empresaActual?.id) return;
       try {
         const lista = await obtenerTrabajadoresEmpresa(empresaActual.id);
         if (Array.isArray(lista)) {
-          // Nota: Si el objeto trabajador incluye el nombre del rol o se valida de otra forma, evitamos el bucle con obtenerRolPorId.
-          // Asumimos que filtramos directamente o dejamos la lista base si el backend ya retorna trabajadores aptos.
-          const trabajadoresFiltrados = lista.sort((a, b) => {
+          const trabajadoresSinAdmin = (
+            await Promise.all(
+              lista.map(async (t: Trabajador) => {
+                if (!t.rol_id) return t;
+                try {
+                  const rol = await obtenerRolPorId(t.rol_id);
+                  const esAdmin =
+                    rol?.nombre?.toLowerCase() === "admin_empresa" ||
+                    rol?.nombre?.toLowerCase() === "admin_gestoría";
+                  return esAdmin ? null : t;
+                } catch {
+                  return t;
+                }
+              }),
+            )
+          ).filter(Boolean) as Trabajador[];
+
+          const trabajadoresFiltrados = trabajadoresSinAdmin.sort((a, b) => {
             const nombreA = `${a.nombre ?? ""} ${a.apellidos ?? ""}`
               .trim()
               .toLowerCase();
@@ -111,7 +136,8 @@ export default function GestionIncidenciasScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar la lista de trabajadores de la empresa: " + error,
+          "Error al cargar la lista de trabajadores de la empresa: " +
+            error.message,
         );
       }
     }
@@ -160,7 +186,8 @@ export default function GestionIncidenciasScreen() {
       setIncidencias(incidenciasConTrabajador);
     } catch (error: any) {
       mostrarError(
-        "Error al cargar las incidencias y tipos de eventos globales: " + error,
+        "Error al cargar las incidencias y tipos de eventos globales: " +
+          error.message,
       );
     } finally {
       setCargando(false);
@@ -217,7 +244,8 @@ export default function GestionIncidenciasScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los fichajes del trabajador seleccionado: " + error,
+          "Error al cargar los fichajes del trabajador seleccionado: " +
+            error.message,
         );
         setFichajesDisponibles([]);
       }
@@ -272,6 +300,13 @@ export default function GestionIncidenciasScreen() {
       );
       return;
     }
+    if (!firmaSolicitante) {
+      mostrarMensaje(
+        "Firma requerida",
+        "Debes firmar la solicitud de corrección antes de enviarla.",
+      );
+      return;
+    }
     try {
       setCargando(true);
       if (!usuarioActual?.id || !empresaActual?.id) return;
@@ -282,6 +317,7 @@ export default function GestionIncidenciasScreen() {
         tipo_correccion: tipoCorreccion,
         tipo_evento_id: tipoEventoIdSolicitado,
         solicitado_por_usuario_id: usuarioActual.id,
+        firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:
           tipoCorreccion !== "Alta_manual" ? fichajeAfectadoId : null,
@@ -319,7 +355,8 @@ export default function GestionIncidenciasScreen() {
       setFechaAfectada("");
     } catch (error: any) {
       mostrarError(
-        "Error al crear o reportar la nueva corrección de fichaje: " + error,
+        "Error al crear o reportar la nueva corrección de fichaje: " +
+          error.message,
       );
     } finally {
       setCargando(false);
@@ -336,17 +373,28 @@ export default function GestionIncidenciasScreen() {
     trabajadorSeleccionadoId,
     empresaActual,
     trabajadores,
+    firmaSolicitante,
   ]);
 
   const handleResolverIncidencia = useCallback(
     async (idCorreccion: string, decision: "Aprobada" | "Rechazada") => {
       if (!usuarioActual?.id) return;
+      setCorreccionResolviendo({ id: idCorreccion, decision });
+    },
+    [usuarioActual?.id],
+  );
+
+  const resolverConFirma = useCallback(
+    async (firma: string) => {
+      if (!usuarioActual?.id || !correccionResolviendo) return;
+      const { id: idCorreccion, decision } = correccionResolviendo;
       setProcesandoId(idCorreccion);
       try {
         const resuelta = await resolverCorreccion(
           idCorreccion,
           decision,
           usuarioActual.id,
+          firma,
         );
         const nuevoEstado = resuelta?.estado ?? decision;
         setIncidencias((prev) =>
@@ -361,13 +409,14 @@ export default function GestionIncidenciasScreen() {
           "Error al resolver la incidencia de fichaje (" +
             decision +
             "): " +
-            error,
+            error.message,
         );
       } finally {
         setProcesandoId(null);
+        setCorreccionResolviendo(null);
       }
     },
-    [usuarioActual?.id],
+    [correccionResolviendo, usuarioActual?.id],
   );
 
   const getColoresEstado = (estado: EstadoCorreccion) => {
@@ -613,6 +662,16 @@ export default function GestionIncidenciasScreen() {
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
               />
+              <Pressable
+                style={styles.signatureButton}
+                onPress={() => setCapturandoFirma(true)}
+              >
+                <ThemedText style={styles.signatureButtonText}>
+                  {firmaSolicitante
+                    ? "Firma guardada · cambiar"
+                    : "Firmar solicitud"}
+                </ThemedText>
+              </Pressable>
             </View>
 
             <Pressable
@@ -657,6 +716,27 @@ export default function GestionIncidenciasScreen() {
         )}
       </View>
 
+      <SignatureCapture
+        visible={capturandoFirma || correccionResolviendo !== null}
+        title={
+          correccionResolviendo
+            ? `Firma para ${correccionResolviendo.decision.toLowerCase()} la corrección`
+            : "Firma de la persona solicitante"
+        }
+        onCancel={() => {
+          setCapturandoFirma(false);
+          setCorreccionResolviendo(null);
+        }}
+        onConfirm={(firma) => {
+          if (correccionResolviendo) {
+            void resolverConFirma(firma);
+          } else {
+            setFirmaSolicitante(firma);
+            setCapturandoFirma(false);
+          }
+        }}
+      />
+
       {cargando && incidencias.length === 0 ? (
         <ActivityIndicator
           size="large"
@@ -695,7 +775,13 @@ export default function GestionIncidenciasScreen() {
                   </View>
 
                   <ThemedText style={styles.nombreTrabajador}>
-                    👤 Trabajador: {item.trabajador_nombre_completo ?? "N/A"}
+                    👤 Trabajador:{" "}
+                    {item.trabajador?.nombre.concat(
+                      " ",
+                      item.trabajador.apellidos,
+                      " ",
+                      item.trabajador.dni_nif_nie,
+                    ) ?? "N/A"}
                   </ThemedText>
                   <ThemedText style={styles.itemMotivo}>
                     Motivo: "{item.motivo}"
@@ -832,6 +918,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  signatureButton: {
+    alignItems: "center",
+    paddingVertical: 11,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  signatureButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "700" },
   disabled: { opacity: 0.6 },
   submitText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
   contenedorBuscador: {

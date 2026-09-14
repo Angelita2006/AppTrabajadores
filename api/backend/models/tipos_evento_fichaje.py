@@ -17,6 +17,7 @@ class TiposEventoFichaje(Base):
     codigo: Mapped[str] = mapped_column(String(30), nullable=False)
     descripcion: Mapped[str] = mapped_column(String(150), nullable=False)
     computa_como_trabajo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='tipos_evento_fichaje') # type: ignore
     fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='tipo_evento') # type: ignore

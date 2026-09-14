@@ -104,13 +104,23 @@ export function useTabCalendario({
   const [nuevaDescFestivo, setNuevaDescFestivo] = useState("");
   const [tipoFestivo, setNuevoTipoFestivo] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState(false);
+  const calendariosActivos = calendariosEmpresa.filter(
+    (calendario) => calendario.activo !== false,
+  );
+  const calendariosInactivos = calendariosEmpresa.filter(
+    (calendario) => calendario.activo === false,
+  );
 
   /**
    * Efecto para sincronizar el centro de trabajo por defecto al actualizar la lista de centros.
    */
   useEffect(() => {
-    if (centrosEmpresa && centrosEmpresa.length > 0) {
-      setCentroNuevoCalendario(centrosEmpresa[0].id);
+    const centrosActivos = centrosEmpresa.filter(
+      (centro) => centro.activo === true,
+    );
+    if (centrosActivos.length > 0) {
+      setCentroNuevoCalendario(centrosActivos[0].id);
     } else {
       setCentroNuevoCalendario("");
     }
@@ -127,7 +137,9 @@ export function useTabCalendario({
     }
   }, [calendarioActual]);
 
-  const tieneCentrosValidos = centrosEmpresa && centrosEmpresa.length > 0;
+  const tieneCentrosValidos = centrosEmpresa.some(
+    (centro) => centro.activo === true,
+  );
 
   /**
    * Valida los datos introducidos y ejecuta la petición para registrar un nuevo calendario laboral.
@@ -168,6 +180,7 @@ export function useTabCalendario({
         centro_trabajo_id: respuestaBackend.centro_trabajo_id ?? "",
         nombre: respuestaBackend.nombre,
         anio: respuestaBackend.anio,
+        activo: respuestaBackend.activo,
         festivos: [],
       };
 
@@ -175,8 +188,11 @@ export function useTabCalendario({
       setCalendarioActual(nuevoCalendarioUI);
       setAnoNuevoCalendario("");
       setNombreNuevoCalendario("");
-      if (centrosEmpresa.length > 0) {
-        setCentroNuevoCalendario(centrosEmpresa[0].id);
+      const centrosActivos = centrosEmpresa.filter(
+        (centro) => centro.activo === true,
+      );
+      if (centrosActivos.length > 0) {
+        setCentroNuevoCalendario(centrosActivos[0].id);
       }
 
       mostrarMensaje(
@@ -185,7 +201,7 @@ export function useTabCalendario({
       );
     } catch (error: any) {
       mostrarError(
-        "Error al crear el calendario laboral en el servidor: " + error,
+        "Error al crear el calendario laboral en el servidor: " + error.message,
       );
     } finally {
       setGuardando(false);
@@ -245,7 +261,7 @@ export function useTabCalendario({
       );
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar la información del calendario: " + error,
+        "Error al actualizar la información del calendario: " + error.message,
       );
     } finally {
       setGuardando(false);
@@ -261,16 +277,41 @@ export function useTabCalendario({
       setGuardando(true);
       await eliminarCalendarioLaboral(calendarioActual.id);
 
-      const restantes = calendariosEmpresa.filter(
-        (c) => c.id !== calendarioActual.id,
+      const actualizados = calendariosEmpresa.map((calendario) =>
+        calendario.id === calendarioActual.id
+          ? { ...calendario, activo: false }
+          : calendario,
       );
-      setCalendariosEmpresa(restantes);
-      setCalendarioActual(restantes.length > 0 ? restantes[0] : null);
+      setCalendariosEmpresa(actualizados);
+      setCalendarioActual(
+        actualizados.find((calendario) => calendario.activo !== false) || null,
+      );
       setMostrarEdicionCampos(false);
-      mostrarMensaje("Éxito", "Calendario laboral eliminado correctamente.");
+      mostrarMensaje("Éxito", "Calendario laboral enviado a la papelera.");
     } catch (error: any) {
       mostrarError(
-        "Error al intentar eliminar el calendario laboral: " + error,
+        "Error al intentar eliminar el calendario laboral: " + error.message,
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleReactivarCalendario = async (idCalendario: string) => {
+    try {
+      setGuardando(true);
+      await actualizarCalendarioLaboral(idCalendario, { activo: true });
+      setCalendariosEmpresa((prev) =>
+        prev.map((calendario) =>
+          calendario.id === idCalendario
+            ? { ...calendario, activo: true }
+            : calendario,
+        ),
+      );
+      mostrarMensaje("Éxito", "Calendario laboral reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError(
+        "Error al reactivar el calendario laboral: " + error.message,
       );
     } finally {
       setGuardando(false);
@@ -392,7 +433,9 @@ export function useTabCalendario({
       setNuevoTipoFestivo("");
       setDiaSeleccionadoCtx(null);
     } catch (error: any) {
-      mostrarError("Error al guardar o actualizar el día festivo: " + error);
+      mostrarError(
+        "Error al guardar o actualizar el día festivo: " + error.message,
+      );
     } finally {
       setGuardando(false);
     }
@@ -466,7 +509,8 @@ export function useTabCalendario({
       );
     } catch (error: any) {
       mostrarError(
-        "Error al procesar e importar el archivo PDF del calendario: " + error,
+        "Error al procesar e importar el archivo PDF del calendario: " +
+          error.message,
       );
     } finally {
       setImportandoPdf(false);
@@ -491,10 +535,15 @@ export function useTabCalendario({
     setNuevoTipoFestivo,
     modalVisible,
     setModalVisible,
+    mostrarPapelera,
+    setMostrarPapelera,
+    calendariosActivos,
+    calendariosInactivos,
     tieneCentrosValidos,
     handleCrearCalendario,
     handleEditarCalendario,
     handleEliminarCalendario,
+    handleReactivarCalendario,
     handleDayPress,
     handleGuardarFestivoContextual,
     handleImportarCalendarioPDF,
@@ -542,10 +591,15 @@ export default function TabCalendario({
     importandoPdf,
     mostrarEdicionCampos,
     setMostrarEdicionCampos,
+    mostrarPapelera,
+    setMostrarPapelera,
+    calendariosActivos,
+    calendariosInactivos,
     tieneCentrosValidos,
     handleCrearCalendario,
     handleEditarCalendario,
     handleEliminarCalendario,
+    handleReactivarCalendario,
     handleDayPress,
     handleImportarCalendarioPDF,
   } = useTabCalendario({
@@ -620,29 +674,31 @@ export default function TabCalendario({
             showsHorizontalScrollIndicator={false}
             style={{ marginBottom: 14, marginTop: 4 }}
           >
-            {centrosEmpresa.map((centro) => {
-              const esEsteCentro = centroNuevoCalendario === centro.id;
-              return (
-                <Pressable
-                  key={centro.id}
-                  style={[
-                    styles.chipAno,
-                    esEsteCentro && { backgroundColor: "#2563EB" },
-                  ]}
-                  onPress={() => setCentroNuevoCalendario(centro.id)}
-                >
-                  <ThemedText
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "600",
-                      color: esEsteCentro ? "#FFFFFF" : "#475569",
-                    }}
+            {centrosEmpresa
+              .filter((centro) => centro.activo === true)
+              .map((centro) => {
+                const esEsteCentro = centroNuevoCalendario === centro.id;
+                return (
+                  <Pressable
+                    key={centro.id}
+                    style={[
+                      styles.chipAno,
+                      esEsteCentro && { backgroundColor: "#2563EB" },
+                    ]}
+                    onPress={() => setCentroNuevoCalendario(centro.id)}
                   >
-                    {centro.nombre} {esEsteCentro ? "✓" : ""}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+                    <ThemedText
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "600",
+                        color: esEsteCentro ? "#FFFFFF" : "#475569",
+                      }}
+                    >
+                      {centro.nombre} {esEsteCentro ? "✓" : ""}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
           </ScrollView>
         )}
 
@@ -697,12 +753,12 @@ export default function TabCalendario({
         Calendarios Disponibles
       </ThemedText>
 
-      {calendariosEmpresa.length > 0 ? (
+      {calendariosActivos.length > 0 ? (
         <View>
           <View style={styles.contenedorFiltroAnual}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <Row>
-                {calendariosEmpresa.map((cal) => {
+                {calendariosActivos.map((cal) => {
                   const centroAsociado = centrosEmpresa.find(
                     (c) => c.id === cal.centro_trabajo_id,
                   );
@@ -787,6 +843,39 @@ export default function TabCalendario({
         </ThemedText>
       )}
 
+      {calendariosInactivos.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable
+            style={[styles.botonAccionHeader, { backgroundColor: "#64748B" }]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+            disabled={guardando}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${calendariosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+          {mostrarPapelera &&
+            calendariosInactivos.map((calendario) => (
+              <View key={calendario.id} style={styles.itemListaEstructural}>
+                <ThemedText style={styles.nombreElementoLista}>
+                  {calendario.nombre} ({calendario.anio})
+                </ThemedText>
+                <Pressable
+                  style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
+                  onPress={() => handleReactivarCalendario(calendario.id)}
+                  disabled={guardando}
+                >
+                  <ThemedText style={styles.textoBotonGuardar}>
+                    ↻ Reactivar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+        </View>
+      )}
+
       {calendarioActual && (
         <View
           style={{
@@ -847,30 +936,32 @@ export default function TabCalendario({
                   showsHorizontalScrollIndicator={false}
                   style={{ marginTop: 4 }}
                 >
-                  {centrosEmpresa.map((centro) => {
-                    const esEsteCentro = editCentroId === centro.id;
-                    return (
-                      <Pressable
-                        key={centro.id}
-                        style={[
-                          styles.chipAno,
-                          esEsteCentro && { backgroundColor: "#0F172A" },
-                        ]}
-                        onPress={() => setEditCentroId(centro.id)}
-                        disabled={guardando}
-                      >
-                        <ThemedText
-                          style={{
-                            fontSize: 11,
-                            fontWeight: "600",
-                            color: esEsteCentro ? "#FFFFFF" : "#475569",
-                          }}
+                  {centrosEmpresa
+                    .filter((centro) => centro.activo === true)
+                    .map((centro) => {
+                      const esEsteCentro = editCentroId === centro.id;
+                      return (
+                        <Pressable
+                          key={centro.id}
+                          style={[
+                            styles.chipAno,
+                            esEsteCentro && { backgroundColor: "#0F172A" },
+                          ]}
+                          onPress={() => setEditCentroId(centro.id)}
+                          disabled={guardando}
                         >
-                          {centro.nombre} {esEsteCentro ? "✓" : ""}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
+                          <ThemedText
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "600",
+                              color: esEsteCentro ? "#FFFFFF" : "#475569",
+                            }}
+                          >
+                            {centro.nombre} {esEsteCentro ? "✓" : ""}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
                 </ScrollView>
               </View>
 

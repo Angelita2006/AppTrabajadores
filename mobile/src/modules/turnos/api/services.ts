@@ -126,25 +126,25 @@ export const editarTurno = async (
 };
 
 /**
- * Elimina un turno de la base de datos (con efecto cascada).
- * URI: DELETE /api/turnos/{id_turno}
+ * Da de baja un turno laboral del sistema.
+ * URI: PUT /api/turnos/{idTurno}/desactivar
  *
  * @async
  * @function eliminarTurno
- * @param {string} idTurno - Identificador único universal (UUID) del turno a eliminar.
- * @returns {Promise<{ detail: string }>} Promesa con el mensaje de confirmación de la eliminación.
+ * @param {string} idTurno - Identificador único universal (UUID) del turno a desactivar.
+ * @returns {Promise<{ detail: string }>} Promesa con el mensaje de confirmación de la desactivación.
  * @throws {Error} Lanza un error si el turno no existe o la API rechaza la petición.
  */
 export const eliminarTurno = async (
   idTurno: string,
 ): Promise<{ detail: string }> => {
   try {
-    const response = await api.delete<{ detail: string }>(
-      `/api/turnos/${idTurno}`,
+    const response = await api.put<{ detail: string }>(
+      `/api/turnos/${idTurno}/desactivar`,
     );
     return response.data;
   } catch (error: any) {
     const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || `Error al eliminar el turno ${idTurno}.`);
+    throw new Error(apiMessage || `Error al desactivar el turno ${idTurno}.`);
   }
 };

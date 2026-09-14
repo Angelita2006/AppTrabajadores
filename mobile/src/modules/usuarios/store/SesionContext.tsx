@@ -144,8 +144,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (rolGuardado) setRolActual(JSON.parse(rolGuardado));
         if (departamentoGuardado)
           setDepartamentoActual(JSON.parse(departamentoGuardado));
-      } catch (error) {
-        mostrarError("Error al recuperar la sesión permanente: " + error);
+      } catch (error: any) {
+        mostrarError(
+          "Error al recuperar la sesión permanente: " + error.message,
+        );
       } finally {
         setCargandoSesionLocal(false);
       }
@@ -229,9 +231,11 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           }
           return;
         }
-      } catch (error) {
+      } catch (error: any) {
         if (!isCancelled) {
-          mostrarError("Error al inicializar el entorno del usuario: " + error);
+          mostrarError(
+            "Error al inicializar el entorno del usuario: " + error.message,
+          );
         }
       }
     }
@@ -320,9 +324,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         );
 
         setTurnoActual(turnoVigenteObj ? turnoVigenteObj.turno : null);
-      } catch (error) {
+      } catch (error: any) {
         if (!isCancelled) {
-          mostrarError("Error al cargar la ficha laboral: " + error);
+          mostrarError("Error al cargar la ficha laboral: " + error.message);
           setTrabajadorActual(null);
           setContratoActual(null);
           setTurnoActual(null);
@@ -408,8 +412,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             AsyncStorage.removeItem(STORAGE_KEY_DEPARTAMENTO),
           ]);
         }
-      } catch (error) {
-        mostrarError("Error al persistir cambios de sesión: " + error);
+      } catch (error: any) {
+        mostrarError("Error al persistir cambios de sesión: " + error.message);
       }
     }
 

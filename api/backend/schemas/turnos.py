@@ -54,6 +54,7 @@ class TurnoUpdate(BaseModel):
     hora_fin: Optional[datetime.time] = Field(None, description="Hora de salida teórica en formato HH:MM:SS")
     duracion_pausa_minutos: Optional[int] = Field(None, ge=0, description="Minutos de descanso reglamentarios")
     dias_semana: Optional[List[int]] = Field(None, description="Días laborables del turno (1=lunes ... 7=domingo)")
+    activo: Optional[bool] = Field(None, description="Indica si el turno está activo")
 
     @field_validator('dias_semana')
     @classmethod
@@ -76,6 +77,7 @@ class TurnoSimpleResponse(TurnoBase):
     Esquema utilizado para estructurar las respuestas JSON que el servidor envía a las aplicaciones.
     """
     id: UUID = Field(..., description="Identificador único UUID del turno autogenerado (gen_random_uuid)")
+    activo: bool = Field(..., description="Indica si el turno está activo")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la creación del cuadrante (now)")
 
     model_config = ConfigDict(from_attributes=True)

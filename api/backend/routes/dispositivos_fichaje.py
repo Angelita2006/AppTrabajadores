@@ -13,6 +13,8 @@ from models.usuarios import Usuarios
 from models.centros_trabajo import CentrosTrabajo
 from models.dispositivos_fichaje import DispositivosFichaje
 from schemas.dispositivos_fichaje import DispositivoFichajeCreate, DispositivoFichajeResponse, DispositivoFichajeUpdate
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de dispositivos de fichaje bajo el prefijo "/api/dispositivos".
 router = APIRouter(prefix="/api/dispositivos", tags=["Dispositivos de Fichaje"])
@@ -23,12 +25,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("", response_model=DispositivoFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Registrar dispositivo de fichaje")
-@limiter.limit("20/minute")  # Protegido frente a registros automatizados o masivos de terminales
+@limiter.limit("20/minute") 
 def registrar_dispositivo(
     request: Request,
     obj_in: DispositivoFichajeCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **POST /api/dispositivos**
@@ -52,7 +54,10 @@ def registrar_dispositivo(
         )
 
     if obj_in.centro_trabajo_id:
-        centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == obj_in.centro_trabajo_id).first()
+        centro = db.query(CentrosTrabajo).filter(
+            CentrosTrabajo.id == obj_in.centro_trabajo_id,
+            CentrosTrabajo.activo.is_(True),
+        ).first()
         if not centro:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -75,23 +80,32 @@ def registrar_dispositivo(
             joinedload(DispositivosFichaje.centro_trabajo)
         ).filter(DispositivosFichaje.id == nuevo_dispositivo.id).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "dispositivos_fichaje", "accion": "registrar", "entidad_id": str(nuevo_dispositivo.id), "detalles": f"Se registró el dispositivo de fichaje {nuevo_dispositivo.id}"}
+        )
+        
         return dispositivo_creado
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al registrar el dispositivo de fichaje: {str(error)}"
+            detail=f"No se ha podido registrar el dispositivo de fichaje: {str(error)}"
         )
 
 
 @router.put("/{id_dispositivo}/estado", response_model=DispositivoFichajeResponse, summary="Cambiar estado de dispositivo")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def cambiar_estado_dispositivo(
     request: Request,
     id_dispositivo: UUID, 
     activo: bool, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **PUT /api/dispositivos/{id_dispositivo}/estado**
@@ -129,23 +143,32 @@ def cambiar_estado_dispositivo(
             joinedload(DispositivosFichaje.centro_trabajo)
         ).filter(DispositivosFichaje.id == id_dispositivo).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=dispositivo.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "dispositivos_fichaje", "accion": "cambiar_estado", "entidad_id": str(id_dispositivo), "detalles": f"Se cambió el estado del dispositivo {id_dispositivo} a activo={activo}"}
+        )
+        
         return dispositivo_actualizado
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar el estado del dispositivo: {str(error)}"
+            detail=f"No se ha podido actualizar el estado del dispositivo: {str(error)}"
         )
 
 
 @router.put("/{id_dispositivo}", response_model=DispositivoFichajeResponse, summary="Actualizar dispositivo")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def actualizar_dispositivo(
     request: Request,
     id_dispositivo: UUID,
     obj_in: DispositivoFichajeUpdate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **PUT /api/dispositivos/{id_dispositivo}**
@@ -191,32 +214,41 @@ def actualizar_dispositivo(
             joinedload(DispositivosFichaje.centro_trabajo)
         ).filter(DispositivosFichaje.id == id_dispositivo).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=dispositivo.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "dispositivos_fichaje", "accion": "actualizar", "entidad_id": str(id_dispositivo), "detalles": f"Se actualizó el dispositivo {id_dispositivo}"}
+        )
+        
         return dispositivo_actualizado
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar el dispositivo: {str(error)}"
+            detail=f"No se ha podido actualizar el dispositivo: {str(error)}"
         )
 
 
-@router.delete("/{id_dispositivo}", status_code=status.HTTP_200_OK, summary="Dar de baja dispositivo")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@router.put("/{id_dispositivo}/desactivar", status_code=status.HTTP_200_OK, summary="Dar de baja lógica dispositivo")
+@limiter.limit("20/minute")
 def dar_de_baja_dispositivo(
     request: Request,
     id_dispositivo: UUID,
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
-    **DELETE /api/dispositivos/{id_dispositivo}**
+    **PUT /api/dispositivos/{id_dispositivo}/desactivar**
     
     Realiza una baja lógica (desactivación) para proteger la integridad 
     de los fichajes históricos asociados al terminal.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de baja lógica del dispositivo {id_dispositivo} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
+    print(f"Petición de baja del dispositivo {id_dispositivo} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    
     dispositivo = db.query(DispositivosFichaje).options(
         joinedload(DispositivosFichaje.empresa),
         joinedload(DispositivosFichaje.centro_trabajo)
@@ -239,17 +271,26 @@ def dar_de_baja_dispositivo(
     
     try:
         db.commit()
-        return {"message": "Dispositivo desactivado correctamente (baja lógica aplicada para proteger el histórico de fichajes)."}
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=dispositivo.empresa_id,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={"recurso": "dispositivos_fichaje", "accion": "desactivar", "entidad_id": str(id_dispositivo), "detalles": f"Se dio de baja lógica el dispositivo {id_dispositivo}"}
+        )
+
+        return {"message": "Dispositivo desactivado correctamente (enviado a papelera)."}
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al dar de baja el dispositivo: {str(error)}"
+            detail=f"No se ha podido dar de baja el dispositivo: {str(error)}"
         )
 
-
 @router.get("/empresa/{id_empresa}", response_model=List[DispositivoFichajeResponse], summary="Obtener dispositivos por empresa")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de dispositivos por empresa
+@limiter.limit("60/minute") 
 def obtener_dispositivos_empresa(
     request: Request,
     id_empresa: UUID, 
@@ -270,19 +311,30 @@ def obtener_dispositivos_empresa(
             detail="Acceso denegado. No tienes autorización para consultar los dispositivos de esta empresa."
         )
 
-    return (
+    resultados = (
         db.query(DispositivosFichaje)
         .options(
             joinedload(DispositivosFichaje.empresa),
             joinedload(DispositivosFichaje.centro_trabajo)
         )
-        .filter(DispositivosFichaje.empresa_id == id_empresa)
+        .filter(DispositivosFichaje.empresa_id == id_empresa, DispositivosFichaje.activo.is_(True))
         .all()
     )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar_por_empresa", "detalles": f"Se consultaron los dispositivos de la empresa {id_empresa}"}
+    )
+
+    return resultados
+
 
 @router.get("/centro/{id_centro}", response_model=List[DispositivoFichajeResponse], summary="Obtener dispositivos por centro de trabajo")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de dispositivos por centro de trabajo
+@limiter.limit("60/minute")  
 def obtener_dispositivos_centro(
     request: Request,
     id_centro: UUID, 
@@ -310,19 +362,30 @@ def obtener_dispositivos_centro(
             detail="Acceso denegado. No tienes autorización para consultar los dispositivos de este centro de trabajo."
         )
 
-    return (
+    resultados = (
         db.query(DispositivosFichaje)
         .options(
             joinedload(DispositivosFichaje.empresa),
             joinedload(DispositivosFichaje.centro_trabajo)
         )
-        .filter(DispositivosFichaje.centro_trabajo_id == id_centro)
+        .filter(DispositivosFichaje.centro_trabajo_id == id_centro, DispositivosFichaje.activo.is_(True))
         .all()
     )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=centro.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar_por_centro", "entidad_id": str(id_centro), "detalles": f"Se consultaron los dispositivos del centro de trabajo {id_centro}"}
+    )
+
+    return resultados
+
 
 @router.get("/{id_dispositivo}", response_model=DispositivoFichajeResponse, summary="Obtener dispositivo por ID")
-@limiter.limit("60/minute")  # Limita las consultas de detalles de un dispositivo específico
+@limiter.limit("60/minute") 
 def obtener_dispositivo(
     request: Request,
     id_dispositivo: UUID, 
@@ -353,5 +416,14 @@ def obtener_dispositivo(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acceso denegado. No tienes autorización para consultar este dispositivo."
         )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=dispositivo.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar_por_id", "entidad_id": str(id_dispositivo), "detalles": f"Se consultó el dispositivo {id_dispositivo}"}
+    )
 
     return dispositivo

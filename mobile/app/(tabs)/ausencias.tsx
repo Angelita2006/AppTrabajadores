@@ -1,14 +1,15 @@
 import {
   obtenerAusenciasTrabajador,
   solicitarAusencia,
-} from "@/src/modules/vacaciones/api/services";
+} from "@/src/modules/ausencias/api/services";
 import {
   AusenciaCreateRequest,
   AusenciaResponse,
   ItemAusencia,
   TipoAusencia,
-} from "@/src/modules/vacaciones/types/ausencia";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+} from "@/src/modules/ausencias/types/ausencia";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,6 +36,8 @@ export default function VacacionesScreen() {
     "Vacaciones" as TipoAusencia,
   );
 
+  const { mostrarError } = useAppModal();
+
   // Carga histórica de ausencias
   const cargarHistoricoAusencias = async () => {
     if (!trabajadorActual?.id) {
@@ -49,7 +52,8 @@ export default function VacacionesScreen() {
       setSolicitudes(ausenciasTrabajador || []);
     } catch (error: any) {
       mostrarError(
-        "Error al cargar el histórico de ausencias del trabajador: " + error,
+        "Error al cargar el histórico de ausencias del trabajador: " +
+          error.message,
       );
     } finally {
       setBuscandoInicial(false);
@@ -164,7 +168,9 @@ export default function VacacionesScreen() {
       setSolicitudes([nueva, ...solicitudes]);
       setMotivo("");
     } catch (error: any) {
-      mostrarError("Error al enviar la solicitud de ausencia: " + error);
+      mostrarError(
+        "Error al enviar la solicitud de ausencia: " + error.message,
+      );
     } finally {
       setCargando(false);
     }
@@ -219,7 +225,7 @@ export default function VacacionesScreen() {
                 "Baja_temporal",
                 "Maternidad_paternidad",
                 "Permiso_retribuido",
-                "Ausencia_justificada",
+                "Ausencia_injustificada",
               ] as TipoAusencia[]
             ).map((tipo) => (
               <Pressable
@@ -382,7 +388,7 @@ const styles = StyleSheet.create({
   },
   textoOpcionActiva: {
     color: "#1E40AF",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     textAlign: "center",
   },

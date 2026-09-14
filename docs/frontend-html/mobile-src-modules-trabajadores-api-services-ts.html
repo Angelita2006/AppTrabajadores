@@ -1,0 +1,87 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>services.ts · Fichapp</title><style>
+:root{color-scheme:light;--ink:#18212f;--muted:#667085;--line:#d9e0e8;--paper:#fff;--wash:#f4f6f8;--navy:#132238;--accent:#b44a2d;--accent-wash:#fff1ec;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font-size:16px;line-height:1.65}a{color:#8d341f;text-decoration:none}a:hover{text-decoration:underline}.top{background:var(--navy);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:28px}.brand{font-size:1.45rem;font-weight:700;letter-spacing:.02em}.top small{color:#b9c4d3}.layout{display:grid;grid-template-columns:275px minmax(0,900px);max-width:1240px;margin:0 auto;min-height:calc(100vh - 70px)}aside{padding:30px 22px;border-right:1px solid var(--line);background:#eef1f4;position:sticky;top:0;height:calc(100vh - 70px);overflow:auto}aside h3{font:700 .75rem/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:22px 0 8px}nav a{display:block;padding:5px 9px;border-radius:4px;font:14px/1.45 Arial,sans-serif;color:#344054}nav a:hover{background:#dfe5eb;text-decoration:none}.search{width:100%;border:1px solid #c5ced9;border-radius:4px;padding:9px 10px;background:#fff;font:14px Arial,sans-serif}.content{background:var(--paper);padding:54px clamp(24px,6vw,76px) 90px}h1,h2,h3{font-weight:700;line-height:1.2}h1{font-size:2.55rem;margin:0 0 14px;color:var(--navy)}h2{font-size:1.6rem;margin:48px 0 18px;border-bottom:1px solid var(--line);padding-bottom:9px}h3{font-size:1.15rem;margin:0 0 4px}.lead{font-size:1.16rem;color:#4b5565;max-width:720px}.eyebrow{font:700 .74rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:30px 0}.stat,.item{border:1px solid var(--line);padding:16px;background:#fff}.stat strong{display:block;font-size:1.8rem;color:var(--accent)}.stat span,.meta{font:13px Arial,sans-serif;color:var(--muted)}.item{margin:12px 0}.item code,.path,code{font-family:'Cascadia Code',Consolas,monospace;font-size:.88em}.path{color:var(--muted);margin-bottom:16px}.entry{border-top:1px solid var(--line);padding:22px 0}.entry pre{white-space:pre-wrap;margin:10px 0 0;padding:14px;background:#f7f8fa;border-left:3px solid #d9a08f;font:14px/1.6 'Cascadia Code',Consolas,monospace;color:#344054}.tag{display:inline-block;background:var(--accent-wash);color:#8d341f;padding:2px 7px;margin-right:7px;font:12px Arial,sans-serif;border-radius:3px}@media(max-width:760px){.layout{display:block}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.content{padding:34px 22px 60px}h1{font-size:2rem}.top{padding:15px 18px}}
+</style></head><body><header class="top"><div class="brand">Fichapp</div><small>Documentación del frontend</small></header><div class="layout"><aside><input class="search" type="search" placeholder="Buscar en la documentación" data-search><h3>Guía</h3><nav><a href="index.html">Inicio</a><a href="architecture.html">Arquitectura</a><a href="routes.html">Rutas</a><a href="modules.html">Módulos</a></nav><h3>Módulos</h3><nav><a href="modules.html#another-services">another-services</a><a href="modules.html#asignaciones-turno">asignaciones-turno</a><a href="modules.html#ausencias">ausencias</a><a href="modules.html#calendarios-laborales">calendarios-laborales</a><a href="modules.html#centros-trabajo">centros-trabajo</a><a href="modules.html#contratos">contratos</a><a href="modules.html#correcciones-fichaje">correcciones-fichaje</a><a href="modules.html#departamentos">departamentos</a><a href="modules.html#dispositivos-fichaje">dispositivos-fichaje</a><a href="modules.html#empresas">empresas</a><a href="modules.html#festivos">festivos</a><a href="modules.html#fichajes">fichajes</a><a href="modules.html#permisos">permisos</a><a href="modules.html#resumenes-jornada">resumenes-jornada</a><a href="modules.html#roles">roles</a><a href="modules.html#tipos_eventos_fichaje">tipos_eventos_fichaje</a><a href="modules.html#trabajadores">trabajadores</a><a href="modules.html#turnos">turnos</a><a href="modules.html#usuarios">usuarios</a><a href="modules.html#usuarios_roles">usuarios_roles</a></nav></aside><main class="content"><p class="eyebrow">Referencia de código</p><h1>services.ts</h1><p class="path">mobile/src/modules/trabajadores/api/services.ts</p><article class="entry"><h3><span class="tag">const</span>obtenerTrabajadores</h3><pre>Servicio de Gestión de Trabajadores y Expedientes Laborales.
+Contiene todas las operaciones CRUD y lógicas de negocio para el registro, consulta, edición, gestión de imágenes y asignación de turnos a empleados.
+/
+
+/**
+Obtiene la plantilla completa de empleados registrados en la empresa aplicando aislamiento multi-tenant.
+URI: GET /api/trabajadores/empresa/{empresa_id}
+
+@async
+@function obtenerTrabajadores
+@param {string} idEmpresa - Identificador único universal (UUID) de la empresa.
+@returns {Promise&lt;Trabajador[]&gt;} Promesa con el listado completo de empleados de la empresa.
+@throws {Error} Lanza un error si ocurre un fallo al recuperar la plantilla.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerTrabajador</h3><pre>Recupera la información detallada de un trabajador específico mediante su UUID.
+URI: GET /api/trabajadores/{id_trabajador}
+
+@async
+@function obtenerTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+@returns {Promise&lt;Trabajador&gt;} Promesa con los detalles del trabajador solicitado.
+@throws {Error} Lanza un error si el trabajador no se encuentra.</pre></article><article class="entry"><h3><span class="tag">const</span>crearTrabajador</h3><pre>Registra un nuevo empleado en la base de datos de la plataforma.
+URI: POST /api/trabajadores
+
+@async
+@function crearTrabajador
+@param {TrabajadorCreate} payload - Objeto con los datos necesarios para registrar el nuevo trabajador.
+@returns {Promise&lt;Trabajador&gt;} Promesa con el expediente del trabajador recién creado.
+@throws {Error} Lanza un error si los datos no son válidos o falla el registro.</pre></article><article class="entry"><h3><span class="tag">const</span>actualizarTrabajador</h3><pre>Actualiza de forma parcial los datos de un trabajador existente.
+URI: PATCH /api/trabajadores/{id_trabajador}
+
+@async
+@function actualizarTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador a modificar.
+@param {TrabajadorUpdate} payload - Objeto con los datos parciales a actualizar.
+@returns {Promise&lt;Trabajador&gt;} Promesa con el expediente del trabajador actualizado.
+@throws {Error} Lanza un error si la actualización no se puede completar.</pre></article><article class="entry"><h3><span class="tag">const</span>actualizarFotoTrabajador</h3><pre>Actualiza la fotografía de perfil de un trabajador mediante un formato multipart/form-data compatible con Web y Móvil.
+URI: PUT /api/trabajadores/{id_trabajador}/foto
+
+@async
+@function actualizarFotoTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+@param {string} fileUri - URI local o remota del archivo de imagen.
+@param {string} fileName - Nombre del archivo de imagen.
+@param {string} fileType - Tipo MIME del archivo (ej. image/jpeg).
+@returns {Promise&lt;Trabajador&gt;} Promesa con el expediente actualizado del trabajador.
+@throws {Error} Lanza un error si el procesamiento de la imagen o la subida fallan.</pre></article><article class="entry"><h3><span class="tag">const</span>obtenerEmpresaTrabajador</h3><pre>Recupera la empresa vinculada al expediente del trabajador validando permisos y token de acceso.
+URI: GET /api/trabajadores/{id_trabajador}/empresa
+
+@async
+@function obtenerEmpresaTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+@param {string} token - Token de autenticación Bearer de la sesión actual.
+@returns {Promise&lt;Empresa&gt;} Promesa con la información de la empresa vinculada.
+@throws {Error} Lanza un error si falla la recuperación de la empresa.</pre></article><article class="entry"><h3><span class="tag">const</span>tramitarBajaTotalTrabajador</h3><pre>Tramita la baja total de un trabajador mediante una única petición atómica al backend.
+URI: POST /api/trabajadores/{id}/baja-total
+
+@async
+@function tramitarBajaTotalTrabajador
+@param {string} trabajadorId - Identificador único del trabajador.
+@returns {Promise&lt;void&gt;}</pre></article><article class="entry"><h3><span class="tag">const</span>eliminarTrabajador</h3><pre>Elimina un trabajador de la plataforma validando privilegios de administración o empresa.
+URI: DELETE /api/trabajadores/{id_trabajador}
+
+@async
+@function eliminarTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador a eliminar.
+@returns {Promise&lt;{ detail: string }&gt;} Promesa con el mensaje de confirmación de la eliminación.
+@throws {Error} Lanza un error si el trabajador no existe o la API rechaza la petición.</pre></article><article class="entry"><h3><span class="tag">const</span>asignarTurnosTrabajador</h3><pre>Asigna turnos de forma masiva a un trabajador validando el ámbito de la empresa y los rangos de fechas opcionales.
+URI: POST /api/trabajadores/turnos/{id_trabajador}
+
+@async
+@function asignarTurnosTrabajador
+@param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+@param {string[]} turnos - Lista de identificadores únicos (UUIDs) de los turnos a asignar.
+@param {string} [fechaInicio] - Fecha inicial de vigencia en formato &quot;AAAA-MM-DD&quot;.
+@param {string | null} [fechaFin] - Fecha final de vigencia opcional en formato &quot;AAAA-MM-DD&quot;.
+@returns {Promise&lt;{ status: string; detail: string; trabajador_id: string; turnos_asignados: string[]; }&gt;} Promesa con el resultado de la asignación.
+@throws {Error} Lanza un error si ocurre un fallo durante la asignación de los turnos.</pre></article><article class="entry"><h3><span class="tag">const</span>actualizarAsignacionTurno</h3><pre>Modifica los datos sobre una asignación de turno existente mediante parámetros en URL.
+URI: PUT /api/asignaciones-turno/{id_asignacion}/editar
+
+@async
+@function actualizarAsignacionTurno
+@param {string} idAsignacion - Identificador único universal (UUID) de la asignación de turno.
+@param {string} fechaInicio - Fecha de inicio de la asignación en formato &quot;AAAA-MM-DD&quot;.
+@param {string | null} fechaFin - Fecha de fin de la asignación opcional en formato &quot;AAAA-MM-DD&quot;.
+@returns {Promise&lt;any&gt;} Promesa con la respuesta de la edición de la asignación.
+@throws {Error} Lanza un error si la actualización no se puede completar.</pre></article></main></div><script>const q=document.querySelector('[data-search]');q?.addEventListener('input',e=>{const value=e.target.value.toLowerCase();document.querySelectorAll('.item,.entry').forEach(el=>el.hidden=value&&!el.textContent.toLowerCase().includes(value))});</script></body></html>

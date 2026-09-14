@@ -7,7 +7,8 @@ import {
   obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { setAuthToken } from "@/src/service/api/api";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { mostrarMensaje } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
@@ -62,6 +63,7 @@ export default function PerfilScreen() {
     useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const opacidadTarjeta = useSharedValue(0);
+  const { mostrarError } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = 0;
@@ -109,7 +111,8 @@ export default function PerfilScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los centros de trabajo de la empresa: " + error,
+          "Error al cargar los centros de trabajo de la empresa: " +
+            error.message,
         );
       } finally {
         if (isMounted) setCargandoCentros(false);
@@ -155,7 +158,7 @@ export default function PerfilScreen() {
       }
     } catch (error: any) {
       mostrarError(
-        "Error al seleccionar o procesar la imagen de perfil: " + error,
+        "Error al seleccionar o procesar la imagen de perfil: " + error.message,
       );
     }
   };
@@ -209,7 +212,7 @@ export default function PerfilScreen() {
         mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
       }
     } catch (error: any) {
-      mostrarError("Error al guardar los cambios del perfil: " + error);
+      mostrarError("Error al guardar los cambios del perfil: " + error.message);
     } finally {
       setGuardando(false);
     }

@@ -147,9 +147,23 @@ export interface FichajeSimpleResponse extends FichajeBase {
  */
 export interface RegistroFichaje extends FichajeSimpleResponse {
   /** Nombre del turno laboral asignado al trabajador en el momento del fichaje (campo complementario). */
-  turno_nombre?: string;
+  turno_nombre: string;
   /** Detalles del tipo de evento asociado. */
-  tipo_evento?: TipoEventoFichaje | null;
+  tipo_evento: TipoEventoFichaje;
   /** Detalles del trabajador asociado. */
-  trabajador?: Trabajador | null;
+  trabajador: Trabajador;
+  correccion_aprobada?: {
+    id: string;
+    tipo_correccion: string;
+    motivo: string;
+    fecha_solicitud: string;
+    fecha_resolucion?: string | null;
+    valor_nuevo?: Record<string, any> | null;
+    firma_solicitante?: string | null;
+    firma_resolutor?: string | null;
+    solicitante?: string | null;
+    resolutor?: string | null;
+    solicitante_tipo?: string | null;
+    resolutor_tipo?: string | null;
+  } | null;
 }

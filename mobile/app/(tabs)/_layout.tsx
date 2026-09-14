@@ -1,3 +1,4 @@
+import { AppModalProvider } from "@/src/shared/ui/AppModalNotification";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
@@ -26,160 +27,164 @@ export default function TabsLayout() {
   const tabBarHeight = 65 + bottomInset;
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarStyle: {
-          display: tieneSesion ? "flex" : "none",
-          height: tabBarHeight,
-          paddingTop: 8,
-          paddingBottom: bottomInset,
-          backgroundColor: "#FFFFFF",
-          borderTopWidth: 1,
-          borderTopColor: "#E2E8F0",
-        },
-        tabBarLabel: ({ children, color }) => (
-          <ThemedText
-            numberOfLines={1}
-            style={{
-              fontSize: 9,
-              textAlign: "center",
-              color,
-              marginTop: 2,
-              fontWeight: "700",
-            }}
-          >
-            {children}
-          </ThemedText>
-        ),
-        tabBarActiveTintColor: "#2563EB",
-        tabBarInactiveTintColor: "#64748B",
-        headerShown: false,
-      }}
-    >
-      {/* 1. Fichar / Home personal (Trabajadores y RRHH) */}
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: "Fichar",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="house.fill" color={color} />
+    <AppModalProvider>
+      <Tabs
+        screenOptions={{
+          tabBarStyle: {
+            display: tieneSesion ? "flex" : "none",
+            height: tabBarHeight,
+            paddingTop: 8,
+            paddingBottom: bottomInset,
+            backgroundColor: "#FFFFFF",
+            borderTopWidth: 1,
+            borderTopColor: "#E2E8F0",
+          },
+          tabBarLabel: ({ children, color }) => (
+            <ThemedText
+              numberOfLines={1}
+              style={{
+                fontSize: 9,
+                textAlign: "center",
+                color,
+                marginTop: 2,
+                fontWeight: "700",
+              }}
+            >
+              {children}
+            </ThemedText>
           ),
-          href: tieneSesion && (esTrabajador || esRrhh) ? "/home" : null,
+          tabBarActiveTintColor: "#2563EB",
+          tabBarInactiveTintColor: "#64748B",
+          headerShown: false,
         }}
-      />
+      >
+        {/* 1. Fichar / Home personal (Trabajadores y RRHH) */}
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: "Fichar",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="house.fill" color={color} />
+            ),
+            href: tieneSesion && (esTrabajador || esRrhh) ? "/home" : null,
+          }}
+        />
 
-      {/* 2. Perfil / Login (Siempre visible con sesión) */}
-      <Tabs.Screen
-        name="perfil"
-        options={{
-          title: tieneSesion ? "Perfil" : "Login",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="person" color={color} />
-          ),
-          href: !tieneSesion ? null : "/perfil",
-        }}
-      />
+        {/* 2. Perfil / Login (Siempre visible con sesión) */}
+        <Tabs.Screen
+          name="perfil"
+          options={{
+            title: tieneSesion ? "Perfil" : "Login",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="person" color={color} />
+            ),
+            href: !tieneSesion ? null : "/perfil",
+          }}
+        />
 
-      {/* 3. Empresa (Admin y RRHH) */}
-      <Tabs.Screen
-        name="empresa"
-        options={{
-          title: "Empresa",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="briefcase.fill" color={color} />
-          ),
-          href: tieneSesion && (esAdmin || esRrhh) ? "/empresa" : null,
-        }}
-      />
+        {/* 3. Empresa (Admin y RRHH) */}
+        <Tabs.Screen
+          name="empresa"
+          options={{
+            title: "Empresa",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="briefcase.fill" color={color} />
+            ),
+            href: tieneSesion && (esAdmin || esRrhh) ? "/empresa" : null,
+          }}
+        />
 
-      {/* 4. Plantilla (Admin y RRHH) */}
-      <Tabs.Screen
-        name="plantilla"
-        options={{
-          title: "Plantilla",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="group" color={color} />
-          ),
-          href: tieneSesion && (esAdmin || esRrhh) ? "/plantilla" : null,
-        }}
-      />
+        {/* 4. Plantilla (Admin y RRHH) */}
+        <Tabs.Screen
+          name="plantilla"
+          options={{
+            title: "Plantilla",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="group" color={color} />
+            ),
+            href: tieneSesion && (esAdmin || esRrhh) ? "/plantilla" : null,
+          }}
+        />
 
-      {/* 5. Horarios personales (Trabajadores y RRHH) */}
-      <Tabs.Screen
-        name="horarios"
-        options={{
-          title: "Horarios",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="schedule" color={color} />
-          ),
-          href: tieneSesion && (esTrabajador || esRrhh) ? "/horarios" : null,
-        }}
-      />
+        {/* 5. Horarios personales (Trabajadores y RRHH) */}
+        <Tabs.Screen
+          name="horarios"
+          options={{
+            title: "Horarios",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="schedule" color={color} />
+            ),
+            href: tieneSesion && (esTrabajador || esRrhh) ? "/horarios" : null,
+          }}
+        />
 
-      {/* 6. Registro de fichajes globales (Admin, RRHH e Inspectores/Representantes) */}
-      <Tabs.Screen
-        name="fichajes"
-        options={{
-          title: "Registro",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="schedule" color={color} />
-          ),
-          href:
-            tieneSesion && (esAdmin || esRrhh || esInspectorOVisualizador)
-              ? "/fichajes"
-              : null,
-        }}
-      />
+        {/* 6. Registro de fichajes globales (Admin, RRHH e Inspectores/Representantes) */}
+        <Tabs.Screen
+          name="fichajes"
+          options={{
+            title: "Registro",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="folder" color={color} />
+            ),
+            href:
+              tieneSesion && (esAdmin || esRrhh || esInspectorOVisualizador)
+                ? "/fichajes"
+                : null,
+          }}
+        />
 
-      {/* 7. Incidencias personales (Trabajadores) */}
-      <Tabs.Screen
-        name="incidencias"
-        options={{
-          title: "Incidencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="warning" color={color} />
-          ),
-          href: tieneSesion && esTrabajador ? "/incidencias" : null,
-        }}
-      />
+        {/* 7. Incidencias personales (Trabajadores) */}
+        <Tabs.Screen
+          name="incidencias"
+          options={{
+            title: "Incidencias",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="warning" color={color} />
+            ),
+            href: tieneSesion && esTrabajador ? "/incidencias" : null,
+          }}
+        />
 
-      {/* 9. Gestión completa de Incidencias (Admin y RRHH) */}
-      <Tabs.Screen
-        name="gestion-incidencias"
-        options={{
-          title: "Incidencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="warning" color={color} />
-          ),
-          href:
-            tieneSesion && (esAdmin || esRrhh) ? "/gestion-incidencias" : null,
-        }}
-      />
+        {/* 9. Gestión completa de Incidencias (Admin y RRHH) */}
+        <Tabs.Screen
+          name="gestion-incidencias"
+          options={{
+            title: "Incidencias",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="warning" color={color} />
+            ),
+            href:
+              tieneSesion && (esAdmin || esRrhh)
+                ? "/gestion-incidencias"
+                : null,
+          }}
+        />
 
-      {/* 10. Ausencias personales (Trabajadores) */}
-      <Tabs.Screen
-        name="ausencias"
-        options={{
-          title: "Ausencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="event" color={color} />
-          ),
-          href: tieneSesion && esTrabajador ? "/ausencias" : null,
-        }}
-      />
+        {/* 10. Ausencias personales (Trabajadores) */}
+        <Tabs.Screen
+          name="ausencias"
+          options={{
+            title: "Ausencias",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="event" color={color} />
+            ),
+            href: tieneSesion && esTrabajador ? "/ausencias" : null,
+          }}
+        />
 
-      {/* 12. Gestión completa de Ausencias (Admin y RRHH) */}
-      <Tabs.Screen
-        name="gestion-ausencias"
-        options={{
-          title: "Ausencias",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="event" color={color} />
-          ),
-          href:
-            tieneSesion && (esAdmin || esRrhh) ? "/gestion-ausencias" : null,
-        }}
-      />
-    </Tabs>
+        {/* 12. Gestión completa de Ausencias (Admin y RRHH) */}
+        <Tabs.Screen
+          name="gestion-ausencias"
+          options={{
+            title: "Ausencias",
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={24} name="event" color={color} />
+            ),
+            href:
+              tieneSesion && (esAdmin || esRrhh) ? "/gestion-ausencias" : null,
+          }}
+        />
+      </Tabs>
+    </AppModalProvider>
   );
 }

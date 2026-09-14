@@ -17,6 +17,8 @@ from models.trabajadores import Trabajadores
 from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
 from models.contratos import Contratos
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de contratos bajo el prefijo "/api/contratos".
 router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
@@ -26,7 +28,7 @@ router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=ContratoResponse, status_code=status.HTTP_201_CREATED, summary="Crear contrato laboral")
-@limiter.limit("20/minute")  # Protegido frente a la creación masiva o automatizada de contratos
+@limiter.limit("20/minute") 
 def crear_contrato(
     request: Request,
     obj_in: ContratoCreate, 
@@ -54,21 +56,30 @@ def crear_contrato(
             detail=f"Empresa con ID ({obj_in.empresa_id}) no encontrada."
         )
 
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
+    trabajador = db.query(Trabajadores).filter(
+        Trabajadores.id == obj_in.trabajador_id,
+        Trabajadores.activo.is_(True),
+    ).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail=f"Trabajador con ID ({obj_in.trabajador_id}) no encontrado."
         )
 
-    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == obj_in.centro_trabajo_id).first()
+    centro = db.query(CentrosTrabajo).filter(
+        CentrosTrabajo.id == obj_in.centro_trabajo_id,
+        CentrosTrabajo.activo.is_(True),
+    ).first()
     if not centro:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail=f"Centro de trabajo con ID ({obj_in.centro_trabajo_id}) no encontrado."
         )
 
-    calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == obj_in.calendario_laboral_id).first()
+    calendario = db.query(CalendariosLaborales).filter(
+        CalendariosLaborales.id == obj_in.calendario_laboral_id,
+        CalendariosLaborales.activo.is_(True),
+    ).first()
     if not calendario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -76,7 +87,10 @@ def crear_contrato(
         )
 
     if obj_in.departamento_id:
-        departamento = db.query(Departamentos).filter(Departamentos.id == obj_in.departamento_id).first()
+        departamento = db.query(Departamentos).filter(
+            Departamentos.id == obj_in.departamento_id,
+            Departamentos.activo.is_(True),
+        ).first()
         if not departamento:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
@@ -111,16 +125,25 @@ def crear_contrato(
             joinedload(Contratos.calendario_laboral)
         ).filter(Contratos.id == nuevo_contrato.id).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "contratos", "accion": "crear", "entidad_id": str(nuevo_contrato.id), "detalles": f"Se creó el contrato para el trabajador {obj_in.trabajador_id}"}
+        )
+        
         return contrato_creado
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error de integridad al registrar el contrato: {str(error)}"
+            detail=f"No se ha podido registrar el contrato: {str(error)}"
         )
 
 @router.put("/{id_contrato}", response_model=ContratoResponse, summary="Actualizar contrato")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def actualizar_contrato(
     request: Request,
     id_contrato: UUID, 
@@ -156,7 +179,7 @@ def actualizar_contrato(
         if not depto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
-                detail=f"Departamento destino con ID ({update_data['departamento_id']}) no encontrado."
+                detail=f"Departamento con ID ({update_data['departamento_id']}) no encontrado."
             )
 
     for field, value in update_data.items():
@@ -173,17 +196,26 @@ def actualizar_contrato(
             joinedload(Contratos.calendario_laboral)
         ).filter(Contratos.id == id_contrato).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "contratos", "accion": "actualizar", "entidad_id": str(contrato.id), "detalles": f"Se actualizó el contrato {contrato.id}"}
+        )
+        
         return contrato_actualizado
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=f"Error al actualizar el contrato: {str(error)}"
+            detail=f"No se ha podido actualizar el contrato: {str(error)}"
         )
 
 
 @router.put("/{id_contrato}/dar-baja", response_model=ContratoResponse, summary="Rescindir contrato")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def rescindir_contrato(
     request: Request,
     id_contrato: UUID, 
@@ -233,23 +265,32 @@ def rescindir_contrato(
             joinedload(Contratos.calendario_laboral)
         ).filter(Contratos.id == id_contrato).first()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "contratos", "accion": "dar_baja", "entidad_id": str(contrato.id), "detalles": f"Se dio de baja/rescindió el contrato {contrato.id}"}
+        )
+        
         return contrato_dado_de_baja
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al dar de baja el contrato: {str(error)}"
+            detail=f"No se ha podido dar de baja el contrato: {str(error)}"
         )
 
 
 @router.delete("/empresa/{empresa_id}/trabajador/{trabajador_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar todos los contratos de un trabajador")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def eliminar_todos_los_contratos_trabajador(
     request: Request,
     empresa_id: UUID, 
     trabajador_id: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **DELETE /api/contratos/empresa/{empresa_id}/trabajador/{trabajador_id}**
@@ -283,16 +324,26 @@ def eliminar_todos_los_contratos_trabajador(
         ).delete(synchronize_session=False)
         
         db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=empresa_id,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={"recurso": "contratos", "accion": "eliminar_masivo", "entidad_id": str(trabajador_id), "detalles": f"Se eliminaron todos los contratos del trabajador {trabajador_id}"}
+        )
+        
         return None
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al eliminar los contratos del trabajador: {str(error)}"
+            detail=f"No se han podido eliminar los contratos del trabajador: {str(error)}"
         )
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[ContratoResponse], summary="Obtener contratos por trabajador")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de contratos por trabajador
+@limiter.limit("60/minute") 
 def obtener_contratos_por_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -321,7 +372,7 @@ def obtener_contratos_por_trabajador(
                 detail="Acceso denegado. No tienes permisos para consultar los contratos de este trabajador."
             )
 
-    return (
+    contratos = (
         db.query(Contratos)
         .options(
             joinedload(Contratos.empresa),
@@ -334,9 +385,20 @@ def obtener_contratos_por_trabajador(
         .all()
     )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "contratos", "accion": "consultar_por_trabajador", "entidad_id": str(id_trabajador)}
+    )
+
+    return contratos
+
 
 @router.get("/empresa/{id_empresa}", response_model=List[ContratoResponse], summary="Obtener contratos por empresa")
-@limiter.limit("60/minute")  # Limita las consultas masivas de listados de contratos por empresa
+@limiter.limit("60/minute")  
 def obtener_contratos_por_empresa(
     request: Request,
     id_empresa: UUID, 
@@ -357,7 +419,7 @@ def obtener_contratos_por_empresa(
             detail="Acceso denegado. No tienes autorización para consultar los contratos de esta empresa."
         )
 
-    return (
+    contratos = (
         db.query(Contratos)
         .options(
             joinedload(Contratos.empresa),
@@ -370,9 +432,20 @@ def obtener_contratos_por_empresa(
         .all()
     )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "contratos", "accion": "consultar_por_empresa"}
+    )
+
+    return contratos
+
 
 @router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}/activo", response_model=ContratoResponse, summary="Obtener contrato activo de un trabajador")
-@limiter.limit("60/minute")  # Limita las consultas del contrato activo
+@limiter.limit("60/minute")  
 def obtener_contrato_activo_trabajador_empresa(
     request: Request,
     id_trabajador: UUID, 
@@ -402,7 +475,7 @@ def obtener_contrato_activo_trabajador_empresa(
         .options(
             joinedload(Contratos.empresa),
             joinedload(Contratos.centro_trabajo),
-            joinedload(Contratos.trabajador),
+            joinedload(CentrosTrabajo.empresa) if False else joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
             joinedload(Contratos.calendario_laboral)
         )
@@ -426,4 +499,13 @@ def obtener_contrato_activo_trabajador_empresa(
             detail=f"No se ha encontrado ningún contrato activo para el trabajador con ID ({id_trabajador}) en la empresa seleccionada."
         )
         
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "contratos", "accion": "consultar_activo", "entidad_id": str(contrato_activo.id)}
+    )
+
     return contrato_activo

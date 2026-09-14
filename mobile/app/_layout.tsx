@@ -1,4 +1,5 @@
 import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
+import { AppModalProvider } from "@/src/shared/ui/AppModalNotification";
 import * as Notifications from "expo-notifications"; // <--- Importante
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -123,7 +124,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
     <ProveedorSesion>
-      <InitialLayout />
+      <AppModalProvider>
+        <InitialLayout />
+      </AppModalProvider>
     </ProveedorSesion>
   );
 }

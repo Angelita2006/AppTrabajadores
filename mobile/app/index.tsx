@@ -2,9 +2,9 @@ import { obtenerEmpresaTrabajador } from "@/src/modules/trabajadores/api/service
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { setAuthToken } from "@/src/service/api/api";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
-import { mostrarError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -47,6 +47,8 @@ export default function RootIndexScreen() {
   const [errorEmail, setErrorEmail] = useState(false);
   const [errorPassword, setErrorPassword] = useState(false);
 
+  const { mostrarError } = useAppModal();
+
   const opacidadTarjeta = useSharedValue(0);
 
   useEffect(() => {
@@ -67,7 +69,9 @@ export default function RootIndexScreen() {
             await NotificationService.programarAlarmasTurno(usuarioActual.id);
           }
         } catch (error: any) {
-          mostrarError("Error al configurar las notificaciones: " + error);
+          mostrarError(
+            "No se han podido configurar las notificaciones: " + error.message,
+          );
         }
       }
     };
@@ -96,12 +100,12 @@ export default function RootIndexScreen() {
       try {
         respuestaLogin = await iniciarSesion(email, password);
       } catch (error: any) {
-        mostrarError("Error al iniciar sesión en el servidor: " + error);
+        mostrarError("Error al iniciar sesión: " + error.message);
         return;
       }
 
       if (!respuestaLogin) {
-        mostrarError("Error: No se pudo obtener respuesta del servidor.");
+        mostrarError("No se pudo obtener respuesta del servidor.");
         return;
       }
 
@@ -115,7 +119,8 @@ export default function RootIndexScreen() {
           setEmpresaActual(empresa);
         } catch (error: any) {
           mostrarError(
-            "Error al cargar los datos de la empresa administradora: " + error,
+            "No se pudieron cargar los datos de la empresa administradora: " +
+              error.message,
           );
         }
       } else if (usuario.trabajador_id) {
@@ -128,11 +133,13 @@ export default function RootIndexScreen() {
             setEmpresaActual(empresaTrabajador);
           }
         } catch (error: any) {
-          mostrarError("Error al cargar empresas del trabajador: " + error);
+          mostrarError(
+            "No se pudieron cargar empresas del trabajador: " + error.message,
+          );
         }
       }
     } catch (error: any) {
-      mostrarError("Error general en el proceso de autenticación: " + error);
+      mostrarError("Ha fallado el proceso de autenticación: " + error.message);
     } finally {
       setCargando(false);
       isAuthenticatingGlobal = false;
@@ -159,7 +166,6 @@ export default function RootIndexScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
       {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
@@ -317,25 +323,17 @@ export default function RootIndexScreen() {
             </ThemedText>
           </Pressable>
 
-          {/* Separador sutil opcional para diferenciar el acceso profesional */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <ThemedText style={styles.dividerText}>o</ThemedText>
-            <View style={styles.dividerLine} />
-          </View>
-
           <Pressable
-            onPress={() => router.push("/(authentication)/registro-gestoria")}
-            style={styles.gestoriaRegisterButton}
+            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            style={{ alignSelf: "center", marginTop: 20 }}
           >
-            <IconSymbol
-              name="briefcase.fill"
-              size={16}
-              color="#2563EB"
-              style={{ marginRight: 6 }}
-            />
-            <ThemedText style={styles.gestoriaRegisterText}>
-              ¿Eres una asesoría? Registrar gestoría
+            <ThemedText
+              style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}
+            >
+              Al iniciar sesión, aceptas nuestra{" "}
+              <ThemedText style={{ color: "#2563EB", fontWeight: "700" }}>
+                Política de Privacidad
+              </ThemedText>
             </ThemedText>
           </Pressable>
         </Animated.View>
@@ -448,40 +446,6 @@ const styles = StyleSheet.create({
   },
   organizationRegisterText: {
     color: "#1E293B",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    marginVertical: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E2E8F0",
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 12,
-    color: "#94A3B8",
-    fontWeight: "600",
-  },
-  gestoriaRegisterButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-    padding: 10,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#DBEAFE",
-  },
-  gestoriaRegisterText: {
-    color: "#1D4ED8",
     fontSize: 13,
     fontWeight: "700",
   },

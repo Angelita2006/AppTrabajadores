@@ -111,22 +111,24 @@ export const editarDispositivo = async (
 };
 
 /**
- * Da de baja o elimina un dispositivo de fichaje del sistema de forma definitiva.
- * URI: DELETE /api/dispositivos/{dispositivoId}
+ * Da de baja un dispositivo de fichaje del sistema.
+ * URI: PUT /api/dispositivos/{idDispositivo}/desactivar
  *
  * @async
  * @function eliminarDispositivo
- * @param {string} idDispositivo - Identificador único del dispositivo a eliminar.
- * @returns {Promise<void>} Promesa que se resuelve al completar la operación de borrado.
+ * @param {string} idDispositivo - Identificador único del dispositivo a desactivar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar la operación de desactivación.
  * @throws {Error} Lanza un error si el dispositivo no se encuentra o falla la operación.
  */
 export const eliminarDispositivo = async (
   idDispositivo: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/dispositivos/${idDispositivo}`);
+    await api.put(`/api/dispositivos/${idDispositivo}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al eliminar el dispositivo.");
+    throw new Error(
+      apiMessage || `Error al desactivar el dispositivo ${idDispositivo}.`,
+    );
   }
 };

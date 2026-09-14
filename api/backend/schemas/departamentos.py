@@ -32,6 +32,7 @@ class DepartamentoUpdate(BaseModel):
     """
     nombre: Optional[str] = Field(None, min_length=2, max_length=255, description="Nuevo nombre descriptivo del departamento")
     centro_trabajo_id: Optional[UUID] = Field(None, description="Nuevo ID de centro de trabajo asociado")
+    activo: Optional[bool] = Field(None, description="Indica si el departamento está activo")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,6 +42,7 @@ class DepartamentoSimpleResponse(DepartamentoBase):
     Incluye las propiedades automáticas y metadatos de auditoría temporal del sistema.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
+    activo: bool = Field(..., description="Indica si el departamento está activo")
     created_at: datetime.datetime = Field(..., description="Fecha de inserción real calculada por el servidor (now)")
     updated_at: datetime.datetime = Field(..., description="Fecha de la última modificación efectuada (now)")
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo asociado si aplica")

@@ -5,13 +5,15 @@ import {
   DIAS_SEMANA,
   RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
+import { obtenerResumenesPorTrabajador } from "@/src/modules/resumenes-jornada/api/services";
+import { ResumenJornada } from "@/src/modules/resumenes-jornada/types/resumen-jornada";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
-import { mostrarError } from "@/src/utils/errorHandler";
 import {
   formatearAHorasYMinutos,
   horaAMinutos,
@@ -28,7 +30,11 @@ export default function HorariosScreen() {
   const [fichajesRealizados, setFichajesRealizados] = useState<
     RegistroFichaje[]
   >([]);
+  const [resumenesJornada, setResumenesJornada] = useState<ResumenJornada[]>(
+    [],
+  );
   const [cargando, setCargando] = useState(true);
+  const { mostrarError } = useAppModal();
 
   useEffect(() => {
     let isMounted = true;
@@ -49,16 +55,19 @@ export default function HorariosScreen() {
         const trabajadorId = usuarioActual?.trabajador_id;
         if (!trabajadorId) return;
 
-        const [asignaciones, todosLosFichajes]: [
+        const [asignaciones, todosLosFichajes, resumenes]: [
           AsignacionTurno[],
           RegistroFichaje[],
+          ResumenJornada[],
         ] = await Promise.all([
           obtenerAsignacionesTurnoTrabajador(trabajadorId),
           obtenerFichajesTurnoActual(trabajadorId),
+          obtenerResumenesPorTrabajador(trabajadorId),
         ]);
 
         if (!isMounted) return;
         setFichajesRealizados(todosLosFichajes);
+        setResumenesJornada(resumenes);
 
         let turnos: Turno[] = [];
         const hoy = new Date();
@@ -127,7 +136,8 @@ export default function HorariosScreen() {
         if (isMounted) setCuadrante(turnos);
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los centros de trabajo de la empresa: " + error,
+          "Error al cargar los centros de trabajo de la empresa: " +
+            error.message,
         );
       } finally {
         if (isMounted) setCargando(false);
@@ -295,7 +305,8 @@ export default function HorariosScreen() {
             );
 
             const textoTrabajadoReal = formatearAHorasYMinutos(
-              minutosTrabajadosReales,
+              resumenesJornada.find((resumen) => resumen.fecha === fechaRealStr)
+                ?.minutos_trabajados ?? minutosTrabajadosReales,
             );
             const textoTrabajadoTeorico =
               formatearAHorasYMinutos(minutosTeoricosNetos);

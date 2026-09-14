@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -12,6 +14,8 @@ from models.empresas import Empresas
 from schemas.turnos import TurnoCreate, TurnoResponse, TurnoUpdate
 from models.turnos import Turnos
 from models.usuarios import Usuarios
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # Configuración del enrutador para la gestión de turnos laborales
 router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
@@ -20,7 +24,7 @@ router = APIRouter(prefix="/api/turnos", tags=["Turnos Laborales"])
 limiter = Limiter(key_func=get_remote_address)
 
 @router.get("/empresa/{id_empresa}", response_model=List[TurnoResponse], summary="Obtener turnos por empresa")
-@limiter.limit("60/minute") # Limita las consultas masivas de listados de turnos por empresa para proteger el rendimiento de la base de datos
+@limiter.limit("60/minute")
 def obtener_turnos_empresa(
     request: Request,
     id_empresa: UUID, 
@@ -52,13 +56,25 @@ def obtener_turnos_empresa(
             detail="No tienes autorización para consultar los turnos de esta empresa."
         )
 
-    return db.query(Turnos).options(
+    turnos = db.query(Turnos).options(
         joinedload(Turnos.empresa)
-    ).filter(Turnos.empresa_id == id_empresa).order_by(Turnos.nombre.asc()).all()
+    ).filter(Turnos.empresa_id == id_empresa, Turnos.activo.is_(True)).order_by(Turnos.nombre.asc()).all()
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "turnos", "accion": "obtener_por_empresa", "entidad_id": str(id_empresa), "detalles": f"Se consultó el listado de turnos de la empresa {id_empresa}"}
+    )
+    db.commit()
+
+    return turnos
 
 
 @router.get("/{id_turno}", response_model=TurnoResponse, summary="Obtener turno por ID")
-@limiter.limit("60/minute") # Limita las consultas individuales de turnos para prevenir ataques de enumeración y sobrecarga
+@limiter.limit("60/minute") 
 def obtener_turno_laboral(
     request: Request,
     id_turno: UUID, 
@@ -92,11 +108,21 @@ def obtener_turno_laboral(
             detail="No tienes autorización para ver los detalles de este turno."
         )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=turno.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "turnos", "accion": "obtener_por_id", "entidad_id": str(id_turno), "detalles": f"Se consultó el detalle del turno {id_turno}"}
+    )
+    db.commit()
+
     return turno
 
 
 @router.post("", response_model=TurnoResponse, status_code=status.HTTP_201_CREATED, summary="Crear turno laboral")
-@limiter.limit("20/minute") # Protegido frente a la creación masiva o automatizada de turnos fraudulentos
+@limiter.limit("20/minute") 
 def crear_turno_laboral(
     request: Request,
     obj_in: TurnoCreate, 
@@ -138,9 +164,19 @@ def crear_turno_laboral(
         )
         
         db.add(nuevo_turno)
+        db.flush()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "turnos", "accion": "crear", "entidad_id": str(nuevo_turno.id), "detalles": f"Se creó el turno {nuevo_turno.id}"}
+        )
+
         db.commit()
         
-        # Consulta de refresco aplicando joinedload para asegurar que la relación 'empresa' esté cargada para Pydantic
         turno_con_relacion = db.query(Turnos).options(
             joinedload(Turnos.empresa)
         ).filter(Turnos.id == nuevo_turno.id).first()
@@ -153,12 +189,12 @@ def crear_turno_laboral(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ha ocurrido un error al guardar el turno laboral: {str(error)}"
+            detail=f"No se ha podido guardar el turno laboral: {str(error)}"
         )
 
 
 @router.put("/{id_turno}/editar", response_model=TurnoResponse, summary="Editar turno laboral")
-@limiter.limit("20/minute") # Protegido frente a modificaciones masivas concurrentes y ataques de fuerza de escritura
+@limiter.limit("20/minute") 
 def editar_turno(
     request: Request,
     id_turno: UUID, 
@@ -197,6 +233,14 @@ def editar_turno(
             setattr(turno, key, value)
     
     try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=turno.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "turnos", "accion": "editar", "entidad_id": str(id_turno), "detalles": f"Se editó el turno {id_turno}"}
+        )
         db.commit()
         
         # Consulta de refresco aplicando joinedload para asegurar la relación con empresa
@@ -209,26 +253,25 @@ def editar_turno(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar el turno en la base de datos: {str(error)}"
+            detail=f"No se ha podido actualizar el turno en la base de datos: {str(error)}"
         )
 
-
-@router.delete("/{id_turno}", status_code=status.HTTP_200_OK, summary="Eliminar turno laboral")
-@limiter.limit("20/minute") # Protegido frente a eliminaciones masivas destructivas de turnos en el sistema
-def eliminar_turno_maestro(
+@router.put("/{id_turno}/desactivar", status_code=status.HTTP_200_OK, summary="Dar de baja lógica turno laboral")
+@limiter.limit("20/minute") 
+def dar_de_baja_turno(
     request: Request,
     id_turno: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
-    **DELETE /api/turnos/{id_turno}**
+    **PUT /api/turnos/{id_turno}/desactivar**
     
-    Elimina físicamente un turno validando previamente que no existan contratos o asignaciones activas asociadas.
+    Da de baja un turno validando previamente que no existan contratos o asignaciones activas asociadas.
     """
     # Registrar metadatos de red y auditoría de la eliminación
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de eliminación del turno {id_turno} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de baja del turno {id_turno} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
     turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
     if not turno:
@@ -237,31 +280,30 @@ def eliminar_turno_maestro(
             detail=f"Turno laboral con ID {id_turno} no localizado en el sistema."
         )
 
-    # Validar permisos multi-tenant
     es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
     if not es_admin_gestoria and usuario_actual.empresa_id != turno.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para eliminar este turno."
+            detail="No tienes permisos para modificar este turno."
         )
     
-    asignaciones_activas = db.query(AsignacionesTurno).filter(
-        AsignacionesTurno.turno_id == id_turno
-    ).count()
-
-    if asignaciones_activas > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Acción bloqueada: No se puede eliminar el turno porque tiene {asignaciones_activas} trabajador(es) asignado(s) actualmente. Debe reasignarlos a otro turno primero."
-        )
+    turno.activo = False
+    turno.updated_at = datetime.now()
 
     try:
-        db.delete(turno)
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=turno.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "turnos", "accion": "desactivar", "entidad_id": str(id_turno), "detalles": f"Se desactivó el turno {id_turno}"}
+        )
         db.commit()
-        return {"detail": f"Turno con ID {id_turno} eliminado correctamente."}
+        return {"detail": f"Turno con ID {id_turno} desactivado correctamente y enviado a la papelera."}
     except Exception as error:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se puede eliminar el turno debido a restricciones de integridad referencial. Error: {str(error)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se ha podido desactivar el turno: {str(error)}"
         )

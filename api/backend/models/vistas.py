@@ -37,6 +37,18 @@ SELECT
     f.dispositivo_id, f.latitud, f.longitud, f.ip_address, f.origen,
     f.estado, f.fichaje_sustituido_id, f.hash_integridad, f.observaciones, f.created_at
 FROM public.fichajes f
+WHERE f.id NOT IN (
+    SELECT fichaje_sustituido_id
+    FROM public.fichajes
+    WHERE fichaje_sustituido_id IS NOT NULL
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM public.correcciones_fichaje c
+    WHERE c.fichaje_afectado_id = f.id
+      AND c.tipo_correccion = 'Anulación'
+      AND c.estado = 'Aprobada'
+)
 """
 
 vista_fichajes_vigentes_def = CreateView(t_v_fichajes_vigentes, sql_v_fichajes_vigentes)

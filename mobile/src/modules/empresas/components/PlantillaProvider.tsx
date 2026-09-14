@@ -59,7 +59,8 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
         empresaActual.id,
       ).catch((error: any) => {
         throw new Error(
-          "Error al obtener la lista de trabajadores de la empresa: " + error,
+          "Error al obtener la lista de trabajadores de la empresa: " +
+            error.message,
         );
       });
 
@@ -105,7 +106,6 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
 
               return {
                 ...trabajador,
-                estado: 1, // Ajusta o mapea según corresponda a tu lógica numérica de Estado
                 contratos: contratos || [],
                 contratoActivo:
                   contratos?.find((c: Contrato) => c.activo === true) || null,

@@ -1,0 +1,70 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ModalAltaEditarTrabajador.tsx · Fichapp</title><style>
+:root{color-scheme:light;--ink:#18212f;--muted:#667085;--line:#d9e0e8;--paper:#fff;--wash:#f4f6f8;--navy:#132238;--accent:#b44a2d;--accent-wash:#fff1ec;font-family:Georgia,'Times New Roman',serif}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font-size:16px;line-height:1.65}a{color:#8d341f;text-decoration:none}a:hover{text-decoration:underline}.top{background:var(--navy);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:28px}.brand{font-size:1.45rem;font-weight:700;letter-spacing:.02em}.top small{color:#b9c4d3}.layout{display:grid;grid-template-columns:275px minmax(0,900px);max-width:1240px;margin:0 auto;min-height:calc(100vh - 70px)}aside{padding:30px 22px;border-right:1px solid var(--line);background:#eef1f4;position:sticky;top:0;height:calc(100vh - 70px);overflow:auto}aside h3{font:700 .75rem/1.2 Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:22px 0 8px}nav a{display:block;padding:5px 9px;border-radius:4px;font:14px/1.45 Arial,sans-serif;color:#344054}nav a:hover{background:#dfe5eb;text-decoration:none}.search{width:100%;border:1px solid #c5ced9;border-radius:4px;padding:9px 10px;background:#fff;font:14px Arial,sans-serif}.content{background:var(--paper);padding:54px clamp(24px,6vw,76px) 90px}h1,h2,h3{font-weight:700;line-height:1.2}h1{font-size:2.55rem;margin:0 0 14px;color:var(--navy)}h2{font-size:1.6rem;margin:48px 0 18px;border-bottom:1px solid var(--line);padding-bottom:9px}h3{font-size:1.15rem;margin:0 0 4px}.lead{font-size:1.16rem;color:#4b5565;max-width:720px}.eyebrow{font:700 .74rem Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:30px 0}.stat,.item{border:1px solid var(--line);padding:16px;background:#fff}.stat strong{display:block;font-size:1.8rem;color:var(--accent)}.stat span,.meta{font:13px Arial,sans-serif;color:var(--muted)}.item{margin:12px 0}.item code,.path,code{font-family:'Cascadia Code',Consolas,monospace;font-size:.88em}.path{color:var(--muted);margin-bottom:16px}.entry{border-top:1px solid var(--line);padding:22px 0}.entry pre{white-space:pre-wrap;margin:10px 0 0;padding:14px;background:#f7f8fa;border-left:3px solid #d9a08f;font:14px/1.6 'Cascadia Code',Consolas,monospace;color:#344054}.tag{display:inline-block;background:var(--accent-wash);color:#8d341f;padding:2px 7px;margin-right:7px;font:12px Arial,sans-serif;border-radius:3px}@media(max-width:760px){.layout{display:block}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.content{padding:34px 22px 60px}h1{font-size:2rem}.top{padding:15px 18px}}
+</style></head><body><header class="top"><div class="brand">Fichapp</div><small>Documentación del frontend</small></header><div class="layout"><aside><input class="search" type="search" placeholder="Buscar en la documentación" data-search><h3>Guía</h3><nav><a href="index.html">Inicio</a><a href="architecture.html">Arquitectura</a><a href="routes.html">Rutas</a><a href="modules.html">Módulos</a></nav><h3>Módulos</h3><nav><a href="modules.html#another-services">another-services</a><a href="modules.html#asignaciones-turno">asignaciones-turno</a><a href="modules.html#ausencias">ausencias</a><a href="modules.html#calendarios-laborales">calendarios-laborales</a><a href="modules.html#centros-trabajo">centros-trabajo</a><a href="modules.html#contratos">contratos</a><a href="modules.html#correcciones-fichaje">correcciones-fichaje</a><a href="modules.html#departamentos">departamentos</a><a href="modules.html#dispositivos-fichaje">dispositivos-fichaje</a><a href="modules.html#empresas">empresas</a><a href="modules.html#festivos">festivos</a><a href="modules.html#fichajes">fichajes</a><a href="modules.html#permisos">permisos</a><a href="modules.html#resumenes-jornada">resumenes-jornada</a><a href="modules.html#roles">roles</a><a href="modules.html#tipos_eventos_fichaje">tipos_eventos_fichaje</a><a href="modules.html#trabajadores">trabajadores</a><a href="modules.html#turnos">turnos</a><a href="modules.html#usuarios">usuarios</a><a href="modules.html#usuarios_roles">usuarios_roles</a></nav></aside><main class="content"><p class="eyebrow">Referencia de código</p><h1>ModalAltaEditarTrabajador.tsx</h1><p class="path">mobile/src/modules/empresas/components/modals/ModalAltaEditarTrabajador.tsx</p><article class="entry"><h3><span class="tag">interface</span>ModalAltaEditarTrabajadorProps</h3><pre>Propiedades requeridas para el funcionamiento del componente ModalAltaEditarTrabajador.
+Define los estados de los datos del trabajador, catálogos de roles, funciones de actualización
+y referencias de inputs para formularios de alta y edición.</pre></article><article class="entry"><h3><span class="tag">const</span>ModalAltaEditarTrabajador</h3><pre>Bandera booleana que indica si el modal se encuentra en modo de edición de un trabajador existente. */
+  esEdicion: boolean;
+  /** Valor actual del nombre del trabajador. */
+  nombre: string;
+  /** Función para actualizar el nombre del trabajador. */
+  setNombre: (val: string) =&gt; void;
+  /** Valor actual de los apellidos del trabajador. */
+  apellidos: string;
+  /** Función para actualizar los apellidos del trabajador. */
+  setApellidos: (val: string) =&gt; void;
+  /** Valor actual del documento de identidad (NIF o NIE). */
+  nifNie: string;
+  /** Función para actualizar el NIF o NIE. */
+  setNifNie: (val: string) =&gt; void;
+  /** Valor actual del correo electrónico. */
+  email: string;
+  /** Función para actualizar el correo electrónico. */
+  setEmail: (val: string) =&gt; void;
+  /** Valor actual del teléfono móvil. */
+  telefono: string;
+  /** Función para actualizar el teléfono móvil. */
+  setTelefono: (val: string) =&gt; void;
+  /** Valor actual del número de la seguridad social. */
+  nss: string;
+  /** Función para actualizar el número de la seguridad social. */
+  setNss: (val: string) =&gt; void;
+  /** Valor actual de la fecha de nacimiento (Formato YYYY-MM-DD). */
+  fechaNacimiento: string;
+  /** Función para actualizar la fecha de nacimiento. */
+  setFechaNacimiento: (val: string) =&gt; void;
+
+  /** Identificador o tipo de rol asignado actualmente al trabajador. */
+  tipoRol: string;
+  /** Función para actualizar el rol asignado. */
+  setTipoRol: (val: string) =&gt; void;
+  /** Listado completo de roles disponibles en el sistema. */
+  rolesDisponibles: Rol[];
+
+  /** Función callback ejecutada al superar satisfactoriamente todas las validaciones. */
+  onGuardar: () =&gt; void;
+  /** Estado booleano que indica si se está ejecutando una operación asíncrona de guardado. */
+  procesando: boolean;
+  /** Objeto de estilos personalizados aplicados al formulario y componentes visuales. */
+  styles: any;
+  /** Referencias opcionales para el control de enfoque secuencial entre inputs. */
+  inputRefs?: {
+    apellidosRef?: any;
+    nifRef?: any;
+    emailRef?: any;
+    telefonoRef?: any;
+    nssRef?: any;
+    fechaNacRef?: any;
+    botonGuardarRef?: any;
+  };
+}
+
+/**
+Componente modal interactivo para el alta y edición de expedientes de trabajadores.
+Implementa validaciones robustas y centralizadas para cada campo obligatorio (nombre,
+apellidos, NIF/NIE, email, teléfono, NSS, fecha de nacimiento real y rol), emitiendo
+mensajes de error específicos y feedback visual.
+
+@param props - Propiedades de configuración, estados y manejadores del modal.
+@returns Estructura visual en React Native con el formulario completo de trabajadores.</pre></article><article class="entry"><h3><span class="tag">const</span>validarYGuardar</h3><pre>Valida exhaustivamente cada campo del formulario de alta o edición de trabajadores
+utilizando utilidades centralizadas y comprobaciones lógicas. Emite avisos detallados
+en caso de detectar anomalías y procede con el guardado si todo es correcto.</pre></article></main></div><script>const q=document.querySelector('[data-search]');q?.addEventListener('input',e=>{const value=e.target.value.toLowerCase();document.querySelectorAll('.item,.entry').forEach(el=>el.hidden=value&&!el.textContent.toLowerCase().includes(value))});</script></body></html>

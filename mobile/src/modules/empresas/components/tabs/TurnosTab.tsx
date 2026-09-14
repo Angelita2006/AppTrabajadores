@@ -31,12 +31,17 @@ export default function TabTurnos({
   styles,
 }: TabTurnosProps) {
   const [mostrarFormTurno, setMostrarFormTurno] = useState<boolean>(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState(false);
 
   const [nombreTurno, setNombreTurno] = useState<string>("");
   const [horaInicio, setHoraInicio] = useState<string>("");
   const [horaFin, setHoraFin] = useState<string>("");
   const [duracionPausa, setDuracionPausa] = useState<string>("0");
   const [turnoEnEdicion, setTurnoEnEdicion] = useState<Turno | null>(null);
+  const turnosActivos = turnosEmpresa.filter((turno) => turno.activo !== false);
+  const turnosInactivos = turnosEmpresa.filter(
+    (turno) => turno.activo === false,
+  );
 
   /**
    * Valida de forma integral los campos del formulario de turnos utilizando las funciones de validación.
@@ -110,7 +115,7 @@ export default function TabTurnos({
       setDuracionPausa("0");
       setMostrarFormTurno(false);
     } catch (error: any) {
-      mostrarError("Error al crear el turno laboral: " + error);
+      mostrarError("Error al crear el turno laboral: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -143,7 +148,7 @@ export default function TabTurnos({
       mostrarMensaje("Éxito", "Turno actualizado correctamente.");
       setTurnoEnEdicion(null);
     } catch (error: any) {
-      mostrarError("Error al actualizar el turno laboral: " + error);
+      mostrarError("Error al actualizar el turno laboral: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -167,9 +172,11 @@ export default function TabTurnos({
         setGuardando(true);
         await eliminarTurno(turnoId);
         setTurnosEmpresa((prev: Turno[]) =>
-          prev.filter((t: Turno) => t.id !== turnoId),
+          prev.map((t: Turno) =>
+            t.id === turnoId ? { ...t, activo: false } : t,
+          ),
         );
-        mostrarMensaje("Éxito", "Turno laboral eliminado correctamente.");
+        mostrarMensaje("Éxito", "Turno laboral enviado a la papelera.");
       } catch (error: any) {
         mostrarError(
           `Existen contratos activos vinculados al turno "${nombreTurnoParam}". Debe modificarlos o rescindirlos antes de borrarlo. ` +
@@ -200,6 +207,23 @@ export default function TabTurnos({
           },
         ],
       );
+    }
+  };
+
+  const handleReactivarTurno = async (turnoId: string) => {
+    try {
+      setGuardando(true);
+      await editarTurno(turnoId, { activo: true });
+      setTurnosEmpresa((prev) =>
+        prev.map((turno) =>
+          turno.id === turnoId ? { ...turno, activo: true } : turno,
+        ),
+      );
+      mostrarMensaje("Éxito", "Turno reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError("Error al reactivar el turno: " + error.message);
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -296,7 +320,7 @@ export default function TabTurnos({
       <ThemedText style={styles.subseccionTitulo}>Turnos</ThemedText>
 
       {/* Listado dinámico de turnos configurados */}
-      {turnosEmpresa.map((turno: Turno) => (
+      {turnosActivos.map((turno: Turno) => (
         <View key={turno.id}>
           <View
             style={[
@@ -445,6 +469,39 @@ export default function TabTurnos({
           )}
         </View>
       ))}
+
+      {turnosInactivos.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable
+            style={[styles.botonAccionHeader, { backgroundColor: "#64748B" }]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+            disabled={guardando}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${turnosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+          {mostrarPapelera &&
+            turnosInactivos.map((turno) => (
+              <View key={turno.id} style={styles.itemListaEstructural}>
+                <ThemedText style={styles.nombreElementoLista}>
+                  {turno.nombre.toUpperCase()}
+                </ThemedText>
+                <Pressable
+                  style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
+                  onPress={() => handleReactivarTurno(turno.id)}
+                  disabled={guardando}
+                >
+                  <ThemedText style={styles.textoBotonGuardar}>
+                    ↻ Reactivar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+        </View>
+      )}
     </View>
   );
 }

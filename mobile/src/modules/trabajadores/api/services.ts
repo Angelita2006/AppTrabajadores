@@ -202,6 +202,30 @@ export const obtenerEmpresaTrabajador = async (
 };
 
 /**
+ * Tramita la baja total de un trabajador mediante una única petición atómica al backend.
+ * URI: POST /api/trabajadores/{id}/baja-total
+ *
+ * @async
+ * @function tramitarBajaTotalTrabajador
+ * @param {string} trabajadorId - Identificador único del trabajador.
+ * @returns {Promise<void>}
+ */
+export const tramitarBajaTotalTrabajador = async (
+  trabajadorId: string,
+): Promise<void> => {
+  try {
+    await api.post(`/api/trabajadores/${trabajadorId}/baja-total`);
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(
+      apiMessage ||
+        "Ha ocurrido un error inesperado al procesar la baja total del trabajador.",
+    );
+  }
+};
+
+/**
  * Elimina un trabajador de la plataforma validando privilegios de administración o empresa.
  * URI: DELETE /api/trabajadores/{id_trabajador}
  *

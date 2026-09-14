@@ -8,12 +8,13 @@ from slowapi.util import get_remote_address
 from models.ausencias import Ausencias
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
+from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
 from models.empresas import Empresas
 from core.enums import EstadoAusenciaEnum
 from schemas.ausencias import AusenciaCreate, AusenciaResponse
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
+from core.auditoria import registrar_auditoria
 
 # APIRouter agrupa todos los endpoints relacionados con el control de ausencias y bajas bajo el prefijo "/api/ausencias".
 router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"])
@@ -22,12 +23,12 @@ router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=AusenciaResponse, status_code=status.HTTP_201_CREATED, summary="Solicitar ausencia")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def solicitar_ausencia(
     request: Request,
     obj_in: AusenciaCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     **POST /api/ausencias**
@@ -72,6 +73,16 @@ def solicitar_ausencia(
         db.add(nueva_ausencia)
         db.commit()
         
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "ausencias", "accion": "crear"},
+            trabajador_id=obj_in.trabajador_id
+        )
+        
         ausencia_creada = (
             db.query(Ausencias)
             .options(
@@ -87,78 +98,14 @@ def solicitar_ausencia(
         return ausencia_creada
     except Exception as error:
         db.rollback()
-        print(f"Error de integridad al registrar ausencia: {str(error)}")
+        print(f"No se ha podido registrar ausencia: {str(error)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ha ocurrido un error de integridad al procesar la solicitud: {str(error)}"
+            detail=f"No se ha podido procesar la solicitud: {str(error)}"
         )
-
-
-@router.put("/{id_ausencia}/estado", response_model=AusenciaResponse, summary="Actualizar estado de ausencia")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
-def actualizar_estado_ausencia(
-    request: Request,
-    id_ausencia: UUID, 
-    nuevo_estado: str,  
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
-):
-    """
-    **PUT /api/ausencias/{id_ausencia}/estado?nuevo_estado=aprobado**
-    
-    Modifica el estado de una solicitud de ausencia (aprobar o rechazar).
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de actualización de estado para ausencia {id_ausencia} a '{nuevo_estado}' desde la IP: {cliente_ip} por: {usuario_actual.email}")
-
-    # 1. Buscar la ausencia por su ID único
-    ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
-    
-    if not ausencia:
-        print(f"Ausencia con ID {id_ausencia} no localizada.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró ninguna solicitud de ausencia con el ID {id_ausencia}."
-        )
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == ausencia.trabajador_id).first()
-    if usuario_actual.empresa_id and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
-        print(f"Acceso denegado: El usuario {usuario_actual.email} intentó modificar ausencia de otra empresa.")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar el estado de esta ausencia."
-        )
-
-    # 2. Actualizar el campo de estado de forma dinámica
-    setattr(ausencia, "estado", nuevo_estado)
-    
-    try:
-        db.commit()
-        
-        ausencia_actualizada = (
-            db.query(Ausencias)
-            .options(
-                joinedload(Ausencias.empresa),
-                joinedload(Ausencias.trabajador),
-                joinedload(Ausencias.validado_por_usuario)
-            )
-            .filter(Ausencias.id == id_ausencia)
-            .first()
-        )
-        
-        print(f"Estado de la ausencia {id_ausencia} actualizado exitosamente a '{nuevo_estado}'.")
-        return ausencia_actualizada
-    except Exception as error:
-        db.rollback()
-        print(f"Error al actualizar el estado de la ausencia {id_ausencia}: {str(error)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar el estado de la ausencia: {str(error)}"
-        )
-
 
 @router.put("/{id_ausencia}/resolver", response_model=AusenciaResponse, summary="Resolver solicitud de ausencia")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def resolver_solicitud_ausencia(
     request: Request,
     id_ausencia: UUID, 
@@ -166,7 +113,7 @@ def resolver_solicitud_ausencia(
     resolutor_usuario_id: UUID, 
     observaciones: Optional[str] = None,
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **PUT /api/ausencias/{id_ausencia}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID**
@@ -212,6 +159,16 @@ def resolver_solicitud_ausencia(
 
     db.commit()
     
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=ausencia.empresa_id,
+        accion=AccionAuditoriaEnum.MODIFICACION,
+        detalle={"recurso": "ausencias", "accion": "resolver"},
+        trabajador_id=ausencia.trabajador_id
+    )
+    
     ausencia_resuelta = (
         db.query(Ausencias)
         .options(
@@ -229,6 +186,7 @@ def resolver_solicitud_ausencia(
 
 @router.get("/empresa/{id_empresa}", response_model=List[AusenciaResponse], summary="Obtener ausencias por empresa")
 def obtener_ausencias_por_empresa(
+    request: Request,
     id_empresa: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
@@ -247,6 +205,16 @@ def obtener_ausencias_por_empresa(
             detail="No tienes autorización para consultar las ausencias de esta empresa."
         )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "ausencias", "accion": "consulta_empresa"},
+        trabajador_id=None
+    )
+
     return (
         db.query(Ausencias)
         .options(
@@ -261,6 +229,7 @@ def obtener_ausencias_por_empresa(
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[AusenciaResponse], summary="Obtener ausencias por trabajador")
 def obtener_ausencias_por_trabajador(
+    request: Request,
     id_trabajador: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
@@ -284,6 +253,16 @@ def obtener_ausencias_por_trabajador(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para consultar las ausencias de este trabajador."
             )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "ausencias", "accion": "consulta_trabajador"},
+        trabajador_id=id_trabajador
+    )
 
     return (
         db.query(Ausencias)

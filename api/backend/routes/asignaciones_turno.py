@@ -5,9 +5,10 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from core.auditoria import registrar_auditoria
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
+from core.enums import AccionAuditoriaEnum, TipoUsuarioEnum
 from schemas.asignaciones_turno import AsignacionTurnoCreate, AsignacionTurnoMasivaCreate, AsignacionTurnoResponse
 from models.trabajadores import Trabajadores
 from models.turnos import Turnos
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/asignaciones-turno", tags=["Asignaciones de Turn
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=AsignacionTurnoResponse, status_code=status.HTTP_201_CREATED, summary="Asignar turno a trabajador")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def asignar_turno_trabajador(
     request: Request,
     obj_in: AsignacionTurnoCreate, 
@@ -37,15 +38,21 @@ def asignar_turno_trabajador(
     print(f"Petición de asignación de turno para el trabajador ID {obj_in.trabajador_id} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
     # 1. Validaciones estructurales básicas de existencia
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
+    trabajador = db.query(Trabajadores).filter(
+        Trabajadores.id == obj_in.trabajador_id,
+        Trabajadores.activo.is_(True),
+    ).first()
     if not trabajador:
         print(f"Trabajador con ID {obj_in.trabajador_id} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
-    turno = db.query(Turnos).filter(Turnos.id == obj_in.turno_id).first()
+    turno = db.query(Turnos).filter(
+        Turnos.id == obj_in.turno_id,
+        Turnos.activo.is_(True),
+    ).first()
     if not turno:
-        print(f"Turno teórico con ID {obj_in.turno_id} no encontrado.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Turno teórico no encontrado.")
+        print(f"Turno con ID {obj_in.turno_id} no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Turno no encontrado.")
 
     # 2. Mapeo y volcado directo al modelo físico de la base de datos
     nueva_asignacion = AsignacionesTurno(
@@ -58,6 +65,16 @@ def asignar_turno_trabajador(
     try:
         db.add(nueva_asignacion)
         db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "asignaciones_turno", "accion": "crear"},
+            trabajador_id=nueva_asignacion.trabajador_id
+        )
         
         asignacion_creada = (
             db.query(AsignacionesTurno)
@@ -73,14 +90,14 @@ def asignar_turno_trabajador(
         return asignacion_creada
     except Exception as error:
         db.rollback()
-        print(f"Error al consolidar la asignación en la base de datos: {str(error)}")
+        print(f"No se ha podido consolidar la asignación en la base de datos: {str(error)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al consolidar la asignación en la base de datos: {str(error)}"
+            detail=f"No se ha podido consolidar la asignación en la base de datos: {str(error)}"
         )
 
 @router.post("/masiva", response_model=List[AsignacionTurnoResponse], status_code=status.HTTP_201_CREATED, summary="Asignación masiva de turnos")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def asignar_turnos_masivamente(
     request: Request,
     obj_in: AsignacionTurnoMasivaCreate, 
@@ -96,7 +113,10 @@ def asignar_turnos_masivamente(
     print(f"Petición de asignación masiva para el trabajador ID {obj_in.trabajador_id} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
     # 1. Validar existencia del trabajador
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
+    trabajador = db.query(Trabajadores).filter(
+        Trabajadores.id == obj_in.trabajador_id,
+        Trabajadores.activo.is_(True),
+    ).first()
     if not trabajador:
         print(f"Trabajador con ID {obj_in.trabajador_id} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
@@ -106,7 +126,10 @@ def asignar_turnos_masivamente(
     try:
         for turno_id in obj_in.turnos_ids:
             # Validar que cada turno exista
-            turno = db.query(Turnos).filter(Turnos.id == turno_id).first()
+            turno = db.query(Turnos).filter(
+                Turnos.id == turno_id,
+                Turnos.activo.is_(True),
+            ).first()
             if not turno:
                 print(f"Turno con ID {turno_id} no encontrado durante asignación masiva.")
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Turno {turno_id} no encontrado.")
@@ -122,6 +145,16 @@ def asignar_turnos_masivamente(
             nuevas_asignaciones_ids.append(nueva_asignacion.id)
 
         db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "asignaciones_turno", "accion": "crear"},
+            trabajador_id=obj_in.trabajador_id
+        )
         
         asignaciones_creadas = (
             db.query(AsignacionesTurno)
@@ -140,19 +173,19 @@ def asignar_turnos_masivamente(
         raise he
     except Exception as error:
         db.rollback()
-        print(f"Error al procesar la asignación masiva: {str(error)}")
+        print(f"No se ha podido procesar la asignación masiva: {str(error)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al procesar la asignación masiva: {str(error)}"
+            detail=f"No se ha podido procesar la asignación masiva: {str(error)}"
         )
 
 @router.put("/{id_asignacion}/editar", response_model=AsignacionTurnoResponse, summary="Editar asignación de turno")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def editar_asignacion_turno(
     request: Request,
     id_asignacion: UUID, 
     fecha_fin: date, 
-    fecha_inicio = None,  
+    fecha_inicio: date,  
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
@@ -189,6 +222,20 @@ def editar_asignacion_turno(
     setattr(asignacion, "fecha_fin", fecha_fin)
     
     db.commit()
+
+    # Obtener el trabajador vinculado a la asignación para extraer su empresa_id
+    trabajador_asociado = db.query(Trabajadores).filter(Trabajadores.id == asignacion.trabajador_id).first()
+    empresa_id_audit = trabajador_asociado.empresa_id if trabajador_asociado else usuario_actual.empresa_id
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=empresa_id_audit,
+        accion=AccionAuditoriaEnum.MODIFICACION,
+        detalle={"recurso": "asignaciones_turno", "accion": "modificar"},
+        trabajador_id=asignacion.trabajador_id
+    )
     
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
@@ -205,7 +252,7 @@ def editar_asignacion_turno(
 
 
 @router.patch("/{id_asignacion}/created-at", response_model=AsignacionTurnoResponse, status_code=status.HTTP_200_OK, summary="Actualizar fecha de creación de asignación")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def poner_fecha_creacion_asignacion_turno(
     request: Request,
     id_asignacion: UUID, 
@@ -233,6 +280,19 @@ def poner_fecha_creacion_asignacion_turno(
 
     try:
         db.commit()
+
+        trabajador_asociado = db.query(Trabajadores).filter(Trabajadores.id == asignacion.trabajador_id).first()
+        empresa_id_audit = trabajador_asociado.empresa_id if trabajador_asociado else usuario_actual.empresa_id
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=empresa_id_audit,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "asignaciones_turno", "accion": "modificar"},
+            trabajador_id=asignacion.trabajador_id
+        )
         
         asignacion_actualizada = (
             db.query(AsignacionesTurno)
@@ -248,15 +308,15 @@ def poner_fecha_creacion_asignacion_turno(
         return asignacion_actualizada
     except Exception as e:
         db.rollback()
-        print(f"Error al guardar la fecha de creación para asignación {id_asignacion}: {str(e)}")
+        print(f"No se ha podido guardar la fecha de creación para asignación {id_asignacion}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al guardar la fecha de creación: {str(e)}"
+            detail=f"No se ha podido guardar la fecha de creación: {str(e)}"
         )
 
 
 @router.put("/{id_asignacion}/finalizar", response_model=AsignacionTurnoResponse, summary="Finalizar vigencia de turno")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute") 
 def finalizar_vigencia_turno(
     request: Request,
     id_asignacion: UUID, 
@@ -278,7 +338,7 @@ def finalizar_vigencia_turno(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación de turno no encontrada.")
 
     if asignacion.fecha_inicio > fecha_fin:
-        print(f"Error: Fecha de fin anterior a la de inicio en asignación {id_asignacion}.")
+        print(f"La fecha de fin es anterior a la de inicio en asignación {id_asignacion}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La fecha de finalización no puede ser previa a la fecha de inicio del turno."
@@ -287,6 +347,19 @@ def finalizar_vigencia_turno(
     setattr(asignacion, "fecha_fin", fecha_fin)
     
     db.commit()
+
+    trabajador_asociado = db.query(Trabajadores).filter(Trabajadores.id == asignacion.trabajador_id).first()
+    empresa_id_audit = trabajador_asociado.empresa_id if trabajador_asociado else usuario_actual.empresa_id
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=empresa_id_audit,
+        accion=AccionAuditoriaEnum.BAJA_LOGICA,
+        detalle={"recurso": "asignaciones_turno", "accion": "baja"},
+        trabajador_id=asignacion.trabajador_id
+    )
     
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
@@ -304,6 +377,7 @@ def finalizar_vigencia_turno(
 
 @router.delete("/{id_asignacion}", status_code=status.HTTP_200_OK, summary="Eliminar asignación de turno")
 def eliminar_asignacion_turno(
+    request: Request,
     id_asignacion: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
@@ -320,14 +394,30 @@ def eliminar_asignacion_turno(
         print(f"Asignación con ID {id_asignacion} no encontrada para eliminar.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asignación de turno no encontrada.")
 
+    trabajador_asociado = db.query(Trabajadores).filter(Trabajadores.id == asignacion.trabajador_id).first()
+    empresa_id_audit = trabajador_asociado.empresa_id if trabajador_asociado else usuario_actual.empresa_id
+    trabajador_id_audit = asignacion.trabajador_id
+
     db.delete(asignacion)
     db.commit()
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=empresa_id_audit,
+        accion=AccionAuditoriaEnum.ELIMINACION,
+        detalle={"recurso": "asignaciones_turno", "accion": "eliminar"},
+        trabajador_id=trabajador_id_audit
+    )
+
     print(f"Asignación {id_asignacion} eliminada correctamente.")
     return {"detail": f"Asignación ({id_asignacion}) eliminada correctamente del cuadrante."}
 
 
 @router.delete("/trabajador/{trabajador_id}/eliminar-todas", status_code=status.HTTP_200_OK, summary="Eliminar todas las asignaciones de un trabajador")
 def eliminar_todas_asignaciones_trabajador(
+    request: Request,
     trabajador_id: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
@@ -358,6 +448,17 @@ def eliminar_todas_asignaciones_trabajador(
             db.delete(asignacion)
             
         db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={"recurso": "asignaciones_turno", "accion": "eliminar_todas"},
+            trabajador_id=trabajador_id
+        )
+
         print(f"Se han eliminado {len(asignaciones)} asignaciones del trabajador ID {trabajador_id}.")
         return {"detail": f"Se han eliminado {len(asignaciones)} asignaciones del trabajador."}
     
@@ -366,17 +467,18 @@ def eliminar_todas_asignaciones_trabajador(
         raise he
     except Exception as error:
         db.rollback()
-        print(f"Error al eliminar las asignaciones del trabajador {trabajador_id}: {str(error)}")
+        print(f"No se ha podido eliminar las asignaciones del trabajador {trabajador_id}: {str(error)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al eliminar las asignaciones: {str(error)}"
+            detail=f"No se ha podido eliminar las asignaciones: {str(error)}"
         )
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[AsignacionTurnoResponse], summary="Obtener asignaciones por trabajador")
 def obtener_asignaciones_por_trabajador(
+    request: Request,
     id_trabajador: UUID, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     **GET /api/asignaciones-turno/trabajador/{id_trabajador}**
@@ -389,6 +491,16 @@ def obtener_asignaciones_por_trabajador(
     if not trabajador:
         print(f"Trabajador con ID {id_trabajador} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "asignaciones_turno", "accion": "consulta"},
+        trabajador_id=id_trabajador
+    )
 
     return (
         db.query(AsignacionesTurno)

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import os
 import shutil
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
@@ -7,6 +7,7 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from models.contratos import Contratos
 from models.asignaciones_turno import AsignacionesTurno
 from models.usuarios_roles import UsuariosRoles
 from core.database import get_db
@@ -18,6 +19,8 @@ from schemas.usuarios import LoginRequest
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from models.turnos import Turnos
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum
 
 # Configuración del enrutador para la gestión de trabajadores y expedientes de empleados
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
@@ -29,12 +32,12 @@ CARPETA_FOTOS_TRABAJADORES = "static/fotos_trabajadores"
 os.makedirs(CARPETA_FOTOS_TRABAJADORES, exist_ok=True)
 
 @router.get("/empresa/{id_empresa}", response_model=List[TrabajadorResponse], summary="Obtener trabajadores por empresa")
-@limiter.limit("60/minute") # Limita las consultas masivas de listados de empleados para proteger el rendimiento de la base de datos
+@limiter.limit("60/minute") 
 def obtener_trabajadores_por_empresa(
     request: Request,
     id_empresa: UUID,
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     **GET /api/trabajadores/empresa/{id_empresa}**
@@ -55,12 +58,23 @@ def obtener_trabajadores_por_empresa(
     trabajadores = db.query(Trabajadores).options(
         joinedload(Trabajadores.empresa),
         joinedload(Trabajadores.rol)
-    ).filter(Trabajadores.empresa_id == id_empresa).all()
+    ).filter(Trabajadores.empresa_id == id_empresa, Trabajadores.activo.is_(True)).all()
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "trabajadores", "accion": "obtener_por_empresa", "entidad_id": str(id_empresa), "detalles": f"Se consultó el listado de trabajadores de la empresa {id_empresa}"}
+    )
+    db.commit()
+
     return trabajadores
 
 
 @router.get("/{id_trabajador}", response_model=TrabajadorResponse, summary="Obtener trabajador por ID")
-@limiter.limit("60/minute") # Limita las consultas individuales de expedientes para prevenir ataques de enumeración
+@limiter.limit("60/minute") 
 def obtener_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -95,11 +109,21 @@ def obtener_trabajador(
                 detail="No tienes permisos para consultar este expediente personal."
             )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "trabajadores", "accion": "obtener_por_id", "entidad_id": str(id_trabajador), "detalles": f"Se consultó el expediente del trabajador {id_trabajador}"}
+    )
+    db.commit()
+
     return trabajador
 
 
 @router.get("/{id_trabajador}/empresa", response_model=EmpresaResponse, summary="Obtener empresa del trabajador")
-@limiter.limit("60/minute") # Limita las consultas de vinculación empresarial de empleados
+@limiter.limit("60/minute") 
 def obtener_empresa_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -139,17 +163,26 @@ def obtener_empresa_trabajador(
             detail=f"El trabajador con ID {id_trabajador} no tiene una empresa asociada."
         )
 
-    # Retorna directamente el objeto de la empresa, no una lista
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_actual,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "trabajadores", "accion": "obtener_empresa", "entidad_id": str(id_trabajador), "detalles": f"Se consultó la empresa vinculada al trabajador {id_trabajador}"}
+    )
+    db.commit()
+
     return trabajador.empresa
 
 
 @router.post("", response_model=TrabajadorResponse, status_code=status.HTTP_201_CREATED, summary="Registrar trabajador")
-@limiter.limit("15/minute") # Protegido frente a la creación masiva o automatizada de expedientes de empleados
+@limiter.limit("15/minute")
 def registrar_trabajador(
     request: Request,
     obj_in: TrabajadorCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     **POST /api/trabajadores**
@@ -158,14 +191,22 @@ def registrar_trabajador(
     """
     # Registrar metadatos de red y auditoría de la creación
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de trabajador desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de registro de trabajador desde IP: {cliente_ip}")
 
-    if obj_in.email:
-        email_existente = db.query(Usuarios).filter(Usuarios.email == obj_in.email).first()
-        if email_existente:
+    email_limpio = str(obj_in.email).strip().lower() if obj_in.email else None
+    if email_limpio:
+        email_trabajador_existente = db.query(Trabajadores).filter(
+            Trabajadores.email == email_limpio,
+            Trabajadores.activo.is_(True),
+        ).first()
+        email_usuario_existente = db.query(Usuarios).filter(
+            Usuarios.email == email_limpio,
+            Usuarios.activo.is_(True),
+        ).first()
+        if email_trabajador_existente or email_usuario_existente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El correo electrónico ya se encuentra registrado en el sistema."
+                detail="El correo electrónico ya está asignado a otro trabajador activo."
             )
 
     identidad_existente = db.query(Trabajadores).filter(
@@ -185,7 +226,7 @@ def registrar_trabajador(
         dni_nif_nie=obj_in.dni_nif_nie,
         nombre=obj_in.nombre,
         apellidos=obj_in.apellidos,
-        email=obj_in.email,
+        email=email_limpio,
         telefono=obj_in.telefono,
         numero_seguridad_social=obj_in.numero_seguridad_social,
         fecha_nacimiento=obj_in.fecha_nacimiento,
@@ -194,6 +235,17 @@ def registrar_trabajador(
     
     try:
         db.add(nuevo_trabajador)
+        db.flush()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=obj_in.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "trabajadores", "accion": "registrar", "entidad_id": str(nuevo_trabajador.id), "detalles": f"Se registró el trabajador {nuevo_trabajador.id}"}
+        )
+
         db.commit()
         
         trabajador_con_relacion = db.query(Trabajadores).options(
@@ -206,12 +258,12 @@ def registrar_trabajador(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al registrar el trabajador en la base de datos: {str(error)}"
+            detail=f"No se ha podido registrar el trabajador en la base de datos: {str(error)}"
         )
 
 
 @router.post("/login", response_model=TrabajadorResponse, summary="Login de trabajador")
-@limiter.limit("5/minute") # Altamente protegido frente a ataques de fuerza bruta en credenciales de acceso
+@limiter.limit("5/minute") 
 def login_trabajador(
     request: Request, 
     credenciales: LoginRequest, 
@@ -226,7 +278,10 @@ def login_trabajador(
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Intento de login de trabajador desde la IP: {cliente_ip} con correo: {credenciales.email}")
 
-    usuario_cuenta = db.query(Usuarios).filter(Usuarios.email == credenciales.email).first()
+    usuario_cuenta = db.query(Usuarios).filter(
+        Usuarios.email == str(credenciales.email).strip().lower(),
+        Usuarios.activo.is_(True),
+    ).first()
 
     if not usuario_cuenta or not verify_password(credenciales.password, str(usuario_cuenta.password_hash)):
         raise HTTPException(
@@ -257,11 +312,21 @@ def login_trabajador(
             detail="El expediente de empleado asociado no existe en el sistema."
         )
 
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario=usuario_cuenta,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "trabajadores", "accion": "login", "entidad_id": str(trabajador.id), "detalles": f"Inicio de sesión del trabajador {trabajador.id}"}
+    )
+    db.commit()
+
     return trabajador
 
 
 @router.post("/turnos/{id_trabajador}", status_code=status.HTTP_200_OK, summary="Asignar turnos a trabajador")
-@limiter.limit("15/minute") # Protegido frente a asignaciones masivas concurrentes o automatizadas
+@limiter.limit("15/minute") 
 def asignar_turnos_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -310,6 +375,15 @@ def asignar_turnos_trabajador(
             db.add(nueva_asignacion)
             nuevas_asignaciones.append(nueva_asignacion)
 
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={"recurso": "trabajadores", "accion": "asignar_turnos", "entidad_id": str(id_trabajador), "detalles": f"Se asignaron {len(nuevas_asignaciones)} turnos al trabajador {id_trabajador}"}
+        )
+
         db.commit()
 
         return {
@@ -326,12 +400,12 @@ def asignar_turnos_trabajador(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error crítico al procesar la asignación múltiple de turnos: {str(error)}"
+            detail=f"No se ha podido procesar la asignación múltiple de turnos: {str(error)}"
         )
 
 
 @router.patch("/{id_trabajador}", response_model=TrabajadorResponse, summary="Actualizar trabajador")
-@limiter.limit("20/minute") # Protegido frente a actualizaciones masivas concurrentes
+@limiter.limit("20/minute")
 def actualizar_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -359,24 +433,57 @@ def actualizar_trabajador(
         )
     
     datos_actualizacion = obj_in.model_dump(exclude_unset=True)
+
+    if "email" in datos_actualizacion:
+        email_nuevo = datos_actualizacion["email"]
+        email_nuevo = str(email_nuevo).strip().lower() if email_nuevo else None
+        datos_actualizacion["email"] = email_nuevo
+        if email_nuevo:
+            email_trabajador_existente = db.query(Trabajadores).filter(
+                Trabajadores.email == email_nuevo,
+                Trabajadores.activo.is_(True),
+                Trabajadores.id != id_trabajador,
+            ).first()
+            usuario_asociado_actual = db.query(Usuarios).filter(
+                Usuarios.trabajador_id == id_trabajador,
+            ).first()
+            email_usuario_existente = db.query(Usuarios).filter(
+                Usuarios.email == email_nuevo,
+                Usuarios.activo.is_(True),
+                Usuarios.id != getattr(usuario_asociado_actual, "id", None),
+            ).first()
+            if email_trabajador_existente or email_usuario_existente:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El correo electrónico ya está asignado a otro trabajador activo."
+                )
     
     for field, value in datos_actualizacion.items():
         setattr(trabajador, field, value)
     
     try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "trabajadores", "accion": "actualizar", "entidad_id": str(id_trabajador), "detalles": f"Se actualizó el trabajador {id_trabajador}"}
+        )
         db.commit()
     except Exception as error:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al actualizar los datos del trabajador: {str(error)}"
+            detail=f"No se han podido actualizar los datos del trabajador: {str(error)}"
         )
 
-    # Sincronización opcional: Si el trabajador ya tiene cuenta de usuario vinculada y se actualizó su rol, 
-    # actualizamos también su rol en la tabla relacional de accesos (usuarios_roles) si aplica en tu arquitectura.
-    if "rol_id" in datos_actualizacion and trabajador.email:
-        usuario_asociado = db.query(Usuarios).filter(Usuarios.email == trabajador.email).first()
+    # Mantener la cuenta de acceso vinculada al expediente, aunque cambie el correo.
+    if "email" in datos_actualizacion or "rol_id" in datos_actualizacion:
+        usuario_asociado = db.query(Usuarios).filter(Usuarios.trabajador_id == id_trabajador).first()
         if usuario_asociado:
+            if datos_actualizacion.get("email"):
+                usuario_asociado.email = str(datos_actualizacion["email"])
             ur_existente = db.query(UsuariosRoles).filter(
                 UsuariosRoles.usuario_id == usuario_asociado.id,
                 UsuariosRoles.empresa_id == trabajador.empresa_id
@@ -408,7 +515,7 @@ def actualizar_trabajador(
 
 
 @router.put("/{id_trabajador}/foto", response_model=TrabajadorResponse, summary="Actualizar foto de trabajador")
-@limiter.limit("20/minute") # Protegido frente a la subida masiva de archivos para evitar saturación de almacenamiento
+@limiter.limit("20/minute")
 async def actualizar_foto_trabajador(
     request: Request,
     id_trabajador: UUID,
@@ -451,14 +558,22 @@ async def actualizar_foto_trabajador(
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al guardar el archivo de imagen en el servidor: {str(error)}"
+            detail=f"No se ha podido guardar el archivo de imagen en el servidor: {str(error)}"
         )
 
-    ruta_relativa = f"/static/fotos_trabajadores/{nombre_archivo}"
+    ruta_relativa = f"/api/archivos/fotos_trabajadores/{nombre_archivo}"
     trabajador.foto_url = ruta_relativa
     trabajador.updated_at = datetime.now()
 
     try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "trabajadores", "accion": "actualizar_foto", "entidad_id": str(id_trabajador), "detalles": f"Se actualizó la foto del trabajador {id_trabajador}"}
+        )
         db.commit()
         
         trabajador_con_foto = db.query(Trabajadores).options(
@@ -469,11 +584,79 @@ async def actualizar_foto_trabajador(
         return trabajador_con_foto
     except Exception as error:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Error al actualizar la URL de la foto en la base de datos: {str(error)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se ha podido actualizar la URL de la foto en la base de datos: {str(error)}")
 
+@router.post("/{id_trabajador}/baja-total", status_code=status.HTTP_200_OK, summary="Baja total y coordinada de un trabajador")
+@limiter.limit("10/minute")
+def baja_total_trabajador(
+    request: Request,
+    id_trabajador: UUID,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+):
+    """
+    **POST /api/trabajadores/{id_trabajador}/baja-total**
+    
+    Realiza una transacción atómica para tramitar la baja completa de un trabajador:
+    - Marca al trabajador como inactivo y registra su fecha de baja.
+    - Rescinde o finaliza sus contratos activos.
+    - Inactiva o desvincula su cuenta de usuario de sesión para liberar su correo.
+    - Limpia asignaciones asociadas (turnos, roles, etc.).
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de tramitación de baja para el trabajador {id_trabajador} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    
+
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(status_code=404, detail=f"Trabajador con ID {id_trabajador} no encontrado.")
+
+    if usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar trabajadores de otra empresa.")
+
+    try:
+        fecha_actual = date.today()
+
+        # 1. Actualizar estado del trabajador
+        trabajador.activo = False
+        trabajador.fecha_baja_empresa = fecha_actual
+
+        # 2. Rescindir contrato activo (Ajusta según tu modelo de contratos)
+        contratos_activos = db.query(Contratos).filter(
+            Contratos.trabajador_id == id_trabajador,
+            Contratos.activo == True
+        ).all()
+        for contrato in contratos_activos:
+            contrato.activo = False
+            contrato.fecha_fin = fecha_actual
+
+        # 3. Inactivar la cuenta vinculada. Se conserva la relación histórica.
+        usuario_asociado = db.query(Usuarios).filter(Usuarios.trabajador_id == id_trabajador).first()
+        if usuario_asociado:
+            usuario_asociado.activo = False
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "trabajadores", "accion": "baja_total", "entidad_id": str(id_trabajador), "detalles": f"Se procesó la baja total del trabajador {id_trabajador}"}
+        )
+
+        db.commit()
+        return {"detail": f"Baja total procesada correctamente para el trabajador {id_trabajador}."}
+
+    except Exception as error:
+        db.rollback()
+        print(f"No se ha podido procesar la baja total de trabajador: {str(error)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se ha podido tramitar la baja total. Se ha revertido la operación."
+        )
 
 @router.delete("/{id_trabajador}", status_code=status.HTTP_200_OK, summary="Eliminar trabajador")
-@limiter.limit("20/minute") # Protegido frente a eliminaciones masivas destructivas de expedientes
+@limiter.limit("20/minute") 
 def eliminar_trabajador(
     request: Request,
     id_trabajador: UUID, 
@@ -503,7 +686,18 @@ def eliminar_trabajador(
         )
     
     try:
+        empresa_id_aux = trabajador.empresa_id
         db.delete(trabajador)
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=empresa_id_aux,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={"recurso": "trabajadores", "accion": "eliminar", "entidad_id": str(id_trabajador), "detalles": f"Se eliminó el trabajador {id_trabajador}"}
+        )
+
         db.commit()
         return {"detail": f"Trabajador con ID {id_trabajador} eliminado correctamente junto con su planificación en cascada."}
     except Exception as error:

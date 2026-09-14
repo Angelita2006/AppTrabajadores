@@ -70,7 +70,7 @@ export function usePlantillaFormularios(
       })
       .catch((error: any) => {
         mostrarError(
-          "Error al cargar los roles disponibles del sistema: " + error,
+          "Error al cargar los roles disponibles del sistema: " + error.message,
         );
       });
   }, []);
@@ -150,7 +150,9 @@ export function usePlantillaFormularios(
       await cargarPlantilla();
       mostrarMensaje("Éxito", "Trabajador dado de alta correctamente.");
     } catch (error: any) {
-      mostrarError("Error al procesar el alta del trabajador: " + error);
+      mostrarError(
+        "Error al procesar el alta del trabajador: " + error.message,
+      );
     } finally {
       setProcesando(false);
     }
@@ -187,7 +189,9 @@ export function usePlantillaFormularios(
       cerrarModales();
       mostrarMensaje("Éxito", "Trabajador actualizado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al actualizar los datos del trabajador: " + error);
+      mostrarError(
+        "Error al actualizar los datos del trabajador: " + error.message,
+      );
     } finally {
       setProcesando(false);
     }
@@ -222,7 +226,7 @@ export function usePlantillaFormularios(
       mostrarMensaje("Éxito", "Contrato registrado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al guardar el nuevo contrato del trabajador: " + error,
+        "Error al guardar el nuevo contrato del trabajador: " + error.message,
       );
     } finally {
       setProcesando(false);
@@ -242,7 +246,8 @@ export function usePlantillaFormularios(
       );
     } catch (error: any) {
       mostrarError(
-        "Error al eliminar las asignaciones de turno del trabajador: " + error,
+        "Error al eliminar las asignaciones de turno del trabajador: " +
+          error.message,
       );
     } finally {
       setProcesando(false);

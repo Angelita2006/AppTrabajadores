@@ -40,11 +40,14 @@ class UsuarioRegisterCreate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class UsuarioSimpleResponse(UsuarioBase):
+class UsuarioSimpleResponse(BaseModel):
     """
     Esquema utilizado para empaquetar los datos del perfil que se envían al cliente.
     Excluye por completo el hash de la contraseña para evitar brechas de seguridad.
     """
+    nombre: str = Field(..., min_length=2, max_length=150, description="Nombre identificativo de la cuenta")
+    email: Optional[str] = Field(None, description="Correo electrónico de acceso, si está informado")
+    tipo_usuario: TipoUsuarioEnum = Field(..., description="Categoría de usuario")
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
     mfa_habilitado: bool = Field(..., description="Determina si tiene activa la autenticación de doble factor")
     activo: bool = Field(..., description="Determina si el usuario tiene permitido el acceso a la plataforma")

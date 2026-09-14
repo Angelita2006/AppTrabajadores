@@ -20,12 +20,12 @@ router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=AuditoriaAccesoResponse, status_code=status.HTTP_201_CREATED, summary="Registrar acceso de auditoría")
-@limiter.limit("20/minute")  # Limita este endpoint a un máximo de 20 peticiones por minuto por IP
+@limiter.limit("20/minute")  
 def registrar_acceso_auditoria(
     request: Request,
     obj_in: AuditoriaAccesoCreate, 
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]))
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
     """
     **POST /api/auditoria-accesos**
@@ -105,10 +105,10 @@ def registrar_acceso_auditoria(
         raise http_error
     except Exception as error:
         db.rollback()
-        print(f"Error al guardar el registro de auditoría: {str(error)}")
+        print(f"No se ha podido guardar el registro de auditoría: {str(error)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ha ocurrido un error al guardar el registro de auditoría: {str(error)}"
+            detail=f"No se ha podido guardar el registro de auditoría: {str(error)}"
         )
 
 @router.get("/empresa/{id_empresa}", response_model=List[AuditoriaAccesoResponse], summary="Obtener auditoría por empresa")

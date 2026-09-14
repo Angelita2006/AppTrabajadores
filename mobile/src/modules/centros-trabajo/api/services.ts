@@ -171,24 +171,24 @@ export const cambiarEstadoCentroTrabajo = async (
 };
 
 /**
- * Elimina de forma definitiva un centro de trabajo por su identificador único.
- * URI: DELETE /api/centros-trabajo/{idCentro}
+ * Da de baja un centro de trabajo por su identificador único.
+ * URI: PUT /api/centros-trabajo/{idCentro}/desactivar
  *
  * @async
  * @function eliminarCentroTrabajo
- * @param {string} idCentro - Identificador UUID único del centro a eliminar.
- * @returns {Promise<void>} Promesa que se resuelve al completar la eliminación.
+ * @param {string} idCentro - Identificador UUID único del centro a desactivar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar la desactivación.
  * @throws {Error} Lanza un error si el centro no existe o falla la operación.
  */
 export const eliminarCentroTrabajo = async (
   idCentro: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/centros-trabajo/${idCentro}`);
+    await api.put(`/api/centros-trabajo/${idCentro}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || `Error al eliminar el centro de trabajo ${idCentro}.`,
+      apiMessage || `Error al desactivar el centro de trabajo ${idCentro}.`,
     );
   }
 };

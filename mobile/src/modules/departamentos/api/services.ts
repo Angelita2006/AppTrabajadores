@@ -116,24 +116,24 @@ export const editarDepartamento = async (
 };
 
 /**
- * Da de baja o elimina un departamento de la base de datos de forma definitiva.
- * URI: DELETE /api/departamentos/{id_departamento}
+ * Da de baja un departamento del sistema.
+ * URI: PUT /api/departamentos/{idDepartamento}/desactivar
  *
  * @async
  * @function eliminarDepartamento
- * @param {string} idDepartamento - Identificador UUID único del departamento a eliminar.
- * @returns {Promise<void>} Promesa que se resuelve al completar la operación de borrado.
+ * @param {string} idDepartamento - Identificador UUID único del departamento a desactivar.
+ * @returns {Promise<void>} Promesa que se resuelve al completar la operación de desactivación.
  * @throws {Error} Lanza un error si el departamento no se encuentra o falla la operación.
  */
 export const eliminarDepartamento = async (
   idDepartamento: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/departamentos/${idDepartamento}`);
+    await api.put(`/api/departamentos/${idDepartamento}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || `Error al eliminar el departamento ${idDepartamento}.`,
+      apiMessage || `Error al desactivar el departamento ${idDepartamento}.`,
     );
   }
 };

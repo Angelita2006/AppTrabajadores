@@ -118,7 +118,7 @@ export const crearTipoEventoFichaje = async (
 };
 
 /**
- * Actualiza los atributos de una categoría de marcaje horario existente en el catálogo maestro.
+ * Actualiza parcialmente los atributos de una categoría de marcaje horario existente en el catálogo maestro.
  * URI: PUT /api/tipos-evento-fichaje/{id_tipo_evento}
  *
  * @async
@@ -147,24 +147,24 @@ export const actualizarTipoEventoFichaje = async (
 };
 
 /**
- * Elimina una categoría o tipo de evento de fichaje del catálogo maestro mediante su ID único.
- * URI: DELETE /api/tipos-evento-fichaje/{id_tipo_evento}
+ * Da de baja lógica una categoría o tipo de evento de fichaje del catálogo maestro mediante su ID único.
+ * URI: PUT /api/tipos-evento-fichaje/{idTipoEvento}/desactivar
  *
  * @async
  * @function eliminarTipoEventoFichaje
- * @param {string} idTipoEvento - Identificador único universal (UUID) del tipo de evento a eliminar.
- * @returns {Promise<void>} Promesa vacía al completarse la eliminación de forma exitosa.
+ * @param {string} idTipoEvento - Identificador único universal (UUID) del tipo de evento a desactivar.
+ * @returns {Promise<void>} Promesa vacía al completarse la desactivación de forma exitosa.
  * @throws {Error} Lanza un error si el registro no existe o la API rechaza la petición.
  */
 export const eliminarTipoEventoFichaje = async (
   idTipoEvento: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/tipos-evento-fichaje/${idTipoEvento}`);
+    await api.put(`/api/tipos-evento-fichaje/${idTipoEvento}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || "Error al eliminar el tipo de evento de fichaje.",
+      apiMessage || "Error al desactivar el tipo de evento de fichaje.",
     );
   }
 };

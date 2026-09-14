@@ -17,6 +17,8 @@ export interface CalendarioFestivo {
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
   anio: number;
+  /** Indica si el calendario laboral está activo. */
+  activo: boolean;
   /** Listado de días festivos asociados y anidados al calendario. */
   festivos: Festivo[];
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
@@ -50,6 +52,8 @@ export interface CalendarioLaboralUpdate {
   nombre?: string;
   /** Año natural actualizado al que corresponde el calendario. */
   anio?: number;
+  /** Estado de activación del calendario. */
+  activo?: boolean;
 }
 
 /**
@@ -67,6 +71,8 @@ export interface CalendarioLaboralResponse {
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
   anio: number;
+  /** Indica si el calendario laboral está activo. */
+  activo: boolean;
   /** Marca de tiempo (ISO 8601 con zona horaria) de la fecha de creación del registro. */
   created_at: string;
 

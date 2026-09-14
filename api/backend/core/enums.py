@@ -2,11 +2,15 @@ import enum
 
 class AccionAuditoriaEnum(str, enum.Enum):
     CONSULTA = 'Consulta'
-    EXPORTACION = 'Exportación'
-    DESCARGA = 'Descarga'
+    CREACION = 'Creación'
     MODIFICACION = 'Modificación'
+    BAJA_LOGICA = 'Baja_logica'
+    ELIMINACION = 'Eliminación'
+    EXPORTACION = 'Exportación'
+    IMPORTACION = 'Importación'
+    DESCARGA = 'Descarga'
     ACCESO_DENEGADO = 'Acceso_denegado'
-
+    
 class AccionRetencionEnum(str, enum.Enum):
     ARCHIVAR = 'Archivar'
     ANONIMIZAR = 'Anonimizar'

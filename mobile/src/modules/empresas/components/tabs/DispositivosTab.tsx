@@ -53,6 +53,7 @@ export default function TabDispositivos({
   styles,
 }: TabDispositivosProps) {
   const [mostrarFormDispositivo, setMostrarFormDispositivo] = useState(false);
+  const [mostrarPapelera, setMostrarPapelera] = useState(false);
   const [dispositivoEnEdicion, setDispositivoEnEdicion] =
     useState<Dispositivo | null>(null);
   const [centroIdAsociado, setCentroIdAsociado] = useState("");
@@ -60,6 +61,12 @@ export default function TabDispositivos({
   const [tipoDispositivoSeleccionado, setTipoDispositivoSeleccionado] =
     useState<TipoDispositivo>(TIPOS_DISPOSITIVO.APP_MOVIL);
   const [estadoActivoEdicion, setEstadoActivoEdicion] = useState<boolean>(true);
+  const dispositivosActivos = dispositivosEmpresa.filter(
+    (dispositivo) => dispositivo.activo !== false,
+  );
+  const dispositivosInactivos = dispositivosEmpresa.filter(
+    (dispositivo) => dispositivo.activo === false,
+  );
 
   /**
    * Ejecuta la creación de un nuevo dispositivo de fichaje asociado a un centro de trabajo.
@@ -91,7 +98,9 @@ export default function TabDispositivos({
       setMostrarFormDispositivo(false);
       mostrarMensaje("Éxito", "Dispositivo registrado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el dispositivo de fichaje: " + error);
+      mostrarError(
+        "Error al crear el dispositivo de fichaje: " + error.message,
+      );
     } finally {
       setGuardando(false);
     }
@@ -137,7 +146,9 @@ export default function TabDispositivos({
 
       mostrarMensaje("Éxito", "Dispositivo actualizado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al actualizar el dispositivo de fichaje: " + error);
+      mostrarError(
+        "Error al actualizar el dispositivo de fichaje: " + error.message,
+      );
     } finally {
       setGuardando(false);
     }
@@ -157,11 +168,15 @@ export default function TabDispositivos({
         setGuardando(true);
         await eliminarDispositivo(dispositivoId);
         setDispositivosEmpresa((prev: Dispositivo[]) =>
-          prev.filter((d: Dispositivo) => d.id !== dispositivoId),
+          prev.map((d: Dispositivo) =>
+            d.id === dispositivoId ? { ...d, activo: false } : d,
+          ),
         );
-        mostrarMensaje("Éxito", "Dispositivo eliminado correctamente.");
+        mostrarMensaje("Éxito", "Dispositivo enviado a la papelera.");
       } catch (error: any) {
-        mostrarError("Error al eliminar el dispositivo de fichaje: " + error);
+        mostrarError(
+          "Error al eliminar el dispositivo de fichaje: " + error.message,
+        );
       } finally {
         setGuardando(false);
       }
@@ -187,8 +202,28 @@ export default function TabDispositivos({
     }
   };
 
+  const handleReactivarDispositivo = async (dispositivoId: string) => {
+    try {
+      setGuardando(true);
+      await editarDispositivo(dispositivoId, { activo: true });
+      setDispositivosEmpresa((prev) =>
+        prev.map((dispositivo) =>
+          dispositivo.id === dispositivoId
+            ? { ...dispositivo, activo: true }
+            : dispositivo,
+        ),
+      );
+      mostrarMensaje("Éxito", "Dispositivo reactivado correctamente.");
+    } catch (error: any) {
+      mostrarError("Error al reactivar el dispositivo: " + error.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const tieneCentrosValidos =
-    Array.isArray(centrosEmpresa) && centrosEmpresa.length > 0;
+    Array.isArray(centrosEmpresa) &&
+    centrosEmpresa.some((centro) => centro.activo === true);
 
   return (
     <View>
@@ -275,31 +310,33 @@ export default function TabDispositivos({
                 showsHorizontalScrollIndicator={false}
                 style={{ marginTop: 4 }}
               >
-                {centrosEmpresa.map((centro: CentroTrabajo) => {
-                  const esEsteCentro = centroIdAsociado === centro.id;
-                  return (
-                    <Pressable
-                      key={centro.id}
-                      style={[
-                        styles.chipAno,
-                        esEsteCentro && {
-                          backgroundColor: "#2563EB",
-                        },
-                      ]}
-                      onPress={() => setCentroIdAsociado(centro.id)}
-                    >
-                      <ThemedText
-                        style={{
-                          fontSize: 12,
-                          fontWeight: "600",
-                          color: esEsteCentro ? "#FFFFFF" : "#475569",
-                        }}
+                {centrosEmpresa
+                  .filter((centro) => centro.activo === true)
+                  .map((centro: CentroTrabajo) => {
+                    const esEsteCentro = centroIdAsociado === centro.id;
+                    return (
+                      <Pressable
+                        key={centro.id}
+                        style={[
+                          styles.chipAno,
+                          esEsteCentro && {
+                            backgroundColor: "#2563EB",
+                          },
+                        ]}
+                        onPress={() => setCentroIdAsociado(centro.id)}
                       >
-                        {centro.nombre} {esEsteCentro ? "✓" : ""}
-                      </ThemedText>
-                    </Pressable>
-                  );
-                })}
+                        <ThemedText
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: esEsteCentro ? "#FFFFFF" : "#475569",
+                          }}
+                        >
+                          {centro.nombre} {esEsteCentro ? "✓" : ""}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
               </ScrollView>
             )}
           </View>
@@ -317,10 +354,10 @@ export default function TabDispositivos({
       )}
 
       <ThemedText style={styles.subseccionTitulo}>
-        Dispositivos Registrados
+        Dispositivos Activos
       </ThemedText>
 
-      {dispositivosEmpresa?.map((dispositivo: Dispositivo) => (
+      {dispositivosActivos.map((dispositivo: Dispositivo) => (
         <ItemDispositivo
           key={dispositivo.id}
           dispositivo={dispositivo}
@@ -336,13 +373,48 @@ export default function TabDispositivos({
             label: val,
             value: val,
           }))}
-          centrosConfigurados={centrosEmpresa}
+          centrosConfigurados={centrosEmpresa.filter(
+            (centro) => centro.activo === true,
+          )}
           tipoDispositivoSeleccionado={tipoDispositivoSeleccionado}
           centroIdAsociado={centroIdAsociado}
           estadoActivoEdicion={estadoActivoEdicion}
           styles={styles}
         />
       ))}
+
+      {dispositivosInactivos.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable
+            style={[styles.botonAccionHeader, { backgroundColor: "#64748B" }]}
+            onPress={() => setMostrarPapelera(!mostrarPapelera)}
+            disabled={guardando}
+          >
+            <ThemedText style={styles.textoBotonGuardar}>
+              {mostrarPapelera
+                ? "📂 Ocultar Papelera"
+                : `🗑 Ver Papelera (${dispositivosInactivos.length})`}
+            </ThemedText>
+          </Pressable>
+          {mostrarPapelera &&
+            dispositivosInactivos.map((dispositivo) => (
+              <View key={dispositivo.id} style={styles.itemListaEstructural}>
+                <ThemedText style={styles.nombreElementoLista}>
+                  {dispositivo.tipo_dispositivo}
+                </ThemedText>
+                <Pressable
+                  style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
+                  onPress={() => handleReactivarDispositivo(dispositivo.id)}
+                  disabled={guardando}
+                >
+                  <ThemedText style={styles.textoBotonGuardar}>
+                    ↻ Reactivar
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+        </View>
+      )}
     </View>
   );
 }

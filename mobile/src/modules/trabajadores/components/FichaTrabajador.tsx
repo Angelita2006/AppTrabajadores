@@ -1,6 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { Card } from "@/src/shared/ui/AppSurface";
-import { mostrarError } from "@/src/utils/errorHandler";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Image, Pressable, View } from "react-native";
@@ -28,9 +27,16 @@ const TEXTO_ESTADOS_TRABAJADOR: Record<number, string> = {
 };
 
 /**
+ * Extendemos las props para incluir la función que maneja el modal de error desde el padre.
+ */
+export interface FichaTrabajadorConErrorProps extends FichaTrabajadorProps {
+  onMostrarError?: (mensaje: string) => void;
+}
+
+/**
  * Componente de tarjeta informativa que representa la ficha de un trabajador.
  */
-export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
+export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   item,
   onSeleccionarTrabajador,
   setModalActivo,
@@ -38,12 +44,11 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
   prepararAsignarTurno,
   handleAsignarTurnoTrabajador,
   styles,
+  onMostrarError,
 }) => {
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [nombreRol, setNombreRol] = useState<string>("Sin rol");
 
-  // Como Trabajador base no incluye estas propiedades por defecto,
-  // inicializamos los estados de forma segura (null / array vacío).
   const [contratoActivo, setContratoActivo] = useState<Contrato | null>(null);
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
     [],
@@ -116,7 +121,12 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
           setContratoActivo(contratoData);
         }
       } catch (error) {
-        mostrarError("Error al cargar los datos del trabajador: " + error);
+        const mensaje = "Error al cargar los datos del trabajador: " + error;
+        if (onMostrarError) {
+          onMostrarError(mensaje);
+        } else {
+          console.error(mensaje);
+        }
       }
     };
 
@@ -125,7 +135,7 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [item.id, item.empresa_id]);
+  }, [item.id, item.empresa_id, onMostrarError]);
 
   useEffect(() => {
     let isMounted = true;
@@ -143,7 +153,12 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
         const turnosObtenidos = await Promise.all(promesasTurnos);
         if (isMounted) setTurnos(turnosObtenidos.filter(Boolean) as Turno[]);
       } catch (error) {
-        mostrarError("Error al cargar los nombres de los turnos: " + error);
+        const mensaje = "Error al cargar los nombres de los turnos: " + error;
+        if (onMostrarError) {
+          onMostrarError(mensaje);
+        } else {
+          console.error(mensaje);
+        }
       }
     };
 
@@ -152,7 +167,7 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [asignacionesVigentes.length]);
+  }, [asignacionesVigentes.length, onMostrarError]);
 
   // Obtener la representación textual del estado usando el const
   const textoEstado =
@@ -565,22 +580,38 @@ export const FichaTrabajador: React.FC<FichaTrabajadorProps> = ({
       {!item.activo && (
         <View
           style={{
-            marginTop: 4,
-            paddingTop: 8,
+            marginTop: 8,
+            paddingTop: 10,
             borderTopWidth: 1,
             borderTopColor: "#E2E8F0",
             borderStyle: "dashed",
           }}
         >
           <Pressable
-            style={styles.botonReactivarEmpresa}
             onPress={() => {
               onSeleccionarTrabajador();
               setModalActivo("reactivar_trabajador");
             }}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#DCFCE7",
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+            }}
           >
-            <FontAwesome5 name="user-slash" size={11} color="#117937" />
-            <ThemedText style={styles.textoBotonReactivarEmpresa}>
+            <FontAwesome5 name="user-check" size={13} color="#16803D" />
+            <ThemedText
+              style={{
+                color: "#16803D",
+                fontSize: 12,
+                fontWeight: "600",
+                marginLeft: 6,
+              }}
+            >
               Reactivar Trabajador en Empresa
             </ThemedText>
           </Pressable>

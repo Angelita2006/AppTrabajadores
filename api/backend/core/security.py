@@ -78,7 +78,7 @@ def obtener_usuario_actual(
         raise credentials_exception
 
     if user_id.__contains__("@"): 
-        usuario = db.query(Usuarios).filter(Usuarios.email == user_id).first()
+        usuario = db.query(Usuarios).filter(Usuarios.email == user_id, Usuarios.activo.is_(True)).first()
     else:
         usuario = db.query(Usuarios).filter(Usuarios.id == user_id).first()    
     if usuario is None or not usuario.activo:
