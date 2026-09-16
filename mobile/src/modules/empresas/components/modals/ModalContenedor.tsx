@@ -1,5 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
@@ -50,6 +50,8 @@ export const ModalContenedor: React.FC<ModalContenedorProps> = ({
   styles,
   children,
 }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   /**
    * Valida la integridad del identificador del modal antes de permitir su renderizado
    * o gestiona acciones correctivas si el contexto recibido no es válido.

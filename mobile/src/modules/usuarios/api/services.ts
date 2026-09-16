@@ -180,36 +180,95 @@ export const cambiarEstadoUsuario = async (
 };
 
 /**
- * Permite cambiar la contraseña de acceso de un usuario tras validar su contraseña actual.
- * URI: PUT /api/usuarios/{id_usuario}/password
- *
- * @async
- * @function cambiarPasswordUsuario
- * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
- * @param {string} antiguaPassword - Contraseña actual en texto plano para verificación.
- * @param {string} nuevaPassword - Nueva contraseña que se desea establecer.
- * @returns {Promise<UsuarioResponse>} Datos del usuario con la confirmación del cambio.
- * @throws {Error} Lanza un error si la contraseña antigua no coincide o la nueva no cumple los requisitos.
+ * Solicita el cambio de correo electrónico generando un enlace de verificación.
+ * URI: POST /api/usuarios/solicitar-cambio-email
  */
-export const cambiarPasswordUsuario = async (
-  idUsuario: string,
-  antiguaPassword: string,
-  nuevaPassword: string,
-): Promise<UsuarioResponse> => {
+export const solicitarCambioEmail = async (
+  nuevoEmail: string,
+): Promise<any> => {
   try {
-    const respuesta = await api.put<UsuarioResponse>(
-      `/api/usuarios/${idUsuario}/password`,
+    const respuesta = await api.put(
+      "/api/usuarios/solicitar-cambio-email",
       null,
+      { params: { nuevo_email: nuevoEmail } },
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al solicitar el cambio de correo electrónico.",
+    );
+  }
+};
+
+export const confirmarCambioEmail = async (token: string) => {
+  const response = await api.post(
+    `/api/usuarios/confirmar-cambio-email?token=${token}`,
+  );
+  return response.data;
+};
+
+/**
+ * Solicita un código de 6 dígitos para el cambio de contraseña (Paso 1).
+ * URI: POST /api/usuarios/solicitar-cambio-password
+ */
+export const solicitarCambioPassword = async (
+  antiguaPassword: string,
+): Promise<any> => {
+  try {
+    const respuesta = await api.put("/api/usuarios/solicitar-cambio-password", {
+      antigua_password: antiguaPassword,
+    });
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al solicitar el código de cambio de contraseña.",
+    );
+  }
+};
+
+/**
+ * Confirma el cambio de contraseña introduciendo el código y la nueva contraseña (Paso 2).
+ * URI: POST /api/usuarios/confirmar-cambio-password
+ */
+export const confirmarCambioPassword = async (
+  codigoVerificacion: string,
+  nuevaPassword: string,
+): Promise<any> => {
+  try {
+    const respuesta = await api.post(
+      "/api/usuarios/confirmar-cambio-password",
       {
-        params: {
-          antigua_password: antiguaPassword,
-          nueva_password: nuevaPassword,
-        },
+        codigo_verificacion: codigoVerificacion,
+        nueva_password: nuevaPassword,
       },
     );
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al actualizar la contraseña.");
+    throw new Error(apiMessage || "Error al confirmar la nueva contraseña.");
+  }
+};
+
+/**
+ * Obtiene la información completa del usuario actualmente autenticado mediante el token de sesión.
+ * URI: GET /api/usuarios/me
+ *
+ * @async
+ * @function obtenerUsuarioActual
+ * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario de la sesión.
+ * @throws {Error} Lanza un error si el token ha expirado o no es válido.
+ */
+export const obtenerUsuarioActual = async (): Promise<UsuarioResponse> => {
+  try {
+    const respuesta = await api.get<UsuarioResponse>("/api/usuarios/me");
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.message || error?.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al recuperar la información del usuario actual.",
+    );
   }
 };

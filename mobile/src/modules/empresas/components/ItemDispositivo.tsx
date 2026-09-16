@@ -1,4 +1,4 @@
-import { mostrarError } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { obtenerCentroTrabajo } from "../../centros-trabajo/api/services";
@@ -70,6 +70,7 @@ export default function ItemDispositivo({
   styles,
 }: ItemDispositivoProps) {
   const [nombreCentro, setNombreCentro] = useState<string>("Cargando...");
+  const { mostrarError } = useAppModal();
 
   /**
    * Efecto secundario para obtener de forma asíncrona el nombre del centro de trabajo
@@ -198,7 +199,8 @@ export default function ItemDispositivo({
                         color: seleccionado ? "#FFFFFF" : "#475569",
                       }}
                     >
-                      {tipo.label} {seleccionado ? "✓" : ""}
+                      {tipo.label.toString().replace("_", " ")}{" "}
+                      {seleccionado ? "✓" : ""}
                     </Text>
                   </Pressable>
                 );

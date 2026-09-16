@@ -1,6 +1,6 @@
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React from "react";
 import {
@@ -52,6 +52,8 @@ export const ModalAsignarTurnoTrabajador: React.FC<
   styles,
   inputRefs = {},
 }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   const handleValidarYGuardar = () => {
     if (!fechaInicio || fechaInicio.trim() === "") {
       mostrarError("La fecha de inicio de la asignación es obligatoria.");

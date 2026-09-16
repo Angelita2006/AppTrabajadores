@@ -1,34 +1,33 @@
 import {
-  obtenerAusenciasEmpresa,
-  resolverSolicitudAusencia,
-  solicitarAusencia,
+    obtenerAusenciasEmpresa,
+    resolverSolicitudAusencia,
+    solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  AusenciaCreateRequest,
-  AusenciaResponse,
-  EstadoAusencia,
-  ItemAusencia,
-  TipoAusencia,
-  TIPOS_AUSENCIA,
-  TIPOS_AUSENCIA_LABELS,
+    AusenciaCreateRequest,
+    AusenciaResponse,
+    EstadoAusencia,
+    ItemAusencia,
+    TipoAusencia,
+    TIPOS_AUSENCIA,
+    TIPOS_AUSENCIA_LABELS,
 } from "../../src/modules/ausencias/types/ausencia";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row } from "../../src/shared/ui/AppSurface";
 
@@ -59,7 +58,7 @@ export default function GestionAusenciasScreen() {
     return { pendientes, aprobadas, rechazadas };
   }, [ausencias]);
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // Carga optimizada de trabajadores
   useEffect(() => {

@@ -1,6 +1,5 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -49,7 +48,8 @@ export default function RegistroScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const opacidadTarjeta = useSharedValue(0);
-  const { mostrarError } = useAppModal();
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
@@ -352,7 +352,7 @@ export default function RegistroScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            onPress={() => router.push("/politica-privacidad")}
             style={{ alignSelf: "center", marginTop: 20 }}
           >
             <ThemedText

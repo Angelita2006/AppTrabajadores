@@ -1,13 +1,7 @@
 import { mostrarError } from "@/src/utils/errorHandler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { ReactNode, useEffect } from "react";
+import { create } from "zustand";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
@@ -19,45 +13,11 @@ import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaj
 import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import {
-  obtenerEmpresaTrabajador,
-  obtenerTrabajador,
+    obtenerEmpresaTrabajador,
+    obtenerTrabajador,
 } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
-
-/**
- * Estructura de valores expuestos por el contexto de sesión de la aplicación.
- */
-interface SesionContextValue {
-  /** 1. IDENTIDAD Y CONTROL DE ACCESO */
-  usuarioActual: UsuarioSesion | null;
-  setUsuarioActual: (usuario: UsuarioSesion | null) => void;
-  empresaActual: Empresa | null;
-  setEmpresaActual: (empresa: Empresa | null) => void;
-
-  /** 2. EXPEDIENTE LABORAL COMPUESTO Y SELECCIÓN DE ENTORNO */
-  trabajadorActual: Trabajador | null;
-  setTrabajadorActual: (trabajador: Trabajador | null) => void;
-  contratoActual: Contrato | null;
-  setContratoActual: (contrato: Contrato | null) => void;
-  turnoActual: AsignacionTurno | null;
-  setTurnoActual: (turno: AsignacionTurno | null) => void;
-  centroTrabajoActual: CentroTrabajo | null;
-  setCentroTrabajoActual: (centro: CentroTrabajo | null) => void;
-  calendarioLaboralActual: CalendarioFestivo | null;
-  setCalendarioLaboralActual: (calendario: CalendarioFestivo | null) => void;
-  dispositivoFichajeActual: Dispositivo | null;
-  setDispositivoFichajeActual: (dispositivo: Dispositivo | null) => void;
-  rolActual: TipoUsuarioEnum | null;
-  setRolActual: (rol: TipoUsuarioEnum | null) => void;
-  departamentoActual: string | null;
-  setDepartamentoActual: (departamento: string | null) => void;
-
-  /** 3. CONTROL DE ASINCRONÍA */
-  cargandoSesionLocal: boolean;
-}
-
-const SesionContext = createContext<SesionContextValue | undefined>(undefined);
 
 const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESA = "@fichapp_empresa_actual";
@@ -70,41 +30,153 @@ const STORAGE_KEY_ROL = "@fichapp_rol_actual";
 const STORAGE_KEY_DEPARTAMENTO = "@fichapp_departamento_actual";
 const STORAGE_KEY_TOKEN = "user_token";
 
+interface SesionState {
+  usuarioActual: UsuarioSesion | null;
+  setUsuarioActual: (usuario: UsuarioSesion | null) => void;
+  empresas: Empresa[];
+  setEmpresas: (empresas: Empresa[]) => void;
+  empresaActual: Empresa | null;
+  setEmpresaActual: (empresa: Empresa | null) => void;
+  trabajadores: Trabajador[];
+  setTrabajadores: (trabajadores: Trabajador[]) => void;
+  trabajadorActual: Trabajador | null;
+  setTrabajadorActual: (trabajador: Trabajador | null) => void;
+  contratos: Contrato[];
+  setContratos: (contratos: Contrato[]) => void;
+  contratoActual: Contrato | null;
+  setContratoActual: (contrato: Contrato | null) => void;
+  turnos: AsignacionTurno[];
+  setTurnos: (turnos: AsignacionTurno[]) => void;
+  turnoActual: AsignacionTurno | null;
+  setTurnoActual: (turno: AsignacionTurno | null) => void;
+  centrosTrabajo: CentroTrabajo[];
+  setCentrosTrabajo: (centros: CentroTrabajo[]) => void;
+  centroTrabajoActual: CentroTrabajo | null;
+  setCentroTrabajoActual: (centro: CentroTrabajo | null) => void;
+  calendarios: CalendarioFestivo[];
+  setCalendarios: (calendarios: CalendarioFestivo[]) => void;
+  calendarioLaboralActual: CalendarioFestivo | null;
+  setCalendarioLaboralActual: (calendario: CalendarioFestivo | null) => void;
+  dispositivos: Dispositivo[];
+  setDispositivos: (dispositivos: Dispositivo[]) => void;
+  dispositivoFichajeActual: Dispositivo | null;
+  setDispositivoFichajeActual: (dispositivo: Dispositivo | null) => void;
+  roles: TipoUsuarioEnum[];
+  setRoles: (roles: TipoUsuarioEnum[]) => void;
+  rolActual: TipoUsuarioEnum | null;
+  setRolActual: (rol: TipoUsuarioEnum | null) => void;
+  departamentos: string[];
+  setDepartamentos: (departamentos: string[]) => void;
+  departamentoActual: string | null;
+  setDepartamentoActual: (departamento: string | null) => void;
+  cargandoSesionLocal: boolean;
+  setCargandoSesionLocal: (cargando: boolean) => void;
+  actualizarUsuarioSesion: (
+    nuevoUsuario: UsuarioSesion | null,
+  ) => Promise<void>;
+}
+
+export const useSesionStore = create<SesionState>((set) => ({
+  usuarioActual: null,
+  setUsuarioActual: (usuarioActual) => set({ usuarioActual }),
+  empresas: [],
+  setEmpresas: (empresas) => set({ empresas }),
+  empresaActual: null,
+  setEmpresaActual: (empresaActual) => set({ empresaActual }),
+  trabajadores: [],
+  setTrabajadores: (trabajadores) => set({ trabajadores }),
+  trabajadorActual: null,
+  setTrabajadorActual: (trabajadorActual) => set({ trabajadorActual }),
+  contratos: [],
+  setContratos: (contratos) => set({ contratos }),
+  contratoActual: null,
+  setContratoActual: (contratoActual) => set({ contratoActual }),
+  turnos: [],
+  setTurnos: (turnos) => set({ turnos }),
+  turnoActual: null,
+  setTurnoActual: (turnoActual) => set({ turnoActual }),
+  centrosTrabajo: [],
+  setCentrosTrabajo: (centrosTrabajo) => set({ centrosTrabajo }),
+  centroTrabajoActual: null,
+  setCentroTrabajoActual: (centroTrabajoActual) => set({ centroTrabajoActual }),
+  calendarios: [],
+  setCalendarios: (calendarios) => set({ calendarios }),
+  calendarioLaboralActual: null,
+  setCalendarioLaboralActual: (calendarioLaboralActual) =>
+    set({ calendarioLaboralActual }),
+  dispositivos: [],
+  setDispositivos: (dispositivos) => set({ dispositivos }),
+  dispositivoFichajeActual: null,
+  setDispositivoFichajeActual: (dispositivoFichajeActual) =>
+    set({ dispositivoFichajeActual }),
+  roles: [],
+  setRoles: (roles) => set({ roles }),
+  rolActual: null,
+  setRolActual: (rolActual) => set({ rolActual }),
+  departamentos: [],
+  setDepartamentos: (departamentos) => set({ departamentos }),
+  departamentoActual: null,
+  setDepartamentoActual: (departamentoActual) => set({ departamentoActual }),
+  cargandoSesionLocal: true,
+  setCargandoSesionLocal: (cargandoSesionLocal) => set({ cargandoSesionLocal }),
+
+  // Implementación del método seguro para refrescar datos de usuario sin caché viejo
+  actualizarUsuarioSesion: async (nuevoUsuario) => {
+    try {
+      if (nuevoUsuario) {
+        await AsyncStorage.setItem(
+          STORAGE_KEY_USUARIO,
+          JSON.stringify(nuevoUsuario),
+        );
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEY_USUARIO);
+      }
+      set({ usuarioActual: nuevoUsuario });
+    } catch (error: any) {
+      mostrarError(
+        "Error al actualizar la sesión del usuario: " + error.message,
+      );
+    }
+  },
+}));
+
 /**
- * Proveedor global de sesión encargado de gestionar el estado de autenticación,
- * persistencia local en AsyncStorage y carga de expediente laboral del usuario.
+ * Componente Proveedor que ejecuta los 4 motores de carga y sincronización.
  */
 export function ProveedorSesion({ children }: { children: ReactNode }) {
-  const [usuarioActual, setUsuarioActual] = useState<UsuarioSesion | null>(
-    null,
-  );
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaActual, setEmpresaActual] = useState<Empresa | null>(null);
-  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
-  const [trabajadorActual, setTrabajadorActual] = useState<Trabajador | null>(
-    null,
-  );
-  const [contratos, setContratos] = useState<Contrato[]>([]);
-  const [contratoActual, setContratoActual] = useState<Contrato | null>(null);
-  const [turnos, setTurnos] = useState<AsignacionTurno[]>([]);
-  const [turnoActual, setTurnoActual] = useState<AsignacionTurno | null>(null);
-  const [centrosTrabajo, setCentrosTrabajo] = useState<CentroTrabajo[]>([]);
-  const [centroTrabajoActual, setCentroTrabajoActual] =
-    useState<CentroTrabajo | null>(null);
-  const [calendarios, setCalendarios] = useState<CalendarioFestivo[]>([]);
-  const [calendarioLaboralActual, setCalendarioLaboralActual] =
-    useState<CalendarioFestivo | null>(null);
-  const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
-  const [dispositivoFichajeActual, setDispositivoFichajeActual] =
-    useState<Dispositivo | null>(null);
-  const [roles, setRoles] = useState<TipoUsuarioEnum[]>([]);
-  const [rolActual, setRolActual] = useState<TipoUsuarioEnum | null>(null);
-  const [departamentos, setDepartamentos] = useState<string[]>([]);
-  const [departamentoActual, setDepartamentoActual] = useState<string | null>(
-    null,
-  );
-
-  const [cargandoSesionLocal, setCargandoSesionLocal] = useState<boolean>(true);
+  const {
+    usuarioActual,
+    setUsuarioActual,
+    setEmpresas,
+    empresaActual,
+    setEmpresaActual,
+    setTrabajadores,
+    setTrabajadorActual,
+    setContratos,
+    setContratoActual,
+    setTurnos,
+    setTurnoActual,
+    setCentrosTrabajo,
+    setCentroTrabajoActual,
+    setRoles,
+    setRolActual,
+    setDepartamentos,
+    setDepartamentoActual,
+    setDispositivos,
+    setDispositivoFichajeActual,
+    setCalendarios,
+    setCalendarioLaboralActual,
+    cargandoSesionLocal,
+    setCargandoSesionLocal,
+    trabajadorActual,
+    contratoActual,
+    turnoActual,
+    centroTrabajoActual,
+    calendarioLaboralActual,
+    dispositivoFichajeActual,
+    rolActual,
+    departamentoActual,
+  } = useSesionStore();
 
   // MOTOR 1: RESTAURACIÓN EN FRÍO
   useEffect(() => {
@@ -155,10 +227,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     recuperarSesionPermanente();
   }, []);
 
-  // MOTOR 2: RESOLUCIÓN DE EMPRESAS (Con control de Condiciones de Carrera)
+  // MOTOR 2: RESOLUCIÓN DE EMPRESAS
   useEffect(() => {
     if (cargandoSesionLocal) return;
-
     let isCancelled = false;
 
     async function inicializarEntornoUsuario() {
@@ -201,9 +272,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           const todasLasEmpresas = await obtenerEmpresas();
           if (isCancelled) return;
           setEmpresas(todasLasEmpresas);
+          const empresaActualActual = useSesionStore.getState().empresaActual;
           setEmpresaActual(
-            (prev) =>
-              prev ??
+            empresaActualActual ??
               (todasLasEmpresas.length > 0 ? todasLasEmpresas[0] : null),
           );
           return;
@@ -212,17 +283,13 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (usuarioActual.trabajador_id) {
           const token = await AsyncStorage.getItem(STORAGE_KEY_TOKEN);
           if (isCancelled) return;
-
           try {
-            const [empresas, empresaTrabajador] = await Promise.all([
+            const [empresasLista, empresaTrabajador] = await Promise.all([
               obtenerEmpresas(),
               obtenerEmpresaTrabajador(usuarioActual.trabajador_id, token!),
             ]);
-
             if (isCancelled) return;
-
-            setEmpresas(empresas);
-            // Forzamos la asignación directa de la empresa del trabajador para corregir el estado "Sin Asignar"
+            setEmpresas(empresasLista);
             if (empresaTrabajador) {
               setEmpresaActual(empresaTrabajador);
             }
@@ -241,16 +308,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     }
 
     inicializarEntornoUsuario();
-
     return () => {
       isCancelled = true;
     };
   }, [usuarioActual, cargandoSesionLocal]);
 
-  // MOTOR 3: CARGA DE EXPEDIENTE LABORAL (Con control de Condiciones de Carrera y optimización de promesas)
+  // MOTOR 3: CARGA DE EXPEDIENTE LABORAL
   useEffect(() => {
     if (cargandoSesionLocal) return;
-
     let isCancelled = false;
 
     async function cargarFichaLaboralCompuesta() {
@@ -273,7 +338,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           ]);
 
         if (isCancelled) return;
-
         setTrabajadorActual(datosTrabajador);
 
         const contratoVigente = listaContratos.find(
@@ -301,7 +365,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         }
 
         const hoyStr = new Date().toISOString().split("T")[0];
-
         const turnosConEmpresa = await Promise.all(
           listaTurnos.map(async (t: AsignacionTurno) => {
             const trabajadorTurno = await obtenerTrabajador(t.trabajador_id);
@@ -335,7 +398,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     }
 
     cargarFichaLaboralCompuesta();
-
     return () => {
       isCancelled = true;
     };
@@ -344,7 +406,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   // MOTOR 4: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO
   useEffect(() => {
     if (cargandoSesionLocal) return;
-
     async function guardarEstadosEnDisco() {
       try {
         if (usuarioActual) {
@@ -416,7 +477,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         mostrarError("Error al persistir cambios de sesión: " + error.message);
       }
     }
-
     guardarEstadosEnDisco();
   }, [
     usuarioActual,
@@ -432,70 +492,13 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     cargandoSesionLocal,
   ]);
 
-  const value = useMemo(
-    () => ({
-      usuarioActual,
-      setUsuarioActual,
-      empresaActual,
-      setEmpresaActual,
-      trabajadorActual,
-      setTrabajadorActual,
-      contratoActual,
-      setContratoActual,
-      turnoActual,
-      setTurnoActual,
-      centroTrabajoActual,
-      setCentroTrabajoActual,
-      calendarioLaboralActual,
-      setCalendarioLaboralActual,
-      dispositivoFichajeActual,
-      setDispositivoFichajeActual,
-      rolActual,
-      setRolActual,
-      departamentoActual,
-      setDepartamentoActual,
-      cargandoSesionLocal,
-    }),
-    [
-      usuarioActual,
-      setUsuarioActual,
-      empresaActual,
-      setEmpresaActual,
-      trabajadorActual,
-      setTrabajadorActual,
-      contratoActual,
-      setContratoActual,
-      turnoActual,
-      setTurnoActual,
-      centroTrabajoActual,
-      setCentroTrabajoActual,
-      calendarioLaboralActual,
-      setCalendarioLaboralActual,
-      dispositivoFichajeActual,
-      setDispositivoFichajeActual,
-      rolActual,
-      setRolActual,
-      departamentoActual,
-      setDepartamentoActual,
-      cargandoSesionLocal,
-    ],
-  );
-
-  return (
-    <SesionContext.Provider value={value}>{children}</SesionContext.Provider>
-  );
+  return <>{children}</>;
 }
 
 /**
- * Hook para consumir el contexto de sesión de la aplicación.
- *
- * @returns Objeto con los datos y métodos del contexto de sesión (`SesionContextValue`).
- * @throws Error si se intenta invocar fuera de un `ProveedorSesion`.
+ * Hook personalizado para consumir el store de Zustand.
  */
 export function useSesion() {
-  const context = useContext(SesionContext);
-  if (!context) {
-    throw new Error("useSesion debe usarse dentro de ProveedorSesion");
-  }
-  return context;
+  const store = useSesionStore();
+  return store;
 }

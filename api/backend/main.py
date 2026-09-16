@@ -26,17 +26,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 1. Asegurar que las carpetas físicas existan al arrancar el servidor
-os.makedirs("static/logos", exist_ok=True)
-os.makedirs("static/fotos_trabajador", exist_ok=True)
-os.makedirs("static/firmas", exist_ok=True)
-
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
     version="1.0.0",
 )
-
 
 @app.on_event("startup")
 def startup_event():

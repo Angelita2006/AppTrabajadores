@@ -1,6 +1,6 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import {
   validarDuracionPausa,
   validarFormatoHora,
@@ -42,6 +42,7 @@ export default function TabTurnos({
   const turnosInactivos = turnosEmpresa.filter(
     (turno) => turno.activo === false,
   );
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   /**
    * Valida de forma integral los campos del formulario de turnos utilizando las funciones de validación.

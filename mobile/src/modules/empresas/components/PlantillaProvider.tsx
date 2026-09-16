@@ -1,4 +1,4 @@
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { createContext, useCallback, useContext, useState } from "react";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
@@ -7,7 +7,7 @@ import { Contrato } from "../../contratos/types/contrato";
 import { obtenerTrabajadores } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { obtenerTurnoPorId } from "../../turnos/api/services";
-import { useSesion } from "../../usuarios/store/SesionContext";
+import { useSesion } from "../../usuarios/store/SesionContextZustand";
 
 /**
  * Interfaz que define los valores y métodos expuestos por el contexto de la plantilla de personal.
@@ -43,6 +43,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
   const [plantilla, setPlantilla] = useState<Trabajador[]>([]);
   const [cargando, setCargando] = useState<boolean>(false);
   const [inicializado, setInicializado] = useState<boolean>(false);
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   /**
    * Carga de forma asíncrona la plantilla completa de trabajadores vinculados a la empresa seleccionada,

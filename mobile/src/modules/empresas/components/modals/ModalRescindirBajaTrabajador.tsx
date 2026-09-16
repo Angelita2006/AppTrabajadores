@@ -1,6 +1,6 @@
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
@@ -40,6 +40,8 @@ export const ModalRescindirBajaTrabajador: React.FC<
   styles,
   botonRef,
 }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   // Determina si el trabajador se encuentra actualmente activo en el sistema
   const estaActivo = trabajadorActual?.activo;
 

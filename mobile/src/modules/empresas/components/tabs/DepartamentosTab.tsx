@@ -1,6 +1,6 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import { Picker } from "@react-native-picker/picker";
 import React, { useState } from "react";
 import {
@@ -68,6 +68,8 @@ export default function TabDepartamentos({
   const departamentosInactivos = departamentosEmpresa.filter(
     (departamento) => departamento.activo === false,
   );
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // ==========================================
   // CREACIÓN DE DEPARTAMENTOS

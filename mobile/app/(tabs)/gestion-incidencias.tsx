@@ -1,7 +1,7 @@
 import {
-  crearCorreccion,
-  obtenerCorreccionesPorEmpresa,
-  resolverCorreccion,
+    crearCorreccion,
+    obtenerCorreccionesPorEmpresa,
+    resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
@@ -9,30 +9,29 @@ import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 // Ya no necesitamos obtenerRolPorId ni obtenerTrabajador uno a uno si el backend puede devolver los datos poblados o si filtramos por rol_id directamente si viene incluido en el objeto Trabajador.
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import {
-  obtenerTipoEventoPorId,
-  obtenerTiposEventosEmpresa,
+    obtenerTipoEventoPorId,
+    obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  CorreccionFichajeCreate,
-  CorreccionFichajeResponse,
-  EstadoCorreccion,
-  TipoCorreccion,
+    CorreccionFichajeCreate,
+    CorreccionFichajeResponse,
+    EstadoCorreccion,
+    TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
@@ -93,7 +92,8 @@ export default function GestionIncidenciasScreen() {
     ).length;
     return { pendientes, aprobadas, rechazadas };
   }, [incidencias]);
-  const { mostrarError } = useAppModal();
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // 1. Carga optimizada de trabajadores
   useEffect(() => {

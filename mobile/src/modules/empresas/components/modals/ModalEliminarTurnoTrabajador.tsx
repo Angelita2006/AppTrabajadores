@@ -1,6 +1,6 @@
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
@@ -31,6 +31,8 @@ interface ModalEliminarTurnoTrabajadorProps {
 export const ModalEliminarTurnoTrabajador: React.FC<
   ModalEliminarTurnoTrabajadorProps
 > = ({ trabajadorActual, onConfirmar, procesando, styles, botonRef }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   /**
    * Valida los datos esenciales del trabajador seleccionado antes de permitir
    * la ejecución de la acción de desvinculación de los turnos del mes actual.

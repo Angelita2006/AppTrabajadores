@@ -1,5 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
@@ -67,6 +67,8 @@ export default function TabDispositivos({
   const dispositivosInactivos = dispositivosEmpresa.filter(
     (dispositivo) => dispositivo.activo === false,
   );
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   /**
    * Ejecuta la creación de un nuevo dispositivo de fichaje asociado a un centro de trabajo.
@@ -284,7 +286,8 @@ export default function TabDispositivos({
                         color: seleccionado ? "#FFFFFF" : "#475569",
                       }}
                     >
-                      {tipoValue} {seleccionado ? "✓" : ""}
+                      {tipoValue.toString().replace("_", " ")}{" "}
+                      {seleccionado ? "✓" : ""}
                     </ThemedText>
                   </Pressable>
                 );

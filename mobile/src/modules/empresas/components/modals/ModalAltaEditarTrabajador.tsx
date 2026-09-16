@@ -1,6 +1,6 @@
 import { Rol } from "@/src/modules/roles/types/rol";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import {
   validarDniEspanol,
   validarEmail,
@@ -106,6 +106,7 @@ export const ModalAltaEditarTrabajador: React.FC<
   styles,
   inputRefs = {},
 }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
   /**
    * Valida exhaustivamente cada campo del formulario de alta o edición de trabajadores
    * utilizando utilidades centralizadas y comprobaciones lógicas. Emite avisos detallados

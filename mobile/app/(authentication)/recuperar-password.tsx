@@ -5,7 +5,6 @@ import {
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -42,7 +41,7 @@ export default function RecuperarPasswordScreen() {
   // Inicializamos en 0 para la animación de entrada suave
   const opacidadTarjeta = useSharedValue(0);
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
     // Forzamos a Reanimated a despertar el componente al cargar la vista

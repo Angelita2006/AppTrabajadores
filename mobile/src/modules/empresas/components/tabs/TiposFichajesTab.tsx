@@ -1,6 +1,6 @@
-import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { useState } from "react";
 import {
   Alert,
@@ -65,6 +65,7 @@ export default function TabTipoEventos({
     useState<boolean>(true);
   const [tipoEventoEnEdicion, setTipoEventoEnEdicion] =
     useState<TipoEventoFichaje | null>(null);
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // Separación de eventos activos e inactivos (Papelera)
   // Asumimos que un evento inactivo tiene activo === false o un indicador equivalente.

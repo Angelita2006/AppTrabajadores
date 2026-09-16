@@ -1,5 +1,6 @@
 import { obtenerEmpresaTrabajador } from "@/src/modules/trabajadores/api/services";
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { NotificationService } from "@/src/notifications/NotificationService";
 import { setAuthToken } from "@/src/service/api/api";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
@@ -23,7 +24,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { obtenerEmpresa } from "../src/modules/empresas/api/services";
-import { useSesion } from "../src/modules/usuarios/store/SesionContext";
 import { ThemedText } from "../src/shared/components/ThemedText";
 import { IconSymbol } from "../src/shared/ui/IconSymbol";
 
@@ -57,7 +57,7 @@ export default function RootIndexScreen() {
     }
     opacidadTarjeta.value = 0;
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
-  }, [opacidadTarjeta, setUsuarioActual, usuarioActual]);
+  }, [opacidadTarjeta, usuarioActual]);
 
   useEffect(() => {
     const configurarNotificaciones = async () => {
@@ -112,6 +112,7 @@ export default function RootIndexScreen() {
       const { access_token, usuario } = respuestaLogin;
       setAuthToken(access_token);
       setUsuarioActual(usuario);
+      // setToken(access_token);
 
       if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
         try {
@@ -324,7 +325,7 @@ export default function RootIndexScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            onPress={() => router.push("/politica-privacidad")}
             style={{ alignSelf: "center", marginTop: 20 }}
           >
             <ThemedText

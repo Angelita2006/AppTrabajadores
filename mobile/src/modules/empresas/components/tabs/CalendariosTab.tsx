@@ -1,13 +1,14 @@
 import { CalendarLaboralAnual } from "@/src/shared/components/Calendar";
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import { validarAnioRango } from "@/src/utils/validators";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -105,6 +106,9 @@ export function useTabCalendario({
   const [tipoFestivo, setNuevoTipoFestivo] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [mostrarPapelera, setMostrarPapelera] = useState(false);
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   const calendariosActivos = calendariosEmpresa.filter(
     (calendario) => calendario.activo !== false,
   );
@@ -188,6 +192,7 @@ export function useTabCalendario({
       setCalendarioActual(nuevoCalendarioUI);
       setAnoNuevoCalendario("");
       setNombreNuevoCalendario("");
+
       const centrosActivos = centrosEmpresa.filter(
         (centro) => centro.activo === true,
       );
@@ -253,7 +258,6 @@ export function useTabCalendario({
         nombre: respuestaBackend.nombre,
         centro_trabajo_id: respuestaBackend.centro_trabajo_id,
       });
-
       setMostrarEdicionCampos(false);
       mostrarMensaje(
         "Éxito",
@@ -282,6 +286,7 @@ export function useTabCalendario({
           ? { ...calendario, activo: false }
           : calendario,
       );
+
       setCalendariosEmpresa(actualizados);
       setCalendarioActual(
         actualizados.find((calendario) => calendario.activo !== false) || null,
@@ -427,7 +432,6 @@ export function useTabCalendario({
           ? "Festivo modificado correctamente."
           : `Festivo registrado el ${diaSeleccionadoCtx}`,
       );
-
       setModalVisible(false);
       setNuevaDescFestivo("");
       setNuevoTipoFestivo("");
@@ -470,8 +474,8 @@ export function useTabCalendario({
       const archivoPdf = resultado.assets[0];
       setImportandoPdf(true);
       setGuardando(true);
-      const formData = new FormData();
 
+      const formData = new FormData();
       if (Platform.OS === "web") {
         const respuestaBlob = await fetch(archivoPdf.uri);
         const blobReal = await respuestaBlob.blob();
@@ -488,8 +492,8 @@ export function useTabCalendario({
         calendarioActual.id,
         formData,
       );
-      const festivosNuevos = datosRespuesta.festivos;
 
+      const festivosNuevos = datosRespuesta.festivos;
       const calendariosActualizados = calendariosEmpresa.map((cal) => {
         if (cal.id === calendarioActual.id) {
           const objetoActualizado = {
@@ -591,6 +595,13 @@ export default function TabCalendario({
     importandoPdf,
     mostrarEdicionCampos,
     setMostrarEdicionCampos,
+    diaSeleccionadoCtx,
+    nuevaDescFestivo,
+    setNuevaDescFestivo,
+    tipoFestivo,
+    setNuevoTipoFestivo,
+    modalVisible,
+    setModalVisible,
     mostrarPapelera,
     setMostrarPapelera,
     calendariosActivos,
@@ -601,6 +612,7 @@ export default function TabCalendario({
     handleEliminarCalendario,
     handleReactivarCalendario,
     handleDayPress,
+    handleGuardarFestivoContextual,
     handleImportarCalendarioPDF,
   } = useTabCalendario({
     calendariosEmpresa,
@@ -660,7 +672,6 @@ export default function TabCalendario({
         <ThemedText style={styles.labelInput}>
           1. Centro de Trabajo Destino *
         </ThemedText>
-
         {!tieneCentrosValidos ? (
           <View style={styles.bannerError}>
             <ThemedText style={styles.textoBannerError}>
@@ -705,7 +716,6 @@ export default function TabCalendario({
         <ThemedText style={styles.labelInput}>
           2. Identificación del Calendario
         </ThemedText>
-
         <TextInput
           style={[styles.inputForm, { marginBottom: 10 }]}
           placeholder="Nombre (Ej: Sede Madrid 2026)"
@@ -713,7 +723,6 @@ export default function TabCalendario({
           onChangeText={setNombreNuevoCalendario}
           editable={tieneCentrosValidos && !guardando}
         />
-
         <Row>
           <TextInput
             style={[styles.inputForm, { flex: 1, marginRight: 10 }]}
@@ -796,7 +805,6 @@ export default function TabCalendario({
               </Row>
             </ScrollView>
           </View>
-
           <Row>
             <Pressable
               style={[
@@ -816,7 +824,6 @@ export default function TabCalendario({
                 ✏️ {mostrarEdicionCampos ? "Cerrar" : "Cambiar"}
               </ThemedText>
             </Pressable>
-
             <Pressable
               style={[
                 {
@@ -856,6 +863,7 @@ export default function TabCalendario({
                 : `🗑 Ver Papelera (${calendariosInactivos.length})`}
             </ThemedText>
           </Pressable>
+
           {mostrarPapelera &&
             calendariosInactivos.map((calendario) => (
               <View key={calendario.id} style={styles.itemListaEstructural}>
@@ -900,7 +908,6 @@ export default function TabCalendario({
               <ThemedText style={[styles.subseccionTitulo, { marginTop: 0 }]}>
                 Modificar Información del Calendario
               </ThemedText>
-
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>
                   Nombre Descriptivo
@@ -912,7 +919,6 @@ export default function TabCalendario({
                   editable={!guardando}
                 />
               </View>
-
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>
                   Año del Cuadrante
@@ -926,7 +932,6 @@ export default function TabCalendario({
                   editable={!guardando}
                 />
               </View>
-
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>
                   Centro de Trabajo Asignado
@@ -964,7 +969,6 @@ export default function TabCalendario({
                     })}
                 </ScrollView>
               </View>
-
               <Pressable
                 style={[
                   styles.botonGuardar,
@@ -1002,6 +1006,116 @@ export default function TabCalendario({
           />
         </View>
       )}
+
+      {/* --- MODAL PARA AÑADIR / EDITAR DÍAS FESTIVOS --- */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 12,
+              padding: 20,
+              width: "100%",
+              maxWidth: 400,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <ThemedText
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                marginBottom: 12,
+                color: "#1E3A8A",
+              }}
+            >
+              {diaSeleccionadoCtx
+                ? `Festivo: ${diaSeleccionadoCtx}`
+                : "Configurar Día Festivo"}
+            </ThemedText>
+
+            <ThemedText style={styles.labelInput}>
+              Descripción del Festivo
+            </ThemedText>
+            <TextInput
+              style={[styles.inputForm, { marginBottom: 12 }]}
+              placeholder="Ej: Día de Navidad, Fiestas Locales..."
+              value={nuevaDescFestivo}
+              onChangeText={setNuevaDescFestivo}
+              editable={!guardando}
+            />
+
+            <ThemedText style={styles.labelInput}>
+              Tipo de Festivo (Nacional, Autonómico, Local)
+            </ThemedText>
+            <TextInput
+              style={[styles.inputForm, { marginBottom: 20 }]}
+              placeholder="Nacional / Autonómico / Local"
+              value={tipoFestivo}
+              onChangeText={setNuevoTipoFestivo}
+              editable={!guardando}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                gap: 10,
+              }}
+            >
+              <Pressable
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  backgroundColor: "#94A3B8",
+                }}
+                onPress={() => setModalVisible(false)}
+                disabled={guardando}
+              >
+                <ThemedText style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Cancelar
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  backgroundColor: "#2563EB",
+                  opacity: guardando ? 0.7 : 1,
+                }}
+                onPress={handleGuardarFestivoContextual}
+                disabled={guardando}
+              >
+                {guardando ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                    Guardar Festivo
+                  </ThemedText>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

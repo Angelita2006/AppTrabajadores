@@ -45,26 +45,19 @@ El repositorio se divide en dos componentes principales además de la documentac
 Accede a la carpeta de la API e instala las dependencias necesarias:
 
 ```bash
-cd api
-# Se recomienda crear y activar un entorno virtual
-python -m venv venv
-source venv/bin/activate # En Windows: venv\Scripts\activate
 
-# Instalar dependencias
-pip install fastapi uvicorn sqlalchemy alembic
 ```
 
 Para ejecutar las migraciones de la base de datos con Alembic:
 
 ```bash
-alembic upgrade head
+
 ```
 
 Para iniciar el servidor de desarrollo del backend:
 
 ```bash
-cd backend
-uvicorn main:app --reload
+
 ```
 
 ### 2. Configuración de la Aplicación Móvil (Fichapp)
@@ -72,14 +65,13 @@ uvicorn main:app --reload
 Accede a la carpeta de la aplicación móvil e instala las dependencias:
 
 ```bash
-cd mobile
-npm install
+
 ```
 
 Para iniciar Fichapp con Expo:
 
 ```bash
-npx expo start
+
 ```
 
 ---
@@ -93,24 +85,15 @@ Para que el proyecto funcione correctamente, es necesario configurar las variabl
 Crea un archivo `.env` dentro de la carpeta `backend` basándote en la siguiente estructura:
 
 ```env
-# Configuración de la Base de Datos
-DATABASE_URL=postgresql://usuario:password@localhost:5432/fichapp_db
-
-# Seguridad y Autenticación
-SECRET_KEY=tu_clave_secreta_super_segura
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+GEMINI_API_KEY=
+DATABASE_URL=
+SECRET_KEY=
+SMTP_SERVER=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASSWORD=
+EMAILS_FROM=
 ```
-
-### Aplicación Móvil (`mobile/.env`)
-
-Crea un archivo `.env` (o configura tu archivo de entorno de Expo) en la raíz de la carpeta `mobile`:
-
-```env
-EXPO_PUBLIC_API_URL=http://localhost:8000
-```
-
----
 
 ## Módulos Principales del Backend
 
@@ -129,8 +112,8 @@ descripciones, parámetros, respuestas y esquemas publicados reflejan el contrat
 
 - [Documentación Markdown de la API](docs/API.md)
 - [Contrato OpenAPI en JSON](docs/openapi.json)
-- Swagger UI disponible en `http://localhost:8000/docs` cuando el backend está iniciado.
-- ReDoc disponible en `http://localhost:8000/redoc` cuando el backend está iniciado.
+- Swagger UI disponible en `http://localhost:8080/docs` cuando el backend está iniciado.
+- ReDoc disponible en `http://localhost:8080/redoc` cuando el backend está iniciado.
 
 Para regenerar la documentación después de modificar rutas o esquemas:
 
@@ -174,7 +157,7 @@ los comentarios `/** ... */` del código y vuelve a ejecutar el comando.
 
 ### Ejecutar Tests en el Backend
 
-Si cuentas con pruebas unitarias o de integración configuradas (por ejemplo, con `pytest`), puedes ejecutarlas desde la carpeta `api`:
+Para pruebas unitarias o de integración configuradas (por ejemplo, con `pytest`), puedes ejecutarlas desde la carpeta `api`:
 
 ```bash
 cd api
@@ -185,5 +168,5 @@ pytest
 
 ## Despliegue (Deployment)
 
-- **Backend**: Preparado para ser desplegado en servicios cloud compatibles con contenedores Docker o plataformas como Render, Railway o AWS utilizando `uvicorn` como servidor ASGI.
+- **Backend**: Preparado para ser desplegado en servicios cloud (compatibles con contenedores Docker o plataformas como Render, Railway o AWS) utilizando `uvicorn` como servidor ASGI.
 - **Móvil**: Compilación de Fichapp lista para producción mediante EAS (_Expo Application Services_) para generar los binarios nativos de Android (`.apk` / `.aab`) e iOS (`.ipa`).

@@ -10,8 +10,8 @@ import {
   actualizarLogoEmpresa,
   guardarDatosEmpresa,
   obtenerEmpresas,
-  obtenerUrlLogo,
 } from "@/src/modules/empresas/api/services";
+import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import TabCalendario from "@/src/modules/empresas/components/tabs/CalendariosTab";
 import TabCentros from "@/src/modules/empresas/components/tabs/CentrosTab";
 import TabDepartamentos from "@/src/modules/empresas/components/tabs/DepartamentosTab";
@@ -25,20 +25,18 @@ import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tip
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { Empresa } from "../../src/modules/empresas/types/empresa";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -98,7 +96,7 @@ export default function EmpresasScreen() {
   // Estados para la gestión de la entidad y su logo corporativo
   const [logoUrlInput, setLogoUrlInput] = useState("");
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // Sincronizar el input del logo cada vez que cambie la empresa seleccionada
   useEffect(() => {
@@ -379,12 +377,9 @@ export default function EmpresasScreen() {
                           }}
                         >
                           {item.logo_url ? (
-                            <Image
-                              source={{
-                                uri: obtenerUrlLogo(item.logo_url) || undefined,
-                              }}
+                            <ImagenConToken
+                              rutaRelativa={item.logo_url}
                               style={{ width: 36, height: 36 }}
-                              resizeMode="cover"
                             />
                           ) : (
                             <ThemedText style={{ fontSize: 14 }}>🏢</ThemedText>

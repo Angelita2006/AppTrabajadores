@@ -4,6 +4,7 @@ import { obtenerCalendarioLaboral } from "@/src/modules/calendarios-laborales/ap
 import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/calendario";
 import { obtenerContratoActivoTrabajador } from "@/src/modules/contratos/api/services";
 import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
+import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import { obtenerFichajesEmpresaPorFecha } from "@/src/modules/fichajes/api/services";
 import {
   DIAS_SEMANA,
@@ -18,9 +19,8 @@ import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
-import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import {
   capitalizar,
   extraerHora,
@@ -35,13 +35,7 @@ import {
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -78,13 +72,20 @@ const escaparHtml = (valor: unknown): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-const firmaComoHtml = (firma?: string | null): string => {
+const firmaComoHtml = async (
+  firma?: string | null,
+  mostrarError?: (error: any) => void,
+): Promise<string | undefined> => {
   if (!firma) return '<span class="sin-firma">Sin firma</span>';
+  try {
+    const urlFirma = await obtenerUrlLogo(firma);
 
-  const urlFirma = obtenerUrlLogo(firma);
-  if (!urlFirma) return '<span class="sin-firma">Sin firma</span>';
+    if (!urlFirma) return '<span class="sin-firma">Sin firma</span>';
 
-  return `<img class="firma-fichaje" src="${escaparHtml(urlFirma)}" alt="Firma del trabajador" />`;
+    return `<img class="firma-fichaje" src="${escaparHtml(urlFirma)}" alt="Firma del trabajador" />`;
+  } catch (error: any) {
+    if (mostrarError) mostrarError(error.message);
+  }
 };
 
 export default function FichajesHistorialScreen() {
@@ -103,9 +104,7 @@ export default function FichajesHistorialScreen() {
   const [mapaTurnosObjetos, setMapaTurnosObjetos] = useState<{
     [key: string]: TurnoConAsignacion[];
   }>({});
-
-  const { mostrarError } = useAppModal();
-
+  const { mostrarError, mostrarMensaje } = useAppModal();
   const [
     trabajadoresSeleccionadosParaPdf,
     setTrabajadoresSeleccionadosParaPdf,
@@ -173,15 +172,6 @@ export default function FichajesHistorialScreen() {
           .map((fichaje) => fichaje.fichaje_sustituido_id)
           .filter((id): id is string => Boolean(id)),
       );
-
-      // let mensaje = "";
-
-      // todosLosFichajes.forEach((f) => {
-      //   mensaje += f.id + " ";
-      // });
-
-      // console.error(mensaje);
-
       const fichajesValidos = todosLosFichajes.filter((f: RegistroFichaje) => {
         const estadoLimpio = f.estado?.trim().toLowerCase() || "";
         return (
@@ -190,16 +180,13 @@ export default function FichajesHistorialScreen() {
         );
       });
       setFichajesSemanales(fichajesValidos);
-
       const tiposEventosEmpresaData = await obtenerTiposEventosEmpresa(
         empresaActual!.id,
       );
       setTiposEventosEmpresa(tiposEventosEmpresaData);
-
       const idTrabajadoresUnicos = Array.from(
         new Set(fichajesValidos.map((f: RegistroFichaje) => f.trabajador_id)),
       );
-
       const nuevoMapaObjetosTurnos: { [key: string]: TurnoConAsignacion[] } =
         {};
       const nuevoMapaDatosFiscales: { [key: string]: any } = {};
@@ -210,7 +197,6 @@ export default function FichajesHistorialScreen() {
       )
         .toISOString()
         .split("T")[0];
-
       const sabadoObj = new Date(lunesSemanaActual);
       sabadoObj.setDate(lunesSemanaActual.getDate() + 5);
       const sabadoStr = new Date(
@@ -281,7 +267,6 @@ export default function FichajesHistorialScreen() {
             diasOrdenados.length > 0
               ? diasOrdenados.join(", ")
               : "Sin días asignados";
-
           nuevoMapaDatosFiscales[idTrabajador] = {
             jornada: capitalizar(contratoActivo?.tipo_jornada || ""),
             tipo_contrato: capitalizar(contratoActivo?.tipo_contrato || ""),
@@ -296,7 +281,6 @@ export default function FichajesHistorialScreen() {
             foto_url: trabajador?.foto_url || "",
             calendario_id: calendarioIdAsociado || null,
           };
-
           if (asignacionesVigentes.length > 0) {
             const turnosTrabajador: TurnoConAsignacion[] = [];
             for (const asig of asignacionesVigentes) {
@@ -313,7 +297,7 @@ export default function FichajesHistorialScreen() {
                   duracion_pausa_minutos: tInfo.duracion_pausa_minutos || 0,
                   fecha_real:
                     asig.fecha_inicio || new Date().toISOString().split("T")[0],
-                  dias_semana: tInfo.dias_semana || "",
+                  dias_semana: tInfo.dias_semana || [],
                   fecha_asignacion_inicio: asig.fecha_inicio,
                   fecha_asignacion_fin: asig.fecha_fin || "",
                 });
@@ -385,7 +369,7 @@ export default function FichajesHistorialScreen() {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
         const fin = t.hora_fin ? t.hora_fin.substring(0, 5) : "00:00";
         const pausa =
-          t.duracion_pausa_minutos > 0
+          (t.duracion_pausa_minutos || 0) > 0
             ? ` [Pausa: ${t.duracion_pausa_minutos} min]`
             : "";
         return `${t.nombre} (${inicio}-${fin})${pausa}`;
@@ -402,11 +386,9 @@ export default function FichajesHistorialScreen() {
           const fiscal = mapaDatosFiscales[f.trabajador_id] || {};
           const turnosTrabajador = mapaTurnosObjetos[f.trabajador_id] || [];
           const turnoActivo = turnosTrabajador[0];
-
           const nombreTrabajador = f.trabajador?.nombre || fiscal?.nombre || "";
           const apellidosTrabajador =
             f.trabajador?.apellidos || fiscal?.apellidos || "";
-
           mapa[f.trabajador_id] = {
             id: f.trabajador_id,
             nombre: nombreTrabajador,
@@ -424,7 +406,6 @@ export default function FichajesHistorialScreen() {
           };
         }
       });
-
       Object.keys(mapa).forEach((trabajadorId) => {
         const fichajesDelTrabajador = fichajesSemanales.filter(
           (f) => f.trabajador_id === trabajadorId,
@@ -453,13 +434,14 @@ export default function FichajesHistorialScreen() {
           );
           let turnoAsignadoKey = "Turno General";
           for (const turno of turnosDelTrabajador) {
-            const inicioMinutos = horaAMinutos(turno.hora_inicio) - 60;
-            const finMinutos = horaAMinutos(turno.hora_fin) + 60;
+            const inicioMinutos =
+              horaAMinutos(turno.hora_inicio || "00:00") - 60;
+            const finMinutos = horaAMinutos(turno.hora_fin || "00:00") + 60;
             if (
               horaFichajeMinutos >= inicioMinutos &&
               horaFichajeMinutos <= finMinutos
             ) {
-              turnoAsignadoKey = turno.nombre;
+              turnoAsignadoKey = turno.nombre || "Turno General";
               break;
             }
           }
@@ -477,7 +459,6 @@ export default function FichajesHistorialScreen() {
           ].push(f);
         });
       });
-
       Object.values(mapa).forEach((t: TrabajadorConFichajesSemanales) => {
         Object.values(t.dias).forEach((d: DetalleDiaTrabajador) => {
           Object.values(d.turnos).forEach((arr: RegistroFichaje[]) => {
@@ -498,14 +479,12 @@ export default function FichajesHistorialScreen() {
       );
       return;
     }
-
     const trabajadoresAIncluir = trabajadoresAgrupadosSemanales.filter(
       (t: TrabajadorConFichajesSemanales) =>
         trabajadoresSeleccionadosParaPdf.some(
           (idSeleccionado) => String(idSeleccionado) === String(t.id),
         ),
     );
-
     if (trabajadoresAIncluir.length === 0) {
       mostrarMensaje(
         "Alerta",
@@ -513,13 +492,11 @@ export default function FichajesHistorialScreen() {
       );
       return;
     }
-
     const promesasBloques = trabajadoresAIncluir.map(
       async (t: TrabajadorConFichajesSemanales) => {
         let filasCalendarioHtml = "";
         let totalMinutosSemanales = 0;
         const entradasDias = Object.entries(t.dias || {});
-
         for (const [fechaKey, datosDia] of entradasDias) {
           const [anio, mes, dia] = fechaKey.split("-").map(Number);
           const fechaObjeto = new Date(anio, mes - 1, dia);
@@ -534,7 +511,6 @@ export default function FichajesHistorialScreen() {
           ];
           const nombreDiaReal = nombresDiasSemana[fechaObjeto.getDay()];
           const fechaFormateada = `${dia}/${mes}`;
-
           if (
             datosDia &&
             datosDia.turnos &&
@@ -567,11 +543,10 @@ export default function FichajesHistorialScreen() {
                   } catch (error: any) {
                     mostrarError(
                       `Error al obtener el tipo de evento (${m.tipo_evento_id}): ` +
-                        error,
+                        error.message,
                     );
                   }
                 }
-
                 const tipoUpper = String(tipoCodigo).toUpperCase();
                 const esEntrada = tipoUpper.includes("ENTRADA");
                 const esSalida = tipoUpper.includes("SALIDA");
@@ -579,7 +554,6 @@ export default function FichajesHistorialScreen() {
                   tipoUpper.includes("INICIO_PAUSA") ||
                   (tipoUpper.includes("PAUSA") && !tipoUpper.includes("FIN"));
                 const esFinPausa = tipoUpper.includes("FIN_PAUSA");
-
                 if (esEntrada) {
                   entrada = hora;
                   entradaMinutos = horaAMinutos(hora);
@@ -598,16 +572,18 @@ export default function FichajesHistorialScreen() {
                   );
                   aPausaInicio = null;
                 }
-                firmasHtml.push(firmaComoHtml(m.firma_digital));
+                const firmaRes = await firmaComoHtml(
+                  m.firma_digital,
+                  mostrarError,
+                );
+                firmasHtml.push(firmaRes || "");
                 eventosFirma.push(
                   `${tipoCodigo || "Evento"} · ${new Date(m.fecha_hora).toLocaleString("es-ES")}`,
                 );
               }
-
               let minutesTrabajadosHoy = 0;
               let estadoLinea = "Incompleto";
               let colorEstado = "#EA580C";
-
               if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
                 minutesTrabajadosHoy =
                   salidaMinutos - entradaMinutos - tiempoPausasMinutos;
@@ -621,79 +597,79 @@ export default function FichajesHistorialScreen() {
                   nombreDiaReal === "Sábado" ? "Sin horas extra" : "Sin marcas";
                 colorEstado = "#94A3B8";
               }
-
               const horasHoyTexto =
                 minutesTrabajadosHoy > 0
                   ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
                   : "-";
               const pausasTexto =
                 tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
-
               let correccionFichaje = null;
-
               for (const correccion of correccionesAprobadas) {
                 if (!correccion) continue;
                 correccionFichaje = correccion;
               }
-
               if (correccionFichaje) {
                 const valorNuevo = correccionFichaje.valor_nuevo || {};
                 const fechaNueva =
                   valorNuevo.fecha_descuadre || fechaFormateada;
                 const horaNueva = valorNuevo.hora_propuesta || "-";
                 if (horaNueva && horaNueva !== "") entrada = horaNueva;
+                const firmaSolicitanteHtml = await firmaComoHtml(
+                  correccionFichaje.firma_solicitante,
+                  mostrarError,
+                );
+                const firmaResolutorHtml = await firmaComoHtml(
+                  correccionFichaje.firma_resolutor,
+                  mostrarError,
+                );
 
-                filasCalendarioHtml += `
-                <tr>
-                  <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td>
-                  <td>${entrada}</td>
-                  <td>${salida}</td>
-                  <td style="width:10px">${pausasTexto}</td>
-                  <td style="font-weight: bold;">${horasHoyTexto}</td>
-                  <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
-                  <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td>
-                </tr>
-              `;
-
-                filasCalendarioHtml += `
-                  <tr class="fila-correccion">
-                    <td colspan="2"><strong>CORRECCIÓN APROBADA</strong><br/><small>${escaparHtml(correccionFichaje.tipo_correccion)}<br/>${escaparHtml(fechaNueva)} ${escaparHtml(horaNueva)}</small></td>
-                    <td colspan="2"><small>Solicita: ${escaparHtml(correccionFichaje.solicitante || "Usuario identificado")} (${escaparHtml(correccionFichaje.solicitante_tipo || "Usuario")})</small><br/>${firmaComoHtml(correccionFichaje.firma_solicitante)}</td>
-                    <td colspan="2"><small>Aprueba: ${escaparHtml(correccionFichaje.resolutor || "Usuario identificado")} (${escaparHtml(correccionFichaje.resolutor_tipo || "Usuario")})</small><br/>${firmaComoHtml(correccionFichaje.firma_resolutor)}</td>
-                    <td class="celda-firma"><small>${escaparHtml("Fecha y hora de corrección")}<br>${escaparHtml(correccionFichaje.fecha_resolucion?.substring(0, 10).concat(" ", correccionFichaje.fecha_resolucion.substring(11, 16)) || "")}</small></td>
-                  </tr>
+                filasCalendarioHtml += ` 
+                  <tr> 
+                    <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td> 
+                    <td>${entrada}</td> 
+                    <td>${salida}</td> 
+                    <td style="width:10px">${pausasTexto}</td> 
+                    <td style="font-weight: bold;">${horasHoyTexto}</td> 
+                    <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td> 
+                    <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td> 
+                  </tr> 
+                  <tr class="fila-correccion"> 
+                    <td colspan="2"><strong>CORRECCIÓN APROBADA</strong><br/><small>${escaparHtml(correccionFichaje.tipo_correccion)}<br/>${escaparHtml(fechaNueva)} ${escaparHtml(horaNueva)}</small></td> 
+                    <td colspan="2"><small>Solicita: ${escaparHtml(correccionFichaje.solicitante || "Usuario identificado")} (${escaparHtml(correccionFichaje.solicitante_tipo || "Usuario")})</small><br/>${firmaSolicitanteHtml}</td> 
+                    <td colspan="2"><small>Aprueba: ${escaparHtml(correccionFichaje.resolutor || "Usuario identificado")} (${escaparHtml(correccionFichaje.resolutor_tipo || "Usuario")})</small><br/>${firmaResolutorHtml}</td> 
+                    <td class="celda-firma"><small>${escaparHtml("Fecha y hora de corrección")}<br>${escaparHtml(correccionFichaje.fecha_resolucion?.substring(0, 10).concat(" ", correccionFichaje.fecha_resolucion.substring(11, 16)) || "")}</small></td> 
+                  </tr> 
                 `;
               } else {
-                filasCalendarioHtml += `
-                <tr>
-                  <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td>
-                  <td>${entrada}</td>
-                  <td>${salida}</td>
-                  <td style="width:10px">${pausasTexto}</td>
-                  <td style="font-weight: bold;">${horasHoyTexto}</td>
-                  <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td>
-                  <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td>
-                </tr>
-              `;
+                filasCalendarioHtml += ` 
+                  <tr> 
+                    <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td> 
+                    <td>${entrada}</td> 
+                    <td>${salida}</td> 
+                    <td style="width:10px">${pausasTexto}</td> 
+                    <td style="font-weight: bold;">${horasHoyTexto}</td> 
+                    <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td> 
+                    <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td> 
+                  </tr> 
+                `;
               }
             }
           } else {
             const esSabado = nombreDiaReal === "Sábado";
             const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
-            filasCalendarioHtml += `
-              <tr>
-                <td><strong>${nombreDiaReal} (${fechaFormateada})</strong></td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td>
-                <td class="celda-firma"></td>
-              </tr>
+            filasCalendarioHtml += ` 
+              <tr> 
+                <td><strong>${nombreDiaReal} (${fechaFormateada})</strong></td> 
+                <td>-</td> 
+                <td>-</td> 
+                <td>-</td> 
+                <td>-</td> 
+                <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td> 
+                <td class="celda-firma"></td> 
+              </tr> 
             `;
           }
         }
-
         const nombreEmpresa =
           empresaActual?.nombre_comercial || "Sin identificar";
         const razonSocial = empresaActual?.razon_social || "Sin identificar";
@@ -702,7 +678,12 @@ export default function FichajesHistorialScreen() {
         const cnaeEmpresa = empresaActual?.codigo_cnae || "No consta";
         const convenioEmpresa =
           empresaActual?.convenio_colectivo || "No consta";
-        const logoEmpresa = obtenerUrlLogo(empresaActual?.logo_url);
+        let logoEmpresa = "";
+        try {
+          logoEmpresa = (await obtenerUrlLogo(empresaActual?.logo_url)) || "";
+        } catch (error: any) {
+          mostrarError(error.message);
+        }
         const fiscal = mapaDatosFiscales[t.id];
         const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
         const nssTrabajador = fiscal?.numero_seguridad_social || "-";
@@ -713,129 +694,119 @@ export default function FichajesHistorialScreen() {
             ? t.turnoResumen
             : "Sin cuadrante de turnos activo en estas fechas";
         const totalHorasCalculadas = `${Math.floor(totalMinutosSemanales / 60)} horas y ${totalMinutosSemanales % 60} minutos`;
-
-        return `
-          <div class="hoja-trabajador">
-            <header class="cabecera-documento">
-              <div class="marca-empresa">${logoEmpresa ? `<img src="${escaparHtml(logoEmpresa)}" alt="Logo de ${escaparHtml(nombreEmpresa)}" />` : ""}<div><h1>${escaparHtml(nombreEmpresa)}</h1><p>${escaparHtml(razonSocial)}</p></div></div>
-              <div class="titulo-documento"><strong>REGISTRO DIARIO DE JORNADA</strong><span>Resumen semanal de control horario</span></div>
-            </header>
-            <div class="caja-legal">
-              Registro conforme al artículo 34.9 del Estatuto de los Trabajadores y al Real Decreto-ley 8/2019, de 8 de marzo. Conservar durante cuatro años a disposición de las personas trabajadoras, sus representantes y la Inspección de Trabajo.
-            </div>
-            <table class="tabla-datos">
-              <tr>
-                <td><strong>Razón social:</strong> ${escaparHtml(razonSocial)}</td>
-                <td><strong>CIF/NIF:</strong> ${escaparHtml(cifEmpresa)}</td>
-              </tr>
-              <tr>
-                <td><strong>Nombre comercial:</strong> ${escaparHtml(nombreEmpresa)}</td>
-                <td><strong>Domicilio fiscal:</strong> ${escaparHtml(direccionEmpresa)}</td>
-              </tr>
-              <tr>
-                <td><strong>CNAE:</strong> ${escaparHtml(cnaeEmpresa)}</td>
-                <td><strong>Convenio colectivo:</strong> ${escaparHtml(convenioEmpresa)}</td>
-              </tr>
-              <tr>
-                <td><strong>Trabajador:</strong> ${escaparHtml(`${t.nombre || ""} ${t.apellidos || ""}`.trim())}</td>
-                <td><strong>DNI/NIE/NIF:</strong> ${escaparHtml(dniTrabajador)}</td>
-              </tr>
-              <tr>
-                <td><strong>Nº Seguridad Social:</strong> ${escaparHtml(nssTrabajador)}</td>
-                <td><strong>Contrato/Jornada:</strong> ${escaparHtml(relacionLaboralTexto)}</td>
-              </tr>
-              <tr>
-                <td><strong>Horario planificado:</strong> ${escaparHtml(horarioVigenteTexto)}</td>
-                <td><strong>Periodo:</strong> ${escaparHtml(rangoSemanaStr)}</td>
-              </tr>
-              <tr>
-                <td colspan="2"><strong>Días planificados:</strong> ${escaparHtml(diasAsignadosTexto)}</td>
-              </tr>
-            </table>
-            <table class="tabla-registro">
-              <thead>
-                <tr>
-                  <th>Día / Turno Evaluado</th>
-                  <th>Hora Entrada</th>
-                  <th>Hora Salida</th>
-                  <th>Interrupciones / Pausas</th>
-                  <th>Horas Computadas</th>
-                  <th>Estado</th>
-                  <th>Firma y trazabilidad del fichaje</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${filasCalendarioHtml}
-              </tbody>
-              <tfoot>
-                <tr style="background-color: #F1F5F9; font-weight: bold;">
-                  <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS COMPUTADAS EN LA SEMANA:</td>
-                  <td colspan="3" style="text-align: left; padding: 8px; font-size: 12px; color: #1E3A8A;">${totalHorasCalculadas}</td>
-                </tr>
-              </tfoot>
-            </table>
-            <p style="font-size: 9px; color: #555; margin-top: 15px; font-style: italic;">
-              * El trabajador firma este documento en señal de conformidad con los horarios reflejados en el presente cuadrante de control de presencia.
-            </p>
-            <div class="firmas-bloque">
-              <div class="firma-caja" style="float: left;">Firma de la Empresa / Sello Autorizado</div>
-              <div class="firma-caja" style="float: right;">Firma de Conformidad del Trabajador</div>
-              <div style="clear: both;"></div>
-            </div>
-            <div class="page-break"></div>
-          </div>
+        return ` 
+          <div class="hoja-trabajador"> 
+            <header class="cabecera-documento"> 
+              <div class="marca-empresa">${logoEmpresa ? `<img src="${escaparHtml(logoEmpresa)}" alt="Logo de ${escaparHtml(nombreEmpresa)}" />` : ""}<div><h1>${escaparHtml(nombreEmpresa)}</h1><p>${escaparHtml(razonSocial)}</p></div></div> 
+              <div class="titulo-documento"><strong>REGISTRO DIARIO DE JORNADA</strong><span>Resumen semanal de control horario</span></div> 
+            </header> 
+            <div class="caja-legal"> 
+              Registro conforme al artículo 34.9 del Estatuto de los Trabajadores y al Real Decreto-ley 8/2019, de 8 de marzo. Conservar durante cuatro años a disposición de las personas trabajadoras, sus representantes y la Inspección de Trabajo. 
+            </div> 
+            <table class="tabla-datos"> 
+              <tr> 
+                <td><strong>Razón social:</strong> ${escaparHtml(razonSocial)}</td> 
+                <td><strong>CIF/NIF:</strong> ${escaparHtml(cifEmpresa)}</td> 
+              </tr> 
+              <tr> 
+                <td><strong>Nombre comercial:</strong> ${escaparHtml(nombreEmpresa)}</td> 
+                <td><strong>Domicilio fiscal:</strong> ${escaparHtml(direccionEmpresa)}</td> 
+              </tr> 
+              <tr> 
+                <td><strong>CNAE:</strong> ${escaparHtml(cnaeEmpresa)}</td> 
+                <td><strong>Convenio colectivo:</strong> ${escaparHtml(convenioEmpresa)}</td> 
+              </tr> 
+              <tr> 
+                <td><strong>Trabajador:</strong> ${escaparHtml(`${t.nombre || ""} ${t.apellidos || ""}`.trim())}</td> 
+                <td><strong>DNI/NIE/NIF:</strong> ${escaparHtml(dniTrabajador)}</td> 
+              </tr> 
+              <tr> 
+                <td><strong>Nº Seguridad Social:</strong> ${escaparHtml(nssTrabajador)}</td> 
+                <td><strong>Contrato/Jornada:</strong> ${escaparHtml(relacionLaboralTexto)}</td> 
+              </tr> 
+              <tr> 
+                <td><strong>Horario planificado:</strong> ${escaparHtml(horarioVigenteTexto)}</td> 
+                <td><strong>Periodo:</strong> ${escaparHtml(rangoSemanaStr)}</td> 
+              </tr> 
+              <tr> 
+                <td colspan="2"><strong>Días planificados:</strong> ${escaparHtml(diasAsignadosTexto)}</td> 
+              </tr> 
+            </table> 
+            <table class="tabla-registro"> 
+              <thead> 
+                <tr> 
+                  <th>Día / Turno Evaluado</th> 
+                  <th>Hora Entrada</th> 
+                  <th>Hora Salida</th> 
+                  <th>Interrupciones / Pausas</th> 
+                  <th>Horas Computadas</th> 
+                  <th>Estado</th> 
+                  <th>Firma y trazabilidad del fichaje</th> 
+                </tr> 
+              </thead> 
+              <tbody> ${filasCalendarioHtml} </tbody> 
+              <tfoot> 
+                <tr style="background-color: #F1F5F9; font-weight: bold;"> 
+                  <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS COMPUTADAS EN LA SEMANA:</td> 
+                  <td colspan="3" style="text-align: left; padding: 8px; font-size: 12px; color: #1E3A8A;">${totalHorasCalculadas}</td> 
+                </tr> 
+              </tfoot> 
+            </table> 
+            <p style="font-size: 9px; color: #555; margin-top: 15px; font-style: italic;"> * El trabajador firma este documento en señal de conformidad con los horarios reflejados en el presente cuadrante de control de presencia. </p> 
+            <div class="firmas-bloque"> 
+              <div class="firma-caja" style="float: left;">Firma de la Empresa / Sello Autorizado</div> 
+              <div class="firma-caja" style="float: right;">Firma de Conformidad del Trabajador</div> 
+              <div style="clear: both;"></div> </div> <div class="page-break"></div> 
+          </div> 
         `;
       },
     );
-
     const bloquesTrabajadoresHtml = (await Promise.all(promesasBloques)).join(
       "",
     );
-
-    const plantillaHtml = `
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Arial', sans-serif; padding: 10px; color: #172033; font-size: 10px; }
-            .cabecera-documento { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; margin-bottom: 10px; }
-            .marca-empresa { display: flex; align-items: center; gap: 10px; max-width: 55%; }
-            .marca-empresa img { max-width: 105px; max-height: 48px; object-fit: contain; }
-            .marca-empresa h1 { font-size: 16px; margin: 0; color: #1E3A8A; }
-            .marca-empresa p { margin: 2px 0 0; font-size: 9px; color: #475569; }
-            .titulo-documento { text-align: right; color: #1E3A8A; }
-            .titulo-documento strong, .titulo-documento span { display: block; }
-            .titulo-documento strong { font-size: 13px; }
-            .titulo-documento span { font-size: 9px; color: #475569; margin-top: 3px; }
-            .caja-legal { border: 1px solid #64748B; padding: 7px; text-align: center; margin-bottom: 12px; font-size: 9px; }
-            .tabla-datos { width: 100%; margin-bottom: 15px; border-collapse: collapse; }
-            .tabla-datos td { padding: 6px; border: 1px solid #000; background-color: #F9F9F9; }
-            .tabla-registro { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            .tabla-registro th, .tabla-registro td { border: 1px solid #94A3B8; padding: 4px; text-align: center; vertical-align: middle; }
-            .tabla-registro th { background-color: #E2E8F0; font-size: 9px; text-transform: uppercase; }
-            .fila-correccion { background-color: #EFF6FF; }
-            .fila-correccion td { border-top: 0; color: #1E3A8A; }
-            .celda-firma { width: 145px; padding: 4px !important; vertical-align: middle; text-align: center; }
-            .registro-firma { border-bottom: 1px dotted #94A3B8; padding: 4px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-            .registro-firma:last-child { border-bottom: 0; }
-            .registro-firma small { display: block; font-size: 7px; color: #475569; margin-bottom: 2px; text-align: center; }
-            .firma-fichaje { display: block; width: 100%; max-height: 35px; object-fit: contain; image-rendering: -webkit-optimize-contrast; }
-            .sin-firma { color: #64748B; font-size: 8px; }
-            .texto-secundario { color: #475569; }
-            .firmas-bloque { margin-top: 20px; width: 100%; }
-            .firma-caja { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 50px; font-weight: bold; }
-            .page-break { page-break-after: always; }
-          </style>
-        </head>
-        <body>${bloquesTrabajadoresHtml}</body>
-      </html>
+    const plantillaHtml = ` 
+      <html> 
+        <head> 
+          <meta charset="utf-8"> 
+          <style> 
+            body { font-family: 'Arial', sans-serif; padding: 10px; color: #172033; font-size: 10px; } 
+            .cabecera-documento { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 10px; margin-bottom: 10px; } 
+            .marca-empresa { display: flex; align-items: center; gap: 10px; max-width: 55%; } 
+            .marca-empresa img { max-width: 105px; max-height: 48px; object-fit: contain; } 
+            .marca-empresa h1 { font-size: 16px; margin: 0; color: #1E3A8A; } 
+            .marca-empresa p { margin: 2px 0 0; font-size: 9px; color: #475569; } 
+            .titulo-documento { text-align: right; color: #1E3A8A; } 
+            .titulo-documento strong, .titulo-documento span { display: block; } 
+            .titulo-documento strong { font-size: 13px; } 
+            .titulo-documento span { font-size: 9px; color: #475569; margin-top: 3px; } 
+            .caja-legal { border: 1px solid #64748B; padding: 7px; text-align: center; margin-bottom: 12px; font-size: 9px; } 
+            .tabla-datos { width: 100%; margin-bottom: 15px; border-collapse: collapse; } 
+            .tabla-datos td { padding: 6px; border: 1px solid #000; background-color: #F9F9F9; } 
+            .tabla-registro { width: 100%; border-collapse: collapse; margin-top: 10px; } 
+            .tabla-registro th, .tabla-registro td { border: 1px solid #94A3B8; padding: 4px; text-align: center; vertical-align: middle; } 
+            .tabla-registro th { background-color: #E2E8F0; font-size: 9px; text-transform: uppercase; } 
+            .fila-correccion { background-color: #EFF6FF; } 
+            .fila-correccion td { border-top: 0; color: #1E3A8A; } 
+            .celda-firma { width: 145px; padding: 4px !important; vertical-align: middle; text-align: center; } 
+            .registro-firma { border-bottom: 1px dotted #94A3B8; padding: 4px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; } 
+            .registro-firma:last-child { border-bottom: 0; } 
+            .registro-firma small { display: block; font-size: 7px; color: #475569; margin-bottom: 2px; text-align: center; } 
+            .firma-fichaje { display: block; width: 100%; max-height: 35px; object-fit: contain; image-rendering: -webkit-optimize-contrast; } 
+            .sin-firma { color: #64748B; font-size: 8px; } 
+            .texto-secundario { color: #475569; } 
+            .firmas-bloque { margin-top: 20px; width: 100%; } 
+            .firma-caja { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 50px; font-weight: bold; } 
+            .page-break { page-break-after: always; } 
+          </style> 
+        </head> 
+        <body>${bloquesTrabajadoresHtml}</body> 
+      </html> 
     `;
-
     try {
       if (
         typeof window !== "undefined" &&
         window.document &&
-        window.navigator.product !== "ReactNative"
+        (window.navigator as any).product !== "ReactNative"
       ) {
         const iframe = document.createElement("iframe");
         iframe.style.position = "fixed";
@@ -845,8 +816,8 @@ export default function FichajesHistorialScreen() {
         iframe.style.height = "0";
         iframe.style.border = "0";
         document.body.appendChild(iframe);
-
-        const doc = iframe.contentWindow?.document || iframe.contentDocument;
+        const doc =
+          iframe.contentWindow?.document || (iframe as any).contentDocument;
         if (doc) {
           doc.open();
           doc.write(plantillaHtml);
@@ -867,7 +838,9 @@ export default function FichajesHistorialScreen() {
         });
       }
     } catch (error: any) {
-      mostrarError("Error al generar o exportar el documento PDF: " + error);
+      mostrarError(
+        "Error al generar o exportar el documento PDF: " + error.message,
+      );
     }
   }, [
     fichajesSemanales,
@@ -894,7 +867,6 @@ export default function FichajesHistorialScreen() {
           </View>
         </View>
       )}
-
       <View style={styles.consolaAcciones}>
         <Pressable
           style={styles.botonAccionFiltro}
@@ -914,7 +886,6 @@ export default function FichajesHistorialScreen() {
           <FontAwesome5 name="chevron-right" size={12} color="#2563EB" />
         </Pressable>
       </View>
-
       <Pressable
         style={[styles.botonPDF, { marginBottom: 14 }]}
         onPress={handleExportarPDF}
@@ -926,7 +897,6 @@ export default function FichajesHistorialScreen() {
             : "Exportar Registro Semanal en PDF"}
         </ThemedText>
       </Pressable>
-
       <Row>
         <StatCard
           label="Marcajes Semanales"
@@ -938,11 +908,10 @@ export default function FichajesHistorialScreen() {
           tone="success"
         />
       </Row>
-
       <ThemedText style={styles.sectionTitle}>
-        Panel de Control Semanal
+        {" "}
+        Panel de Control Semanal{" "}
       </ThemedText>
-
       {cargando ? (
         <ActivityIndicator
           size="large"
@@ -960,11 +929,8 @@ export default function FichajesHistorialScreen() {
                   <View style={styles.headerTrabajador}>
                     <View style={styles.avatarCirculo}>
                       {trabajador.foto_url ? (
-                        <Image
-                          source={{
-                            uri:
-                              obtenerUrlLogo(trabajador.foto_url) || undefined,
-                          }}
+                        <ImagenConToken
+                          rutaRelativa={trabajador.foto_url}
                           style={[
                             styles.avatarCirculo,
                             { width: 40, height: 40, borderRadius: 20 },
@@ -1012,7 +978,6 @@ export default function FichajesHistorialScreen() {
                       />
                     </Pressable>
                   </View>
-
                   <View style={styles.gridDias}>
                     {Object.entries(trabajador.dias).map(
                       ([fechaKey, datosDia]: [

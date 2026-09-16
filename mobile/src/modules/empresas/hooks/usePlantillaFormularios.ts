@@ -10,7 +10,7 @@ import {
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { UsuarioSesion } from "@/src/modules/usuarios/types/usuario";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { useEffect, useRef, useState } from "react";
 
 export type TipoModal =
@@ -30,6 +30,8 @@ export function usePlantillaFormularios(
   usuarioActual: UsuarioSesion,
   cargarPlantilla: () => Promise<void>,
 ) {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   const [procesando, setProcesando] = useState(false);
   const [modalActivo, setModalActivo] = useState<TipoModal>(null);
   const [trabajadorActual, setTrabajadorActual] = useState<Trabajador | null>(

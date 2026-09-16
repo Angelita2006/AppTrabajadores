@@ -8,7 +8,7 @@ import { ActivityIndicator, useColorScheme, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
-} from "../src/modules/usuarios/store/SesionContext";
+} from "../src/modules/usuarios/store/SesionContextZustand";
 
 // Configuración global de comportamiento de notificaciones en primer plano
 Notifications.setNotificationHandler({

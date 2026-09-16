@@ -1,19 +1,23 @@
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
-import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
+import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import {
   actualizarFotoTrabajador,
   actualizarTrabajador,
   obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
+import {
+  obtenerUsuarioActual,
+  solicitarCambioEmail,
+  solicitarCambioPassword,
+} from "@/src/modules/usuarios/api/services";
 import { setAuthToken } from "@/src/service/api/api";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router/build/useFocusEffect";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   TextInput,
@@ -24,7 +28,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
@@ -54,6 +58,7 @@ export default function PerfilScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
+  // Estados para edición personal
   const [telefono, setTelefono] = useState(trabajadorActual?.telefono ?? "");
   const [nss, setNss] = useState(
     trabajadorActual?.numero_seguridad_social ?? "",
@@ -62,8 +67,20 @@ export default function PerfilScreen() {
   const [nuevaFotoAsset, setNuevaFotoAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
 
+  // Estados de Seguridad Separados
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [nuevoEmail, setNuevoEmail] = useState("");
+  const [guardandoEmail, setGuardandoEmail] = useState(false);
+
+  const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [passwordActual, setPasswordActual] = useState("");
+  const [nuevaPassword, setNuevaPassword] = useState("");
+  const [confirmarPassword, setConfirmarPassword] = useState("");
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+
   const opacidadTarjeta = useSharedValue(0);
-  const { mostrarError } = useAppModal();
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = 0;
@@ -81,7 +98,6 @@ export default function PerfilScreen() {
 
   useEffect(() => {
     let isMounted = true;
-
     const cargarCentrosDeLaEmpresa = async () => {
       if (!empresaActual?.id) {
         if (isMounted) {
@@ -90,15 +106,11 @@ export default function PerfilScreen() {
         }
         return;
       }
-
       try {
         if (isMounted) setCargandoCentros(true);
         const centros = await obtenerCentrosTrabajoPorEmpresa(empresaActual.id);
-
         if (!isMounted) return;
-
         setCentrosDisponibles(centros ?? []);
-
         if (centros && centros.length > 0) {
           if (
             !centroTrabajoActual ||
@@ -111,16 +123,13 @@ export default function PerfilScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los centros de trabajo de la empresa: " +
-            error.message,
+          "Error al cargar los centros de trabajo: " + error.message,
         );
       } finally {
         if (isMounted) setCargandoCentros(false);
       }
     };
-
     cargarCentrosDeLaEmpresa();
-
     return () => {
       isMounted = false;
     };
@@ -128,7 +137,6 @@ export default function PerfilScreen() {
 
   const handleCambiarFoto = async () => {
     if (!isEditing || !trabajadorActual) return;
-
     try {
       const permisoResult =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -139,14 +147,12 @@ export default function PerfilScreen() {
         );
         return;
       }
-
       const resultado = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (
         !resultado.canceled &&
         resultado.assets &&
@@ -157,18 +163,15 @@ export default function PerfilScreen() {
         setFotoUrl(asset.uri);
       }
     } catch (error: any) {
-      mostrarError(
-        "Error al seleccionar o procesar la imagen de perfil: " + error.message,
-      );
+      mostrarError("Error al seleccionar imagen: " + error.message);
     }
   };
 
-  const handleSaveProfile = async () => {
+  const handleGuardarPerfil = async () => {
     try {
       setGuardando(true);
       if (trabajadorActual) {
         let trabajadorActualizado = { ...trabajadorActual };
-
         if (nuevaFotoAsset) {
           const filename =
             nuevaFotoAsset.fileName ||
@@ -176,7 +179,6 @@ export default function PerfilScreen() {
             "foto.jpg";
           const match = /\.(\w+)$/.exec(filename);
           const type = match ? `image/${match[1]}` : `image/jpeg`;
-
           trabajadorActualizado = await actualizarFotoTrabajador(
             trabajadorActual.id,
             nuevaFotoAsset.uri,
@@ -184,23 +186,19 @@ export default function PerfilScreen() {
             type,
           );
         }
-
         const trabajadorActualizadoDatos = {
           ...trabajadorActualizado,
           telefono: telefono.trim() || undefined,
           numero_seguridad_social: nss.trim() || undefined,
         };
-
         await actualizarTrabajador(
           trabajadorActual.id,
           trabajadorActualizadoDatos,
         );
-
         const datosFrescos = await obtenerTrabajador(trabajadorActual.id);
         const cacheBustUrl = datosFrescos.foto_url
           ? `${datosFrescos.foto_url.split("?")[0]}?t=${Date.now()}`
           : "";
-
         setTrabajadorActual({
           ...datosFrescos,
           foto_url: cacheBustUrl,
@@ -208,23 +206,112 @@ export default function PerfilScreen() {
         setFotoUrl(cacheBustUrl);
         setNuevaFotoAsset(null);
         setIsEditing(false);
-
         mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
       }
     } catch (error: any) {
-      mostrarError("Error al guardar los cambios del perfil: " + error.message);
+      mostrarError("Error al guardar perfil: " + error.message);
     } finally {
       setGuardando(false);
     }
   };
 
-  const handleLogout = async () => {
+  const handleGuardarEmail = async () => {
+    try {
+      setGuardandoEmail(true);
+      if (
+        !nuevoEmail ||
+        nuevoEmail.trim() === "" ||
+        nuevoEmail === usuarioActual?.email
+      ) {
+        mostrarError(
+          "Introduce un correo electrónico válido y diferente al actual.",
+        );
+        return;
+      }
+
+      await solicitarCambioEmail(nuevoEmail.trim());
+      mostrarMensaje(
+        "Verificación enviada",
+        "Se ha enviado un enlace de confirmación a tu nuevo correo. Tu email no cambiará hasta que lo verifiques.",
+      );
+
+      setIsEditingEmail(false);
+      setNuevoEmail("");
+    } catch (error: any) {
+      mostrarError("Error al actualizar el correo: " + error.message);
+    } finally {
+      setGuardandoEmail(false);
+    }
+  };
+
+  const handleGuardarPassword = async () => {
+    try {
+      setGuardandoPassword(true);
+
+      if (!passwordActual) {
+        mostrarError("Debes introducir tu contraseña actual.");
+        return;
+      }
+      if (!nuevaPassword) {
+        mostrarError("Debes introducir una nueva contraseña.");
+        return;
+      }
+      if (nuevaPassword !== confirmarPassword) {
+        mostrarError("Las nuevas contraseñas no coinciden.");
+        return;
+      }
+      if (nuevaPassword.length < 6) {
+        mostrarError("La nueva contraseña debe tener al menos 6 caracteres.");
+        return;
+      }
+
+      await solicitarCambioPassword(passwordActual);
+
+      mostrarMensaje(
+        "Éxito",
+        "Proceso de contraseña iniciado. Sigue las instrucciones enviadas.",
+      );
+
+      setIsEditingPassword(false);
+      setPasswordActual("");
+      setNuevaPassword("");
+      setConfirmarPassword("");
+    } catch (error: any) {
+      mostrarError("Error al actualizar la contraseña: " + error.message);
+    } finally {
+      setGuardandoPassword(false);
+    }
+  };
+
+  const handleCierreSesion = async () => {
     setAuthToken("");
     setEmpresaActual(null);
     setCentroTrabajoActual(null);
     setCentrosDisponibles([]);
     setUsuarioActual(null);
   };
+
+  // Función para consultar los datos actualizados del usuario en el backend
+  const handleRefrescarDatosUsuario = async () => {
+    try {
+      // Si el usuario tiene trabajador asociado, refrescamos sus datos (puedes ajustar esta llamada según tu API de usuario/trabajador)
+      if (trabajadorActual?.id) {
+        const usuarioFresco = await obtenerUsuarioActual();
+        if (usuarioFresco) {
+          setUsuarioActual(usuarioFresco);
+        }
+      }
+    } catch (error) {
+      console.log("No se pudieron refrescar los datos del usuario", error);
+    }
+  };
+
+  // Se ejecuta cada vez que el usuario entra o vuelve a enfocar la pantalla de Perfil
+  useFocusEffect(
+    useCallback(() => {
+      handleRefrescarDatosUsuario();
+    }, [trabajadorActual?.id]),
+  );
 
   const estiloTarjetaAnimada = useAnimatedStyle(() => {
     return {
@@ -238,15 +325,16 @@ export default function PerfilScreen() {
     };
   });
 
-  // Mostrar el panel de gestión simplificado solo si es admin y NO tiene ficha de trabajador vinculada
-  if (usuarioActual && esAdmin && !trabajadorActual) {
-    return (
-      <AppScreen title="Panel de Gestión">
-        <Row>
+  return (
+    <AppScreen
+      title={esAdmin && !trabajadorActual ? "Panel de Gestión" : "Mi Perfil"}
+    >
+      <Row>
+        {esAdmin && !trabajadorActual ? (
           <StatCard
             label="Rol de Sistema"
             value={
-              usuarioActual.tipo_usuario
+              usuarioActual?.tipo_usuario
                 ? usuarioActual.tipo_usuario
                     .toString()
                     .replace("_", " ")
@@ -254,11 +342,25 @@ export default function PerfilScreen() {
                 : "SIN ROL"
             }
           />
-        </Row>
+        ) : (
+          <>
+            <StatCard
+              label="Estado"
+              value={usuarioActual?.activo ? "Activo" : "Inactivo"}
+              tone={usuarioActual?.activo ? "success" : "danger"}
+            />
+            <StatCard
+              label="Empresa Activa"
+              value={empresaActual?.nombre_comercial ?? "Sin Asignar"}
+            />
+          </>
+        )}
+      </Row>
 
-        <Animated.View
-          style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
-        >
+      <Animated.View
+        style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
+      >
+        {usuarioActual && esAdmin && !trabajadorActual ? (
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="business" size={20} color="#EA580C" />
@@ -289,326 +391,282 @@ export default function PerfilScreen() {
               />
             </View>
           </Card>
-
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="manage-accounts" size={20} color="#475569" />
-              <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
-                Seguridad y Cuenta
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail label="Correo Electrónico" value={usuarioActual.email} />
-              <Detail
-                label="Último Acceso"
-                value={
-                  usuarioActual.ultimo_acceso
-                    ? usuarioActual.ultimo_acceso
-                        .replace("T", " a las ")
-                        .substring(0, 22)
-                        .concat(" hs")
-                    : "Sesión Actual"
-                }
-              />
-            </View>
-          </Card>
-
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <IconSymbol name="logout" size={18} color="#FFFFFF" />
-            <ThemedText style={styles.logoutButtonText}>
-              Cerrar Sesión
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      </AppScreen>
-    );
-  }
-
-  return (
-    <AppScreen title="Mi Perfil">
-      <Row>
-        <StatCard
-          label="Estado"
-          value={usuarioActual?.activo ? "Activo" : "Inactivo"}
-          tone={usuarioActual?.activo ? "success" : "danger"}
-        />
-        <StatCard
-          label="Empresa Activa"
-          value={empresaActual?.nombre_comercial ?? "Sin Asignar"}
-        />
-      </Row>
-
-      <Animated.View
-        style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
-      >
-        <Card>
-          <View style={styles.headerConAccion}>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="person" size={20} color="#2563EB" />
-              <ThemedText style={styles.perfilTitle}>
-                Información Personal
-              </ThemedText>
-            </View>
-            <Pressable
-              style={styles.botonAccionHeader}
-              onPress={() => {
-                if (isEditing) {
-                  setTelefono(trabajadorActual?.telefono ?? "");
-                  setNss(trabajadorActual?.numero_seguridad_social ?? "");
-                  setFotoUrl(trabajadorActual?.foto_url ?? "");
-                  setNuevaFotoAsset(null);
-                }
-                setIsEditing(!isEditing);
-              }}
-            >
-              <ThemedText style={styles.textoBotonAccionHeader}>
-                {isEditing ? "Cancelar" : "Editar"}
-              </ThemedText>
-            </Pressable>
-          </View>
-          <View style={styles.separadorPerfil} />
-
-          <View style={styles.avatarContainer}>
-            <Pressable
-              onPress={handleCambiarFoto}
-              disabled={!isEditing || guardando}
-              style={[
-                styles.avatarPressable,
-                isEditing && styles.avatarPressableEditing,
-              ]}
-            >
-              {guardando ? (
-                <ActivityIndicator size="small" color="#2563EB" />
-              ) : fotoUrl ? (
-                <Image
-                  source={{
-                    uri: nuevaFotoAsset
-                      ? nuevaFotoAsset.uri
-                      : obtenerUrlLogo(fotoUrl) || undefined,
-                  }}
-                  style={{ width: 64, height: 64 }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <ThemedText style={{ fontSize: 26 }}>👤</ThemedText>
-              )}
-            </Pressable>
-            {isEditing && (
-              <ThemedText style={styles.avatarHintText}>
-                Toca la foto para cambiarla
-              </ThemedText>
-            )}
-          </View>
-
-          <View style={styles.detailGrid}>
-            <Detail
-              label="Nombre Completo"
-              value={`${trabajadorActual?.nombre ?? ""} ${trabajadorActual?.apellidos ?? ""}`}
-            />
-            <Detail
-              label="Documento (NIF/NIE)"
-              value={trabajadorActual?.dni_nif_nie ?? "-"}
-            />
-
-            {isEditing ? (
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.detailLabel}>
-                  Número Seguridad Social
-                </ThemedText>
-                <TextInput
-                  style={styles.inputEdit}
-                  value={nss}
-                  onChangeText={setNss}
-                  placeholder="Número de seguridad social"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-            ) : (
-              <Detail
-                label="Número Seguridad Social"
-                value={
-                  trabajadorActual?.numero_seguridad_social ??
-                  "No cumplimentado"
-                }
-              />
-            )}
-
-            {isEditing ? (
-              <View style={styles.inputGroup}>
-                <ThemedText style={styles.detailLabel}>
-                  Teléfono Móvil
-                </ThemedText>
-                <TextInput
-                  style={styles.inputEdit}
-                  value={telefono}
-                  onChangeText={setTelefono}
-                  placeholder="Teléfono móvil"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
-                />
-              </View>
-            ) : (
-              <Detail
-                label="Teléfono Móvil"
-                value={trabajadorActual?.telefono ?? "No registrado"}
-              />
-            )}
-          </View>
-
-          {isEditing && (
-            <Pressable
-              style={styles.saveButton}
-              onPress={handleSaveProfile}
-              disabled={guardando}
-            >
-              {guardando ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <ThemedText style={styles.saveButtonText}>
-                  Guardar Cambios
-                </ThemedText>
-              )}
-            </Pressable>
-          )}
-        </Card>
-
-        {/* La tarjeta de Condiciones Contractuales solo se muestra si NO es un admin sin contrato, o se oculta si es admin puro */}
-        {!esAdmin && (
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="description" size={20} color="#16A34A" />
-              <ThemedText style={[styles.perfilTitle, { color: "#16A34A" }]}>
-                Condiciones Contractuales
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <Detail
-                label="Puesto de Trabajo"
-                value={
-                  contratoActual?.puesto_trabajo ?? "Operario / No Definido"
-                }
-              />
-              <Detail
-                label="Tipo de Contrato"
-                value={contratoActual?.tipo_contrato ?? "Régimen General"}
-              />
-              <Detail
-                label="Fecha Alta Contrato"
-                value={
-                  contratoActual?.fecha_inicio ??
-                  trabajadorActual?.fecha_alta_empresa ??
-                  "No consta"
-                }
-              />
-              <Detail
-                label="Vencimiento / Fin"
-                value={contratoActual?.fecha_fin ?? "Indefinido / Continuo"}
-              />
-              <Detail
-                label="Jornada Semanal"
-                value={
-                  contratoActual?.horas_semana
-                    ? `${contratoActual.horas_semana.toString().substring(0, 2)} hs/semana`
-                    : "Según Convenio Colectivo"
-                }
-              />
-            </View>
-          </Card>
-        )}
-        {!esAdmin && (
-          <Card>
-            <View style={styles.seccionPerfilHeader}>
-              <IconSymbol name="business" size={20} color="#EA580C" />
-              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                Organización y Centro de Fichaje
-              </ThemedText>
-            </View>
-            <View style={styles.separadorPerfil} />
-
-            <View style={styles.detailGrid}>
-              <View style={styles.selectorContainer}>
-                <ThemedText style={styles.detailLabel}>
-                  Empresa vinculada
-                </ThemedText>
-                <View style={styles.pickerWrapper}>
-                  <ThemedText style={styles.selectorSingleText}>
-                    {empresaActual?.nombre_comercial ??
-                      "No hay empresa vinculada"}
+        ) : (
+          <>
+            {/* Información Personal */}
+            <Card>
+              <View style={styles.headerConAccion}>
+                <View style={styles.seccionPerfilHeader}>
+                  <IconSymbol name="person" size={20} color="#2563EB" />
+                  <ThemedText style={styles.perfilTitle}>
+                    Información Personal
                   </ThemedText>
                 </View>
+                <Pressable
+                  style={styles.botonAccionHeader}
+                  onPress={() => {
+                    if (isEditing) {
+                      setTelefono(trabajadorActual?.telefono ?? "");
+                      setNss(trabajadorActual?.numero_seguridad_social ?? "");
+                      setFotoUrl(trabajadorActual?.foto_url ?? "");
+                      setNuevaFotoAsset(null);
+                    }
+                    setIsEditing(!isEditing);
+                  }}
+                >
+                  <ThemedText style={styles.textoBotonAccionHeader}>
+                    {isEditing ? "Cancelar" : "Editar"}
+                  </ThemedText>
+                </Pressable>
               </View>
+              <View style={styles.separadorPerfil} />
 
-              <View style={styles.selectorContainer}>
-                <ThemedText style={styles.detailLabel}>
-                  Seleccionar Centro
-                </ThemedText>
-                {cargandoCentros ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#EA580C"
-                    style={{ marginVertical: 10 }}
-                  />
-                ) : (
-                  <View style={styles.pickerWrapperHorizontal}>
-                    {centrosDisponibles && centrosDisponibles.length > 0 ? (
-                      centrosDisponibles.map((centro: CentroTrabajo) => (
-                        <Pressable
-                          key={centro.id}
-                          style={[
-                            styles.chipCentro,
-                            centroTrabajoActual?.id === centro.id &&
-                              styles.chipCentroActivo,
-                          ]}
-                          onPress={() => {
-                            if (centroTrabajoActual?.id !== centro.id) {
-                              setCentroTrabajoActual(centro);
-                            }
-                          }}
-                        >
-                          <ThemedText
-                            style={[
-                              styles.chipCentroText,
-                              centroTrabajoActual?.id === centro.id &&
-                                styles.chipCentroTextActivo,
-                            ]}
-                          >
-                            {centro.nombre}
-                          </ThemedText>
-                        </Pressable>
-                      ))
-                    ) : (
-                      <ThemedText style={styles.detailValue}>
-                        No hay centros configurados para esta empresa
-                      </ThemedText>
-                    )}
-                  </View>
+              <View style={styles.avatarContainer}>
+                <Pressable
+                  onPress={handleCambiarFoto}
+                  disabled={!isEditing || guardando}
+                  style={[
+                    styles.avatarPressable,
+                    isEditing && styles.avatarPressableEditing,
+                  ]}
+                >
+                  {guardando ? (
+                    <ActivityIndicator size="small" color="#2563EB" />
+                  ) : fotoUrl ? (
+                    <ImagenConToken
+                      rutaRelativa={fotoUrl}
+                      style={{ width: 64, height: 64 }}
+                    />
+                  ) : (
+                    <ThemedText style={{ fontSize: 26 }}>👤</ThemedText>
+                  )}
+                </Pressable>
+                {isEditing && (
+                  <ThemedText style={styles.avatarHintText}>
+                    Toca la foto para cambiarla
+                  </ThemedText>
                 )}
               </View>
 
-              <View style={styles.zonaHorariaCard}>
-                <IconSymbol name="schedule" size={16} color="#475569" />
-                <ThemedText style={styles.zonaHorariaTexto}>
-                  Zona Horaria de Registro:{" "}
-                  <ThemedText style={{ fontWeight: "700", color: "#0F172A" }}>
-                    {centroTrabajoActual?.zona_horaria ?? "Europe/Madrid"}
-                  </ThemedText>
-                </ThemedText>
+              <View style={styles.detailGrid}>
+                <Detail
+                  label="Nombre Completo"
+                  value={`${trabajadorActual?.nombre ?? ""} ${trabajadorActual?.apellidos ?? ""}`}
+                />
+                <Detail
+                  label="Documento (NIF/NIE)"
+                  value={trabajadorActual?.dni_nif_nie ?? "-"}
+                />
+
+                {isEditing ? (
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Número Seguridad Social
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={nss}
+                      onChangeText={setNss}
+                      placeholder="Número de seguridad social"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                ) : (
+                  <Detail
+                    label="Número Seguridad Social"
+                    value={
+                      trabajadorActual?.numero_seguridad_social ??
+                      "No cumplimentado"
+                    }
+                  />
+                )}
+
+                {isEditing ? (
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Teléfono Móvil
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={telefono}
+                      onChangeText={setTelefono}
+                      placeholder="Teléfono móvil"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                ) : (
+                  <Detail
+                    label="Teléfono Móvil"
+                    value={trabajadorActual?.telefono ?? "No registrado"}
+                  />
+                )}
               </View>
 
-              <Detail
-                label="Dirección de la Sede"
-                value={centroTrabajoActual?.direccion ?? "No registrada"}
-              />
-              <Detail
-                label="CIF / NIF Empresa"
-                value={empresaActual?.cif ?? "No disponible"}
-              />
-            </View>
-          </Card>
+              {isEditing && (
+                <Pressable
+                  style={styles.saveButton}
+                  onPress={handleGuardarPerfil}
+                  disabled={guardando}
+                >
+                  {guardando ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <ThemedText style={styles.saveButtonText}>
+                      Guardar Cambios
+                    </ThemedText>
+                  )}
+                </Pressable>
+              )}
+            </Card>
+
+            {/* Condiciones Contractuales */}
+            {!esAdmin && (
+              <Card>
+                <View style={styles.seccionPerfilHeader}>
+                  <IconSymbol name="description" size={20} color="#16A34A" />
+                  <ThemedText
+                    style={[styles.perfilTitle, { color: "#16A34A" }]}
+                  >
+                    Condiciones Contractuales
+                  </ThemedText>
+                </View>
+                <View style={styles.separadorPerfil} />
+                <View style={styles.detailGrid}>
+                  <Detail
+                    label="Puesto de Trabajo"
+                    value={
+                      contratoActual?.puesto_trabajo ?? "Operario / No Definido"
+                    }
+                  />
+                  <Detail
+                    label="Tipo de Contrato"
+                    value={contratoActual?.tipo_contrato ?? "Régimen General"}
+                  />
+                  <Detail
+                    label="Fecha Alta Contrato"
+                    value={
+                      contratoActual?.fecha_inicio ??
+                      trabajadorActual?.fecha_alta_empresa ??
+                      "No consta"
+                    }
+                  />
+                  <Detail
+                    label="Vencimiento / Fin"
+                    value={contratoActual?.fecha_fin ?? "Indefinido / Continuo"}
+                  />
+                  <Detail
+                    label="Jornada Semanal"
+                    value={
+                      contratoActual?.horas_semana
+                        ? `${contratoActual.horas_semana.toString().substring(0, 2)} hs/semana`
+                        : "Según Convenio Colectivo"
+                    }
+                  />
+                </View>
+              </Card>
+            )}
+
+            {/* Organización y Centro de Fichaje */}
+            {!esAdmin && (
+              <Card>
+                <View style={styles.seccionPerfilHeader}>
+                  <IconSymbol name="business" size={20} color="#EA580C" />
+                  <ThemedText
+                    style={[styles.perfilTitle, { color: "#EA580C" }]}
+                  >
+                    Organización y Centro de Fichaje
+                  </ThemedText>
+                </View>
+                <View style={styles.separadorPerfil} />
+
+                <View style={styles.detailGrid}>
+                  <View style={styles.selectorContainer}>
+                    <ThemedText style={styles.detailLabel}>
+                      Empresa vinculada
+                    </ThemedText>
+                    <View style={styles.pickerWrapper}>
+                      <ThemedText style={styles.selectorSingleText}>
+                        {empresaActual?.nombre_comercial ??
+                          "No hay empresa vinculada"}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  <View style={styles.selectorContainer}>
+                    <ThemedText style={styles.detailLabel}>
+                      Seleccionar Centro
+                    </ThemedText>
+                    {cargandoCentros ? (
+                      <ActivityIndicator
+                        size="small"
+                        color="#EA580C"
+                        style={{ marginVertical: 10 }}
+                      />
+                    ) : (
+                      <View style={styles.pickerWrapperHorizontal}>
+                        {centrosDisponibles && centrosDisponibles.length > 0 ? (
+                          centrosDisponibles.map((centro: CentroTrabajo) => (
+                            <Pressable
+                              key={centro.id}
+                              style={[
+                                styles.chipCentro,
+                                centroTrabajoActual?.id === centro.id &&
+                                  styles.chipCentroActivo,
+                              ]}
+                              onPress={() => {
+                                if (centroTrabajoActual?.id !== centro.id) {
+                                  setCentroTrabajoActual(centro);
+                                }
+                              }}
+                            >
+                              <ThemedText
+                                style={[
+                                  styles.chipCentroText,
+                                  centroTrabajoActual?.id === centro.id &&
+                                    styles.chipCentroTextActivo,
+                                ]}
+                              >
+                                {centro.nombre}
+                              </ThemedText>
+                            </Pressable>
+                          ))
+                        ) : (
+                          <ThemedText style={styles.detailValue}>
+                            No hay centros configurados para esta empresa
+                          </ThemedText>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.zonaHorariaCard}>
+                    <IconSymbol name="schedule" size={16} color="#475569" />
+                    <ThemedText style={styles.zonaHorariaTexto}>
+                      Zona Horaria de Registro:{" "}
+                      <ThemedText
+                        style={{ fontWeight: "700", color: "#0F172A" }}
+                      >
+                        {centroTrabajoActual?.zona_horaria ?? "Europe/Madrid"}
+                      </ThemedText>
+                    </ThemedText>
+                  </View>
+
+                  <Detail
+                    label="Dirección de la Sede"
+                    value={centroTrabajoActual?.direccion ?? "No registrada"}
+                  />
+                  <Detail
+                    label="CIF / NIF Empresa"
+                    value={empresaActual?.cif ?? "No disponible"}
+                  />
+                </View>
+              </Card>
+            )}
+          </>
         )}
 
+        {/* Seguridad y Cuenta (Separado en Email y Contraseña) */}
         <Card>
           <View style={styles.seccionPerfilHeader}>
             <IconSymbol name="manage-accounts" size={20} color="#475569" />
@@ -617,11 +675,159 @@ export default function PerfilScreen() {
             </ThemedText>
           </View>
           <View style={styles.separadorPerfil} />
+
           <View style={styles.detailGrid}>
-            <Detail
-              label="Correo Electrónico"
-              value={usuarioActual?.email ?? ""}
-            />
+            {/* 1. SECCIÓN DE CORREO ELECTRÓNICO */}
+            <View style={styles.subseccionSeguridad}>
+              <View style={styles.headerSubseccion}>
+                <ThemedText style={styles.subseccionTitle}>
+                  Correo Electrónico
+                </ThemedText>
+                <Pressable
+                  style={styles.botonAccionHeader}
+                  onPress={() => {
+                    if (isEditingEmail) {
+                      setNuevoEmail("");
+                    } else {
+                      setNuevoEmail(usuarioActual?.email ?? "");
+                    }
+                    setIsEditingEmail(!isEditingEmail);
+                  }}
+                >
+                  <ThemedText style={styles.textoBotonAccionHeader}>
+                    {isEditingEmail ? "Cancelar" : "Modificar"}
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {isEditingEmail ? (
+                <View style={{ gap: 10, marginTop: 8 }}>
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Nuevo Correo (Requiere Confirmación)
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={nuevoEmail}
+                      onChangeText={setNuevoEmail}
+                      placeholder="Nuevo correo electrónico"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  <Pressable
+                    style={styles.saveButton}
+                    onPress={handleGuardarEmail}
+                    disabled={guardandoEmail}
+                  >
+                    {guardandoEmail ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <ThemedText style={styles.saveButtonText}>
+                        Actualizar Correo
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              ) : (
+                <Detail
+                  label="Correo actual"
+                  value={usuarioActual?.email ?? ""}
+                />
+              )}
+            </View>
+
+            <View style={styles.separadorPerfil} />
+
+            {/* 2. SECCIÓN DE CONTRASEÑA */}
+            <View style={styles.subseccionSeguridad}>
+              <View style={styles.headerSubseccion}>
+                <ThemedText style={styles.subseccionTitle}>
+                  Contraseña
+                </ThemedText>
+                <Pressable
+                  style={styles.botonAccionHeader}
+                  onPress={() => {
+                    if (isEditingPassword) {
+                      setPasswordActual("");
+                      setNuevaPassword("");
+                      setConfirmarPassword("");
+                    }
+                    setIsEditingPassword(!isEditingPassword);
+                  }}
+                >
+                  <ThemedText style={styles.textoBotonAccionHeader}>
+                    {isEditingPassword ? "Cancelar" : "Modificar"}
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {isEditingPassword ? (
+                <View style={{ gap: 10, marginTop: 8 }}>
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Contraseña Actual (Obligatoria)
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={passwordActual}
+                      onChangeText={setPasswordActual}
+                      placeholder="Contraseña actual"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Nueva Contraseña
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={nuevaPassword}
+                      onChangeText={setNuevaPassword}
+                      placeholder="Nueva contraseña"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <ThemedText style={styles.detailLabel}>
+                      Confirmar Nueva Contraseña
+                    </ThemedText>
+                    <TextInput
+                      style={styles.inputEdit}
+                      value={confirmarPassword}
+                      onChangeText={setConfirmarPassword}
+                      placeholder="Repite la nueva contraseña"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry
+                    />
+                  </View>
+
+                  <Pressable
+                    style={styles.saveButton}
+                    onPress={handleGuardarPassword}
+                    disabled={guardandoPassword}
+                  >
+                    {guardandoPassword ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <ThemedText style={styles.saveButtonText}>
+                        Actualizar Contraseña
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              ) : (
+                <Detail label="Estado de Contraseña" value="••••••••••••" />
+              )}
+            </View>
+
+            <View style={styles.separadorPerfil} />
+
             <Detail
               label="Rol Autorizado Sistema"
               value={
@@ -647,7 +853,8 @@ export default function PerfilScreen() {
           </View>
         </Card>
 
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
+        {/* Botón de Logout */}
+        <Pressable style={styles.logoutButton} onPress={handleCierreSesion}>
           <IconSymbol name="logout" size={18} color="#FFFFFF" />
           <ThemedText style={styles.logoutButtonText}>Cerrar Sesión</ThemedText>
         </Pressable>
@@ -671,6 +878,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  headerSubseccion: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  subseccionSeguridad: {
+    marginVertical: 4,
+  },
+  subseccionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
   },
   botonAccionHeader: {
     paddingHorizontal: 10,
@@ -731,7 +952,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 12,
   },
   saveButtonText: {
     color: "#FFFFFF",
@@ -786,26 +1007,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     marginTop: 6,
-  },
-  selectorItem: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-  },
-  selectorItemActivo: {
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
-  },
-  selectorItemText: {
-    fontSize: 14,
-    color: "#475569",
-    fontWeight: "500",
-  },
-  selectorItemTextActivo: {
-    color: "#1D4ED8",
-    fontWeight: "700",
   },
   chipCentro: {
     paddingHorizontal: 12,

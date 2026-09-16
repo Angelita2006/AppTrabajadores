@@ -7,6 +7,10 @@ from pydantic import BaseModel, EmailStr, Field
 class EmailRecuperacionRequest(BaseModel):
     email: EmailStr
 
+class EmailCambioRequest(BaseModel):
+    email: EmailStr
+    antigua_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña")
+
 class ConfirmarPasswordRequest(BaseModel):
     """
     Esquema para validar el código de 6 dígitos recibido y establecer una nueva contraseña.

@@ -1,24 +1,23 @@
 import {
-  obtenerAusenciasTrabajador,
-  solicitarAusencia,
+    obtenerAusenciasTrabajador,
+    solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import {
-  AusenciaCreateRequest,
-  AusenciaResponse,
-  ItemAusencia,
-  TipoAusencia,
+    AusenciaCreateRequest,
+    AusenciaResponse,
+    ItemAusencia,
+    TipoAusencia,
 } from "@/src/modules/ausencias/types/ausencia";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -36,7 +35,7 @@ export default function VacacionesScreen() {
     "Vacaciones" as TipoAusencia,
   );
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // Carga histórica de ausencias
   const cargarHistoricoAusencias = async () => {

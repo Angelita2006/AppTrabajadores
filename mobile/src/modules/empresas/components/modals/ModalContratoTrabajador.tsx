@@ -6,7 +6,7 @@ import {
 } from "@/src/modules/contratos/types/contrato";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React from "react";
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 
@@ -87,6 +87,8 @@ export const ModalContratoTrabajador: React.FC<
   styles,
   inputRefs = {},
 }) => {
+  const { mostrarError, mostrarMensaje } = useAppModal();
+
   const handleValidarYGuardar = () => {
     if (!trabajadorActual || !trabajadorActual.id) {
       mostrarError(

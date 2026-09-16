@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import api from "../../../service/api/api";
 import { Empresa, EmpresaUpdate } from "../types/empresa";
@@ -290,26 +291,44 @@ export const actualizarLogoEmpresa = async (
 };
 
 /**
- * Construye y devuelve la URL absoluta accesible para visualizar el logo de la empresa según la plataforma (Web o Móvil).
- *
- * @function obtenerUrlLogo
- * @param {string | null | undefined} logoUrl - Ruta o URL relativa del logo devuelta por el servidor.
- * @returns {string | null} URL absoluta formateada del logo o null si no existe.
+ * Construye y devuelve la URL absoluta accesible para visualizar el logo
+ * o archivos protegidos de la empresa según la plataforma (Web o Móvil).
  */
-export const obtenerUrlLogo = (logoUrl?: string | null): string | null => {
+export const obtenerUrlLogo = async (
+  logoUrl?: string | null,
+): Promise<string | null> => {
   if (!logoUrl) return null;
 
+  // Si ya es una URL absoluta externa, la devolvemos tal cual
   if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
     return logoUrl;
   }
 
-  if (Platform.OS === "web") {
-    return `http://127.0.0.1:8080${logoUrl.startsWith("/") ? "" : "/"}${logoUrl}`;
+  // Transformamos /static/ a /api/archivos/ para que apunte al endpoint protegido
+  let rutaModificada = logoUrl;
+  if (rutaModificada.startsWith("/static/")) {
+    rutaModificada = rutaModificada.replace("/static/", "/api/archivos/");
+  } else if (!rutaModificada.startsWith("/api/archivos/")) {
+    rutaModificada = `/api/archivos${rutaModificada.startsWith("/") ? "" : "/"}${rutaModificada}`;
   }
 
-  const baseURL = api.defaults.baseURL || "http://10.0.2.2:8000";
-  const cleanBase = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
-  const cleanPath = logoUrl.startsWith("/") ? logoUrl : `/${logoUrl}`;
+  // Determinamos la URL base unificada de Axios
+  const baseURL = api.defaults.baseURL;
+  if (!baseURL) return null;
 
-  return `${cleanBase}${cleanPath}`;
+  const cleanBase = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+  const cleanPath = rutaModificada.startsWith("/")
+    ? rutaModificada
+    : `/${rutaModificada}`;
+
+  let urlFinal = `${cleanBase}${cleanPath}`;
+
+  const token = await AsyncStorage.getItem("user_token");
+  // Si tenemos un token, lo adjuntamos como query param para que el endpoint protegido pueda validarlo
+  if (token) {
+    const separador = urlFinal.includes("?") ? "&" : "?";
+    urlFinal = `${urlFinal}${separador}token=${token}`;
+  }
+
+  return urlFinal;
 };

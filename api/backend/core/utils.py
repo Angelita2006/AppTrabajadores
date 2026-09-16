@@ -143,7 +143,7 @@ def enviar_correo_recuperacion(destinatario: str, codigo: str):
     """Función auxiliar para enviar el correo mediante SMTP"""
     try:
         mensaje = MIMEMultipart("alternative")
-        mensaje.add_header("Subject", "Código de recuperación de contraseña - FichApp")
+        mensaje.add_header("Subject", "Código de recuperación de contraseña - Fichapp")
         mensaje["From"] = EMAILS_FROM
         mensaje["To"] = destinatario
 
@@ -175,4 +175,86 @@ def enviar_correo_recuperacion(destinatario: str, codigo: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo enviar el correo electrónico de recuperación. Inténtalo más tarde."
+        )
+
+
+def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
+    """Función auxiliar para enviar el correo mediante SMTP"""
+    try:
+        mensaje = MIMEMultipart("alternative")
+        mensaje.add_header("Subject", "Código de cambio de contraseña - Fichapp")
+        mensaje["From"] = EMAILS_FROM
+        mensaje["To"] = destinatario
+
+        html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 5px;">
+              <h2 style="color: #2563EB;">Cambio de Contraseña</h2>
+              <p>Has solicitado cambiar tu contraseña en <strong>Fichapp</strong>.</p>
+              <p>Tu código de verificación de 6 dígitos es:</p>
+              <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1f2937; border-radius: 4px;">
+                {codigo}
+              </div>
+              <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
+            </div>
+          </body>
+        </html>
+        """
+
+        mensaje.attach(MIMEText(html, "html", "utf-8"))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
+            servidor.starttls()
+            servidor.login(SMTP_USER, SMTP_PASSWORD)
+            servidor.sendmail(SMTP_USER, destinatario, mensaje.as_string())
+            
+    except Exception as e:
+        print(f"Error al enviar el correo SMTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo enviar el correo electrónico de cambio de contraseña. Inténtalo más tarde."
+        )
+
+def enviar_correo_cambio_email(destinatario: str, token: str):
+    """Función auxiliar para enviar el enlace de confirmación de cambio de correo mediante SMTP"""
+    # Ajusta esta URL a la ruta de tu frontend o aplicación que procesará el token
+    url_confirmacion = f"http://localhost:8081/confirmar-cambio-email?token={token}"
+    
+    try:
+        mensaje = MIMEMultipart("alternative")
+        mensaje.add_header("Subject", "Confirmación de cambio de correo electrónico - Fichapp")
+        mensaje["From"] = EMAILS_FROM
+        mensaje["To"] = destinatario
+
+        html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 5px;">
+              <h2 style="color: #2563EB;">Cambio de Correo Electrónico</h2>
+              <p>Has solicitado cambiar tu correo electrónico en <strong>Fichapp</strong>.</p>
+              <p>Para confirmar tu nuevo correo y completar el proceso, haz clic en el siguiente botón:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="{url_confirmacion}" style="background-color: #2563EB; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Confirmar mi nuevo correo</a>
+              </div>
+              <p style="font-size: 14px; color: #555;">Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:</p>
+              <p style="font-size: 12px; color: #2563EB; word-break: break-all;">{url_confirmacion}</p>
+              <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si no solicitaste este cambio, puedes ignorar este mensaje de forma segura.</p>
+            </div>
+          </body>
+        </html>
+        """
+
+        mensaje.attach(MIMEText(html, "html", "utf-8"))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
+            servidor.starttls()
+            servidor.login(SMTP_USER, SMTP_PASSWORD)
+            servidor.sendmail(SMTP_USER, destinatario, mensaje.as_string())
+            
+    except Exception as e:
+        print(f"Error al enviar el correo SMTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo enviar el correo electrónico de confirmación. Inténtalo más tarde."
         )

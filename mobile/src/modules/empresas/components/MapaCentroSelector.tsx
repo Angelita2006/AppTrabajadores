@@ -1,4 +1,4 @@
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { useEffect, useState } from "react";
 import {
   Linking,
@@ -41,6 +41,7 @@ export default function SelectorUbicacionMapa({
 }: SelectorUbicacionMapaProps) {
   const [LeafletComponents, setLeafletComponents] = useState<any>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   /**
    * Efecto de inicialización que carga dinámicamente los estilos y componentes

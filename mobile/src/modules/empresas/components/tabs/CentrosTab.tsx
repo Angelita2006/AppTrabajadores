@@ -1,6 +1,6 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
-import { mostrarError, mostrarMensaje } from "@/src/utils/errorHandler";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -73,6 +73,8 @@ export default function TabCentros({
   const centrosInactivos = centrosEmpresa.filter(
     (centro) => centro.activo === false,
   );
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // ==========================================
   // CREACIÓN DE CENTROS DE TRABAJO

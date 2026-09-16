@@ -9,6 +9,9 @@ from models.usuarios import Usuarios
 from core.config import settings
 from models.roles import Roles
 from models.usuarios_roles import UsuariosRoles
+from fastapi import Request, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from jose import jwt, JWTError
 
 # Claves de configuración para los tokens JWT (en producción, cámbialas por variables de entorno)
 SECRET_KEY = settings.SECRET_KEY.__str__()
@@ -54,18 +57,35 @@ def crear_token_acceso(data: dict) -> str:
     return encoded_jwt
 
 def obtener_usuario_actual(
-    token: str = Depends(oauth2_scheme), 
+    request: Request,
     db: Session = Depends(get_db)
 ) -> Usuarios:
     """
     Dependencia de FastAPI para proteger rutas. 
-    Decodifica el token Bearer, extrae el ID de usuario y valida su existencia y estado activo.
+    Busca el token primero en el Header (Authorization: Bearer ...) 
+    y si no lo encuentra, lo busca en los parámetros de la URL (?token=...).
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="No se han podido validar las credenciales de acceso.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    token = None
+
+    # 1. Intentar obtener el token de la cabecera HTTP (Axios / peticiones normales)
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+
+    # 2. Si no está en el header, buscar en los parámetros de la URL (?token=...) (Imágenes y PDFs)
+    if not token:
+        token = request.query_params.get("token")
+
+    # Si no se encontró el token en ninguno de los dos sitios, error 401
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_email_raw = payload.get("sub")

@@ -5,9 +5,9 @@ import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/cal
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import {
-  actualizarContrato,
-  obtenerContratoActivoTrabajador,
-  rescindirContratoActivoTrabajador,
+    actualizarContrato,
+    obtenerContratoActivoTrabajador,
+    rescindirContratoActivoTrabajador,
 } from "@/src/modules/contratos/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
@@ -18,36 +18,35 @@ import { ModalContratoTrabajador } from "@/src/modules/empresas/components/modal
 import { ModalEliminarTurnoTrabajador } from "@/src/modules/empresas/components/modals/ModalEliminarTurnoTrabajador";
 import { ModalRescindirBajaTrabajador } from "@/src/modules/empresas/components/modals/ModalRescindirBajaTrabajador";
 import {
-  PlantillaProvider,
-  usePlantilla,
+    PlantillaProvider,
+    usePlantilla,
 } from "@/src/modules/empresas/components/PlantillaProvider";
 import {
-  TipoModal,
-  usePlantillaFormularios,
+    TipoModal,
+    usePlantillaFormularios,
 } from "@/src/modules/empresas/hooks/usePlantillaFormularios";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
-import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextStyle,
-  View,
-  ViewStyle,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextStyle,
+    View,
+    ViewStyle,
 } from "react-native";
 import {
-  actualizarAsignacionTurno,
-  actualizarTrabajador,
-  asignarTurnosTrabajador,
-  tramitarBajaTotalTrabajador,
+    actualizarAsignacionTurno,
+    actualizarTrabajador,
+    asignarTurnosTrabajador,
+    tramitarBajaTotalTrabajador,
 } from "../../src/modules/trabajadores/api/services";
 import { Trabajador } from "../../src/modules/trabajadores/types/trabajador";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -62,6 +61,7 @@ export default function PlantillaWrapper() {
 }
 
 function PlantillaScreen() {
+  // const { usuarioActual } = useUsuarioQuery();
   const { usuarioActual } = useSesion();
   const { plantilla, cargando, cargarPlantilla, inicializado } = usePlantilla();
 
@@ -141,7 +141,7 @@ function PlantillaScreen() {
     inputRefs,
   } = usePlantillaFormularios(usuarioActual!, cargarPlantilla);
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
     if (usuarioActual?.empresa_id) {

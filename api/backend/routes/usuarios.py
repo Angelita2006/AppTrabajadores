@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from operator import concat
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import random
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
@@ -9,8 +10,10 @@ from slowapi.util import get_remote_address
 from core.security import get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual, verificar_rol_requerido
 from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
 from core.auditoria import registrar_auditoria
+from core.utils import enviar_correo_cambio_contraseña, enviar_correo_cambio_email, enviar_correo_recuperacion
 from models.empresas import Empresas
 from models.roles import Roles
+from schemas.auth import ConfirmarPasswordRequest, EmailCambioRequest, EmailRecuperacionRequest
 from schemas.usuarios_roles import UsuarioRolCreate, UsuarioRolResponse
 from schemas.usuarios import LoginRequest, UsuarioRegisterCreate, UsuarioResponse
 from models.usuarios import Usuarios
@@ -18,6 +21,11 @@ from models.trabajadores import Trabajadores
 from core.database import get_db
 from fastapi.security import OAuth2PasswordRequestForm
 from models.usuarios_roles import UsuariosRoles
+from datetime import datetime, timedelta, timezone
+import secrets
+from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
 
 # Configuración del enrutador para la gestión de usuarios
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
@@ -347,56 +355,301 @@ def cambiar_estado_usuario(
     db.refresh(usuario)
     return usuario
 
-
-@router.put("/{id_usuario}/password", response_model=UsuarioResponse, summary="Actualizar contraseña de usuario")
-@limiter.limit("5/minute") 
-def cambiar_password_usuario(
+@router.put("/solicitar-cambio-email", status_code=status.HTTP_200_OK, summary="Solicitar cambio de correo electrónico con verificación")
+@limiter.limit("5/minute")
+def solicitar_cambio_email(
     request: Request,
-    id_usuario: UUID, 
-    antigua_password: str, 
-    nueva_password: str, 
+    nuevo_email: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
-    **PUT /api/usuarios/{id_usuario}/password**
-    
-    Permite cambiar la contraseña validando que el usuario disponga del rol de administración requerido.
+    Valida la unicidad del nuevo correo, genera un token seguro de verificación 
+    y envía un enlace al nuevo correo electrónico para confirmar el cambio.
     """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición desde IP: {cliente_ip}")
-    print(f"Solicitud de cambio de contraseña para el usuario {id_usuario} autorizada por el admin: {usuario_actual.email}")
-
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == id_usuario).first()
-
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cuenta de usuario con ID {id_usuario} no encontrada."
-        )
-
-    if not verify_password(antigua_password, str(usuario.password_hash)):
+    email_limpio = str(nuevo_email).strip().lower()
+    
+    # 1. Verificar si el email ya está en uso por otro usuario
+    email_existente = db.query(Usuarios).filter(
+        Usuarios.email == email_limpio,
+        Usuarios.id != usuario_actual.id,Usuarios.activo == True
+    ).first()
+    
+    if email_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña antigua introducida no es correcta."
+            detail="El correo electrónico ya está en uso por otro usuario."
         )
 
-    setattr(usuario, "password_hash", get_password_hash(nueva_password))
-    setattr(usuario, "updated_at", datetime.now())
+    # 2. Generar token único y fecha de expiración (ej. 1 hora)
+    token_verificacion = secrets.token_urlsafe(32)
+    expiracion = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    # 3. Guardar el email pendiente y los datos del token en el usuario
+    setattr(usuario_actual, "email_pendiente_verificacion", email_limpio)
+    setattr(usuario_actual, "token_cambio_email", token_verificacion)
+    setattr(usuario_actual, "token_cambio_email_expira_at", expiracion)
+    setattr(usuario_actual, "updated_at", datetime.now(timezone.utc))
+    
+    # 4. Disparar tarea en segundo plano para enviar el correo con el enlace
+    # El enlace debe apuntar a tu frontend o endpoint de confirmación: 
+    background_tasks.add_task(enviar_correo_cambio_email, email_limpio, token_verificacion)
 
     registrar_auditoria(
         db=db,
         request=request,
         usuario=usuario_actual,
-        empresa_id=usuario.empresa_id,
+        empresa_id=usuario_actual.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "usuarios", "accion": "cambiar_password", "entidad_id": str(id_usuario), "detalles": f"Cambio de contraseña para el usuario {id_usuario}"}
+        detalle={
+            "recurso": "usuarios", 
+            "accion": "solicitar_cambio_email", 
+            "entidad_id": str(usuario_actual.id), 
+            "detalles": f"Solicitud de cambio de email a {email_limpio}"
+        }
     )
-    db.commit()
-    db.refresh(usuario)
     
+    db.commit()
+    db.refresh(usuario_actual)
+    
+    return {
+        "status": "success",
+        "message": "Se ha enviado un enlace de confirmación a tu nuevo correo electrónico."
+    }
+
+@router.post("/confirmar-cambio-email", status_code=status.HTTP_200_OK, summary="Confirmar cambio de correo electrónico mediante enlace")
+def confirmar_cambio_email(
+    request: Request,
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint que procesa el clic en el enlace del correo. Valida el token, 
+    actualiza el email antiguo por el nuevo en el usuario y en su trabajador asociado, y limpia los campos temporales.
+    """
+    # 1. Buscar usuario que tenga ese token registrado
+    usuario = db.query(Usuarios).filter(
+        Usuarios.token_cambio_email == token
+    ).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El token de verificación es inválido."
+        )
+
+    # 2. Validar si el token ha expirado
+    if usuario.token_cambio_email_expira_at and datetime.now(timezone.utc) > usuario.token_cambio_email_expira_at:
+        usuario.token_cambio_email = None
+        usuario.token_cambio_email_expira_at = None
+        usuario.email_pendiente_verificacion = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El enlace de verificación ha expirado. Por favor, solicita uno nuevo desde tu perfil."
+        )
+
+    # 3. Aplicar el cambio definitivo del correo
+    nuevo_email = usuario.email_pendiente_verificacion
+    if not nuevo_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hay ninguna solicitud de cambio de correo pendiente."
+        )
+
+    try:
+        # Actualizar datos del usuario
+        usuario.email = nuevo_email
+        usuario.email_pendiente_verificacion = None
+        usuario.token_cambio_email = None
+        usuario.token_cambio_email_expira_at = None
+        usuario.updated_at = datetime.now(timezone.utc)
+
+        db.add(usuario)
+
+        # 4. Buscar y actualizar el trabajador asociado
+        trabajador = db.query(Trabajadores).filter(Trabajadores.id == usuario.trabajador_id).first()
+        
+        if trabajador:
+            trabajador.email = nuevo_email
+            trabajador.updated_at = datetime.now(timezone.utc)
+            db.add(trabajador)
+
+        db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario,
+            empresa_id=usuario.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                "recurso": "usuarios", 
+                "accion": "confirmar_cambio_email", 
+                "entidad_id": str(usuario.id), 
+                "detalles": f"Email cambiado exitosamente a {nuevo_email} (usuario y trabajador asociado)"
+            }
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido completar el cambio de correo electrónico. "+e.__str__()
+        )
+
+    return {
+        "status": "success",
+        "message": "¡Correo electrónico confirmado y actualizado con éxito en tu cuenta y perfil de trabajador!"
+    }
+
+@router.put("/solicitar-cambio-password", status_code=status.HTTP_200_OK, summary="Solicitar código para cambio de contraseña")
+@limiter.limit("5/minute")
+def solicitar_cambio_password(
+    request: Request,
+    payload: EmailCambioRequest, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **POST /api/usuarios/solicitar-cambio-password**
+    
+    Valida la contraseña actual del usuario autenticado, genera un código aleatorio 
+    de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
+    """
+    # 1. Validar que la contraseña antigua introducida es correcta
+    if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual introducida no es correcta."
+        )
+
+    # 2. Generación del código aleatorio de 6 dígitos
+    codigo_aleatorio = f"{random.randint(0, 999999):06d}"
+
+    # 3. Guardar el código y su expiración (15 minutos con zona horaria UTC) en el usuario
+    try:
+        usuario_actual.codigo_recuperacion = codigo_aleatorio
+        usuario_actual.codigo_expira_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+        db.add(usuario_actual)
+        db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=usuario_actual.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "usuarios", "accion": "solicitar_cambio_password", "entidad_id": str(usuario_actual.id)}
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido procesar la solicitud de cambio de contraseña."
+        )
+
+    # 4. Envío real del correo electrónico con el código
+    enviar_correo_cambio_contraseña(usuario_actual.email, codigo_aleatorio)
+
+    return {
+        "status": "success",
+        "message": "Se ha enviado un código de verificación a tu correo electrónico para confirmar el cambio."
+    }
+
+
+@router.post("/confirmar-cambio-password", status_code=status.HTTP_200_OK, summary="Confirmar nueva contraseña con código")
+@limiter.limit("5/minute")
+def confirmar_cambio_password(
+    request: Request,
+    payload: ConfirmarPasswordRequest, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **POST /api/usuarios/confirmar-cambio-password**
+    
+    Valida el código de 6 dígitos recibido por correo y actualiza la contraseña definitivamente.
+    """
+    # 1. Validación estricta del código registrado
+    if not usuario_actual.codigo_recuperacion or payload.codigo_verificacion != usuario_actual.codigo_recuperacion:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación introducido es incorrecto."
+        )
+
+    # 2. Validar si el código ha expirado
+    if usuario_actual.codigo_expira_at and datetime.now(timezone.utc) > usuario_actual.codigo_expira_at:
+        usuario_actual.codigo_recuperacion = None
+        usuario_actual.codigo_expira_at = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de verificación ha expirado. Solicita uno nuevo."
+        )
+
+    if len(payload.nueva_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 6 caracteres."
+        )
+
+    # 3. Actualizar contraseña y limpiar campos temporales
+    try:
+        usuario_actual.password_hash = get_password_hash(payload.nueva_password)
+        usuario_actual.codigo_recuperacion = None
+        usuario_actual.codigo_expira_at = None
+        
+        if hasattr(usuario_actual, 'updated_at'):
+            usuario_actual.updated_at = datetime.now(timezone.utc)
+            
+        db.add(usuario_actual)
+        db.commit()
+        
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=usuario_actual.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "usuarios", "accion": "confirmar_cambio_password", "entidad_id": str(usuario_actual.id)}
+        )
+        
+        return {
+            "status": "success",
+            "message": "Tu contraseña ha sido actualizada correctamente."
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se ha podido actualizar la contraseña: {str(e)}"
+        )
+
+@router.get("/me", response_model=UsuarioResponse, summary="Obtener perfil del usuario autenticado")
+@limiter.limit("30/minute")
+def obtener_mi_usuario(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+) -> UsuarioResponse:
+    """
+    **GET /api/usuarios/me**
+    
+    Devuelve los datos completos del usuario que está realizando la petición usando el token de sesión.
+    """
+    usuario = db.query(Usuarios).options(
+        joinedload(Usuarios.empresa),
+        joinedload(Usuarios.trabajador),
+        joinedload(Usuarios.usuarios_roles)
+    ).filter(Usuarios.id == usuario_actual.id).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la información del usuario autenticado."
+        )
+
     return usuario

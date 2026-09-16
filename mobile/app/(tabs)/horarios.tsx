@@ -2,22 +2,22 @@ import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-t
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
-  DIAS_SEMANA,
-  RegistroFichaje,
+    DIAS_SEMANA,
+    RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerResumenesPorTrabajador } from "@/src/modules/resumenes-jornada/api/services";
 import { ResumenJornada } from "@/src/modules/resumenes-jornada/types/resumen-jornada";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
-import { useSesion } from "@/src/modules/usuarios/store/SesionContext";
+import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
 import {
-  formatearAHorasYMinutos,
-  horaAMinutos,
-  obtenerMinutosFichaje,
+    formatearAHorasYMinutos,
+    horaAMinutos,
+    obtenerMinutosFichaje,
 } from "@/src/utils/formaters";
 import { cumpleDiasSemana } from "@/src/utils/validators";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -34,6 +34,7 @@ export default function HorariosScreen() {
     [],
   );
   const [cargando, setCargando] = useState(true);
+
   const { mostrarError } = useAppModal();
 
   useEffect(() => {

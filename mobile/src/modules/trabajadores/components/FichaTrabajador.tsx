@@ -2,12 +2,12 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { Card } from "@/src/shared/ui/AppSurface";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { obtenerContratoActivoTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
-import { obtenerUrlLogo } from "../../empresas/api/services";
+import { ImagenConToken } from "../../empresas/components/Archivos";
 import { obtenerRolPorId } from "../../roles/api/services";
 import { obtenerTurnoPorId } from "../../turnos/api/services";
 import { Turno } from "../../turnos/types/turno";
@@ -180,8 +180,8 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
       {/* Cabecera de la Ficha: Foto, Nombre completo y Estado Laboral */}
       <View style={styles.cardHeader}>
         {item.foto_url ? (
-          <Image
-            source={{ uri: obtenerUrlLogo(item.foto_url) || undefined }}
+          <ImagenConToken
+            rutaRelativa={item.foto_url}
             style={[
               styles.avatarCirculo,
               { width: 40, height: 40, borderRadius: 20 },

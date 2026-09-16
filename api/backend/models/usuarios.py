@@ -34,6 +34,9 @@ class Usuarios(Base):
     
     codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     codigo_expira_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True)
+    email_pendiente_verificacion = mapped_column(String, nullable=True)
+    token_cambio_email = mapped_column(String, nullable=True, unique=True)
+    token_cambio_email_expira_at = mapped_column(DateTime(timezone=True), nullable=True)
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='usuarios') # type: ignore
     trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', back_populates='usuarios') # type: ignore

@@ -22,7 +22,6 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import {
   validarCifNifOrganizacion,
   validarDniEspanol,
@@ -89,7 +88,7 @@ export default function RegistroOrganizacionScreen() {
 
   const opacidadTarjeta = useSharedValue(0);
 
-  const { mostrarError } = useAppModal();
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
     opacidadTarjeta.value = withTiming(1, { duration: 500 });
@@ -848,7 +847,7 @@ export default function RegistroOrganizacionScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push("/(authentication)/politica-privacidad")}
+            onPress={() => router.push("/politica-privacidad")}
             style={{ alignSelf: "center", marginTop: 20 }}
           >
             <ThemedText

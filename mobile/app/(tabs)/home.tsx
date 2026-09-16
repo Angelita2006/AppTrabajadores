@@ -1,29 +1,28 @@
 import { obtenerDispositivosCentro } from "@/src/modules/dispositivos-fichaje/api/services";
 import { Dispositivo } from "@/src/modules/dispositivos-fichaje/types/dispositivo-fichaje";
 import {
-  obtenerFichajesHoy,
-  registrarFichaje,
+    obtenerFichajesHoy,
+    registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import { mostrarMensaje } from "@/src/utils/errorHandler";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    AppState,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View,
 } from "react-native";
 import SignatureCanvas from "react-native-signature-canvas";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
-import { useSesion } from "../../src/modules/usuarios/store/SesionContext";
+import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
@@ -41,7 +40,8 @@ export default function HomeScreen() {
   const [timestampBaseActual, setTimestampBaseActual] = useState<number | null>(
     null,
   );
-  const { mostrarError } = useAppModal();
+
+  const { mostrarError, mostrarMensaje } = useAppModal();
 
   // Mapeo sincronizado de tipos de evento: { ENTRADA: "uuid-1", SALIDA: "uuid-2", ... }
   const [mapaTiposEvento, setMapaTiposEvento] = useState<
