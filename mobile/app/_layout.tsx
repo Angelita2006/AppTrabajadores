@@ -12,7 +12,7 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, BackHandler, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -51,6 +51,36 @@ function InitialLayout() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Interceptor global del botón de retroceso (BackHandler) por rol
+  useEffect(() => {
+    const backAction = () => {
+      const currentRoute = segments[segments.length - 1];
+      const tipo = usuarioActual?.tipo_usuario;
+      const esAdminOControlador =
+        tipo === "Admin_empresa" ||
+        tipo === "Admin_gestoría" ||
+        tipo === "Auditor_itss" ||
+        tipo === "Representante_legal";
+
+      if (
+        esAdminOControlador &&
+        (currentRoute === "home" || currentRoute === "(tabs)")
+      ) {
+        router.replace("/(tabs)/empresa");
+        return true;
+      }
+
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction,
+    );
+
+    return () => backHandler.remove();
+  }, [segments, usuarioActual, router]);
+
   // Registrar token push y escuchar notificaciones al iniciar sesión
   useEffect(() => {
     if (!usuarioActual?.id) return;
@@ -84,14 +114,30 @@ function InitialLayout() {
   useEffect(() => {
     if (!estaListo || cargandoSesionLocal) return;
 
-    const enGrupoAutenticacion = segments[0] === "(authentication)";
-
-    // 1. Añadimos aquí la excepción para la política de privacidad y otras vistas públicas
+    // Casteamos segments como string[] para evitar problemas con las tuplas estrictas de Expo Router
+    const segs = segments as string[];
+    const enGrupoAutenticacion = segs[0] === "(authentication)";
     const esRutaPublica =
-      enGrupoAutenticacion || segments[0] === "politica-privacidad";
+      enGrupoAutenticacion || segs[0] === "politica-privacidad";
 
     const tieneSesion = usuarioActual !== null;
-    const segmentLength = (segments as string[]).length;
+    const segmentLength = segs.length;
+
+    const tipo = usuarioActual?.tipo_usuario;
+    const esAdminOControlador =
+      tipo === "Admin_empresa" ||
+      tipo === "Admin_gestoría" ||
+      tipo === "Auditor_itss" ||
+      tipo === "Representante_legal";
+
+    // Verificación segura utilizando el array casteado
+    const esRutaHomeTab =
+      segmentLength >= 2 && segs[0] === "(tabs)" && segs[1] === "home";
+
+    if (tieneSesion && esAdminOControlador && esRutaHomeTab) {
+      router.replace("/(tabs)/empresa");
+      return;
+    }
 
     if (!tieneSesion && !esRutaPublica) {
       router.replace("/");
@@ -99,9 +145,12 @@ function InitialLayout() {
       tieneSesion &&
       ((enGrupoAutenticacion && segmentLength > 0) || segmentLength === 0)
     ) {
-      // Nota: Evitamos redirigir si ya estamos visualizando una ruta pública libre como la política de privacidad con sesión activa
-      if (segments[0] !== "politica-privacidad") {
-        router.replace("/(tabs)/perfil");
+      if (segs[0] !== "politica-privacidad") {
+        if (esAdminOControlador) {
+          router.replace("/(tabs)/empresa");
+        } else {
+          router.replace("/(tabs)/perfil");
+        }
       }
     }
   }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);

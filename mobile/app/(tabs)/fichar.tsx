@@ -10,6 +10,7 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { formatearFecha, formatearSegundos } from "@/src/utils/formaters";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
+import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,8 +30,13 @@ import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function HomeScreen() {
-  const { usuarioActual, empresaActual, contratoActual, centroTrabajoActual } =
-    useSesion();
+  const {
+    usuarioActual,
+    empresaActual,
+    contratoActual,
+    centroTrabajoActual,
+    cargandoSesionLocal,
+  } = useSesion();
 
   const [horaActual, setHoraActual] = useState("");
   const [estadoActual, setEstadoActual] = useState<Estado>(1);
@@ -59,6 +65,31 @@ export default function HomeScreen() {
   const signatureRef = useRef<any>(null);
   const webCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
+
+  useEffect(() => {
+    // Si la sesión ya cargó y detectamos que es un rol administrativo,
+    // lo sacamos inmediatamente de la pantalla home hacia su sección permitida.
+    if (!cargandoSesionLocal) {
+      router.replace("/(tabs)/perfil");
+    }
+  }, [usuarioActual, cargandoSesionLocal]);
+
+  // Si está cargando o es un administrador intentando entrar, mostramos un loader vacío
+  // para evitar que se renderice ni un solo segundo la interfaz de fichaje.
+  if (cargandoSesionLocal) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#0F172A",
+        }}
+      >
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
   function obtenerFechaHoraCentroISO(zonaHoraria: string): string {
     const ahora = new Date();

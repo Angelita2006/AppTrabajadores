@@ -29,6 +29,7 @@ export default function TabsLayout() {
   return (
     <AppModalProvider>
       <Tabs
+        initialRouteName="perfil"
         screenOptions={{
           tabBarStyle: {
             display: tieneSesion ? "flex" : "none",
@@ -170,6 +171,13 @@ export default function TabsLayout() {
             ),
             href:
               tieneSesion && (esAdmin || esRrhh) ? "/gestion-ausencias" : null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="index"
+          options={{
+            href: null,
           }}
         />
       </Tabs>

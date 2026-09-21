@@ -89,7 +89,8 @@ export default function GestionAusenciasScreen() {
                   const esAdmin =
                     rol?.nombre === "Admin_empresa" ||
                     rol?.nombre === "Admin_gestoría";
-                  return esAdmin ? null : t;
+                  const esActivo = t.activo;
+                  return esAdmin ? null : esActivo ? t : null;
                 } catch {
                   return t;
                 }
