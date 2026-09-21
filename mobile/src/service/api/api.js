@@ -14,7 +14,7 @@ const getBaseURL = () => {
   // return "http://127.0.0.1:8080"; // Para iOS (emulador) u otros
 
   // URL de producción (dominio en servidor Plesk)
-  return "https://www.registrohorariosimple.es/api";
+  return "https://www.registrohorariosimple.es";
 };
 
 const api = axios.create({
