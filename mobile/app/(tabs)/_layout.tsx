@@ -61,13 +61,13 @@ export default function TabsLayout() {
       >
         {/* 1. Fichar / Home personal (Trabajadores y RRHH) */}
         <Tabs.Screen
-          name="home"
+          name="fichar"
           options={{
             title: "Fichar",
             tabBarIcon: ({ color }) => (
               <IconSymbol size={24} name="house.fill" color={color} />
             ),
-            href: tieneSesion && (esTrabajador || esRrhh) ? "/home" : null,
+            href: tieneSesion && (esTrabajador || esRrhh) ? "/fichar" : null,
           }}
         />
 
