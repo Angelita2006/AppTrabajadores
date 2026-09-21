@@ -1,15 +1,18 @@
 import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
 import { AppModalProvider } from "@/src/shared/ui/AppModalNotification";
+import {
+  FontAwesome,
+  FontAwesome5,
+  Ionicons,
+  MaterialCommunityIcons,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  useColorScheme,
-  View,
-} from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -33,43 +36,6 @@ function InitialLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
-
-  // Inyección de fuentes tipográficas para @expo/vector-icons en Entornos Web
-  useEffect(() => {
-    if (Platform.OS === "web") {
-      const iconFontStyles = `
-        @font-face {
-          font-family: 'FontAwesome';
-          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf")});
-        }
-        @font-face {
-          font-family: 'FontAwesome5_Solid';
-          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf")});
-        }
-        @font-face {
-          font-family: 'FontAwesome5_Regular';
-          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.ttf")});
-        }
-        @font-face {
-          font-family: 'MaterialIcons';
-          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf")});
-        }
-        @font-face {
-          font-family: 'MaterialCommunityIcons';
-          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf")});
-        }
-      `;
-
-      const style = document.createElement("style");
-      style.type = "text/css";
-      if ((style as any).styleSheet) {
-        (style as any).styleSheet.cssText = iconFontStyles;
-      } else {
-        style.appendChild(document.createTextNode(iconFontStyles));
-      }
-      document.head.appendChild(style);
-    }
-  }, []);
 
   // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
@@ -154,7 +120,30 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Carga explícita de mapas de iconos para entornos Web y Móvil
+  const [fuentesCargadas, errorFuentes] = useFonts({
+    ...FontAwesome.font,
+    ...FontAwesome5.font,
+    ...MaterialIcons.font,
+    ...MaterialCommunityIcons.font,
+    ...Ionicons.font,
+  });
+
+  if (!fuentesCargadas && !errorFuentes) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#0F172A",
+        }}
+      >
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
   return (
     <ProveedorSesion>
       <AppModalProvider>
