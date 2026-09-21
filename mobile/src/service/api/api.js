@@ -4,17 +4,17 @@ import axios from "axios";
 import { Platform } from "react-native";
 
 const getBaseURL = () => {
-  if (Platform.OS === "web") {
-    return "http://127.0.0.1:8080"; // Para el navegador web
-  }
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:8080"; // Para el emulador de Android
-  }
+  // if (Platform.OS === "web") {
+  //   return "http://127.0.0.1:8080"; // Para el navegador web
+  // }
+  // if (Platform.OS === "android") {
+  //   return "http://10.0.2.2:8080"; // Para el emulador de Android
+  // }
 
-  return "http://127.0.0.1:8080"; // Para iOS (emulador) u otros
+  // return "http://127.0.0.1:8080"; // Para iOS (emulador) u otros
 
   // URL de producción (dominio en servidor Plesk)
-  // return "https://api.registrohorariosimple.es";
+  return "https://www.registrohorariosimple.es/api";
 };
 
 const api = axios.create({
@@ -24,7 +24,6 @@ const api = axios.create({
 // Variable en memoria global para acceso instantáneo
 let memoryToken = "";
 
-// Inicialización síncrona inmediata para WEB (Evita el error 422 al recargar)
 if (Platform.OS === "web" && typeof window !== "undefined") {
   try {
     memoryToken = localStorage.getItem("user_token") || "";
@@ -36,7 +35,7 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
   }
 }
 
-// Función para establecer el token desde fuera (ej: tras hacer login)
+// Función para establecer el token desde fuera
 export const setAuthToken = async (token) => {
   memoryToken = token || "";
   try {

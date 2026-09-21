@@ -119,7 +119,7 @@ if not origins:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
@@ -155,7 +155,6 @@ app.include_router(usuarios_roles.router)
 app.include_router(usuarios.router) 
 app.include_router(auth.router)
 app.include_router(archivos.router)
-# app.include_router(licencias.router)
 
 @app.get(
     "/api",
