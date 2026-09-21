@@ -1,10 +1,15 @@
 import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
 import { AppModalProvider } from "@/src/shared/ui/AppModalNotification";
-import * as Notifications from "expo-notifications"; // <--- Importante
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  useColorScheme,
+  View,
+} from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -29,6 +34,43 @@ function InitialLayout() {
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
 
+  // Inyección de fuentes tipográficas para @expo/vector-icons en Entornos Web
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      const iconFontStyles = `
+        @font-face {
+          font-family: 'FontAwesome';
+          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf")});
+        }
+        @font-face {
+          font-family: 'FontAwesome5_Solid';
+          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf")});
+        }
+        @font-face {
+          font-family: 'FontAwesome5_Regular';
+          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.ttf")});
+        }
+        @font-face {
+          font-family: 'MaterialIcons';
+          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf")});
+        }
+        @font-face {
+          font-family: 'MaterialCommunityIcons';
+          src: url(${require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf")});
+        }
+      `;
+
+      const style = document.createElement("style");
+      style.type = "text/css";
+      if ((style as any).styleSheet) {
+        (style as any).styleSheet.cssText = iconFontStyles;
+      } else {
+        style.appendChild(document.createTextNode(iconFontStyles));
+      }
+      document.head.appendChild(style);
+    }
+  }, []);
+
   // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -47,25 +89,21 @@ function InitialLayout() {
   useEffect(() => {
     if (!usuarioActual?.id) return;
 
-    // 1. Registramos el token FCM / Expo en tu backend de FastAPI apenas se detecta sesión
     registrarTokenDispositivo(usuarioActual.id);
 
-    // 2. Escuchar cuando llega una notificación con la app abierta
     const subRecibida = Notifications.addNotificationReceivedListener(
       (notification) => {
         console.log("Notificación recibida en primer plano:", notification);
       },
     );
 
-    // 3. Escuchar cuando el usuario hace clic en la notificación de olvido de fichaje
     const subRespuesta = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data;
         console.log("Usuario presionó la notificación:", data);
 
         if (data?.type === "OLVIDO_FICHAJE") {
-          // Redirige al usuario a la pantalla correspondiente dentro de tus tabs
-          router.push("/(tabs)/perfil"); // O la ruta específica de fichajes si la tienes
+          router.push("/(tabs)/perfil");
         }
       },
     );
@@ -78,24 +116,19 @@ function InitialLayout() {
 
   // Efecto central de protección de rutas (Guard) antierrores
   useEffect(() => {
-    // Evita evaluar redirecciones si el layout general o el contexto aún cargan
     if (!estaListo || cargandoSesionLocal) return;
 
     const enGrupoAutenticacion = segments[0] === "(authentication)";
     const tieneSesion = usuarioActual !== null;
     const segmentLength = (segments as string[]).length;
 
-    // Caso 1: Usuario sin sesión intentando acceder a rutas protegidas de la app
     if (!tieneSesion && !enGrupoAutenticacion) {
       router.replace("/");
-    }
-    // Caso 2: Usuario con sesión activa atrapado en el login/registro o raíz pura
-    else if (tieneSesion && (enGrupoAutenticacion || segmentLength === 0)) {
+    } else if (tieneSesion && (enGrupoAutenticacion || segmentLength === 0)) {
       router.replace("/(tabs)/perfil");
     }
   }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
 
-  // Pantalla de carga robusta mientras se valida la persistencia o el temporizador
   if (!estaListo || cargandoSesionLocal) {
     return (
       <View
