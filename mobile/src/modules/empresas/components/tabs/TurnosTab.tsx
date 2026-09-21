@@ -6,7 +6,7 @@ import {
   validarFormatoHora,
   validarTextoObligatorio,
 } from "@/src/utils/validators";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Alert, Platform, Pressable, TextInput, View } from "react-native";
 import {
   crearTurno,
@@ -38,6 +38,18 @@ export default function TabTurnos({
   const [horaFin, setHoraFin] = useState<string>("");
   const [duracionPausa, setDuracionPausa] = useState<string>("0");
   const [turnoEnEdicion, setTurnoEnEdicion] = useState<Turno | null>(null);
+
+  // ==========================================
+  // REFERENCIAS PARA CREACIÓN Y EDICIÓN
+  // ==========================================
+  const crearHoraInicioRef = useRef<TextInput | null>(null);
+  const crearHoraFinRef = useRef<TextInput | null>(null);
+  const crearPausaRef = useRef<TextInput | null>(null);
+
+  const editarHoraInicioRef = useRef<TextInput | null>(null);
+  const editarHoraFinRef = useRef<TextInput | null>(null);
+  const editarPausaRef = useRef<TextInput | null>(null);
+
   const turnosActivos = turnosEmpresa.filter((turno) => turno.activo !== false);
   const turnosInactivos = turnosEmpresa.filter(
     (turno) => turno.activo === false,
@@ -270,6 +282,10 @@ export default function TabTurnos({
               value={nombreTurno}
               onChangeText={setNombreTurno}
               placeholder="Ej. Mañana"
+              editable={!guardando}
+              returnKeyType="next"
+              onSubmitEditing={() => crearHoraInicioRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -277,19 +293,29 @@ export default function TabTurnos({
             <View style={[styles.campoFormulario, { flex: 1, marginRight: 8 }]}>
               <ThemedText style={styles.labelInput}>Hora Inicio *</ThemedText>
               <TextInput
+                ref={crearHoraInicioRef}
                 style={styles.inputForm}
                 value={horaInicio}
                 onChangeText={setHoraInicio}
                 placeholder="HH:MM:SS"
+                editable={!guardando}
+                returnKeyType="next"
+                onSubmitEditing={() => crearHoraFinRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             <View style={[styles.campoFormulario, { flex: 1 }]}>
               <ThemedText style={styles.labelInput}>Hora Fin *</ThemedText>
               <TextInput
+                ref={crearHoraFinRef}
                 style={styles.inputForm}
                 value={horaFin}
                 onChangeText={setHoraFin}
                 placeholder="HH:MM:SS"
+                editable={!guardando}
+                returnKeyType="next"
+                onSubmitEditing={() => crearPausaRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
           </Row>
@@ -299,10 +325,15 @@ export default function TabTurnos({
               Duración Pausa (Minutos) *
             </ThemedText>
             <TextInput
+              ref={crearPausaRef}
               style={styles.inputForm}
               value={duracionPausa}
               onChangeText={setDuracionPausa}
               keyboardType="numeric"
+              editable={!guardando}
+              returnKeyType="go"
+              onSubmitEditing={handleCrearTurno}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -399,6 +430,10 @@ export default function TabTurnos({
                   style={styles.inputForm}
                   value={nombreTurno}
                   onChangeText={setNombreTurno}
+                  editable={!guardando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => editarHoraInicioRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
 
@@ -410,17 +445,27 @@ export default function TabTurnos({
                     Hora Inicio *
                   </ThemedText>
                   <TextInput
+                    ref={editarHoraInicioRef}
                     style={styles.inputForm}
                     value={horaInicio}
                     onChangeText={setHoraInicio}
+                    editable={!guardando}
+                    returnKeyType="next"
+                    onSubmitEditing={() => editarHoraFinRef.current?.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
                 <View style={[styles.campoFormulario, { flex: 1 }]}>
                   <ThemedText style={styles.labelInput}>Hora Fin *</ThemedText>
                   <TextInput
+                    ref={editarHoraFinRef}
                     style={styles.inputForm}
                     value={horaFin}
                     onChangeText={setHoraFin}
+                    editable={!guardando}
+                    returnKeyType="next"
+                    onSubmitEditing={() => editarPausaRef.current?.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
               </Row>
@@ -430,10 +475,23 @@ export default function TabTurnos({
                   Duración Pausa (Minutos) *
                 </ThemedText>
                 <TextInput
+                  ref={editarPausaRef}
                   style={styles.inputForm}
                   value={duracionPausa}
                   onChangeText={setDuracionPausa}
                   keyboardType="numeric"
+                  editable={!guardando}
+                  returnKeyType="go"
+                  onSubmitEditing={() => {
+                    handleEditarTurno({
+                      ...turno,
+                      nombre: nombreTurno.trim(),
+                      hora_inicio: horaInicio.trim(),
+                      hora_fin: horaFin.trim(),
+                      duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
+                    });
+                  }}
+                  blurOnSubmit={false}
                 />
               </View>
 

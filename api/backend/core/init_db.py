@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.roles import Roles  # Ajusta la ruta según dónde tengas tu modelo de Roles
+from models.roles import Roles 
 
 ROLES_SISTEMA_INICIALES = [
     {

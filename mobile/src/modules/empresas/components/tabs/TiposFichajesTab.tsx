@@ -1,7 +1,7 @@
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -67,8 +67,13 @@ export default function TabTipoEventos({
     useState<TipoEventoFichaje | null>(null);
   const { mostrarError, mostrarMensaje } = useAppModal();
 
+  // ==========================================
+  // REFERENCIAS PARA FOCO DE INPUTS (ENTER)
+  // ==========================================
+  const inputCreacionRef = useRef<TextInput | null>(null);
+  const inputEdicionRef = useRef<TextInput | null>(null);
+
   // Separación de eventos activos e inactivos (Papelera)
-  // Asumimos que un evento inactivo tiene activo === false o un indicador equivalente.
   const eventosActivos = tiposEventosEmpresa.filter(
     (t: any) => t.activo !== false,
   );
@@ -89,7 +94,7 @@ export default function TabTipoEventos({
     }
     const valoresValidos = Object.values(CATEGORIAS_EVENTO) as string[];
     if (!valoresValidos.includes(codigoTipoEvento.trim())) {
-      return "El tipo base seleccionado não es válido.";
+      return "El tipo base seleccionado no es válido.";
     }
     if (!descripcionTipoEvento || descripcionTipoEvento.trim() === "") {
       return "La descripción personalizada es obligatoria.";
@@ -189,9 +194,6 @@ export default function TabTipoEventos({
       try {
         setGuardando(true);
         await eliminarTipoEventoFichaje(tipoId);
-        // Dependiendo de si la API elimina o marca como inactivo, actualizamos el estado:
-        // Si es un borrado lógico, marcamos activo: false. Si es físico, filtramos fuera.
-        // Aquí asumiremos marcado como inactivo para que aparezca en la papelera, o filtrado si se borra por completo.
         setTiposEventosEmpresa((prev: TipoEventoFichaje[]) =>
           prev.map((t: any) => (t.id === tipoId ? { ...t, activo: false } : t)),
         );
@@ -265,6 +267,9 @@ export default function TabTipoEventos({
             setCodigoTipoEvento(CATEGORIAS_EVENTO.ENTRADA);
             setDescripcionTipoEvento("");
             setComputaTrabajoTipoEvento(true);
+            setTimeout(() => {
+              inputCreacionRef.current?.focus();
+            }, 100);
           }
           setMostrarFormTipoEvento(!mostrarFormTipoEvento);
           setTipoEventoEnEdicion(null);
@@ -337,10 +342,13 @@ export default function TabTipoEventos({
               Descripción Personalizada *
             </ThemedText>
             <TextInput
+              ref={inputCreacionRef}
               style={styles.inputForm}
               value={descripcionTipoEvento}
               onChangeText={setDescripcionTipoEvento}
               placeholder="Ej. Fichaje de Entrada Principal"
+              returnKeyType="done"
+              onSubmitEditing={handleCrearTipoEvento}
             />
           </View>
 
@@ -429,6 +437,9 @@ export default function TabTipoEventos({
                       tipo.computa_como_trabajo ?? true,
                     );
                     setMostrarFormTipoEvento(false);
+                    setTimeout(() => {
+                      inputEdicionRef.current?.focus();
+                    }, 100);
                   }
                 }}
               >
@@ -503,9 +514,12 @@ export default function TabTipoEventos({
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>Descripción</ThemedText>
                 <TextInput
+                  ref={inputEdicionRef}
                   style={styles.inputForm}
                   value={descripcionTipoEvento}
                   onChangeText={setDescripcionTipoEvento}
+                  returnKeyType="done"
+                  onSubmitEditing={() => handleEditarTipoEvento(tipo)}
                 />
               </View>
 

@@ -112,7 +112,6 @@ export default function RootIndexScreen() {
       const { access_token, usuario } = respuestaLogin;
       setAuthToken(access_token);
       setUsuarioActual(usuario);
-      // setToken(access_token);
 
       if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
         try {

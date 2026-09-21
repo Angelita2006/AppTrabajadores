@@ -7,7 +7,7 @@ from models.usuarios import Usuarios
 
 def registrar_auditoria(
     db: Session,
-    request: Request,
+    request: Request | None,
     usuario: Usuarios,
     empresa_id,
     accion: AccionAuditoriaEnum,
@@ -21,5 +21,5 @@ def registrar_auditoria(
         trabajador_id=trabajador_id,
         accion=accion,
         detalle=detalle or {},
-        ip_address=request.client.host if request.client else None,
+        ip_address=request.client.host if request and request.client else None,
     ))

@@ -8,6 +8,11 @@ Create Date: 2026-08-27 17:50:48.211936
 from typing import Sequence, Union
 from alembic import op
 from sqlalchemy_views import CreateView, DropView
+import sys
+
+_backend_path = r"C:\AppTrabajadores\api\backend"
+if _backend_path not in sys.path:
+    sys.path.insert(0, _backend_path)
 from models.vistas import t_v_fichajes_vigentes, sql_v_fichajes_vigentes
 
 # revision identifiers, used by Alembic.

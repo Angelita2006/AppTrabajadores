@@ -17,6 +17,7 @@ import TabCentros from "@/src/modules/empresas/components/tabs/CentrosTab";
 import TabDepartamentos from "@/src/modules/empresas/components/tabs/DepartamentosTab";
 import TabDispositivos from "@/src/modules/empresas/components/tabs/DispositivosTab";
 import TabFiscal from "@/src/modules/empresas/components/tabs/FiscalTab";
+import PlantillaTab from "@/src/modules/empresas/components/tabs/PlantillaTab";
 import TabTipoEventos from "@/src/modules/empresas/components/tabs/TiposFichajesTab";
 import TabTurnos from "@/src/modules/empresas/components/tabs/TurnosTab";
 import { Rol } from "@/src/modules/roles/types/rol";
@@ -42,6 +43,7 @@ import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
 type TabConfig =
   | "fiscal"
+  | "trabajadores"
   | "centros"
   | "turnos"
   | "departamentos"
@@ -413,6 +415,7 @@ export default function EmpresasScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {[
                 { key: "fiscal", label: "Fiscal" },
+                { key: "trabajadores", label: "Plantilla" },
                 { key: "centros", label: "Centros de Trabajo" },
                 { key: "turnos", label: "Turnos" },
                 { key: "departamentos", label: "Departamentos" },
@@ -462,6 +465,14 @@ export default function EmpresasScreen() {
                     handleGuardarDatosEmpresa,
                     guardando,
                     styles,
+                  }}
+                />
+              )}
+
+              {tabActiva === "trabajadores" && (
+                <PlantillaTab
+                  {...{
+                    empresaActual,
                   }}
                 />
               )}
@@ -726,4 +737,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 18,
   },
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  picker: { height: 50, width: "100%", color: "#0F172A" },
 });

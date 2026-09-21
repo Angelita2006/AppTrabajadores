@@ -1,7 +1,7 @@
 import {
-    obtenerAusenciasEmpresa,
-    resolverSolicitudAusencia,
-    solicitarAusencia,
+  obtenerAusenciasEmpresa,
+  resolverSolicitudAusencia,
+  solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
@@ -10,22 +10,28 @@ import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    AusenciaCreateRequest,
-    AusenciaResponse,
-    EstadoAusencia,
-    ItemAusencia,
-    TipoAusencia,
-    TIPOS_AUSENCIA,
-    TIPOS_AUSENCIA_LABELS,
+  AusenciaCreateRequest,
+  AusenciaResponse,
+  EstadoAusencia,
+  ItemAusencia,
+  TipoAusencia,
+  TIPOS_AUSENCIA,
+  TIPOS_AUSENCIA_LABELS,
 } from "../../src/modules/ausencias/types/ausencia";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -51,6 +57,13 @@ export default function GestionAusenciasScreen() {
   const [fechaFin, setFechaFin] = useState("");
   const [comentario, setComentario] = useState("");
 
+  // ==========================================
+  // REFERENCIAS PARA FOCO DE INPUTS (ENTER)
+  // ==========================================
+  const fechaInicioRef = useRef<TextInput | null>(null);
+  const fechaFinRef = useRef<TextInput | null>(null);
+  const comentarioRef = useRef<TextInput | null>(null);
+
   const conteoEstados = useMemo(() => {
     const pendientes = ausencias.filter((i) => i.estado === "Pendiente").length;
     const aprobadas = ausencias.filter((i) => i.estado === "Aprobada").length;
@@ -74,8 +87,8 @@ export default function GestionAusenciasScreen() {
                 try {
                   const rol = await obtenerRolPorId(t.rol_id);
                   const esAdmin =
-                    rol?.nombre?.toLowerCase() === "admin_empresa" ||
-                    rol?.nombre?.toLowerCase() === "admin_gestoría";
+                    rol?.nombre === "Admin_empresa" ||
+                    rol?.nombre === "Admin_gestoría";
                   return esAdmin ? null : t;
                 } catch {
                   return t;
@@ -409,21 +422,29 @@ export default function GestionAusenciasScreen() {
                 <View style={{ flex: 1 }}>
                   <ThemedText style={styles.label}>Fecha Inicio</ThemedText>
                   <TextInput
+                    ref={fechaInicioRef}
                     value={fechaInicio}
                     onChangeText={setFechaInicio}
                     style={styles.input}
                     placeholder="AAAA-MM-DD"
                     placeholderTextColor="#94A3B8"
+                    returnKeyType="next"
+                    onSubmitEditing={() => fechaFinRef.current?.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <ThemedText style={styles.label}>Fecha Fin</ThemedText>
                   <TextInput
+                    ref={fechaFinRef}
                     value={fechaFin}
                     onChangeText={setFechaFin}
                     style={styles.input}
                     placeholder="AAAA-MM-DD"
                     placeholderTextColor="#94A3B8"
+                    returnKeyType="next"
+                    onSubmitEditing={() => comentarioRef.current?.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
               </View>
@@ -432,12 +453,15 @@ export default function GestionAusenciasScreen() {
                 Notas / Motivo Interno
               </ThemedText>
               <TextInput
+                ref={comentarioRef}
                 value={comentario}
                 onChangeText={setComentario}
                 style={[styles.input, styles.textArea]}
                 placeholder="Introduce las razones del ajuste..."
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
+                returnKeyType="done"
+                onSubmitEditing={reportarAusencia}
               />
             </View>
             <Pressable

@@ -4,7 +4,7 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { validarAnioRango } from "@/src/utils/validators";
 import * as DocumentPicker from "expo-document-picker";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -156,7 +156,6 @@ export function useTabCalendario({
       );
       return;
     }
-
     const ano = validarAnioRango(anoNuevoCalendario);
     if (!ano || !empresaActual) {
       mostrarMensaje(
@@ -218,7 +217,6 @@ export function useTabCalendario({
    */
   const handleEditarCalendario = async () => {
     if (!calendarioActual?.id) return;
-
     const anioNum = validarAnioRango(editAnio);
     if (!anioNum) {
       mostrarMensaje(
@@ -258,6 +256,7 @@ export function useTabCalendario({
         nombre: respuestaBackend.nombre,
         centro_trabajo_id: respuestaBackend.centro_trabajo_id,
       });
+
       setMostrarEdicionCampos(false);
       mostrarMensaje(
         "Éxito",
@@ -280,16 +279,18 @@ export function useTabCalendario({
     try {
       setGuardando(true);
       await eliminarCalendarioLaboral(calendarioActual.id);
-
       const actualizados = calendariosEmpresa.map((calendario) =>
         calendario.id === calendarioActual.id
           ? { ...calendario, activo: false }
           : calendario,
       );
-
       setCalendariosEmpresa(actualizados);
       setCalendarioActual(
-        actualizados.find((calendario) => calendario.activo !== false) || null,
+        actualizados.find((calendario) =>
+          calendariosActivos.some(
+            (a) => a.id === calendario.id && a.activo !== false,
+          ),
+        ) || null,
       );
       setMostrarEdicionCampos(false);
       mostrarMensaje("Éxito", "Calendario laboral enviado a la papelera.");
@@ -353,9 +354,6 @@ export function useTabCalendario({
 
   /**
    * Maneja la interacción al presionar un día específico en el componente de calendario visual.
-   *
-   * @param fechaStr - Fecha seleccionada en formato string YYYY-MM-DD.
-   * @param festivoExistente - Datos del festivo si ya existía registrado en dicha fecha.
    */
   const handleDayPress = (fechaStr: string, festivoExistente?: Festivo) => {
     setDiaSeleccionadoCtx(fechaStr);
@@ -390,7 +388,6 @@ export function useTabCalendario({
       );
 
       let festivoGuardadoBackend: Festivo;
-
       if (festivoExistente) {
         festivoGuardadoBackend = await editarFestivo(festivoExistente.id, {
           calendario_id: calendarioActual.id,
@@ -562,11 +559,7 @@ interface TabCalendarioProps extends UseTabCalendarioProps {
 }
 
 /**
- * Componente funcional encargado de renderizar la interfaz gráfica de la pestaña de calendarios laborales,
- * incluyendo formularios de creación, edición, selectores e integración con el calendario anual.
- *
- * @param props - Propiedades que incluyen estados de negocio y estilos de la aplicación.
- * @returns Estructura visual en React Native para la pestaña de calendarios.
+ * Componente funcional encargado de renderizar la interfaz gráfica de la pestaña de calendarios laborales.
  */
 export default function TabCalendario({
   calendariosEmpresa,
@@ -630,6 +623,18 @@ export default function TabCalendario({
     guardando,
     setGuardando,
   });
+
+  // ==========================================
+  // REFERENCIAS PARA FOCO Y ENTER
+  // ==========================================
+  const crearNombreInputRef = useRef<TextInput | null>(null);
+  const crearAnioInputRef = useRef<TextInput | null>(null);
+
+  const editarNombreInputRef = useRef<TextInput | null>(null);
+  const editarAnioInputRef = useRef<TextInput | null>(null);
+
+  const festivoDescInputRef = useRef<TextInput | null>(null);
+  const festivoTipoInputRef = useRef<TextInput | null>(null);
 
   return (
     <View>
@@ -717,14 +722,19 @@ export default function TabCalendario({
           2. Identificación del Calendario
         </ThemedText>
         <TextInput
+          ref={crearNombreInputRef}
           style={[styles.inputForm, { marginBottom: 10 }]}
           placeholder="Nombre (Ej: Sede Madrid 2026)"
           value={nombreNuevoCalendario}
           onChangeText={setNombreNuevoCalendario}
           editable={tieneCentrosValidos && !guardando}
+          returnKeyType="next"
+          onSubmitEditing={() => crearAnioInputRef.current?.focus()}
+          blurOnSubmit={false}
         />
         <Row>
           <TextInput
+            ref={crearAnioInputRef}
             style={[styles.inputForm, { flex: 1, marginRight: 10 }]}
             placeholder="Año (Ej. 2026)"
             keyboardType="numeric"
@@ -732,6 +742,9 @@ export default function TabCalendario({
             value={anoNuevoCalendario}
             onChangeText={setAnoNuevoCalendario}
             editable={tieneCentrosValidos && !guardando}
+            returnKeyType="done"
+            onSubmitEditing={handleCrearCalendario}
+            blurOnSubmit={false}
           />
           <Pressable
             style={[
@@ -863,7 +876,6 @@ export default function TabCalendario({
                 : `🗑 Ver Papelera (${calendariosInactivos.length})`}
             </ThemedText>
           </Pressable>
-
           {mostrarPapelera &&
             calendariosInactivos.map((calendario) => (
               <View key={calendario.id} style={styles.itemListaEstructural}>
@@ -913,10 +925,14 @@ export default function TabCalendario({
                   Nombre Descriptivo
                 </ThemedText>
                 <TextInput
+                  ref={editarNombreInputRef}
                   style={styles.inputForm}
                   value={editNombre}
                   onChangeText={setEditNombre}
                   editable={!guardando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => editarAnioInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
               <View style={styles.campoFormulario}>
@@ -924,12 +940,16 @@ export default function TabCalendario({
                   Año del Cuadrante
                 </ThemedText>
                 <TextInput
+                  ref={editarAnioInputRef}
                   style={styles.inputForm}
                   value={editAnio}
                   onChangeText={setEditAnio}
                   keyboardType="numeric"
                   maxLength={4}
                   editable={!guardando}
+                  returnKeyType="done"
+                  onSubmitEditing={handleEditarCalendario}
+                  blurOnSubmit={false}
                 />
               </View>
               <View style={styles.campoFormulario}>
@@ -998,7 +1018,6 @@ export default function TabCalendario({
             Presiona sobre cualquier día para asignarlo como Festivo/No
             Laborable.
           </ThemedText>
-
           <CalendarLaboralAnual
             anio={Number(calendarioActual.anio)}
             festivos={calendarioActual.festivos}
@@ -1049,27 +1068,33 @@ export default function TabCalendario({
                 ? `Festivo: ${diaSeleccionadoCtx}`
                 : "Configurar Día Festivo"}
             </ThemedText>
-
             <ThemedText style={styles.labelInput}>
               Descripción del Festivo
             </ThemedText>
             <TextInput
+              ref={festivoDescInputRef}
               style={[styles.inputForm, { marginBottom: 12 }]}
               placeholder="Ej: Día de Navidad, Fiestas Locales..."
               value={nuevaDescFestivo}
               onChangeText={setNuevaDescFestivo}
               editable={!guardando}
+              returnKeyType="next"
+              onSubmitEditing={() => festivoTipoInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
-
             <ThemedText style={styles.labelInput}>
               Tipo de Festivo (Nacional, Autonómico, Local)
             </ThemedText>
             <TextInput
+              ref={festivoTipoInputRef}
               style={[styles.inputForm, { marginBottom: 20 }]}
               placeholder="Nacional / Autonómico / Local"
               value={tipoFestivo}
               onChangeText={setNuevoTipoFestivo}
               editable={!guardando}
+              returnKeyType="done"
+              onSubmitEditing={handleGuardarFestivoContextual}
+              blurOnSubmit={false}
             />
             <View
               style={{
@@ -1092,7 +1117,6 @@ export default function TabCalendario({
                   Cancelar
                 </ThemedText>
               </Pressable>
-
               <Pressable
                 style={{
                   paddingVertical: 10,

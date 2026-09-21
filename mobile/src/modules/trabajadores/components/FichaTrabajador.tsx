@@ -2,7 +2,7 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { Card } from "@/src/shared/ui/AppSurface";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { obtenerContratoActivoTrabajador } from "../../contratos/api/services";
@@ -42,7 +42,6 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   setModalActivo,
   abrirEdicionContrato,
   prepararAsignarTurno,
-  handleAsignarTurnoTrabajador,
   styles,
   onMostrarError,
 }) => {
@@ -200,7 +199,8 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
             {item.nombre} {item.apellidos}
           </ThemedText>
           <ThemedText style={{ fontSize: 11, color: "#64748B" }}>
-            Rol: {nombreRol} | Estado: {textoEstado}
+            Rol: {nombreRol}
+            {Platform.OS == "android" ? "\n" : " | "}Estado: {textoEstado}
           </ThemedText>
         </View>
         <View

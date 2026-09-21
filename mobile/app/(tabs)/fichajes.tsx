@@ -5,7 +5,7 @@ import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/cal
 import { obtenerContratoActivoTrabajador } from "@/src/modules/contratos/api/services";
 import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
-import { obtenerFichajesEmpresaPorFecha } from "@/src/modules/fichajes/api/services";
+import { obtenerFichajesEmpresaEntreFechas } from "@/src/modules/fichajes/api/services";
 import {
   DIAS_SEMANA,
   RegistroFichaje,
@@ -24,6 +24,7 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import {
   capitalizar,
   extraerHora,
+  formatearFecha,
   horaAMinutos,
   obtenerConfiguracionEvento,
 } from "@/src/utils/formaters";
@@ -35,7 +36,13 @@ import {
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 
@@ -90,12 +97,10 @@ const firmaComoHtml = async (
 
 export default function FichajesHistorialScreen() {
   const { empresaActual, usuarioActual } = useSesion();
-  const [fichajesSemanales, setFichajesSemanales] = useState<RegistroFichaje[]>(
-    [],
+  const [fichajesPeriodo, setFichajesPeriodo] = useState<RegistroFichaje[]>([]);
+  const [tipoVista, setTipoVista] = useState<"semana" | "mes" | "trimestre">(
+    "semana",
   );
-  const [mapaDatosFiscales, setMapaDatosFiscales] = useState<{
-    [key: string]: any;
-  }>({});
   const [tiposEventosEmpresa, setTiposEventosEmpresa] =
     useState<TipoEventoFichaje[]>();
   const [, setCalendariosFestivos] = useState<CalendarioFestivo[]>([]);
@@ -104,6 +109,9 @@ export default function FichajesHistorialScreen() {
   const [mapaTurnosObjetos, setMapaTurnosObjetos] = useState<{
     [key: string]: TurnoConAsignacion[];
   }>({});
+  const [mapaDatosFiscales, setMapaDatosFiscales] = useState<{
+    [key: string]: any;
+  }>({});
   const { mostrarError, mostrarMensaje } = useAppModal();
   const [
     trabajadoresSeleccionadosParaPdf,
@@ -111,29 +119,70 @@ export default function FichajesHistorialScreen() {
   ] = useState<string[]>([]);
   const [cargandoPdf] = useState(false);
 
-  const lunesSemanaActual = useMemo(() => {
+  // Cálculo del rango de fechas según la vista seleccionada (Semana, Mes o Trimestre)
+  const rangoFechasCalculado = useMemo(() => {
     const d = new Date(fechaReferencia);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff));
-  }, [fechaReferencia]);
+    if (tipoVista === "semana") {
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const lunes = new Date(d.setDate(diff));
+      const sabado = new Date(lunes);
+      sabado.setDate(lunes.getDate() + 5);
+      return {
+        inicio: lunes,
+        fin: sabado,
+        textoStr: `Del ${lunes.toLocaleDateString("es-ES")} al ${sabado.toLocaleDateString("es-ES")}`,
+      };
+    } else if (tipoVista === "mes") {
+      const anio = d.getFullYear();
+      const mes = d.getMonth();
+      const inicioMes = new Date(anio, mes, 1);
+      const finMes = new Date(anio, mes + 1, 0);
+      const nombreMes = inicioMes.toLocaleString("es-ES", {
+        month: "long",
+        year: "numeric",
+      });
+      return {
+        inicio: inicioMes,
+        fin: finMes,
+        textoStr: `Mes de ${capitalizar(nombreMes)}`,
+      };
+    } else {
+      // Trimestre
+      const anio = d.getFullYear();
+      const mesActual = d.getMonth();
+      const trimestreIdx = Math.floor(mesActual / 3);
+      const inicioTrim = new Date(anio, trimestreIdx * 3, 1);
+      const finTrim = new Date(anio, trimestreIdx * 3 + 3, 0);
+      return {
+        inicio: inicioTrim,
+        fin: finTrim,
+        textoStr: `Trimestre ${trimestreIdx + 1} (${anio}) - Del ${inicioTrim.toLocaleDateString("es-ES")} al ${finTrim.toLocaleDateString("es-ES")}`,
+      };
+    }
+  }, [fechaReferencia, tipoVista]);
 
-  const rangoSemanaStr = useMemo(() => {
-    const lunes = new Date(lunesSemanaActual);
-    const sabado = new Date(lunes);
-    sabado.setDate(lunes.getDate() + 5);
-    return `Del ${lunes.toLocaleDateString("es-ES")} al ${sabado.toLocaleDateString("es-ES")}`;
-  }, [lunesSemanaActual]);
-
-  const cambiarSemana = (direccion: "anterior" | "siguiente") => {
+  const cambiarPeriodo = (direccion: "anterior" | "siguiente") => {
     setFechaReferencia((prev) => {
       const nuevaFecha = new Date(prev);
-      nuevaFecha.setDate(prev.getDate() + (direccion === "siguiente" ? 7 : -7));
+      if (tipoVista === "semana") {
+        nuevaFecha.setDate(
+          prev.getDate() + (direccion === "siguiente" ? 7 : -7),
+        );
+      } else if (tipoVista === "mes") {
+        nuevaFecha.setMonth(
+          prev.getMonth() + (direccion === "siguiente" ? 1 : -1),
+        );
+      } else {
+        nuevaFecha.setMonth(
+          prev.getMonth() + (direccion === "siguiente" ? 3 : -3),
+        );
+      }
       return nuevaFecha;
     });
   };
 
-  const cargarFichajesYTurnosSemanales = async () => {
+  const cargarFichajesYTurnosPeriodo = async () => {
     try {
       if (
         usuarioActual?.tipo_usuario !== "Admin_empresa" &&
@@ -143,30 +192,36 @@ export default function FichajesHistorialScreen() {
       )
         return;
       setCargando(true);
+
+      const fechaIteracion = new Date(rangoFechasCalculado.inicio);
+      const fechaFinLimite = new Date(rangoFechasCalculado.fin);
       const promesasFichajes = [];
-      for (let i = 0; i < 6; i++) {
-        const diaConsultar = new Date(lunesSemanaActual);
-        diaConsultar.setDate(lunesSemanaActual.getDate() + i);
-        const offset = diaConsultar.getTimezoneOffset();
-        const fechaLocalStr = new Date(
-          diaConsultar.getTime() - offset * 60 * 1000,
-        )
-          .toISOString()
-          .split("T")[0];
-        promesasFichajes.push(
-          await obtenerFichajesEmpresaPorFecha(
-            empresaActual?.id || "",
-            fechaLocalStr,
-          ).catch((error: any) => {
-            mostrarError(
-              `No se pudieron obtener fichajes para la fecha ${fechaLocalStr}: ` +
-                error.message,
-            );
-            return [];
-          }),
-        );
-      }
-      const todosLosFichajes: RegistroFichaje[] = promesasFichajes.flat();
+
+      const offset = fechaIteracion.getTimezoneOffset();
+      const fechaInicio = formatearFecha(
+        new Date(fechaIteracion.getTime() - offset * 60 * 1000),
+      );
+      const fechaFin = formatearFecha(
+        new Date(fechaFinLimite.getTime() - offset * 60 * 1000),
+      );
+
+      promesasFichajes.push(
+        obtenerFichajesEmpresaEntreFechas(
+          empresaActual?.id || "",
+          fechaInicio,
+          fechaFin,
+        ).catch((error: any) => {
+          mostrarError(
+            `No se pudieron obtener fichajes entre las fechas ${fechaInicio}-${fechaFin} : ` +
+              error.message,
+          );
+          return [];
+        }),
+      );
+      fechaIteracion.setDate(fechaIteracion.getDate() + 1);
+
+      const resultadosFichajes = await Promise.all(promesasFichajes);
+      const todosLosFichajes: RegistroFichaje[] = resultadosFichajes.flat();
       const idsFichajesSustituidos = new Set(
         todosLosFichajes
           .map((fichaje) => fichaje.fichaje_sustituido_id)
@@ -179,44 +234,48 @@ export default function FichajesHistorialScreen() {
           !idsFichajesSustituidos.has(f.id)
         );
       });
-      setFichajesSemanales(fichajesValidos);
+      setFichajesPeriodo(fichajesValidos);
+
       const tiposEventosEmpresaData = await obtenerTiposEventosEmpresa(
         empresaActual!.id,
       );
       setTiposEventosEmpresa(tiposEventosEmpresaData);
+
       const idTrabajadoresUnicos = Array.from(
         new Set(fichajesValidos.map((f: RegistroFichaje) => f.trabajador_id)),
       );
+
       const nuevoMapaObjetosTurnos: { [key: string]: TurnoConAsignacion[] } =
         {};
       const nuevoMapaDatosFiscales: { [key: string]: any } = {};
       const todosLosCalendariosRecogidos: CalendarioFestivo[] = [];
-      const lunesStr = new Date(
-        lunesSemanaActual.getTime() -
-          lunesSemanaActual.getTimezoneOffset() * 60000,
-      )
-        .toISOString()
-        .split("T")[0];
-      const sabadoObj = new Date(lunesSemanaActual);
-      sabadoObj.setDate(lunesSemanaActual.getDate() + 5);
-      const sabadoStr = new Date(
-        sabadoObj.getTime() - sabadoObj.getTimezoneOffset() * 60000,
+
+      const inicioStr = new Date(
+        rangoFechasCalculado.inicio.getTime() -
+          rangoFechasCalculado.inicio.getTimezoneOffset() * 60000,
       )
         .toISOString()
         .split("T")[0];
 
-      const esAsignacionVigenteEnSemana = (
+      const finStr = new Date(
+        rangoFechasCalculado.fin.getTime() -
+          rangoFechasCalculado.fin.getTimezoneOffset() * 60000,
+      )
+        .toISOString()
+        .split("T")[0];
+
+      const esAsignacionVigenteEnPeriodo = (
         asignacion: AsignacionTurno,
       ): boolean => {
         if (!asignacion) return false;
-        const fechaInicio = asignacion.fecha_inicio
+        const fechaInicioAsig = asignacion.fecha_inicio
           ? asignacion.fecha_inicio.split("T")[0]
           : null;
-        const fechaFin = asignacion.fecha_fin
+        const fechaFinAsig = asignacion.fecha_fin
           ? asignacion.fecha_fin.split("T")[0]
           : null;
-        if (fechaInicio && fechaInicio > sabadoStr) return false;
-        if (fechaFin && fechaFin < lunesStr) return false;
+        if (fechaInicioAsig && fechaInicioAsig > finStr) return false;
+        if (fechaFinAsig && fechaFinAsig < inicioStr) return false;
         return true;
       };
 
@@ -241,11 +300,13 @@ export default function FichajesHistorialScreen() {
               );
             }
           }
+
           const asignacionesTurno: AsignacionTurno[] =
             await obtenerAsignacionesTurnoTrabajador(idTrabajador);
           const asignacionesVigentes = Array.isArray(asignacionesTurno)
-            ? asignacionesTurno.filter(esAsignacionVigenteEnSemana)
+            ? asignacionesTurno.filter(esAsignacionVigenteEnPeriodo)
             : [];
+
           const conjuntoDias = new Set<string>();
           if (asignacionesVigentes.length > 0) {
             for (const asig of asignacionesVigentes) {
@@ -267,6 +328,7 @@ export default function FichajesHistorialScreen() {
             diasOrdenados.length > 0
               ? diasOrdenados.join(", ")
               : "Sin días asignados";
+
           nuevoMapaDatosFiscales[idTrabajador] = {
             jornada: capitalizar(contratoActivo?.tipo_jornada || ""),
             tipo_contrato: capitalizar(contratoActivo?.tipo_contrato || ""),
@@ -281,6 +343,7 @@ export default function FichajesHistorialScreen() {
             foto_url: trabajador?.foto_url || "",
             calendario_id: calendarioIdAsociado || null,
           };
+
           if (asignacionesVigentes.length > 0) {
             const turnosTrabajador: TurnoConAsignacion[] = [];
             for (const asig of asignacionesVigentes) {
@@ -325,21 +388,14 @@ export default function FichajesHistorialScreen() {
   };
 
   useEffect(() => {
-    cargarFichajesYTurnosSemanales();
-  }, [lunesSemanaActual, empresaActual?.id]);
+    cargarFichajesYTurnosPeriodo();
+  }, [rangoFechasCalculado, empresaActual?.id]);
 
   const mapearTurnoUIString = (trabajadorId: string) => {
     const lista = mapaTurnosObjetos[trabajadorId] || [];
-    const inicioSemana = new Date(
-      lunesSemanaActual.getFullYear(),
-      lunesSemanaActual.getMonth(),
-      lunesSemanaActual.getDate(),
-    );
-    const finSemana = new Date(
-      lunesSemanaActual.getFullYear(),
-      lunesSemanaActual.getMonth(),
-      lunesSemanaActual.getDate() + 6,
-    );
+    const inicioPeriodoTime = rangoFechasCalculado.inicio.getTime();
+    const finPeriodoTime = rangoFechasCalculado.fin.getTime();
+
     const listaFiltrada = lista.filter((t: TurnoConAsignacion) => {
       if (!t.fecha_asignacion_inicio) return false;
       const partesInicio = t.fecha_asignacion_inicio.split("T")[0].split("-");
@@ -347,8 +403,9 @@ export default function FichajesHistorialScreen() {
         parseInt(partesInicio[0], 10),
         parseInt(partesInicio[1], 10) - 1,
         parseInt(partesInicio[2], 10),
-      );
-      let finTurno = finSemana.getTime();
+      ).getTime();
+
+      let finTurno = finPeriodoTime;
       if (t.fecha_asignacion_fin) {
         const partesFin = t.fecha_asignacion_fin.split("T")[0].split("-");
         finTurno = new Date(
@@ -357,13 +414,11 @@ export default function FichajesHistorialScreen() {
           parseInt(partesFin[2], 10),
         ).getTime();
       }
-      return (
-        inicioTurno.getTime() <= finSemana.getTime() &&
-        finTurno >= inicioSemana.getTime()
-      );
+      return inicioTurno <= finPeriodoTime && finTurno >= inicioPeriodoTime;
     });
+
     if (!listaFiltrada || listaFiltrada.length === 0)
-      return "Sin turno asignado esta semana";
+      return "Sin turno asignado en este periodo";
     return listaFiltrada
       .map((t) => {
         const inicio = t.hora_inicio ? t.hora_inicio.substring(0, 5) : "00:00";
@@ -377,11 +432,11 @@ export default function FichajesHistorialScreen() {
       .join(", ");
   };
 
-  const trabajadoresAgrupadosSemanales: TrabajadorConFichajesSemanales[] =
+  const trabajadoresAgrupadosPeriodo: TrabajadorConFichajesSemanales[] =
     useMemo(() => {
       const mapa: { [trabajadorId: string]: TrabajadorConFichajesSemanales } =
         {};
-      fichajesSemanales.forEach((f: RegistroFichaje) => {
+      fichajesPeriodo.forEach((f: RegistroFichaje) => {
         if (!mapa[f.trabajador_id]) {
           const fiscal = mapaDatosFiscales[f.trabajador_id] || {};
           const turnosTrabajador = mapaTurnosObjetos[f.trabajador_id] || [];
@@ -407,7 +462,7 @@ export default function FichajesHistorialScreen() {
         }
       });
       Object.keys(mapa).forEach((trabajadorId) => {
-        const fichajesDelTrabajador = fichajesSemanales.filter(
+        const fichajesDelTrabajador = fichajesPeriodo.filter(
           (f) => f.trabajador_id === trabajadorId,
         );
         const turnosDelTrabajador = mapaTurnosObjetos[trabajadorId] || [];
@@ -422,7 +477,8 @@ export default function FichajesHistorialScreen() {
                 ? new Date().getDay()
                 : objetoFecha.getDay()
             ];
-          if (nombreDia === "Domingo") return;
+          if (nombreDia === "Domingo" && tipoVista === "semana") return; // Opcional, mantener si aplica
+
           if (!mapa[trabajadorId].dias[fechaFichajeLimpia]) {
             mapa[trabajadorId].dias[fechaFichajeLimpia] = {
               nombreDia: `${nombreDia} (${fechaFichajeLimpia.split("-").reverse().slice(0, 2).join("/")})`,
@@ -469,236 +525,209 @@ export default function FichajesHistorialScreen() {
         });
       });
       return Object.values(mapa);
-    }, [fichajesSemanales, mapaTurnosObjetos, mapaDatosFiscales]);
+    }, [fichajesPeriodo, mapaTurnosObjetos, mapaDatosFiscales, tipoVista]);
 
-  const handleExportarPDF = useCallback(async () => {
-    if (fichajesSemanales.length === 0) {
-      mostrarMensaje(
-        "Alerta",
-        "No constan registros horarios en esta semana para compilar el documento legal.",
+  const handleExportarPDF = useCallback(
+    async (modoExport: "semana" | "mes" | "trimestre" = tipoVista) => {
+      if (fichajesPeriodo.length === 0) {
+        mostrarMensaje(
+          "Alerta",
+          "No constan registros horarios en este periodo para compilar el documento legal.",
+        );
+        return;
+      }
+      const trabajadoresAIncluir = trabajadoresAgrupadosPeriodo.filter(
+        (t: TrabajadorConFichajesSemanales) =>
+          trabajadoresSeleccionadosParaPdf.some(
+            (idSeleccionado) => String(idSeleccionado) === String(t.id),
+          ),
       );
-      return;
-    }
-    const trabajadoresAIncluir = trabajadoresAgrupadosSemanales.filter(
-      (t: TrabajadorConFichajesSemanales) =>
-        trabajadoresSeleccionadosParaPdf.some(
-          (idSeleccionado) => String(idSeleccionado) === String(t.id),
-        ),
-    );
-    if (trabajadoresAIncluir.length === 0) {
-      mostrarMensaje(
-        "Alerta",
-        "Por favor, selecciona al menos un trabajador para generar el informe.",
-      );
-      return;
-    }
-    const promesasBloques = trabajadoresAIncluir.map(
-      async (t: TrabajadorConFichajesSemanales) => {
-        let filasCalendarioHtml = "";
-        let totalMinutosSemanales = 0;
-        const entradasDias = Object.entries(t.dias || {});
-        for (const [fechaKey, datosDia] of entradasDias) {
-          const [anio, mes, dia] = fechaKey.split("-").map(Number);
-          const fechaObjeto = new Date(anio, mes - 1, dia);
-          const nombresDiasSemana = [
-            "Domingo",
-            "Lunes",
-            "Martes",
-            "Miércoles",
-            "Jueves",
-            "Viernes",
-            "Sábado",
-          ];
-          const nombreDiaReal = nombresDiasSemana[fechaObjeto.getDay()];
-          const fechaFormateada = `${dia}/${mes}`;
-          if (
-            datosDia &&
-            datosDia.turnos &&
-            Object.keys(datosDia.turnos).length > 0
-          ) {
-            for (const [nombreTurno, eventos] of Object.entries(
-              datosDia.turnos,
-            )) {
-              let entrada = "-";
-              let salida = "-";
-              let entradaMinutos = 0;
-              let salidaMinutos = 0;
-              let aPausaInicio: Date | null = null;
-              let tiempoPausasMinutos = 0;
-              const firmasHtml: string[] = [];
-              const eventosFirma: string[] = [];
-              const listaEventos = Array.isArray(eventos) ? eventos : [];
-              const correccionesAprobadas = listaEventos
-                .map((evento) => evento.correccion_aprobada)
-                .filter(Boolean);
-              for (const m of listaEventos) {
-                const hora = extraerHora(m.fecha_hora, false);
-                let tipoCodigo = "";
-                if (m.tipo_evento_id) {
-                  try {
-                    const tipoObj = await obtenerTipoEventoPorId(
-                      m.tipo_evento_id,
-                    );
-                    tipoCodigo = tipoObj?.codigo || "";
-                  } catch (error: any) {
-                    mostrarError(
-                      `Error al obtener el tipo de evento (${m.tipo_evento_id}): ` +
-                        error.message,
-                    );
+      if (trabajadoresAIncluir.length === 0) {
+        mostrarMensaje(
+          "Alerta",
+          "Por favor, selecciona al menos un trabajador para generar el informe.",
+        );
+        return;
+      }
+
+      const etiquetaSubtitulo =
+        modoExport === "semana"
+          ? "Resumen semanal de control horario"
+          : modoExport === "mes"
+            ? "Resumen mensual de control horario"
+            : "Resumen trimestral de control horario";
+
+      const promesasBloques = trabajadoresAIncluir.map(
+        async (t: TrabajadorConFichajesSemanales) => {
+          let filasCalendarioHtml = "";
+          let totalMinutosPeriodo = 0;
+          const entradasDias = Object.entries(t.dias || {});
+          for (const [fechaKey, datosDia] of entradasDias) {
+            const [anio, mes, dia] = fechaKey.split("-").map(Number);
+            const fechaObjeto = new Date(anio, mes - 1, dia);
+            const nombresDiasSemana = [
+              "Domingo",
+              "Lunes",
+              "Martes",
+              "Miércoles",
+              "Jueves",
+              "Viernes",
+              "Sábado",
+            ];
+            const nombreDiaReal = nombresDiasSemana[fechaObjeto.getDay()];
+            const fechaFormateada = `${dia}/${mes}/${anio}`;
+            if (
+              datosDia &&
+              datosDia.turnos &&
+              Object.keys(datosDia.turnos).length > 0
+            ) {
+              for (const [nombreTurno, eventos] of Object.entries(
+                datosDia.turnos,
+              )) {
+                let entrada = "-";
+                let salida = "-";
+                let entradaMinutos = 0;
+                let salidaMinutos = 0;
+                let aPausaInicio: Date | null = null;
+                let tiempoPausasMinutos = 0;
+                const firmasHtml: string[] = [];
+                const eventosFirma: string[] = [];
+                const listaEventos = Array.isArray(eventos) ? eventos : [];
+                const correccionesAprobadas = listaEventos
+                  .map((evento) => evento.correccion_aprobada)
+                  .filter(Boolean);
+
+                for (const m of listaEventos) {
+                  const hora = extraerHora(m.fecha_hora, false);
+                  let tipoCodigo = "";
+                  if (m.tipo_evento_id) {
+                    try {
+                      const tipoObj = await obtenerTipoEventoPorId(
+                        m.tipo_evento_id,
+                      );
+                      tipoCodigo = tipoObj?.codigo || "";
+                    } catch (error: any) {
+                      mostrarError(
+                        `Error al obtener el tipo de evento (${m.tipo_evento_id}): ` +
+                          error.message,
+                      );
+                    }
                   }
-                }
-                const tipoUpper = String(tipoCodigo).toUpperCase();
-                const esEntrada = tipoUpper.includes("ENTRADA");
-                const esSalida = tipoUpper.includes("SALIDA");
-                const esInicioPausa =
-                  tipoUpper.includes("INICIO_PAUSA") ||
-                  (tipoUpper.includes("PAUSA") && !tipoUpper.includes("FIN"));
-                const esFinPausa = tipoUpper.includes("FIN_PAUSA");
-                if (esEntrada) {
-                  entrada = hora;
-                  entradaMinutos = horaAMinutos(hora);
-                }
-                if (esSalida) {
-                  salida = hora;
-                  salidaMinutos = horaAMinutos(hora);
-                }
-                if (esInicioPausa && !esFinPausa && m.fecha_hora) {
-                  aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
-                }
-                if (esFinPausa && aPausaInicio && m.fecha_hora) {
-                  const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
-                  tiempoPausasMinutos += Math.round(
-                    (fin.getTime() - aPausaInicio.getTime()) / 60000,
+                  const tipoUpper = String(tipoCodigo).toUpperCase();
+                  const esEntrada = tipoUpper.includes("ENTRADA");
+                  const esSalida = tipoUpper.includes("SALIDA");
+                  const esInicioPausa =
+                    tipoUpper.includes("INICIO_PAUSA") ||
+                    (tipoUpper.includes("PAUSA") && !tipoUpper.includes("FIN"));
+                  const esFinPausa = tipoUpper.includes("FIN_PAUSA");
+                  if (esEntrada) {
+                    entrada = hora;
+                    entradaMinutos = horaAMinutos(hora);
+                  }
+                  if (esSalida) {
+                    salida = hora;
+                    salidaMinutos = horaAMinutos(hora);
+                  }
+                  if (esInicioPausa && !esFinPausa && m.fecha_hora) {
+                    aPausaInicio = new Date(m.fecha_hora.replace(/ /g, "T"));
+                  }
+                  if (esFinPausa && aPausaInicio && m.fecha_hora) {
+                    const fin = new Date(m.fecha_hora.replace(/ /g, "T"));
+                    tiempoPausasMinutos += Math.round(
+                      (fin.getTime() - aPausaInicio.getTime()) / 60000,
+                    );
+                    aPausaInicio = null;
+                  }
+                  const firmaRes = await firmaComoHtml(
+                    m.firma_digital,
+                    mostrarError,
                   );
-                  aPausaInicio = null;
+                  firmasHtml.push(firmaRes || "");
+                  eventosFirma.push(
+                    `${tipoCodigo || "Evento"} · ${new Date(m.fecha_hora).toLocaleString("es-ES")}`,
+                  );
                 }
-                const firmaRes = await firmaComoHtml(
-                  m.firma_digital,
-                  mostrarError,
-                );
-                firmasHtml.push(firmaRes || "");
-                eventosFirma.push(
-                  `${tipoCodigo || "Evento"} · ${new Date(m.fecha_hora).toLocaleString("es-ES")}`,
-                );
-              }
-              let minutesTrabajadosHoy = 0;
-              let estadoLinea = "Incompleto";
-              let colorEstado = "#EA580C";
-              if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
-                minutesTrabajadosHoy =
-                  salidaMinutos - entradaMinutos - tiempoPausasMinutos;
-                if (minutesTrabajadosHoy < 0) minutesTrabajadosHoy = 0;
-                totalMinutosSemanales += minutesTrabajadosHoy;
-                estadoLinea =
-                  nombreDiaReal === "Sábado" ? "Horas extra" : "Efectuado";
-                colorEstado = "#16A34A";
-              } else if (entrada === "-" && salida === "-") {
-                estadoLinea =
-                  nombreDiaReal === "Sábado" ? "Sin horas extra" : "Sin marcas";
-                colorEstado = "#94A3B8";
-              }
-              const horasHoyTexto =
-                minutesTrabajadosHoy > 0
-                  ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
-                  : "-";
-              const pausasTexto =
-                tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
-              let correccionFichaje = null;
-              for (const correccion of correccionesAprobadas) {
-                if (!correccion) continue;
-                correccionFichaje = correccion;
-              }
-              if (correccionFichaje) {
-                const valorNuevo = correccionFichaje.valor_nuevo || {};
-                const fechaNueva =
-                  valorNuevo.fecha_descuadre || fechaFormateada;
-                const horaNueva = valorNuevo.hora_propuesta || "-";
-                if (horaNueva && horaNueva !== "") entrada = horaNueva;
-                const firmaSolicitanteHtml = await firmaComoHtml(
-                  correccionFichaje.firma_solicitante,
-                  mostrarError,
-                );
-                const firmaResolutorHtml = await firmaComoHtml(
-                  correccionFichaje.firma_resolutor,
-                  mostrarError,
-                );
+                let minutesTrabajadosHoy = 0;
+                let estadoLinea = "Incompleto";
+                let colorEstado = "#EA580C";
+                if (entradaMinutos > 0 && salidaMinutos > entradaMinutos) {
+                  minutesTrabajadosHoy =
+                    salidaMinutos - entradaMinutos - tiempoPausasMinutos;
+                  if (minutesTrabajadosHoy < 0) minutesTrabajadosHoy = 0;
+                  totalMinutosPeriodo += minutesTrabajadosHoy;
+                  estadoLinea =
+                    nombreDiaReal === "Sábado" || nombreDiaReal === "Domingo"
+                      ? "Horas extra"
+                      : "Efectuado";
+                  colorEstado = "#16A34A";
+                } else if (entrada === "-" && salida === "-") {
+                  estadoLinea = "Sin marcas";
+                  colorEstado = "#94A3B8";
+                }
+                const horasHoyTexto =
+                  minutesTrabajadosHoy > 0
+                    ? `${Math.floor(minutesTrabajadosHoy / 60)}h ${minutesTrabajadosHoy % 60}m`
+                    : "-";
+                const pausasTexto =
+                  tiempoPausasMinutos > 0 ? `${tiempoPausasMinutos} min` : "-";
 
                 filasCalendarioHtml += ` 
-                  <tr> 
-                    <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td> 
-                    <td>${entrada}</td> 
-                    <td>${salida}</td> 
-                    <td style="width:10px">${pausasTexto}</td> 
-                    <td style="font-weight: bold;">${horasHoyTexto}</td> 
-                    <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td> 
-                    <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td> 
-                  </tr> 
-                  <tr class="fila-correccion"> 
-                    <td colspan="2"><strong>CORRECCIÓN APROBADA</strong><br/><small>${escaparHtml(correccionFichaje.tipo_correccion)}<br/>${escaparHtml(fechaNueva)} ${escaparHtml(horaNueva)}</small></td> 
-                    <td colspan="2"><small>Solicita: ${escaparHtml(correccionFichaje.solicitante || "Usuario identificado")} (${escaparHtml(correccionFichaje.solicitante_tipo || "Usuario")})</small><br/>${firmaSolicitanteHtml}</td> 
-                    <td colspan="2"><small>Aprueba: ${escaparHtml(correccionFichaje.resolutor || "Usuario identificado")} (${escaparHtml(correccionFichaje.resolutor_tipo || "Usuario")})</small><br/>${firmaResolutorHtml}</td> 
-                    <td class="celda-firma"><small>${escaparHtml("Fecha y hora de corrección")}<br>${escaparHtml(correccionFichaje.fecha_resolucion?.substring(0, 10).concat(" ", correccionFichaje.fecha_resolucion.substring(11, 16)) || "")}</small></td> 
-                  </tr> 
-                `;
-              } else {
-                filasCalendarioHtml += ` 
-                  <tr> 
-                    <td><small style="font-size:13px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td> 
-                    <td>${entrada}</td> 
-                    <td>${salida}</td> 
-                    <td style="width:10px">${pausasTexto}</td> 
-                    <td style="font-weight: bold;">${horasHoyTexto}</td> 
-                    <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td> 
-                    <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td> 
-                  </tr> 
-                `;
+                <tr> 
+                  <td><small style="font-size:11px;"><strong>${escaparHtml(nombreDiaReal)} (${escaparHtml(fechaFormateada)})</strong></small><br/><small style="color:#555;">${escaparHtml(nombreTurno)}</small></td> 
+                  <td>${entrada}</td> 
+                  <td>${salida}</td> 
+                  <td style="width:10px">${pausasTexto}</td> 
+                  <td style="font-weight: bold;">${horasHoyTexto}</td> 
+                  <td style="font-weight: bold; font-size:10px; color:${colorEstado};">${estadoLinea}</td> 
+                  <td class="celda-firma">${firmasHtml.map((firma, index) => `<div class="registro-firma"><small>${escaparHtml(eventosFirma[index])}</small>${firma}</div>`).join("") || '<span class="sin-firma">Sin firma</span>'}</td> 
+                </tr> 
+              `;
               }
-            }
-          } else {
-            const esSabado = nombreDiaReal === "Sábado";
-            const textoEstado = esSabado ? "Sin horas extra" : "Sin marcas";
-            filasCalendarioHtml += ` 
+            } else {
+              filasCalendarioHtml += ` 
               <tr> 
                 <td><strong>${nombreDiaReal} (${fechaFormateada})</strong></td> 
                 <td>-</td> 
                 <td>-</td> 
                 <td>-</td> 
                 <td>-</td> 
-                <td style="color:#94A3B8; font-weight: bold; font-size:10px;">${textoEstado}</td> 
+                <td style="color:#94A3B8; font-weight: bold; font-size:10px;">Sin marcas</td> 
                 <td class="celda-firma"></td> 
               </tr> 
             `;
+            }
           }
-        }
-        const nombreEmpresa =
-          empresaActual?.nombre_comercial || "Sin identificar";
-        const razonSocial = empresaActual?.razon_social || "Sin identificar";
-        const cifEmpresa = empresaActual?.cif || "-";
-        const direccionEmpresa = empresaActual?.direccion_fiscal || "No consta";
-        const cnaeEmpresa = empresaActual?.codigo_cnae || "No consta";
-        const convenioEmpresa =
-          empresaActual?.convenio_colectivo || "No consta";
-        let logoEmpresa = "";
-        try {
-          logoEmpresa = (await obtenerUrlLogo(empresaActual?.logo_url)) || "";
-        } catch (error: any) {
-          mostrarError(error.message);
-        }
-        const fiscal = mapaDatosFiscales[t.id];
-        const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
-        const nssTrabajador = fiscal?.numero_seguridad_social || "-";
-        const relacionLaboralTexto = `${t.tipoContrato || "N/A"} (${t.tipoJornada || "N/A"} - ${t.horasContrato || "40"}/sem)`;
-        const diasAsignadosTexto = `${fiscal?.dias_planificados || "Sin especificar"}`;
-        const horarioVigenteTexto =
-          t.turnoResumen && t.turnoResumen !== "Sin turno asignado"
-            ? t.turnoResumen
-            : "Sin cuadrante de turnos activo en estas fechas";
-        const totalHorasCalculadas = `${Math.floor(totalMinutosSemanales / 60)} horas y ${totalMinutosSemanales % 60} minutos`;
-        return ` 
+          const nombreEmpresa =
+            empresaActual?.nombre_comercial || "Sin identificar";
+          const razonSocial = empresaActual?.razon_social || "Sin identificar";
+          const cifEmpresa = empresaActual?.cif || "-";
+          const direccionEmpresa =
+            empresaActual?.direccion_fiscal || "No consta";
+          const cnaeEmpresa = empresaActual?.codigo_cnae || "No consta";
+          const convenioEmpresa =
+            empresaActual?.convenio_colectivo || "No consta";
+          let logoEmpresa = "";
+          try {
+            logoEmpresa = (await obtenerUrlLogo(empresaActual?.logo_url)) || "";
+          } catch (error: any) {
+            mostrarError(error.message);
+          }
+          const fiscal = mapaDatosFiscales[t.id];
+          const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
+          const nssTrabajador = fiscal?.numero_seguridad_social || "-";
+          const relacionLaboralTexto = `${t.tipoContrato || "N/A"} (${t.tipoJornada || "N/A"} - ${t.horasContrato || "40"}/sem)`;
+          const diasAsignadosTexto = `${fiscal?.dias_planificados || "Sin especificar"}`;
+          const horarioVigenteTexto =
+            t.turnoResumen && t.turnoResumen !== "Sin turno asignado"
+              ? t.turnoResumen
+              : "Sin cuadrante de turnos activo en este periodo";
+          const totalHorasCalculadas = `${Math.floor(totalMinutosPeriodo / 60)} horas y ${totalMinutosPeriodo % 60} minutos`;
+
+          return ` 
           <div class="hoja-trabajador"> 
             <header class="cabecera-documento"> 
               <div class="marca-empresa">${logoEmpresa ? `<img src="${escaparHtml(logoEmpresa)}" alt="Logo de ${escaparHtml(nombreEmpresa)}" />` : ""}<div><h1>${escaparHtml(nombreEmpresa)}</h1><p>${escaparHtml(razonSocial)}</p></div></div> 
-              <div class="titulo-documento"><strong>REGISTRO DIARIO DE JORNADA</strong><span>Resumen semanal de control horario</span></div> 
+              <div class="titulo-documento"><strong>REGISTRO DIARIO DE JORNADA</strong><span>${escaparHtml(etiquetaSubtitulo)}</span></div> 
             </header> 
             <div class="caja-legal"> 
               Registro conforme al artículo 34.9 del Estatuto de los Trabajadores y al Real Decreto-ley 8/2019, de 8 de marzo. Conservar durante cuatro años a disposición de las personas trabajadoras, sus representantes y la Inspección de Trabajo. 
@@ -725,8 +754,8 @@ export default function FichajesHistorialScreen() {
                 <td><strong>Contrato/Jornada:</strong> ${escaparHtml(relacionLaboralTexto)}</td> 
               </tr> 
               <tr> 
-                <td><strong>Horario planificado:</strong> ${escaparHtml(horarioVigenteTexto)}</td> 
-                <td><strong>Periodo:</strong> ${escaparHtml(rangoSemanaStr)}</td> 
+                <td><strong>Horario planificado (Vigente):</strong> ${escaparHtml(horarioVigenteTexto)}</td> 
+                <td><strong>Periodo:</strong> ${escaparHtml(rangoFechasCalculado.textoStr)}</td> 
               </tr> 
               <tr> 
                 <td colspan="2"><strong>Días planificados:</strong> ${escaparHtml(diasAsignadosTexto)}</td> 
@@ -747,7 +776,7 @@ export default function FichajesHistorialScreen() {
               <tbody> ${filasCalendarioHtml} </tbody> 
               <tfoot> 
                 <tr style="background-color: #F1F5F9; font-weight: bold;"> 
-                  <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS COMPUTADAS EN LA SEMANA:</td> 
+                  <td colspan="4" style="text-align: right; padding: 8px;">TOTAL HORAS COMPUTADAS EN EL PERIODO:</td> 
                   <td colspan="3" style="text-align: left; padding: 8px; font-size: 12px; color: #1E3A8A;">${totalHorasCalculadas}</td> 
                 </tr> 
               </tfoot> 
@@ -759,12 +788,13 @@ export default function FichajesHistorialScreen() {
               <div style="clear: both;"></div> </div> <div class="page-break"></div> 
           </div> 
         `;
-      },
-    );
-    const bloquesTrabajadoresHtml = (await Promise.all(promesasBloques)).join(
-      "",
-    );
-    const plantillaHtml = ` 
+        },
+      );
+
+      const bloquesTrabajadoresHtml = (await Promise.all(promesasBloques)).join(
+        "",
+      );
+      const plantillaHtml = ` 
       <html> 
         <head> 
           <meta charset="utf-8"> 
@@ -785,15 +815,12 @@ export default function FichajesHistorialScreen() {
             .tabla-registro { width: 100%; border-collapse: collapse; margin-top: 10px; } 
             .tabla-registro th, .tabla-registro td { border: 1px solid #94A3B8; padding: 4px; text-align: center; vertical-align: middle; } 
             .tabla-registro th { background-color: #E2E8F0; font-size: 9px; text-transform: uppercase; } 
-            .fila-correccion { background-color: #EFF6FF; } 
-            .fila-correccion td { border-top: 0; color: #1E3A8A; } 
             .celda-firma { width: 145px; padding: 4px !important; vertical-align: middle; text-align: center; } 
             .registro-firma { border-bottom: 1px dotted #94A3B8; padding: 4px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; } 
             .registro-firma:last-child { border-bottom: 0; } 
             .registro-firma small { display: block; font-size: 7px; color: #475569; margin-bottom: 2px; text-align: center; } 
             .firma-fichaje { display: block; width: 100%; max-height: 35px; object-fit: contain; image-rendering: -webkit-optimize-contrast; } 
             .sin-firma { color: #64748B; font-size: 8px; } 
-            .texto-secundario { color: #475569; } 
             .firmas-bloque { margin-top: 20px; width: 100%; } 
             .firma-caja { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 5px; margin-top: 50px; font-weight: bold; } 
             .page-break { page-break-after: always; } 
@@ -802,64 +829,79 @@ export default function FichajesHistorialScreen() {
         <body>${bloquesTrabajadoresHtml}</body> 
       </html> 
     `;
-    try {
-      if (
-        typeof window !== "undefined" &&
-        window.document &&
-        (window.navigator as any).product !== "ReactNative"
-      ) {
-        const iframe = document.createElement("iframe");
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        document.body.appendChild(iframe);
-        const doc =
-          iframe.contentWindow?.document || (iframe as any).contentDocument;
-        if (doc) {
-          doc.open();
-          doc.write(plantillaHtml);
-          doc.close();
-          setTimeout(() => {
-            if (iframe.contentWindow) {
-              iframe.contentWindow.focus();
-              iframe.contentWindow.print();
-            }
-            document.body.removeChild(iframe);
-          }, 250);
+
+      try {
+        if (
+          typeof window !== "undefined" &&
+          window.document &&
+          (window.navigator as any).product !== "ReactNative"
+        ) {
+          const iframe = document.createElement("iframe");
+          iframe.style.position = "fixed";
+          iframe.style.right = "0";
+          iframe.style.bottom = "0";
+          iframe.style.width = "0";
+          iframe.style.height = "0";
+          iframe.style.border = "0";
+          document.body.appendChild(iframe);
+          const doc =
+            iframe.contentWindow?.document || (iframe as any).contentDocument;
+          if (doc) {
+            doc.open();
+            doc.write(plantillaHtml);
+            doc.close();
+            setTimeout(() => {
+              if (iframe.contentWindow) {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+              }
+              document.body.removeChild(iframe);
+            }, 250);
+          }
+        } else {
+          const { uri } = await Print.printToFileAsync({ html: plantillaHtml });
+          await Sharing.shareAsync(uri, {
+            mimeType: "application/pdf",
+            dialogTitle: `Libro_Registro_${modoExport}_${rangoFechasCalculado.textoStr.replace(/ /g, "_")}`,
+          });
         }
-      } else {
-        const { uri } = await Print.printToFileAsync({ html: plantillaHtml });
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: `Libro_Registro_Semanal_${rangoSemanaStr.replace(/ /g, "_")}`,
-        });
+      } catch (error: any) {
+        mostrarError(
+          "Error al generar o exportar el documento PDF: " + error.message,
+        );
       }
-    } catch (error: any) {
-      mostrarError(
-        "Error al generar o exportar el documento PDF: " + error.message,
-      );
-    }
-  }, [
-    fichajesSemanales,
-    trabajadoresAgrupadosSemanales,
-    trabajadoresSeleccionadosParaPdf,
-    mapaDatosFiscales,
-    empresaActual,
-    rangoSemanaStr,
-  ]);
+    },
+    [
+      fichajesPeriodo,
+      trabajadoresAgrupadosPeriodo,
+      trabajadoresSeleccionadosParaPdf,
+      mapaDatosFiscales,
+      empresaActual,
+      rangoFechasCalculado,
+      tipoVista,
+    ],
+  );
 
   return (
     <AppScreen
-      title="Auditoría de Fichajes"
-      subtitle={`Panel corporativo: ${empresaActual?.nombre_comercial ?? "Administrador Global"}`}
+      title="Registro de Fichajes"
+      subtitle={"Panel corporativo de la empresa"}
     >
       {empresaActual && (
         <View style={styles.cajaInfoEmpresa}>
           <View style={styles.filaInfoEmpresa}>
-            <FontAwesome5 name="building" size={13} color="#475569" />
+            {empresaActual.logo_url ? (
+              <ImagenConToken
+                rutaRelativa={empresaActual.logo_url}
+                style={{ width: 36, height: 36 }}
+              />
+            ) : (
+              <ThemedText style={{ fontSize: 14 }}>🏢</ThemedText>
+            )}
+            <ThemedText style={styles.negrita}>
+              {empresaActual.nombre_comercial.toUpperCase()}
+            </ThemedText>
+
             <ThemedText style={styles.textoInfoEmpresa}>
               <ThemedText style={styles.negrita}>CIF:</ThemedText>{" "}
               {empresaActual.cif}
@@ -867,51 +909,109 @@ export default function FichajesHistorialScreen() {
           </View>
         </View>
       )}
+
+      {/* Selector de tipo de vista (Semana, Mes, Trimestre) */}
+      <View style={styles.contenedorFiltroTipo}>
+        <Pressable
+          style={[
+            styles.botonTipoFiltro,
+            tipoVista === "semana" && styles.botonTipoActivo,
+          ]}
+          onPress={() => setTipoVista("semana")}
+        >
+          <ThemedText
+            style={[
+              styles.textoTipoFiltro,
+              tipoVista === "semana" && styles.textoTipoActivo,
+            ]}
+          >
+            Semanal
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.botonTipoFiltro,
+            tipoVista === "mes" && styles.botonTipoActivo,
+          ]}
+          onPress={() => setTipoVista("mes")}
+        >
+          <ThemedText
+            style={[
+              styles.textoTipoFiltro,
+              tipoVista === "mes" && styles.textoTipoActivo,
+            ]}
+          >
+            Mensual
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.botonTipoFiltro,
+            tipoVista === "trimestre" && styles.botonTipoActivo,
+          ]}
+          onPress={() => setTipoVista("trimestre")}
+        >
+          <ThemedText
+            style={[
+              styles.textoTipoFiltro,
+              tipoVista === "trimestre" && styles.textoTipoActivo,
+            ]}
+          >
+            Trimestral
+          </ThemedText>
+        </Pressable>
+      </View>
+
       <View style={styles.consolaAcciones}>
         <Pressable
           style={styles.botonAccionFiltro}
-          onPress={() => cambiarSemana("anterior")}
+          onPress={() => cambiarPeriodo("anterior")}
         >
           <FontAwesome5 name="chevron-left" size={12} color="#2563EB" />
           <ThemedText style={styles.textoBotonFiltro}>Anterior</ThemedText>
         </Pressable>
         <View style={styles.contenedorRangoSemana}>
-          <ThemedText style={styles.textoRango}>{rangoSemanaStr}</ThemedText>
+          <ThemedText style={styles.textoRango}>
+            {rangoFechasCalculado.textoStr}
+          </ThemedText>
         </View>
         <Pressable
           style={styles.botonAccionFiltro}
-          onPress={() => cambiarSemana("siguiente")}
+          onPress={() => cambiarPeriodo("siguiente")}
         >
           <ThemedText style={styles.textoBotonFiltro}>Siguiente</ThemedText>
           <FontAwesome5 name="chevron-right" size={12} color="#2563EB" />
         </Pressable>
       </View>
+
       <Pressable
         style={[styles.botonPDF, { marginBottom: 14 }]}
-        onPress={handleExportarPDF}
+        onPress={() => handleExportarPDF(tipoVista)}
       >
         <FontAwesome5 name="file-pdf" size={14} color="#FFFFFF" />
         <ThemedText style={styles.textoBotonPDF}>
           {cargandoPdf
             ? "Generando documento..."
-            : "Exportar Registro Semanal en PDF"}
+            : `Exportar Registro de ${capitalizar(tipoVista)} en PDF`}
         </ThemedText>
       </Pressable>
+
       <Row>
         <StatCard
-          label="Marcajes Semanales"
-          value={fichajesSemanales.length.toString()}
+          label="Marcajes del Periodo"
+          value={fichajesPeriodo.length.toString()}
         />
         <StatCard
           label="Personal Evaluado"
-          value={trabajadoresAgrupadosSemanales.length.toString()}
+          value={trabajadoresAgrupadosPeriodo.length.toString()}
           tone="success"
         />
       </Row>
+
       <ThemedText style={styles.sectionTitle}>
-        {" "}
-        Panel de Control Semanal{" "}
+        Panel de Control {capitalizar(tipoVista)}
       </ThemedText>
+
       {cargando ? (
         <ActivityIndicator
           size="large"
@@ -920,7 +1020,7 @@ export default function FichajesHistorialScreen() {
         />
       ) : (
         <View style={styles.contenedorEstructura}>
-          {trabajadoresAgrupadosSemanales.map(
+          {trabajadoresAgrupadosPeriodo.map(
             (trabajador: TrabajadorConFichajesSemanales) => {
               const estaSeleccionado =
                 trabajadoresSeleccionadosParaPdf.includes(trabajador.id);
@@ -953,7 +1053,7 @@ export default function FichajesHistorialScreen() {
                         style={styles.turnoTrabajador}
                         numberOfLines={2}
                       >
-                        Horario: {trabajador.turnoResumen}
+                        Horario vigente: {trabajador.turnoResumen}
                       </ThemedText>
                     </View>
                     <Pressable
@@ -1052,7 +1152,14 @@ export default function FichajesHistorialScreen() {
                                                 { color: config.color },
                                               ]}
                                             >
-                                              {config.texto} {horaLimpia} hs
+                                              {config.texto}
+                                              {Platform.OS == "android" &&
+                                              (config.texto ===
+                                                "INICIO PAUSA" ||
+                                                config.texto === "FIN PAUSA")
+                                                ? "\n"
+                                                : " "}
+                                              {horaLimpia} hs
                                             </ThemedText>
                                           </View>
                                         </View>
@@ -1071,10 +1178,10 @@ export default function FichajesHistorialScreen() {
               );
             },
           )}
-          {trabajadoresAgrupadosSemanales.length === 0 && (
+          {trabajadoresAgrupadosPeriodo.length === 0 && (
             <ThemedText style={styles.empty}>
-              No constan registros de asistencia en la semana laboral
-              seleccionada.
+              No constan registros de asistencia en el periodo laboral
+              seleccionado.
             </ThemedText>
           )}
         </View>
@@ -1213,6 +1320,32 @@ const styles = StyleSheet.create({
     gap: 4,
     marginVertical: 1,
   },
-  textoEvento: { fontSize: 9, fontWeight: "700" },
+  textoEvento: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
   empty: { textAlign: "center", color: "#64748B", marginTop: 20 },
+  contenedorFiltroTipo: {
+    flexDirection: "row",
+    backgroundColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 12,
+  },
+  botonTipoFiltro: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  botonTipoActivo: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  textoTipoFiltro: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  textoTipoActivo: { color: "#2563EB" },
 });

@@ -11,7 +11,9 @@ from core.enums import TipoUsuarioEnum
 from models.licencias import Licencias
 from models.empresas import Empresas
 from models.usuarios import Usuarios
-from schemas.empresas import EmpresaCreate, EmpresaResponse, EmpresaUpdate, RegistroOrganizacionCompletaDTO, RespuestaRegistroCompletoDTO
+from models.roles import Roles
+from schemas.empresas import EmpresaCreate, EmpresaResponse, EmpresaUpdate
+from schemas.registro_organizacion import RegistroOrganizacionCompletaDTO, RespuestaRegistroCompletoDTO
 from schemas.trabajadores import TrabajadorResponse
 import shutil
 import os
@@ -164,6 +166,8 @@ def registrar_organizacion_completa(
         licencia.usada = True
         licencia.empresa_id = nueva_empresa.id
 
+        rol_para_admin = db.query(Roles).filter(Roles.nombre == "Admin_empresa").first()
+
         # 6. Crear el Trabajador asociado (Primer expediente)
         nuevo_trabajador = Trabajadores(
             empresa_id=nueva_empresa.id,
@@ -173,7 +177,8 @@ def registrar_organizacion_completa(
             email=email_limpio,
             telefono=payload.telefono_admin.strip() if payload.telefono_admin else None,
             numero_seguridad_social=payload.nss_admin.strip() if payload.nss_admin else None,
-            fecha_nacimiento=payload.fecha_nacimiento_admin
+            fecha_nacimiento=payload.fecha_nacimiento_admin,
+            rol_id=rol_para_admin.id if rol_para_admin else None
         )
         db.add(nuevo_trabajador)
         db.flush() 

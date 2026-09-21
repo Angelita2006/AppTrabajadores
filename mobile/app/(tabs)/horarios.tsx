@@ -2,8 +2,8 @@ import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-t
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
-    DIAS_SEMANA,
-    RegistroFichaje,
+  DIAS_SEMANA,
+  RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerResumenesPorTrabajador } from "@/src/modules/resumenes-jornada/api/services";
 import { ResumenJornada } from "@/src/modules/resumenes-jornada/types/resumen-jornada";
@@ -15,9 +15,9 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
 import {
-    formatearAHorasYMinutos,
-    horaAMinutos,
-    obtenerMinutosFichaje,
+  formatearAHorasYMinutos,
+  horaAMinutos,
+  obtenerMinutosFichaje,
 } from "@/src/utils/formaters";
 import { cumpleDiasSemana } from "@/src/utils/validators";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -230,8 +230,8 @@ export default function HorariosScreen() {
             const pausasDelDia = fichajesRealizados.filter(
               (fichaje: RegistroFichaje) => {
                 const estadoValido =
-                  fichaje.estado?.toLowerCase() === "valido" ||
-                  fichaje.estado?.localeCompare("Valido") === 0;
+                  fichaje.estado === "Válido" ||
+                  fichaje.estado?.localeCompare("Válido") === 0;
                 if (!estadoValido) return false;
 
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];

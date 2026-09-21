@@ -1,32 +1,33 @@
 import {
-    crearCorreccion,
-    obtenerCorreccionesPorEmpresa,
-    obtenerCorreccionesPorTrabajador,
-    resolverCorreccion,
+  crearCorreccion,
+  obtenerCorreccionesPorEmpresa,
+  obtenerCorreccionesPorTrabajador,
+  resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
-import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
+import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import {
-    obtenerTipoEventoPorId,
-    obtenerTiposEventosEmpresa,
+  obtenerTipoEventoPorId,
+  obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    CorreccionFichajeCreate,
-    CorreccionFichajeResponse,
-    EstadoCorreccion,
-    TipoCorreccion,
+  CorreccionFichajeCreate,
+  CorreccionFichajeResponse,
+  EstadoCorreccion,
+  TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
@@ -114,9 +115,25 @@ export default function IncidenciasScreen() {
       } else {
         if (!usuarioActual || !trabajadorActual?.id) return;
 
+        const hoy = new Date();
+        const diaSemana = hoy.getDay();
+        const diferenciaLunes =
+          hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
+
+        const fechaLunes = new Date(new Date().setDate(diferenciaLunes));
+        const fechaDomingo = new Date(fechaLunes);
+        fechaDomingo.setDate(fechaLunes.getDate() + 6);
+
+        const fechaInicioStr = formatearFecha(fechaLunes);
+        const fechaFinStr = formatearFecha(fechaDomingo);
+
         const [datosPersonales, listaFichajesRaw] = await Promise.all([
           obtenerCorreccionesPorTrabajador(trabajadorActual.id),
-          obtenerFichajesSemanaActual(trabajadorActual.id),
+          obtenerFichajesTrabajadorEntreFechas(
+            trabajadorActual.id,
+            fechaInicioStr,
+            fechaFinStr,
+          ),
         ]);
 
         if (!Array.isArray(listaFichajesRaw)) {
@@ -788,3 +805,6 @@ const styles = StyleSheet.create({
   botonAprobar: { backgroundColor: "#16A34A" },
   textoBotonResolutor: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 });
+function formatearFechaAString(fechaLunes: any) {
+  throw new Error("Function not implemented.");
+}

@@ -324,3 +324,70 @@ export const actualizarAsignacionTurno = async (
     );
   }
 };
+
+export async function verificarSiSeHaLogueadoHoy(
+  idTrabajador: string,
+): Promise<boolean> {
+  try {
+    const respuesta = await api.get(
+      `/api/trabajadores/${idTrabajador}/verificar-login-hoy`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al verificar el registro de acceso de hoy.",
+    );
+  }
+}
+
+export async function verificarSiEsFestivo(
+  fecha: string,
+  idCentroTrabajo: string,
+): Promise<boolean> {
+  try {
+    const respuesta = await api.get(
+      `/api/festivos/${idCentroTrabajo}/verificar-dia?fecha=${fecha}`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al verificar si el día es festivo.");
+  }
+}
+
+export async function verificarSiTieneVacaciones(
+  idTrabajador: string,
+  fecha: string,
+): Promise<boolean> {
+  try {
+    const respuesta = await api.get(
+      `/api/ausencias/${idTrabajador}/vacaciones?fecha=${fecha}`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al actualizar la asignación de turno.",
+    );
+  }
+}
+
+export async function verificarSiTieneBaja(
+  trabajadorId: string,
+  fecha: string,
+): Promise<boolean> {
+  try {
+    const respuesta = await api.get(
+      `/api/ausencias/${trabajadorId}/bajas?fecha=${fecha}`,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al actualizar la asignación de turno.",
+    );
+  }
+}

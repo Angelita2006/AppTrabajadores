@@ -1,5 +1,5 @@
 import base64
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 import hashlib
 import ipaddress
 import os
@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import exists, func
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -17,7 +17,7 @@ from models.centros_trabajo import CentrosTrabajo
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
 from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoUsuarioEnum
-from core.utils import calcular_distancia_metros, calcular_hash_fichaje, validar_dia_laboral_o_marcar_extra
+from core.utils import calcular_distancia_metros, validar_dia_laboral_o_marcar_extra
 from models.empresas import Empresas
 from models.fichajes import Fichajes
 from models.correcciones_fichaje import CorreccionesFichaje
@@ -298,113 +298,8 @@ def obtener_fichajes_trabajador_empresa(
     )
     db.commit()
     return resultados
-
-
-@router.get("/trabajador/{id_trabajador}/hoy", response_model=List[FichajeResponse], summary="Obtener fichajes de hoy")
-@limiter.limit("60/minute") 
-def obtener_fichajes_hoy(
-    request: Request,
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    **GET /api/fichajes/trabajador/{id_trabajador}/hoy**
-     
-    Retorna la lista de fichajes realizados por el trabajador en el día actual (fecha de hoy).
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de fichajes de hoy para el trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID ({id_trabajador}) no localizado."
-        )
-
-    hoy = date.today()
-    
-    fichajes_db = db.query(Fichajes).options(
-        joinedload(Fichajes.tipo_evento),
-        joinedload(Fichajes.trabajador),
-        joinedload(Fichajes.centro_trabajo)
-    ).filter(
-        Fichajes.trabajador_id == id_trabajador,
-        filtro_fichajes_vigentes(),
-        func.date(Fichajes.fecha_hora) == hoy
-    ).all()
-    
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario=usuario_actual,
-        empresa_id=trabajador.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_fichajes_hoy", "entidad_id": str(id_trabajador), "detalles": f"Se consultaron los fichajes de hoy ({hoy}) para el trabajador {id_trabajador}"}
-    )
-    db.commit()
-    
-    return fichajes_db
-
-
-@router.get("/trabajador/{id_trabajador}/semana", response_model=List[FichajeResponse], summary="Obtener fichajes de la semana actual")
-@limiter.limit("60/minute") 
-def obtener_fichajes_semana_actual(
-    request: Request,
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    **GET /api/fichajes/trabajador/{id_trabajador}/semana**
-     
-    Obtiene todos los fichajes registrados de un trabajador durante la semana en curso (de lunes a domingo).
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de fichajes semanales para el trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trabajador no localizado en el sistema."
-        )
-
-    hoy = date.today()
-    dia_semana = hoy.weekday()
-    lunes_esta_semana = hoy - timedelta(days=dia_semana)
-    domingo_esta_semana = lunes_esta_semana + timedelta(days=6)
-
-    fichajes_semana = (
-        db.query(Fichajes)
-        .options(
-            joinedload(Fichajes.tipo_evento),
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo)
-        )
-        .filter(
-            Fichajes.trabajador_id == id_trabajador,
-            filtro_fichajes_vigentes(),
-            func.date(Fichajes.fecha_hora_dispositivo) >= lunes_esta_semana,
-            func.date(Fichajes.fecha_hora_dispositivo) <= domingo_esta_semana
-        )
-        .order_by(Fichajes.fecha_hora_dispositivo.asc())
-        .all()
-    )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario=usuario_actual,
-        empresa_id=trabajador.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_fichajes_semana", "entidad_id": str(id_trabajador), "detalles": f"Se consultaron los fichajes de la semana actual ({lunes_esta_semana} a {domingo_esta_semana}) para el trabajador {id_trabajador}"}
-    )
-    db.commit()
-
-    return fichajes_semana
-
+from datetime import date
+from sqlalchemy import or_, and_
 
 @router.get("/trabajador/{id_trabajador}/turno", response_model=List[FichajeResponse], summary="Obtener fichajes del turno actual")
 @limiter.limit("60/minute") 
@@ -424,23 +319,34 @@ def obtener_fichajes_turno_actual(
             detail="Trabajador no localizado."
         )
 
-    turno = db.query(Turnos).filter(Turnos.empresa_id == trabajador.empresa_id).first()
-    if not turno:
-        return []
-    
-    asignacion_turno = (
-        db.query(AsignacionesTurno)
-        .filter(AsignacionesTurno.trabajador_id == id_trabajador, AsignacionesTurno.turno_id == turno.id)
-        .where(AsignacionesTurno.created_at <= datetime.now())
-        .order_by(AsignacionesTurno.created_at.desc())
-        .first()
-    )
-    if not asignacion_turno:
-        return []
-    
-    fecha_inicio = asignacion_turno.fecha_inicio
-    fecha_fin = asignacion_turno.fecha_fin
+    hoy = date.today()
 
+    # 1. Buscar TODAS las asignaciones de turno que están vigentes a día de hoy para el trabajador
+    asignaciones_vigentes = (
+        db.query(AsignacionesTurno)
+        .filter(
+            AsignacionesTurno.trabajador_id == id_trabajador,
+            AsignacionesTurno.fecha_inicio <= hoy,
+            or_(
+                AsignacionesTurno.fecha_fin.is_(None),
+                AsignacionesTurno.fecha_fin >= hoy
+            )
+        )
+        .all()
+    )
+
+    if not asignaciones_vigentes:
+        return []
+
+    # 2. Construir los rangos de fechas (fecha_inicio a fecha_fin) de las asignaciones activas
+    condiciones_rangos_fechas = []
+    for asig in asignaciones_vigentes:
+        condicion_asig = [func.date(Fichajes.fecha_hora_dispositivo) >= asig.fecha_inicio]
+        if asig.fecha_fin:
+            condicion_asig.append(func.date(Fichajes.fecha_hora_dispositivo) <= asig.fecha_fin)
+        condiciones_rangos_fechas.append(and_(*condicion_asig))
+
+    # 3. Consultar fichajes que caigan dentro de CUALQUIERA de las asignaciones vigentes
     fichajes_turno = (
         db.query(Fichajes)
         .options(
@@ -451,8 +357,7 @@ def obtener_fichajes_turno_actual(
         .filter(
             Fichajes.trabajador_id == id_trabajador,
             filtro_fichajes_vigentes(),
-            func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio,
-            func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
+            or_(*condiciones_rangos_fechas)
         )
         .order_by(Fichajes.fecha_hora_dispositivo.asc())
         .all()
@@ -464,18 +369,23 @@ def obtener_fichajes_turno_actual(
         usuario=usuario_actual,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_fichajes_turno", "entidad_id": str(id_trabajador), "detalles": f"Se consultaron los fichajes del turno actual para el trabajador {id_trabajador}"}
+        detalle={
+            "recurso": "fichajes", 
+            "accion": "consultar_fichajes_turno", 
+            "entidad_id": str(id_trabajador), 
+            "detalles": f"Se consultaron los fichajes del turno actual para el trabajador {id_trabajador}"
+        }
     )
     db.commit()
 
     return fichajes_turno
 
 
-@router.get("/trabajador/{trabajador_id}/ultimo", summary="Obtener último fichaje del trabajador")
+@router.get("/trabajador/{id_trabajador}/ultimo", response_model=Optional[FichajeResponse], summary="Obtener último fichaje del trabajador")
 @limiter.limit("60/minute")
 def obtener_ultimo_fichaje_trabajador(
     request: Request,
-    trabajador_id: UUID, 
+    id_trabajador: UUID, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -485,13 +395,13 @@ def obtener_ultimo_fichaje_trabajador(
     Devuelve estrictamente el último evento de fichaje registrado por el trabajador (ordenado de forma descendente).
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición del último fichaje para el trabajador {trabajador_id} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición del último fichaje para el trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == trabajador_id).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID ({trabajador_id}) no encontrado."
+            detail=f"Trabajador con ID ({id_trabajador}) no encontrado."
         )
 
     ultimo_fichaje = db.query(Fichajes).options(
@@ -499,8 +409,8 @@ def obtener_ultimo_fichaje_trabajador(
         joinedload(Fichajes.trabajador),
         joinedload(Fichajes.centro_trabajo)
     ).filter(
-        Fichajes.trabajador_id == trabajador_id
-    ).order_by(Fichajes.fecha_hora.desc()).first()
+        Fichajes.trabajador_id == id_trabajador
+    ).order_by(Fichajes.created_at.desc()).first()
     
     registrar_auditoria(
         db=db,
@@ -508,26 +418,22 @@ def obtener_ultimo_fichaje_trabajador(
         usuario=usuario_actual,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_ultimo_fichaje", "entidad_id": str(trabajador_id), "detalles": f"Se consultó el último fichaje del trabajador {trabajador_id}"}
+        detalle={"recurso": "fichajes", "accion": "consultar_ultimo_fichaje", "entidad_id": str(id_trabajador), "detalles": f"Se consultó el último fichaje del trabajador {id_trabajador}"}
     )
     db.commit()
 
     if not ultimo_fichaje:
-        return {
-            "id": None,
-            "fecha_hora": None,
-            "tipo_evento": "SALIDA"  
-        }
+        return None
         
     return ultimo_fichaje
 
-
-@router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK, summary="Listar fichajes de empresa por fecha")
+@router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK, summary="Listar fichajes de empresa entre fechas")
 @limiter.limit("60/minute")
-def listar_fichajes_empresa_por_fecha(
+def listar_fichajes_empresa_entre_fechas(
     request: Request,
     empresa_id: UUID, 
-    fecha: date, 
+    fecha_inicio: date, 
+    fecha_fin: date, 
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -550,7 +456,7 @@ def listar_fichajes_empresa_por_fecha(
             )
             .filter(
                 Fichajes.empresa_id == empresa_id,
-                func.date(Fichajes.fecha_hora_dispositivo) == fecha
+                func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
             )
             .all()
         )
@@ -623,7 +529,123 @@ def listar_fichajes_empresa_por_fecha(
             usuario=usuario_actual,
             empresa_id=empresa_id,
             accion=AccionAuditoriaEnum.CONSULTA,
-            detalle={"recurso": "fichajes", "accion": "listar_fichajes_empresa_por_fecha", "entidad_id": str(empresa_id), "detalles": f"Se listaron los fichajes de la empresa {empresa_id} para la fecha {fecha}"}
+            detalle={"recurso": "fichajes", "accion": "listar_fichajes_empresa_por_fecha", "entidad_id": str(empresa_id), "detalles": f"Se listaron los fichajes de la empresa {empresa_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}"}
+        )
+        db.commit()
+
+        return payload_respuesta
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se han podido obtener los fichajes de la empresa: {str(e)}"
+        )
+
+@router.get("/trabajador/{trabajador_id}", status_code=status.HTTP_200_OK, summary="Listar fichajes de trabajador entre fechas")
+@limiter.limit("60/minute")
+def listar_fichajes_trabajador_entre_fechas(
+    request: Request,
+    trabajador_id: UUID, 
+    fecha_inicio: date, 
+    fecha_fin: date, 
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/fichajes/trabajador/{trabajador_id}**
+     
+    Lista detallada de todos los fichajes de un trabajador para un período entre fechas específico,
+    adaptada y formateada para el consumo directo del frontend. Protegida por roles administrativos.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de listado de fichajes por trabajador entre fechas desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    try:
+        resultados = (
+            db.query(Fichajes)
+            .options(
+                joinedload(Fichajes.trabajador),
+                joinedload(Fichajes.tipo_evento),
+                joinedload(Fichajes.centro_trabajo)
+            )
+            .filter(
+                Fichajes.trabajador_id == trabajador_id,
+                func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
+            )
+            .all()
+        )
+
+        fichaje_ids = [fichaje.id for fichaje in resultados]
+        correcciones_aprobadas = {}
+        if fichaje_ids:
+            correcciones = db.query(CorreccionesFichaje).options(
+                joinedload(CorreccionesFichaje.solicitado_por_usuario),
+                joinedload(CorreccionesFichaje.aprobado_por_usuario),
+            ).filter(
+                CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids),
+                CorreccionesFichaje.estado == "Aprobada",
+            ).all()
+            correcciones_aprobadas = {
+                correccion.fichaje_afectado_id: correccion
+                for correccion in correcciones
+            }
+
+        payload_respuesta = []
+        for fichaje in resultados:
+            codigo_evento = ""
+            if fichaje.tipo_evento:
+                codigo_evento = getattr(fichaje.tipo_evento, "codigo", "")
+
+            if fichaje.fecha_hora_dispositivo:
+                fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                fecha_hora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            trabajador_serializado = None
+            if fichaje.trabajador:
+                trabajador_serializado = TrabajadorSimpleResponse.model_validate(fichaje.trabajador).model_dump()
+
+            correccion = correcciones_aprobadas.get(fichaje.id)
+            correccion_serializada = None
+            if correccion:
+                correccion_serializada = {
+                    "id": str(correccion.id),
+                    "tipo_correccion": correccion.tipo_correccion.value,
+                    "motivo": correccion.motivo,
+                    "fecha_solicitud": correccion.fecha_solicitud.isoformat(),
+                    "fecha_resolucion": correccion.fecha_resolucion.isoformat() if correccion.fecha_resolucion else None,
+                    "valor_nuevo": correccion.valor_nuevo,
+                    "firma_solicitante": correccion.firma_solicitante,
+                    "firma_resolutor": correccion.firma_resolutor,
+                    "solicitante": getattr(correccion.solicitado_por_usuario, "nombre", None),
+                    "resolutor": getattr(correccion.aprobado_por_usuario, "nombre", None),
+                    "solicitante_tipo": getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) if getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) else None,
+                    "resolutor_tipo": getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) if getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) else None,
+                }
+
+            payload_respuesta.append({
+                "id": str(fichaje.id),
+                "trabajador_id": str(fichaje.trabajador_id),
+                "trabajador": trabajador_serializado,
+                "correccion_aprobada": correccion_serializada,
+                "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
+                "fecha_hora": fecha_hora_str, 
+                "tipo_evento_id": str(fichaje.tipo_evento_id) if fichaje.tipo_evento_id else None,
+                "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
+                "observaciones": fichaje.observaciones,
+                "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado),
+                "firma_digital": fichaje.firma_digital
+            })
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=usuario_actual.empresa_id
+            ,
+            accion=AccionAuditoriaEnum.CONSULTA,
+            detalle={"recurso": "fichajes", "accion": "listar_fichajes_trabajador_entre_fechas", "entidad_id": str(usuario_actual.empresa_id), "detalles": f"Se listaron los fichajes del trabajador {trabajador_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}"}
         )
         db.commit()
 

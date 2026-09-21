@@ -5,66 +5,79 @@ import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/cal
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import {
-    actualizarContrato,
-    obtenerContratoActivoTrabajador,
-    rescindirContratoActivoTrabajador,
+  actualizarContrato,
+  obtenerContratoActivoTrabajador,
+  rescindirContratoActivoTrabajador,
 } from "@/src/modules/contratos/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
-import { ModalAltaEditarTrabajador } from "@/src/modules/empresas/components/modals/ModalAltaEditarTrabajador";
-import { ModalAsignarTurnoTrabajador } from "@/src/modules/empresas/components/modals/ModalAsignarTurnoTrabajador";
-import { ModalContenedor } from "@/src/modules/empresas/components/modals/ModalContenedor";
-import { ModalContratoTrabajador } from "@/src/modules/empresas/components/modals/ModalContratoTrabajador";
-import { ModalEliminarTurnoTrabajador } from "@/src/modules/empresas/components/modals/ModalEliminarTurnoTrabajador";
-import { ModalRescindirBajaTrabajador } from "@/src/modules/empresas/components/modals/ModalRescindirBajaTrabajador";
-import {
-    PlantillaProvider,
-    usePlantilla,
-} from "@/src/modules/empresas/components/PlantillaProvider";
-import {
-    TipoModal,
-    usePlantillaFormularios,
-} from "@/src/modules/empresas/hooks/usePlantillaFormularios";
+import { obtenerUltimoFichaje } from "@/src/modules/fichajes/api/services";
+import { TIPOS_FICHAJE } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
+import { obtenerTipoEventoPorId } from "@/src/modules/tipos_eventos_fichaje/api/services";
+import {
+  actualizarAsignacionTurno,
+  actualizarTrabajador,
+  asignarTurnosTrabajador,
+  tramitarBajaTotalTrabajador,
+  verificarSiEsFestivo,
+  verificarSiSeHaLogueadoHoy,
+  verificarSiTieneBaja,
+  verificarSiTieneVacaciones,
+} from "@/src/modules/trabajadores/api/services";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
+import {
+  ESTADOS_TRABAJADOR,
+  Trabajador,
+} from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
+import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextStyle,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextStyle,
+  View,
+  ViewStyle,
 } from "react-native";
 import {
-    actualizarAsignacionTurno,
-    actualizarTrabajador,
-    asignarTurnosTrabajador,
-    tramitarBajaTotalTrabajador,
-} from "../../src/modules/trabajadores/api/services";
-import { Trabajador } from "../../src/modules/trabajadores/types/trabajador";
-import { ThemedText } from "../../src/shared/components/ThemedText";
-import { AppScreen } from "../../src/shared/ui/AppSurface";
+  TipoModal,
+  usePlantillaFormularios,
+} from "../../hooks/usePlantillaFormularios";
+import { Empresa } from "../../types/empresa";
+import { ModalAltaEditarTrabajador } from "../modals/ModalAltaEditarTrabajador";
+import { ModalAsignarTurnoTrabajador } from "../modals/ModalAsignarTurnoTrabajador";
+import { ModalContenedor } from "../modals/ModalContenedor";
+import { ModalContratoTrabajador } from "../modals/ModalContratoTrabajador";
+import { ModalEliminarTurnoTrabajador } from "../modals/ModalEliminarTurnoTrabajador";
+import { ModalRescindirBajaTrabajador } from "../modals/ModalRescindirBajaTrabajador";
+import { PlantillaProvider, usePlantilla } from "../PlantillaProvider";
 
-export default function PlantillaWrapper() {
+interface PlantillaTabProps {
+  empresaActual: Empresa;
+}
+
+export default function PlantillaTab({ empresaActual }: PlantillaTabProps) {
   return (
     <PlantillaProvider>
-      <PlantillaScreen />
+      <PlantillaScreen empresaActual={empresaActual} />
     </PlantillaProvider>
   );
 }
 
-function PlantillaScreen() {
-  // const { usuarioActual } = useUsuarioQuery();
+function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
   const { usuarioActual } = useSesion();
-  const { plantilla, cargando, cargarPlantilla, inicializado } = usePlantilla();
 
+  const empresaIdActiva = empresaActual.id || usuarioActual?.empresa_id;
+
+  const { plantilla, cargando, cargarPlantilla, inicializado } = usePlantilla();
   const [filtroEstado] = useState<"todos" | "altas">("todos");
   const [turnosEmpresa, setTurnosEmpresa] = useState<Turno[]>([]);
   const [cargandoSelectores, setCargandoSelectores] = useState(false);
@@ -75,7 +88,6 @@ function PlantillaScreen() {
   const [listaCalendariosLaborales, setListaCalendariosLaborales] = useState<
     CalendarioFestivo[]
   >([]);
-
   const [turnosInicialesVigentes, setTurnosInicialesVigentes] = useState<
     Turno[]
   >([]);
@@ -144,12 +156,12 @@ function PlantillaScreen() {
   const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
-    if (usuarioActual?.empresa_id) {
+    if (empresaIdActiva) {
       Promise.all([
-        obtenerCentrosTrabajoPorEmpresa(usuarioActual.empresa_id),
-        obtenerDepartamentosEmpresa(usuarioActual.empresa_id),
-        obtenerTurnosEmpresa(usuarioActual.empresa_id),
-        obtenerCalendariosFestivosPorEmpresa(usuarioActual.empresa_id),
+        obtenerCentrosTrabajoPorEmpresa(empresaIdActiva),
+        obtenerDepartamentosEmpresa(empresaIdActiva),
+        obtenerTurnosEmpresa(empresaIdActiva),
+        obtenerCalendariosFestivosPorEmpresa(empresaIdActiva),
       ]).then(([centros, departamentos, turnos, calendarios]) => {
         setListaCentros(centros);
         setListaDepartamentos(departamentos);
@@ -157,17 +169,16 @@ function PlantillaScreen() {
         setListaCalendariosLaborales(calendarios);
       });
     }
-  }, [usuarioActual?.empresa_id]);
+  }, [empresaIdActiva]);
 
   useEffect(() => {
-    if (usuarioActual?.empresa_id && puedeAcceder && !inicializado) {
+    if (empresaIdActiva && puedeAcceder && !inicializado) {
       cargarPlantilla();
     }
-  }, [cargarPlantilla, puedeAcceder, usuarioActual?.empresa_id, inicializado]);
+  }, [cargarPlantilla, puedeAcceder, empresaIdActiva, inicializado]);
 
   useEffect(() => {
     if (!modalActivo) return;
-
     const esEdicion = modalActivo === "editar_contrato";
     const esEdicionTrabajador = modalActivo === "editar_trabajador";
     const esCreacion =
@@ -220,13 +231,17 @@ function PlantillaScreen() {
   const [trabajadoresValidosIds, setTrabajadoresValidosIds] = useState<
     string[] | null
   >(null);
+  const [plantillaConEstados, setPlantillaConEstados] = useState<any[]>([]);
 
-  // Extraer todos los IDs únicos de roles y consultarlos en paralelo con Promise.all
   useEffect(() => {
     let isMounted = true;
-    async function filtrarAdminsDePlantilla() {
+
+    async function procesarPlantillaYEstados() {
       if (!plantilla || plantilla.length === 0) {
-        if (isMounted) setTrabajadoresValidosIds([]);
+        if (isMounted) {
+          setTrabajadoresValidosIds([]);
+          setPlantillaConEstados([]);
+        }
         return;
       }
 
@@ -250,57 +265,135 @@ function PlantillaScreen() {
 
         const resultadosRoles = await Promise.all(rolesPromesas);
         const mapaRoles = new Map(resultadosRoles.map((r) => [r.rolId, r.rol]));
-
         const idsValidos: string[] = [];
-        for (const item of plantilla) {
-          if (!item.rol_id) {
-            idsValidos.push(item.id);
-            continue;
-          }
-          const rol = mapaRoles.get(item.rol_id);
-          const esAdmin =
-            rol?.nombre?.toLowerCase().includes("admin") ||
-            rol?.descripcion?.toLowerCase().includes("admin");
 
-          if (!esAdmin) {
-            idsValidos.push(item.id);
-          }
+        // Procesar en paralelo la obtención de estados de cada trabajador
+        const resultadoPlantillaConEstados = await Promise.all(
+          plantilla.map(async (item: Trabajador) => {
+            // 1. Filtrado de administradores
+            let esAdmin = false;
+            if (item.rol_id) {
+              const rol = mapaRoles.get(item.rol_id);
+              esAdmin =
+                Boolean(rol?.nombre?.toLowerCase().includes("admin")) ||
+                Boolean(rol?.descripcion?.toLowerCase().includes("admin"));
+            }
+
+            if (!esAdmin) {
+              idsValidos.push(item.id);
+            }
+
+            // 2. Cálculo de estados según las reglas de negocio
+            let estadoCalculado = ESTADOS_TRABAJADOR.INACTIVO.toString();
+
+            try {
+              const [
+                ultimoFichaje,
+                seHaLogueadoHoy,
+                esFestivoHoy,
+                tieneVacacionesHoy,
+                tieneBajaHoy,
+              ] = await Promise.all([
+                obtenerUltimoFichaje(item.id),
+                verificarSiSeHaLogueadoHoy(item.id).catch(() => false),
+                verificarSiEsFestivo(
+                  formatearFecha(new Date()),
+                  centroTrabajoId,
+                ).catch(() => false),
+                verificarSiTieneVacaciones(
+                  formatearFecha(new Date()),
+                  item.id,
+                ).catch(() => false),
+                verificarSiTieneBaja(formatearFecha(new Date()), item.id).catch(
+                  () => false,
+                ),
+              ]);
+              if (tieneVacacionesHoy) {
+                estadoCalculado = ESTADOS_TRABAJADOR.VACACIONES.toString();
+              } else if (tieneBajaHoy) {
+                estadoCalculado = ESTADOS_TRABAJADOR.BAJA.toString();
+              } else if (ultimoFichaje != undefined) {
+                const tipoFichaje = await obtenerTipoEventoPorId(
+                  ultimoFichaje.tipo_evento_id,
+                );
+
+                if (tipoFichaje.codigo === TIPOS_FICHAJE.ENTRADA.toString()) {
+                  if (esFestivoHoy) {
+                    estadoCalculado = ESTADOS_TRABAJADOR.HORAS_EXTRA.toString();
+                  } else {
+                    estadoCalculado = ESTADOS_TRABAJADOR.TRABAJANDO.toString();
+                  }
+                } else if (
+                  tipoFichaje.codigo === TIPOS_FICHAJE.INICIO_PAUSA.toString()
+                ) {
+                  estadoCalculado = ESTADOS_TRABAJADOR.DESCANSANDO.toString();
+                } else if (
+                  tipoFichaje.codigo === TIPOS_FICHAJE.SALIDA.toString()
+                ) {
+                  estadoCalculado = seHaLogueadoHoy
+                    ? ESTADOS_TRABAJADOR.ACTIVO.toString()
+                    : ESTADOS_TRABAJADOR.INACTIVO.toString();
+                }
+              } else if (seHaLogueadoHoy) {
+                estadoCalculado = ESTADOS_TRABAJADOR.ACTIVO.toString();
+              }
+            } catch (error: any) {
+              mostrarError(
+                `Error calculando estado para el trabajador ${item.id}: ` +
+                  error.message,
+              );
+            }
+
+            return {
+              ...item,
+              estado: estadoCalculado,
+            };
+          }),
+        );
+
+        if (isMounted) {
+          setTrabajadoresValidosIds(idsValidos);
+          setPlantillaConEstados(resultadoPlantillaConEstados);
         }
-
-        if (isMounted) setTrabajadoresValidosIds(idsValidos);
       } catch {
-        if (isMounted)
+        if (isMounted) {
           setTrabajadoresValidosIds(plantilla.map((t: Trabajador) => t.id));
+          setPlantillaConEstados(plantilla);
+        }
       }
     }
 
-    filtrarAdminsDePlantilla();
+    procesarPlantillaYEstados();
+
     return () => {
       isMounted = false;
     };
-  }, [plantilla]);
+  }, [plantilla, centroTrabajoId]);
 
   const plantillaFiltrada = useMemo(() => {
     if (!trabajadoresValidosIds) return [];
-    return plantilla.filter((item: Trabajador) => {
+    // Se puede filtrar utilizando plantillaConEstados o plantilla según prefieras consumir los estados actualizados
+    const fuenteDatos =
+      plantillaConEstados.length > 0 ? plantillaConEstados : plantilla;
+    return fuenteDatos.filter((item: Trabajador) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
       if (esElJefeActual && esAdminEmpresa) return false;
-
       const coincideTenant = esGestoria
         ? true
-        : item.empresa_id === usuarioActual?.empresa_id;
+        : item.empresa_id === empresaIdActiva;
       const coincideEstado = filtroEstado === "todos" || item.activo;
       const noEsAdmin = trabajadoresValidosIds.includes(item.id);
-
       return coincideTenant && coincideEstado && noEsAdmin;
     });
   }, [
     plantilla,
+    plantillaConEstados,
     filtroEstado,
     usuarioActual,
     esGestoria,
     esAdminEmpresa,
     trabajadoresValidosIds,
+    empresaIdActiva,
   ]);
 
   const handleEditarContrato = async () => {
@@ -311,7 +404,7 @@ function PlantillaScreen() {
     try {
       setProcesando(true);
       await actualizarContrato(contratoAEditar.id, {
-        empresa_id: usuarioActual!.empresa_id!,
+        empresa_id: empresaIdActiva!,
         centro_trabajo_id: centroTrabajoId,
         tipo_contrato: tipoContrato,
         tipo_jornada: tipoJornada,
@@ -346,7 +439,6 @@ function PlantillaScreen() {
         const turnosIdsExistentesPrevios = asignacionesActuales.map(
           (a: AsignacionTurno) => a.turno_id,
         );
-
         const turnosAEditar = turnosSeleccionados.filter((t: Turno) =>
           turnosIdsExistentesPrevios.includes(t.id),
         );
@@ -366,7 +458,6 @@ function PlantillaScreen() {
             );
           }
         }
-
         if (turnosANuevo.length > 0) {
           await asignarTurnosTrabajador(
             trabajadorActual.id,
@@ -375,7 +466,6 @@ function PlantillaScreen() {
             fechaFin || null,
           );
         }
-
         for (const itemDesactivar of turnosADesactivar) {
           const asignacionADesactivar = asignacionesActuales.find(
             (a: AsignacionTurno) => a.turno_id === itemDesactivar.id,
@@ -396,7 +486,6 @@ function PlantillaScreen() {
           fechaFin || null,
         );
       }
-
       await cargarPlantilla();
       cerrarModales();
       setTurnosSeleccionados([]);
@@ -410,11 +499,8 @@ function PlantillaScreen() {
   const prepararAsignarTurno = async (trabajador: Trabajador) => {
     try {
       setCargandoSelectores(true);
-      if (!usuarioActual?.empresa_id) return;
-
-      const datosTurnos: Turno[] = await obtenerTurnosEmpresa(
-        usuarioActual.empresa_id,
-      );
+      if (!empresaIdActiva) return;
+      const datosTurnos: Turno[] = await obtenerTurnosEmpresa(empresaIdActiva);
       if (datosTurnos.length === 0) {
         mostrarMensaje(
           "Alerta",
@@ -422,7 +508,6 @@ function PlantillaScreen() {
         );
         return;
       }
-
       const asignaciones: AsignacionTurno[] =
         await obtenerAsignacionesTurnoTrabajador(trabajador.id);
       const hoy = new Date().toISOString().split("T")[0];
@@ -430,7 +515,6 @@ function PlantillaScreen() {
         (a: AsignacionTurno) =>
           a.fecha_inicio <= hoy && a.fecha_fin && a.fecha_fin >= hoy,
       );
-
       const turnosEncontrados: Turno[] = [];
       if (vigentes.length > 0) {
         vigentes.forEach((vigente: AsignacionTurno) => {
@@ -462,14 +546,12 @@ function PlantillaScreen() {
   const abrirEdicionContrato = async (trabajador: Trabajador) => {
     setTrabajadorActual(trabajador);
     if (!trabajador?.id) return;
-
     try {
       setCargandoSelectores?.(true);
       const contratoActivoDelTrabajador = await obtenerContratoActivoTrabajador(
         trabajador.id,
         trabajador.empresa_id,
       );
-
       if (contratoActivoDelTrabajador) {
         setContratoAEditar(contratoActivoDelTrabajador);
         setTipoContrato(contratoActivoDelTrabajador.tipo_contrato || "");
@@ -574,17 +656,14 @@ function PlantillaScreen() {
 
   if (cargando) {
     return (
-      <View>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View style={{ padding: 20, alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
 
   return (
-    <AppScreen
-      title="Plantilla de trabajadores"
-      subtitle="Panel de supervisión contractual, alta de expedientes y cuadrantes."
-    >
+    <View style={{ flex: 1 }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
@@ -595,7 +674,8 @@ function PlantillaScreen() {
         >
           <FontAwesome5 name="user-plus" size={14} color="#FFFFFF" />
           <ThemedText style={styles.textoAltaGlobal}>
-            Dar de Alta Nuevo Trabajador
+            {" "}
+            Dar de Alta Nuevo Trabajador{" "}
           </ThemedText>
         </Pressable>
 
@@ -781,7 +861,7 @@ function PlantillaScreen() {
           />
         )}
       </ModalContenedor>
-    </AppScreen>
+    </View>
   );
 }
 

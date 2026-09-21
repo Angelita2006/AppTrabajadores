@@ -1,5 +1,16 @@
 import { TipoEventoFichaje } from "../modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 
+export const formatearSegundos = (totales: number): string => {
+  const horas = Math.floor(totales / 3600)
+    .toString()
+    .padStart(2, "0");
+  const minutos = Math.floor((totales % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const segundos = (totales % 60).toString().padStart(2, "0");
+  return `${horas}:${minutos}:${segundos}`;
+};
+
 /**
  * Formatea un objeto Date a una cadena estándar con formato YYYY-MM-DD
  * ideal para consultas seguras en APIs o bases de datos.

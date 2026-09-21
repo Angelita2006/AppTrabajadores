@@ -4,7 +4,7 @@ class AccionAuditoriaEnum(str, enum.Enum):
     CONSULTA = 'Consulta'
     CREACION = 'Creación'
     MODIFICACION = 'Modificación'
-    BAJA_LOGICA = 'Baja_logica'
+    BAJA_LOGICA = 'Baja_lógica'
     ELIMINACION = 'Eliminación'
     EXPORTACION = 'Exportación'
     IMPORTACION = 'Importación'

@@ -1,7 +1,7 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,31 +21,15 @@ import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../types/empresa";
 import MapaCentroSelector from "../MapaCentroSelector";
 
-/**
- * Propiedades requeridas por el componente TabCentros.
- */
 interface TabCentrosProps {
-  /** Listado de centros de trabajo asociados a la empresa. */
   centrosEmpresa: CentroTrabajo[];
-  /** Función para actualizar el estado del listado de centros de trabajo. */
   setCentrosEmpresa: React.Dispatch<React.SetStateAction<CentroTrabajo[]>>;
-  /** Objeto que representa la empresa seleccionada actualmente. */
   empresaActual: Empresa | null;
-  /** Estado booleano que indica si se está ejecutando una operación de guardado/carga. */
   guardando: boolean;
-  /** Función para actualizar el estado de guardado. */
   setGuardando: (guardando: boolean) => void;
-  /** Objeto de estilos personalizados de la aplicación. */
   styles: any;
 }
 
-/**
- * Componente que gestiona la pestaña de centros de trabajo de una empresa,
- * permitiendo crear, listar, editar y eliminar centros de trabajo, así como configurar su ubicación geográfica.
- *
- * @component
- * @param {TabCentrosProps} props - Propiedades del componente.
- */
 export default function TabCentros({
   centrosEmpresa,
   setCentrosEmpresa,
@@ -67,6 +51,18 @@ export default function TabCentros({
   );
   const [latitudCentro, setLatitudCentro] = useState(0.0);
   const [longitudCentro, setLongitudCentro] = useState(0.0);
+
+  // ==========================================
+  // REFERENCIAS PARA CREACIÓN Y EDICIÓN
+  // ==========================================
+  const crearDireccionRef = useRef<TextInput | null>(null);
+  const crearZonaRef = useRef<TextInput | null>(null);
+  const crearCccRef = useRef<TextInput | null>(null);
+
+  const editarDireccionRef = useRef<TextInput | null>(null);
+  const editarZonaRef = useRef<TextInput | null>(null);
+  const editarCccRef = useRef<TextInput | null>(null);
+
   const centrosActivos = centrosEmpresa.filter(
     (centro) => centro.activo !== false,
   );
@@ -172,7 +168,7 @@ export default function TabCentros({
   };
 
   // ==========================================
-  // ELIMINACIÓN DE CENTROS DE TRABAJO
+  // ELIMINACIÓN Y REACTIVACIÓN
   // ==========================================
   const handleEliminarCentro = async (
     centroId: string,
@@ -268,11 +264,15 @@ export default function TabCentros({
         </ThemedText>
       </Pressable>
 
+      {/* ==========================================
+          FORMULARIO DE CREACIÓN
+         ========================================== */}
       {mostrarFormCentro && (
         <View style={styles.contenedorFormDesplegado}>
           <ThemedText style={styles.formularioTitulo}>
             Dar de Alta Centro de Trabajo
           </ThemedText>
+
           <View style={styles.campoFormulario}>
             <ThemedText style={styles.labelInput}>
               Nombre del Centro *
@@ -283,40 +283,57 @@ export default function TabCentros({
               onChangeText={setNombreCentro}
               placeholder="Ej. Sede Principal"
               editable={!guardando}
+              returnKeyType="next"
+              onSubmitEditing={() => crearDireccionRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
+
           <View style={styles.campoFormulario}>
             <ThemedText style={styles.labelInput}>
               Dirección del Centro
             </ThemedText>
             <TextInput
+              ref={crearDireccionRef}
               style={styles.inputForm}
               value={direccionCentro}
               onChangeText={setDireccionCentro}
               placeholder="Ej. Calle Mayor 12"
               editable={!guardando}
+              returnKeyType="next"
+              onSubmitEditing={() => crearZonaRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
+
           <Row>
             <View style={[styles.campoFormulario, { flex: 1, marginRight: 8 }]}>
               <ThemedText style={styles.labelInput}>Zona Horaria *</ThemedText>
               <TextInput
+                ref={crearZonaRef}
                 style={styles.inputForm}
                 value={zonaHoraria}
                 onChangeText={setZonaHoraria}
                 placeholder="Ej. Europe/Madrid"
                 editable={!guardando}
+                returnKeyType="next"
+                onSubmitEditing={() => crearCccRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
             <View style={[styles.campoFormulario, { flex: 1 }]}>
               <ThemedText style={styles.labelInput}>Código CCC</ThemedText>
               <TextInput
+                ref={crearCccRef}
                 style={styles.inputForm}
                 value={codigoCcc}
                 onChangeText={setCodigoCcc}
                 keyboardType="numeric"
                 placeholder="Código de cuenta"
                 editable={!guardando}
+                returnKeyType="go"
+                onSubmitEditing={handleCrearCentro}
+                blurOnSubmit={false}
               />
             </View>
           </Row>
@@ -425,11 +442,15 @@ export default function TabCentros({
             </Row>
           </View>
 
+          {/* ==========================================
+              FORMULARIO DE EDICIÓN
+             ========================================== */}
           {centroEnEdicion?.id === centro.id && (
             <View style={styles.contenedorFormDesplegado}>
               <ThemedText style={styles.formularioTitulo}>
                 Editar Centro
               </ThemedText>
+
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>
                   Nombre del Centro *
@@ -439,17 +460,26 @@ export default function TabCentros({
                   value={nombreCentro}
                   onChangeText={setNombreCentro}
                   editable={!guardando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => editarDireccionRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
+
               <View style={styles.campoFormulario}>
                 <ThemedText style={styles.labelInput}>Dirección</ThemedText>
                 <TextInput
+                  ref={editarDireccionRef}
                   style={styles.inputForm}
                   value={direccionCentro}
                   onChangeText={setDireccionCentro}
                   editable={!guardando}
+                  returnKeyType="next"
+                  onSubmitEditing={() => editarZonaRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
+
               <Row>
                 <View
                   style={[styles.campoFormulario, { flex: 1, marginRight: 8 }]}
@@ -458,20 +488,28 @@ export default function TabCentros({
                     Zona Horaria *
                   </ThemedText>
                   <TextInput
+                    ref={editarZonaRef}
                     style={styles.inputForm}
                     value={zonaHoraria}
                     onChangeText={setZonaHoraria}
                     editable={!guardando}
+                    returnKeyType="next"
+                    onSubmitEditing={() => editarCccRef.current?.focus()}
+                    blurOnSubmit={false}
                   />
                 </View>
                 <View style={[styles.campoFormulario, { flex: 1 }]}>
                   <ThemedText style={styles.labelInput}>Código CCC</ThemedText>
                   <TextInput
+                    ref={editarCccRef}
                     style={styles.inputForm}
                     value={codigoCcc}
                     onChangeText={setCodigoCcc}
                     keyboardType="numeric"
                     editable={!guardando}
+                    returnKeyType="go"
+                    onSubmitEditing={() => handleEditarCentro(centro)}
+                    blurOnSubmit={false}
                   />
                 </View>
               </Row>
@@ -521,7 +559,7 @@ export default function TabCentros({
                 {guardando ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <ThemedText style={styles.textoBotonGuardar}>
+                  <ThemedText style={styles.textoBotonGuardار}>
                     Actualizar Cambios
                   </ThemedText>
                 )}

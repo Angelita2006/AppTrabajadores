@@ -1,35 +1,42 @@
 import {
-    crearCorreccion,
-    obtenerCorreccionesPorEmpresa,
-    resolverCorreccion,
+  crearCorreccion,
+  obtenerCorreccionesPorEmpresa,
+  resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
-import { obtenerFichajesSemanaActual } from "@/src/modules/fichajes/api/services";
+import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 // Ya no necesitamos obtenerRolPorId ni obtenerTrabajador uno a uno si el backend puede devolver los datos poblados o si filtramos por rol_id directamente si viene incluido en el objeto Trabajador.
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import {
-    obtenerTipoEventoPorId,
-    obtenerTiposEventosEmpresa,
+  obtenerTipoEventoPorId,
+  obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    CorreccionFichajeCreate,
-    CorreccionFichajeResponse,
-    EstadoCorreccion,
-    TipoCorreccion,
+  CorreccionFichajeCreate,
+  CorreccionFichajeResponse,
+  EstadoCorreccion,
+  TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
@@ -51,7 +58,6 @@ export default function GestionIncidenciasScreen() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [trabajadorSeleccionadoId, setTrabajadorSeleccionadoId] =
     useState<string>("");
-
   const [fichajesDisponibles, setFichajesDisponibles] = useState<
     FichajeSimplificado[]
   >([]);
@@ -60,12 +66,10 @@ export default function GestionIncidenciasScreen() {
   >([]);
   const [cargando, setCargando] = useState(true);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
-
   const [filtroEstado, setFiltroEstado] = useState<"todas" | "pendientes">(
     "pendientes",
   );
   const [busquedaHistorial, setBusquedaHistorial] = useState("");
-
   const [tipoCorreccion, setTipoCorreccion] =
     useState<TipoCorreccion>("Alta_manual");
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
@@ -81,6 +85,10 @@ export default function GestionIncidenciasScreen() {
     id: string;
     decision: "Aprobada" | "Rechazada";
   } | null>(null);
+
+  // Referencias para el control del foco por teclado
+  const horaPropuestaRef = useRef<TextInput>(null);
+  const comentarioRef = useRef<TextInput>(null);
 
   const conteoEstados = useMemo(() => {
     const pendientes = incidencias.filter(
@@ -109,8 +117,8 @@ export default function GestionIncidenciasScreen() {
                 try {
                   const rol = await obtenerRolPorId(t.rol_id);
                   const esAdmin =
-                    rol?.nombre?.toLowerCase() === "admin_empresa" ||
-                    rol?.nombre?.toLowerCase() === "admin_gestoría";
+                    rol?.nombre === "Admin_empresa" ||
+                    rol?.nombre === "Admin_gestoría";
                   return esAdmin ? null : t;
                 } catch {
                   return t;
@@ -150,10 +158,8 @@ export default function GestionIncidenciasScreen() {
       setCargando(false);
       return;
     }
-
     try {
       setCargando(true);
-
       const [eventosEmpresa, datosGlobales] = await Promise.all([
         obtenerTiposEventosEmpresa(empresaActual.id),
         obtenerCorreccionesPorEmpresa(empresaActual.id),
@@ -166,9 +172,8 @@ export default function GestionIncidenciasScreen() {
         );
       }
 
-      // Creamos un diccionario rápido de trabajadores en memoria para evitar llamadas repetidas a obtenerTrabajador
+      // Creamos un diccionario rápido de trabajadores en memoria para evitar llamadas repetidas
       const mapaTrabajadores = new Map(trabajadores.map((t) => [t.id, t]));
-
       const incidenciasConTrabajador = (datosGlobales || []).map(
         (incidencia: CorreccionFichajeResponse) => {
           const trabajador = mapaTrabajadores.get(incidencia.trabajador_id);
@@ -207,9 +212,25 @@ export default function GestionIncidenciasScreen() {
       if (!targetId) return;
 
       try {
-        const listaFichajesRaw = await obtenerFichajesSemanaActual(targetId);
+        const hoy = new Date();
+        const diaSemana = hoy.getDay();
+        const diferenciaLunes =
+          hoy.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
+
+        const fechaLunes = new Date(new Date().setDate(diferenciaLunes));
+        const fechaDomingo = new Date(fechaLunes);
+        fechaDomingo.setDate(fechaLunes.getDate() + 6);
+
+        const fechaInicioStr = formatearFecha(fechaLunes);
+        const fechaFinStr = formatearFecha(fechaDomingo);
+
+        const listaFichajesRaw = await obtenerFichajesTrabajadorEntreFechas(
+          targetId,
+          fechaInicioStr,
+          fechaFinStr,
+        );
+
         if (Array.isArray(listaFichajesRaw)) {
-          // Agrupamos la resolución de tipos de eventos de forma concurrente limpia
           const fichajesProcesadosPromises = listaFichajesRaw.map(
             async (fichaje: RegistroFichaje) => {
               if (
@@ -307,6 +328,7 @@ export default function GestionIncidenciasScreen() {
       );
       return;
     }
+
     try {
       setCargando(true);
       if (!usuarioActual?.id || !empresaActual?.id) return;
@@ -353,6 +375,7 @@ export default function GestionIncidenciasScreen() {
       setFichajeAfectadoId("");
       setHoraAnterior("");
       setFechaAfectada("");
+      setFirmaSolicitante(null);
     } catch (error: any) {
       mostrarError(
         "Error al crear o reportar la nueva corrección de fichaje: " +
@@ -437,7 +460,7 @@ export default function GestionIncidenciasScreen() {
     }
     if (busquedaHistorial.trim()) {
       const query = busquedaHistorial.toLowerCase().trim();
-      result = result.filter((i) => {
+      result = result.filter((i: any) => {
         const nombreTrabajador = (
           i.trabajador_nombre_completo || ""
         ).toLowerCase();
@@ -611,16 +634,23 @@ export default function GestionIncidenciasScreen() {
                       style={styles.input}
                       placeholder="AAAA-MM-DD"
                       placeholderTextColor="#94A3B8"
+                      returnKeyType="next"
+                      onSubmitEditing={() => horaPropuestaRef.current?.focus()}
+                      blurOnSubmit={false}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
                     <ThemedText style={styles.label}>Hora Propuesta</ThemedText>
                     <TextInput
+                      ref={horaPropuestaRef}
                       value={horaRealPropuesta}
                       onChangeText={setHoraRealPropuesta}
                       style={styles.input}
                       placeholder="HH:MM"
                       placeholderTextColor="#94A3B8"
+                      returnKeyType="next"
+                      onSubmitEditing={() => comentarioRef.current?.focus()}
+                      blurOnSubmit={false}
                     />
                   </View>
                 </View>
@@ -655,13 +685,17 @@ export default function GestionIncidenciasScreen() {
                 Justificación / Notas
               </ThemedText>
               <TextInput
+                ref={comentarioRef}
                 value={comentario}
                 onChangeText={setComentario}
                 style={[styles.input, styles.textArea]}
                 placeholder="Motivo detallado..."
                 placeholderTextColor="#94A3B8"
                 maxLength={250}
+                returnKeyType="done"
+                onSubmitEditing={reportarIncidencia}
               />
+
               <Pressable
                 style={styles.signatureButton}
                 onPress={() => setCapturandoFirma(true)}
@@ -708,6 +742,7 @@ export default function GestionIncidenciasScreen() {
           style={styles.inputBuscador}
           placeholder="Buscar por trabajador o motivo..."
           placeholderTextColor="#94A3B8"
+          returnKeyType="search"
         />
         {busquedaHistorial !== "" && (
           <Pressable onPress={() => setBusquedaHistorial("")}>
@@ -749,7 +784,7 @@ export default function GestionIncidenciasScreen() {
         </ThemedText>
       ) : (
         <View style={{ paddingBottom: 40 }}>
-          {listaFiltrada.map((item) => {
+          {listaFiltrada.map((item: any) => {
             const colores = getColoresEstado(item.estado);
             const isBusy = procesandoId !== null;
             const isCurrentProcessing = procesandoId === item.id;
@@ -776,12 +811,14 @@ export default function GestionIncidenciasScreen() {
 
                   <ThemedText style={styles.nombreTrabajador}>
                     👤 Trabajador:{" "}
-                    {item.trabajador?.nombre.concat(
-                      " ",
-                      item.trabajador.apellidos,
-                      " ",
-                      item.trabajador.dni_nif_nie,
-                    ) ?? "N/A"}
+                    {item.trabajador?.nombre
+                      ? item.trabajador.nombre.concat(
+                          " ",
+                          item.trabajador.apellidos,
+                          " ",
+                          item.trabajador.dni_nif_nie,
+                        )
+                      : (item.trabajador_nombre_completo ?? "N/A")}
                   </ThemedText>
                   <ThemedText style={styles.itemMotivo}>
                     Motivo: "{item.motivo}"

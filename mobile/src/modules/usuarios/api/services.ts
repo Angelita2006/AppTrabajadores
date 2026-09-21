@@ -262,11 +262,13 @@ export const confirmarCambioPassword = async (
  */
 export const obtenerUsuarioActual = async (): Promise<UsuarioResponse> => {
   try {
-    const respuesta = await api.get<UsuarioResponse>("/api/usuarios/me");
+    const token = await AsyncStorage.getItem("user_token");
+    const respuesta = await api.get<UsuarioResponse>(
+      `/api/usuarios/me?token=${token}`,
+    );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.message || error?.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar la información del usuario actual.",
     );

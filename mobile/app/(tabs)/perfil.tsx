@@ -297,12 +297,15 @@ export default function PerfilScreen() {
       // Si el usuario tiene trabajador asociado, refrescamos sus datos (puedes ajustar esta llamada según tu API de usuario/trabajador)
       if (trabajadorActual?.id) {
         const usuarioFresco = await obtenerUsuarioActual();
+
         if (usuarioFresco) {
           setUsuarioActual(usuarioFresco);
         }
       }
-    } catch (error) {
-      console.log("No se pudieron refrescar los datos del usuario", error);
+    } catch (error: any) {
+      mostrarError(
+        "No se pudieron refrescar los datos del usuario: " + error.message,
+      );
     }
   };
 

@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from operator import concat
 import random
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from core.security import get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual, verificar_rol_requerido
+from core.security import oauth2_scheme, get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual, verificar_rol_requerido
 from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
 from core.auditoria import registrar_auditoria
 from core.utils import enviar_correo_cambio_contraseña, enviar_correo_cambio_email, enviar_correo_recuperacion
@@ -21,10 +21,7 @@ from models.trabajadores import Trabajadores
 from core.database import get_db
 from fastapi.security import OAuth2PasswordRequestForm
 from models.usuarios_roles import UsuariosRoles
-from datetime import datetime, timedelta, timezone
 import secrets
-from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
 
 # Configuración del enrutador para la gestión de usuarios
@@ -186,8 +183,8 @@ def login_para_swagger(request: Request, form_data: OAuth2PasswordRequestForm = 
     print(f"Petición de login OAuth2 desde IP: {cliente_ip}")
 
     user = db.query(Usuarios).filter(
-        Usuarios.email == form_data.username.strip().lower(),
-        Usuarios.activo.is_(True),
+        Usuarios.email == form_data.username,
+        Usuarios.activo == True,
     ).first()
     
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -214,11 +211,48 @@ def login_para_swagger(request: Request, form_data: OAuth2PasswordRequestForm = 
     }
 
 
+# ==========================================
+# RUTAS ESTÁTICAS (DEBEN IR ANTES DE LAS DINÁMICAS)
+# ==========================================
+
+@router.get("/me", response_model=UsuarioResponse, summary="Obtener perfil del usuario autenticado")
+@limiter.limit("30/minute")
+def obtener_mi_usuario(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+) -> UsuarioResponse:
+    """
+    **GET /api/usuarios/me**
+    
+    Devuelve los datos completos del usuario que está realizando la petición usando el token de sesión.
+    """
+    usuario = db.query(Usuarios).options(
+        joinedload(Usuarios.empresa),
+        joinedload(Usuarios.trabajador),
+        joinedload(Usuarios.usuarios_roles)
+    ).filter(Usuarios.id == usuario_actual.id).first()
+
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la información del usuario autenticado."
+        )
+
+    return usuario
+
+
+# ==========================================
+# RUTAS DINÁMICAS Y CON PARÁMETROS DE RUTA
+# ==========================================
+
 @router.get("/{id_usuario}", response_model=UsuarioResponse, summary="Obtener usuario por ID")
 @limiter.limit("30/minute") 
 def obtener_usuario_por_id(
     request: Request,
     id_usuario: UUID, 
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -268,6 +302,7 @@ def obtener_usuario_por_id(
 def obtener_usuario_por_id_trabajador(
     request: Request,
     id_trabajador: UUID, 
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ) -> UsuarioResponse:
@@ -316,6 +351,7 @@ def cambiar_estado_usuario(
     request: Request,
     id_usuario: UUID, 
     activo: bool, 
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
 ):
@@ -355,12 +391,14 @@ def cambiar_estado_usuario(
     db.refresh(usuario)
     return usuario
 
+
 @router.put("/solicitar-cambio-email", status_code=status.HTTP_200_OK, summary="Solicitar cambio de correo electrónico con verificación")
 @limiter.limit("5/minute")
 def solicitar_cambio_email(
     request: Request,
     nuevo_email: str,
     background_tasks: BackgroundTasks,
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -370,7 +408,6 @@ def solicitar_cambio_email(
     """
     email_limpio = str(nuevo_email).strip().lower()
     
-    # 1. Verificar si el email ya está en uso por otro usuario
     email_existente = db.query(Usuarios).filter(
         Usuarios.email == email_limpio,
         Usuarios.id != usuario_actual.id,Usuarios.activo == True
@@ -382,18 +419,14 @@ def solicitar_cambio_email(
             detail="El correo electrónico ya está en uso por otro usuario."
         )
 
-    # 2. Generar token único y fecha de expiración (ej. 1 hora)
     token_verificacion = secrets.token_urlsafe(32)
     expiracion = datetime.now(timezone.utc) + timedelta(hours=1)
 
-    # 3. Guardar el email pendiente y los datos del token en el usuario
     setattr(usuario_actual, "email_pendiente_verificacion", email_limpio)
     setattr(usuario_actual, "token_cambio_email", token_verificacion)
     setattr(usuario_actual, "token_cambio_email_expira_at", expiracion)
     setattr(usuario_actual, "updated_at", datetime.now(timezone.utc))
     
-    # 4. Disparar tarea en segundo plano para enviar el correo con el enlace
-    # El enlace debe apuntar a tu frontend o endpoint de confirmación: 
     background_tasks.add_task(enviar_correo_cambio_email, email_limpio, token_verificacion)
 
     registrar_auditoria(
@@ -418,6 +451,7 @@ def solicitar_cambio_email(
         "message": "Se ha enviado un enlace de confirmación a tu nuevo correo electrónico."
     }
 
+
 @router.post("/confirmar-cambio-email", status_code=status.HTTP_200_OK, summary="Confirmar cambio de correo electrónico mediante enlace")
 def confirmar_cambio_email(
     request: Request,
@@ -428,7 +462,6 @@ def confirmar_cambio_email(
     Endpoint que procesa el clic en el enlace del correo. Valida el token, 
     actualiza el email antiguo por el nuevo en el usuario y en su trabajador asociado, y limpia los campos temporales.
     """
-    # 1. Buscar usuario que tenga ese token registrado
     usuario = db.query(Usuarios).filter(
         Usuarios.token_cambio_email == token
     ).first()
@@ -439,7 +472,6 @@ def confirmar_cambio_email(
             detail="El token de verificación es inválido."
         )
 
-    # 2. Validar si el token ha expirado
     if usuario.token_cambio_email_expira_at and datetime.now(timezone.utc) > usuario.token_cambio_email_expira_at:
         usuario.token_cambio_email = None
         usuario.token_cambio_email_expira_at = None
@@ -450,7 +482,6 @@ def confirmar_cambio_email(
             detail="El enlace de verificación ha expirado. Por favor, solicita uno nuevo desde tu perfil."
         )
 
-    # 3. Aplicar el cambio definitivo del correo
     nuevo_email = usuario.email_pendiente_verificacion
     if not nuevo_email:
         raise HTTPException(
@@ -459,7 +490,6 @@ def confirmar_cambio_email(
         )
 
     try:
-        # Actualizar datos del usuario
         usuario.email = nuevo_email
         usuario.email_pendiente_verificacion = None
         usuario.token_cambio_email = None
@@ -468,7 +498,6 @@ def confirmar_cambio_email(
 
         db.add(usuario)
 
-        # 4. Buscar y actualizar el trabajador asociado
         trabajador = db.query(Trabajadores).filter(Trabajadores.id == usuario.trabajador_id).first()
         
         if trabajador:
@@ -503,11 +532,13 @@ def confirmar_cambio_email(
         "message": "¡Correo electrónico confirmado y actualizado con éxito en tu cuenta y perfil de trabajador!"
     }
 
+
 @router.put("/solicitar-cambio-password", status_code=status.HTTP_200_OK, summary="Solicitar código para cambio de contraseña")
 @limiter.limit("5/minute")
 def solicitar_cambio_password(
     request: Request,
     payload: EmailCambioRequest, 
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -517,17 +548,14 @@ def solicitar_cambio_password(
     Valida la contraseña actual del usuario autenticado, genera un código aleatorio 
     de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
     """
-    # 1. Validar que la contraseña antigua introducida es correcta
     if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual introducida no es correcta."
         )
 
-    # 2. Generación del código aleatorio de 6 dígitos
     codigo_aleatorio = f"{random.randint(0, 999999):06d}"
 
-    # 3. Guardar el código y su expiración (15 minutos con zona horaria UTC) en el usuario
     try:
         usuario_actual.codigo_recuperacion = codigo_aleatorio
         usuario_actual.codigo_expira_at = datetime.now(timezone.utc) + timedelta(minutes=15)
@@ -550,7 +578,6 @@ def solicitar_cambio_password(
             detail="No se ha podido procesar la solicitud de cambio de contraseña."
         )
 
-    # 4. Envío real del correo electrónico con el código
     enviar_correo_cambio_contraseña(usuario_actual.email, codigo_aleatorio)
 
     return {
@@ -564,6 +591,7 @@ def solicitar_cambio_password(
 def confirmar_cambio_password(
     request: Request,
     payload: ConfirmarPasswordRequest, 
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
@@ -572,14 +600,12 @@ def confirmar_cambio_password(
     
     Valida el código de 6 dígitos recibido por correo y actualiza la contraseña definitivamente.
     """
-    # 1. Validación estricta del código registrado
     if not usuario_actual.codigo_recuperacion or payload.codigo_verificacion != usuario_actual.codigo_recuperacion:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El código de verificación introducido es incorrecto."
         )
 
-    # 2. Validar si el código ha expirado
     if usuario_actual.codigo_expira_at and datetime.now(timezone.utc) > usuario_actual.codigo_expira_at:
         usuario_actual.codigo_recuperacion = None
         usuario_actual.codigo_expira_at = None
@@ -595,7 +621,6 @@ def confirmar_cambio_password(
             detail="La nueva contraseña debe tener al menos 6 caracteres."
         )
 
-    # 3. Actualizar contraseña y limpiar campos temporales
     try:
         usuario_actual.password_hash = get_password_hash(payload.nueva_password)
         usuario_actual.codigo_recuperacion = None
@@ -627,29 +652,3 @@ def confirmar_cambio_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"No se ha podido actualizar la contraseña: {str(e)}"
         )
-
-@router.get("/me", response_model=UsuarioResponse, summary="Obtener perfil del usuario autenticado")
-@limiter.limit("30/minute")
-def obtener_mi_usuario(
-    request: Request,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-) -> UsuarioResponse:
-    """
-    **GET /api/usuarios/me**
-    
-    Devuelve los datos completos del usuario que está realizando la petición usando el token de sesión.
-    """
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == usuario_actual.id).first()
-
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró la información del usuario autenticado."
-        )
-
-    return usuario

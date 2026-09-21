@@ -2,7 +2,7 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { Picker } from "@react-native-picker/picker";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -62,6 +62,13 @@ export default function TabDepartamentos({
   const [departamentoEnEdicion, setDepartamentoEnEdicion] =
     useState<Departamento | null>(null);
   const [centroTrabajoId, setCentroTrabajoId] = useState("");
+
+  // ==========================================
+  // REFERENCIAS PARA CREACIÓN Y EDICIÓN
+  // ==========================================
+  const crearInputRef = useRef<TextInput | null>(null);
+  const editarInputRef = useRef<TextInput | null>(null);
+
   const departamentosActivos = departamentosEmpresa.filter(
     (departamento) => departamento.activo !== false,
   );
@@ -245,27 +252,38 @@ export default function TabDepartamentos({
               Nombre del Departamento *
             </ThemedText>
             <TextInput
+              ref={crearInputRef}
               style={styles.inputForm}
               value={nombreDepto}
               onChangeText={setNombreDepto}
               placeholder="Ej. Recursos Humanos"
               editable={!guardando}
+              returnKeyType="done"
+              onSubmitEditing={handleCrearDepartamento}
+              blurOnSubmit={false}
             />
           </View>
           <View style={styles.campoFormulario}>
             <ThemedText style={styles.labelInput}>Centro de Trabajo</ThemedText>
-            <Picker
-              selectedValue={centroTrabajoId}
-              onValueChange={setCentroTrabajoId}
-              enabled={!guardando}
-            >
-              <Picker.Item label="Seleccionar centro..." value="" />
-              {centrosEmpresa
-                .filter((ct) => ct.activo === true)
-                .map((ct: CentroTrabajo) => (
-                  <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
-                ))}
-            </Picker>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={centroTrabajoId}
+                onValueChange={(val) => setCentroTrabajoId(val)}
+                style={styles.picker}
+                enabled={!guardando}
+              >
+                <Picker.Item
+                  label="Seleccionar centro..."
+                  value=""
+                  enabled={false}
+                />
+                {centrosEmpresa
+                  .filter((ct) => ct.activo === true)
+                  .map((ct: CentroTrabajo) => (
+                    <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
+                  ))}
+              </Picker>
+            </View>
           </View>
           <Pressable
             style={[
@@ -371,27 +389,38 @@ export default function TabDepartamentos({
                   Editar: {dept.nombre}
                 </ThemedText>
                 <TextInput
+                  ref={editarInputRef}
                   style={styles.inputForm}
                   value={nombreDepto}
                   onChangeText={setNombreDepto}
                   editable={!guardando}
+                  returnKeyType="done"
+                  onSubmitEditing={handleEditarDepartamento}
+                  blurOnSubmit={false}
                 />
-                <Picker
-                  selectedValue={centroTrabajoId}
-                  onValueChange={setCentroTrabajoId}
-                  enabled={!guardando}
-                >
-                  <Picker.Item label="Seleccionar centro..." value="" />
-                  {centrosEmpresa
-                    .filter((ct) => ct.activo === true)
-                    .map((ct: CentroTrabajo) => (
-                      <Picker.Item
-                        key={ct.id}
-                        label={ct.nombre}
-                        value={ct.id}
-                      />
-                    ))}
-                </Picker>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={centroTrabajoId}
+                    onValueChange={(val) => setCentroTrabajoId(val)}
+                    style={styles.picker}
+                    enabled={!guardando}
+                  >
+                    <Picker.Item
+                      label="Seleccionar centro..."
+                      value=""
+                      enabled={false}
+                    />
+                    {centrosEmpresa
+                      .filter((ct) => ct.activo === true)
+                      .map((ct: CentroTrabajo) => (
+                        <Picker.Item
+                          key={ct.id}
+                          label={ct.nombre}
+                          value={ct.id}
+                        />
+                      ))}
+                  </Picker>
+                </View>
                 <Pressable
                   style={[
                     styles.botonGuardar,

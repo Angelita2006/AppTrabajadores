@@ -32,10 +32,10 @@ export interface UsuarioCreateRequest {
   tipo_usuario: TipoUsuarioEnum;
   /** Contraseña en texto plano para su posterior cifrado en servidor. */
   password_raw: string;
-  /** Identificador único de la empresa asociada (UUID). */
-  empresa_id: string;
-  /** Identificador único del trabajador asociado (UUID). */
-  trabajador_id: string;
+  /** Identificador de la empresa asociada (UUID). */
+  empresa_id?: string | null;
+  /** Identificador del trabajador asociado (UUID). */
+  trabajador_id?: string | null;
 }
 
 /**
@@ -67,9 +67,9 @@ export interface LoginRequest {
  */
 export interface UsuarioResponse {
   /** Identificador de la empresa asociada (UUID). */
-  empresa_id: string;
+  empresa_id?: string | null;
   /** Identificador del trabajador asociado (UUID). */
-  trabajador_id: string;
+  trabajador_id?: string | null;
   /** Identificador único del usuario (UUID). */
   id: string;
   /** Nombre completo. */
@@ -115,10 +115,10 @@ export interface LoginResponse {
 export interface UsuarioSesion {
   /** Identificador único universal (UUID) de la cuenta de usuario. */
   id: string;
-  /** Identificador de la empresa asociada (UUID) o null para personal global de la gestoría. */
-  empresa_id: string | null;
-  /** Identificador del trabajador asociado (UUID) o null si es un administrador, representante legal o auditor. */
-  trabajador_id: string | null;
+  /** Identificador de la empresa asociada (UUID). */
+  empresa_id?: string | null;
+  /** Identificador del trabajador asociado (UUID). */
+  trabajador_id?: string | null;
   /** Nombre completo del usuario. */
   nombre: string;
   /** Correo electrónico de acceso. */

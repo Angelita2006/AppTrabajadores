@@ -67,30 +67,3 @@ class EmpresaResponse(EmpresaBase):
     logo_url: Optional[str] = Field(None, description="Ruta o URL del logotipo corporativo") 
 
     model_config = ConfigDict(from_attributes=True)
-
-class RegistroOrganizacionCompletaDTO(BaseModel):
-    codigo_licencia: str
-    razon_social: str
-    nombre_comercial: Optional[str] = None
-    cif: str
-    direccion_fiscal: str
-    codigo_cnae: Optional[str] = None
-    convenio_colectivo: Optional[str] = None
-    logo_url: Optional[str] = None
-    
-    # Datos del Administrador / Primer Trabajador
-    nombre_admin: str
-    apellidos_admin: str
-    dni_nif_nie_admin: str
-    email_admin: EmailStr
-    password_raw: str
-    telefono_admin: Optional[str] = None
-    nss_admin: Optional[str] = None
-    fecha_nacimiento_admin: Optional[datetime.date] = None
-
-class RespuestaRegistroCompletoDTO(BaseModel):
-    empresa: dict
-    trabajador: dict
-    usuario: dict
-
-    model_config = ConfigDict(from_attributes=True)

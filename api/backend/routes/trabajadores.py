@@ -21,6 +21,8 @@ from models.usuarios import Usuarios
 from models.turnos import Turnos
 from core.auditoria import registrar_auditoria
 from core.enums import AccionAuditoriaEnum
+from sqlalchemy import func
+
 
 # Configuración del enrutador para la gestión de trabajadores y expedientes de empleados
 router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
@@ -705,4 +707,53 @@ def eliminar_trabajador(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se puede eliminar el trabajador debido a restricciones de integridad referencial. Error: {str(error)}"
+        )
+
+@router.get("/{id_trabajador}/verificar-login-hoy", response_model=bool, summary="Verificar si un trabajador ha hecho login hoy")
+@limiter.limit("60/minute")
+def verificar_si_se_ha_logueado_hoy(
+    request: Request,
+    id_trabajador: UUID,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/trabajadores/verificar-login-hoy/{id_trabajador}**
+    
+    Verifica si el trabajador ha registrado algún acceso o actividad el día de hoy.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de verificación de login para el trabajador {id_trabajador} desde IP: {cliente_ip}")
+
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador con ID {id_trabajador} no encontrado."
+        )
+
+    if usuario_actual.empresa_id != trabajador.empresa_id:
+        if not hasattr(usuario_actual, "trabajador_id") or usuario_actual.trabajador_id != id_trabajador:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para verificar esta información."
+            )
+
+    try:
+        hoy = date.today()
+
+        usuario_trabajador = db.query(Usuarios).filter(Usuarios.trabajador_id == trabajador.id).first()
+
+        if not usuario_trabajador:
+            return False
+        
+        if usuario_trabajador.ultimo_acceso:
+            return usuario_trabajador.ultimo_acceso.date() == hoy
+        
+        return False
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al verificar el registro de acceso: {str(error)}"
         )

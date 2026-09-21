@@ -72,7 +72,7 @@ export const ModalContenedor: React.FC<ModalContenedorProps> = ({
    * incorporando validaciones o avisos opcionales si fuera necesario.
    */
   const handleCerrarSeguro = () => {
-    mostrarMensaje("Cierre de Ventana", "Cerrando el panel de gestión actual.");
+    // mostrarMensaje("Cierre de Ventana", "Cerrando el panel de gestión actual.");
     onCerrar();
   };
 

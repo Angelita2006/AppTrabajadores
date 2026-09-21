@@ -1,6 +1,6 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import {
@@ -61,6 +61,7 @@ export default function TabDispositivos({
   const [tipoDispositivoSeleccionado, setTipoDispositivoSeleccionado] =
     useState<TipoDispositivo>(TIPOS_DISPOSITIVO.APP_MOVIL);
   const [estadoActivoEdicion, setEstadoActivoEdicion] = useState<boolean>(true);
+
   const dispositivosActivos = dispositivosEmpresa.filter(
     (dispositivo) => dispositivo.activo !== false,
   );
@@ -69,6 +70,11 @@ export default function TabDispositivos({
   );
 
   const { mostrarError, mostrarMensaje } = useAppModal();
+
+  // ==========================================
+  // REFERENCIAS PARA FOCO Y GESTIÓN
+  // ==========================================
+  const contenedorFormRef = useRef<View | null>(null);
 
   /**
    * Ejecuta la creación de un nuevo dispositivo de fichaje asociado a un centro de trabajo.
@@ -251,7 +257,7 @@ export default function TabDispositivos({
       </Pressable>
 
       {mostrarFormDispositivo && (
-        <View style={styles.contenedorFormDesplegado}>
+        <View ref={contenedorFormRef} style={styles.contenedorFormDesplegado}>
           <ThemedText style={styles.formularioTitulo}>
             Configurar Nuevo Dispositivo
           </ThemedText>

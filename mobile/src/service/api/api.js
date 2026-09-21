@@ -24,20 +24,54 @@ const api = axios.create({
 // Variable en memoria global para acceso instantáneo
 let memoryToken = "";
 
+// Inicialización síncrona inmediata para WEB (Evita el error 422 al recargar)
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  try {
+    memoryToken = localStorage.getItem("user_token") || "";
+    if (memoryToken) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${memoryToken}`;
+    }
+  } catch (e) {
+    console.error("Error leyendo token síncrono en web:", e);
+  }
+}
+
 // Función para establecer el token desde fuera (ej: tras hacer login)
 export const setAuthToken = async (token) => {
-  memoryToken = token;
-  if (token) {
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  } else {
-    await AsyncStorage.removeItem("user_token");
+  memoryToken = token || "";
+  try {
+    if (token) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        localStorage.setItem("user_token", token);
+      } else {
+        await AsyncStorage.setItem("user_token", token);
+      }
+    } else {
+      delete api.defaults.headers.common["Authorization"];
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        localStorage.removeItem("user_token");
+      } else {
+        await AsyncStorage.removeItem("user_token");
+      }
+    }
+  } catch (e) {
+    mostrarError("Error al guardar/eliminar el token: " + e);
   }
 };
 
 // Función para inicializar el token al arrancar la app
 export const loadAuthToken = async () => {
   try {
-    memoryToken = await AsyncStorage.getItem("user_token");
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      memoryToken = localStorage.getItem("user_token") || "";
+    } else {
+      memoryToken = (await AsyncStorage.getItem("user_token")) || "";
+    }
+
+    if (memoryToken) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${memoryToken}`;
+    }
   } catch (e) {
     mostrarError("Error cargando token inicial: " + e);
   }
@@ -47,7 +81,11 @@ api.interceptors.request.use(
   async (config) => {
     try {
       if (!memoryToken) {
-        memoryToken = await AsyncStorage.getItem("user_token");
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          memoryToken = localStorage.getItem("user_token") || "";
+        } else {
+          memoryToken = (await AsyncStorage.getItem("user_token")) || "";
+        }
       }
 
       if (memoryToken) {

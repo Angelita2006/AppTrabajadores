@@ -56,56 +56,6 @@ export const obtenerFichajesTrabajadorYEmpresa = async (
 };
 
 /**
- * Descarga todos los marcajes del día actual para un trabajador.
- * URI: GET /api/fichajes/trabajador/{trabajador_id}/hoy
- *
- * @async
- * @function obtenerFichajesHoy
- * @param {string} idTrabajador - Identificador UUID único del trabajador.
- * @returns {Promise<RegistroFichaje[]>} Promesa con los fichajes del día actual.
- * @throws {Error} Lanza un error si ocurre un fallo al obtener los fichajes de hoy.
- */
-export const obtenerFichajesHoy = async (
-  idTrabajador: string,
-): Promise<RegistroFichaje[]> => {
-  try {
-    const respuesta = await api.get<RegistroFichaje[]>(
-      `/api/fichajes/trabajador/${idTrabajador}/hoy`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al obtener los fichajes de hoy.");
-  }
-};
-
-/**
- * Recupera el historial de la semana actual del trabajador.
- * URI: GET /api/fichajes/trabajador/{id_trabajador}/semana
- *
- * @async
- * @function obtenerFichajesSemanaActual
- * @param {string} idTrabajador - Identificador UUID único del trabajador.
- * @returns {Promise<RegistroFichaje[]>} Promesa con el listado de fichajes de la semana actual.
- * @throws {Error} Lanza un error si ocurre un fallo al obtener los fichajes de la semana.
- */
-export const obtenerFichajesSemanaActual = async (
-  idTrabajador: string,
-): Promise<RegistroFichaje[]> => {
-  try {
-    const respuesta = await api.get<RegistroFichaje[]>(
-      `/api/fichajes/trabajador/${idTrabajador}/semana`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al obtener los fichajes de la semana.",
-    );
-  }
-};
-
-/**
  * Recupera el historial de fichajes dentro del turno actual del trabajador.
  * URI: GET /api/fichajes/trabajador/{id_trabajador}/turno
  *
@@ -150,38 +100,93 @@ export const obtenerUltimoFichaje = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al consultar el último fichaje.");
+    const errorDetail = error?.response?.data?.detail;
+    let mensajeLegible =
+      "Error al obtener los fichajes de la empresa entre fechas.";
+    if (Array.isArray(errorDetail)) {
+      mensajeLegible = errorDetail
+        .map((err: any) => `${err.loc.join(".")}: ${err.msg}`)
+        .join(", ");
+    } else if (typeof errorDetail === "string") {
+      mensajeLegible = errorDetail;
+    }
+    throw new Error(mensajeLegible);
+    // const apiMessage = error?.response?.data?.message;
+    // throw new Error(apiMessage || "Error al consultar el último fichaje.");
   }
 };
 
 /**
- * Recupera el historial consolidado de marcajes de toda la plantilla para una fecha concreta.
+ * Recupera el historial consolidado de marcajes de toda la plantilla para entre fechas concreta.
  * URI: GET /api/fichajes/empresa/{empresa_id}
  *
  * @async
- * @function obtenerFichajesEmpresaPorFecha
+ * @function obtenerFichajesEmpresaEntreFechas
  * @param {string} idEmpresa - Identificador UUID único de la empresa.
- * @param {string} fechaStr - Fecha consultada en formato de cadena (ej. AAAA-MM-DD).
- * @returns {Promise<RegistroFichaje[]>} Promesa con el listado de fichajes de la empresa en la fecha indicada.
+ * @param {string} fechaInicio - Fecha de inicio consultada en formato de cadena (ej. AAAA-MM-DD).
+ * @param {string} fechaFin - Fecha de fin consultada en formato de cadena (ej. AAAA-MM-DD).
+ * @returns {Promise<RegistroFichaje[]>} Promesa con el listado de fichajes de la empresa entre las fechas indicadas.
  * @throws {Error} Lanza un error si ocurre un fallo al obtener los fichajes de la empresa por fecha.
  */
-export const obtenerFichajesEmpresaPorFecha = async (
+export const obtenerFichajesEmpresaEntreFechas = async (
   idEmpresa: string,
-  fechaStr: string,
+  fechaInicio: string,
+  fechaFin: string,
 ): Promise<RegistroFichaje[]> => {
   try {
     const respuesta = await api.get<RegistroFichaje[]>(
       `/api/fichajes/empresa/${idEmpresa}`,
       {
-        params: { fecha: fechaStr },
+        params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+      },
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail;
+    let mensajeLegible =
+      "Error al obtener los fichajes de la empresa entre fechas.";
+    if (Array.isArray(apiMessage)) {
+      mensajeLegible = apiMessage
+        .map((err: any) => `${err.loc.join(".")}: ${err.msg}`)
+        .join(", ");
+    } else if (typeof apiMessage === "string") {
+      mensajeLegible = apiMessage;
+    }
+
+    throw new Error(mensajeLegible);
+  }
+};
+
+/**
+ * Recupera el historial consolidado de marcajes de un trabajador para un período entre dos fechas concretas.
+ * URI: GET /api/fichajes/trabajador/{trabajador_id}
+ *
+ * @async
+ * @function obtenerFichajesTrabajadorEntreFechas
+ * @param {string} idTrabajador - Identificador UUID único del trabajador.
+ * @param {string} fechaInicio - Fecha de inicio consultada en formato de cadena (ej. AAAA-MM-DD).
+ * @param {string} fechaFin - Fecha de fin consultada en formato de cadena (ej. AAAA-MM-DD).
+ * @returns {Promise<RegistroFichaje[]>} Promesa con el listado de fichajes de la empresa en la fecha indicada.
+ * @throws {Error} Lanza un error si ocurre un fallo al obtener los fichajes de la empresa por fecha.
+ */
+export const obtenerFichajesTrabajadorEntreFechas = async (
+  idTrabajador: string,
+  fechaInicio: string,
+  fechaFin: string,
+): Promise<RegistroFichaje[]> => {
+  try {
+    const respuesta = await api.get<RegistroFichaje[]>(
+      `/api/fichajes/trabajador/${idTrabajador}`,
+      {
+        params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
       },
     );
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
-      apiMessage || "Error al obtener los fichajes de la empresa por fecha.",
+      apiMessage ||
+        "Error al obtener los fichajes del trabajador entre fechas.",
     );
   }
 };

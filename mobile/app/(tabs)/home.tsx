@@ -1,24 +1,25 @@
 import { obtenerDispositivosCentro } from "@/src/modules/dispositivos-fichaje/api/services";
 import { Dispositivo } from "@/src/modules/dispositivos-fichaje/types/dispositivo-fichaje";
 import {
-    obtenerFichajesHoy,
-    registrarFichaje,
+  obtenerFichajesTrabajadorEntreFechas,
+  registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { formatearFecha, formatearSegundos } from "@/src/utils/formaters";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    AppState,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
 import SignatureCanvas from "react-native-signature-canvas";
 import { Estado } from "../../src/modules/trabajadores/types/trabajador";
@@ -84,17 +85,6 @@ export default function HomeScreen() {
       return ahora.toISOString().replace("Z", "");
     }
   }
-
-  const formatearSegundos = (totales: number): string => {
-    const horas = Math.floor(totales / 3600)
-      .toString()
-      .padStart(2, "0");
-    const minutos = Math.floor((totales % 3600) / 60)
-      .toString()
-      .padStart(2, "0");
-    const segundos = (totales % 60).toString().padStart(2, "0");
-    return `${horas}:${minutos}:${segundos}`;
-  };
 
   const obtenerEtiquetaEstado = (estado: Estado): string => {
     switch (estado) {
@@ -165,10 +155,15 @@ export default function HomeScreen() {
 
         if (isMounted) setMapaTiposEvento(mapa);
 
+        const hoy = formatearFecha(new Date());
+
         // 2. Obtener los fichajes del día
-        const fichajesHoy: RegistroFichaje[] = await obtenerFichajesHoy(
-          usuarioActual.trabajador_id,
-        );
+        const fichajesHoy: RegistroFichaje[] =
+          await obtenerFichajesTrabajadorEntreFechas(
+            usuarioActual.trabajador_id,
+            hoy,
+            hoy,
+          );
 
         if (!isMounted) return;
 

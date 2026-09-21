@@ -274,3 +274,67 @@ def obtener_ausencias_por_trabajador(
         .filter(Ausencias.trabajador_id == id_trabajador)
         .all()
     )
+
+@router.get("/{id_trabajador}/vacaciones", response_model=bool, summary="Verificar si una fecha es de vacaciones")
+@limiter.limit("60/minute")
+def verificar_vacaciones(
+    request: Request,
+    fecha: datetime.date,
+    id_trabajador: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/ausencias/{trabajador_id}/vacaciones?fecha=YYYY-MM-DD**
+    
+    Verifica si una fecha específica es de vacaciones para un trabajador concreto.
+    """
+    try:
+        # Consulta para comprobar si existen vacaciones en esa fecha exactamene,
+        # validando si aplica al trabajador indicado.
+        query = db.query(Ausencias).filter(Ausencias.fecha == fecha)
+
+        if id_trabajador:
+            query = query.filter((Ausencias.trabajador_id == id_trabajador) | (Ausencias.trabajador_id.is_(None))).filter(Ausencias.tipo_ausencia == "Vacaciones")
+        
+        vacacion_encontrada = query.first()
+
+        return vacacion_encontrada is not None
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al verificar las vacaciones: {str(error)}"
+        )
+    
+@router.get("/{id_trabajador}/bajas", response_model=bool, summary="Verificar si una fecha es de baja")
+@limiter.limit("60/minute")
+def verificar_bajas(
+    request: Request,
+    fecha: datetime.date,
+    id_trabajador: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+):
+    """
+    **GET /api/ausencias/{trabajador_id}/bajas?fecha=YYYY-MM-DD**
+    
+    Verifica si una fecha específica es de baja para un trabajador concreto.
+    """
+    try:
+        # Consulta para comprobar si existen bajas en esa fecha exactamene,
+        # validando si aplica al trabajador indicado.
+        query = db.query(Ausencias).filter(Ausencias.fecha == fecha)
+
+        if id_trabajador:
+            query = query.filter((Ausencias.trabajador_id == id_trabajador) | (Ausencias.trabajador_id.is_(None))).filter(Ausencias.tipo_ausencia == "Baja")
+        
+        baja_encontrada = query.first()
+
+        return baja_encontrada is not None
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al verificar las bajas: {str(error)}"
+        )
