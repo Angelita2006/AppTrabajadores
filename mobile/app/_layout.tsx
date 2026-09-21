@@ -85,13 +85,24 @@ function InitialLayout() {
     if (!estaListo || cargandoSesionLocal) return;
 
     const enGrupoAutenticacion = segments[0] === "(authentication)";
+
+    // 1. Añadimos aquí la excepción para la política de privacidad y otras vistas públicas
+    const esRutaPublica =
+      enGrupoAutenticacion || segments[0] === "politica-privacidad";
+
     const tieneSesion = usuarioActual !== null;
     const segmentLength = (segments as string[]).length;
 
-    if (!tieneSesion && !enGrupoAutenticacion) {
+    if (!tieneSesion && !esRutaPublica) {
       router.replace("/");
-    } else if (tieneSesion && (enGrupoAutenticacion || segmentLength === 0)) {
-      router.replace("/(tabs)/perfil");
+    } else if (
+      tieneSesion &&
+      ((enGrupoAutenticacion && segmentLength > 0) || segmentLength === 0)
+    ) {
+      // Nota: Evitamos redirigir si ya estamos visualizando una ruta pública libre como la política de privacidad con sesión activa
+      if (segments[0] !== "politica-privacidad") {
+        router.replace("/(tabs)/perfil");
+      }
     }
   }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
 
@@ -113,6 +124,14 @@ function InitialLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="politica-privacidad"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="confirmar-cambio-email"
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="(authentication)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
