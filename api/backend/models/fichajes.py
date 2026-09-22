@@ -46,7 +46,7 @@ class Fichajes(Base):
     dispositivo_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     latitud: Mapped[Optional[decimal.Decimal]] = mapped_column(Numeric(9, 6))
     longitud: Mapped[Optional[decimal.Decimal]] = mapped_column(Numeric(9, 6))
-    ip_address: Mapped[Optional[int]] = mapped_column(BigInteger)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
     fichaje_sustituido_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     observaciones: Mapped[Optional[str]] = mapped_column(Text)
     firma_digital: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='Firma digitalizada en Base64 o URL del archivo.')
