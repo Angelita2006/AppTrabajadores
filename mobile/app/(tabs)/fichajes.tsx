@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   textoEvento: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "700",
   },
   empty: { textAlign: "center", color: "#64748B", marginTop: 20 },
