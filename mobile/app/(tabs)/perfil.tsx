@@ -170,44 +170,46 @@ export default function PerfilScreen() {
   const handleGuardarPerfil = async () => {
     try {
       setGuardando(true);
-      if (trabajadorActual) {
-        let trabajadorActualizado = { ...trabajadorActual };
-        if (nuevaFotoAsset) {
-          const filename =
-            nuevaFotoAsset.fileName ||
-            nuevaFotoAsset.uri.split("/").pop() ||
-            "foto.jpg";
-          const match = /\.(\w+)$/.exec(filename);
-          const type = match ? `image/${match[1]}` : `image/jpeg`;
-          trabajadorActualizado = await actualizarFotoTrabajador(
-            trabajadorActual.id,
-            nuevaFotoAsset.uri,
-            filename,
-            type,
-          );
-        }
-        const trabajadorActualizadoDatos = {
-          ...trabajadorActualizado,
-          telefono: telefono.trim() || undefined,
-          numero_seguridad_social: nss.trim() || undefined,
-        };
-        await actualizarTrabajador(
+      if (!trabajadorActual) return;
+
+      // 1. Si el usuario seleccionó una nueva foto, la subimos al servidor ahora al guardar
+      if (nuevaFotoAsset) {
+        const filename =
+          nuevaFotoAsset.fileName ||
+          nuevaFotoAsset.uri.split("/").pop() ||
+          "foto.jpg";
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        await actualizarFotoTrabajador(
           trabajadorActual.id,
-          trabajadorActualizadoDatos,
+          nuevaFotoAsset.uri,
+          filename,
+          type,
         );
-        const datosFrescos = await obtenerTrabajador(trabajadorActual.id);
-        const cacheBustUrl = datosFrescos.foto_url
-          ? `${datosFrescos.foto_url.split("?")[0]}?t=${Date.now()}`
-          : "";
-        setTrabajadorActual({
-          ...datosFrescos,
-          foto_url: cacheBustUrl,
-        });
-        setFotoUrl(cacheBustUrl);
-        setNuevaFotoAsset(null);
-        setIsEditing(false);
-        mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
       }
+
+      // 2. Actualizamos los datos de texto (teléfono y NSS)
+      await actualizarTrabajador(trabajadorActual.id, {
+        telefono: telefono.trim() || undefined,
+        numero_seguridad_social: nss.trim() || undefined,
+      });
+
+      // 3. Obtenemos los datos limpios y definitivos desde el servidor
+      const datosFrescos = await obtenerTrabajador(trabajadorActual.id);
+      const cacheBustUrl = datosFrescos.foto_url
+        ? `${datosFrescos.foto_url.split("?")[0]}?t=${Date.now()}`
+        : "";
+
+      setTrabajadorActual({
+        ...datosFrescos,
+        foto_url: cacheBustUrl,
+      });
+      setFotoUrl(cacheBustUrl);
+      setNuevaFotoAsset(null);
+      setIsEditing(false);
+
+      mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
     } catch (error: any) {
       mostrarError("Error al guardar perfil: " + error.message);
     } finally {

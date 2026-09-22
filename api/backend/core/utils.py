@@ -13,6 +13,7 @@ from google import genai
 from google.genai import types
 import httpx
 from sqlalchemy.orm import Session
+from core.archivos import CARPETA_FIRMAS
 from core.config import settings
 from models.contratos import Contratos
 from models.festivos import Festivos
@@ -74,7 +75,9 @@ def procesar_y_guardar_firma(data_firma: str) -> str:
     bytes_imagen = base64.b64decode(data_encoded)
 
     nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
-    ruta_destino = os.path.join("/api/archivos/firmas", nombre_archivo)
+    
+    CARPETA_FIRMAS.mkdir(parents=True, exist_ok=True)
+    ruta_destino = CARPETA_FIRMAS / nombre_archivo
 
     with open(ruta_destino, "wb") as buffer:
         buffer.write(bytes_imagen)
@@ -85,7 +88,7 @@ async def obtener_coordenadas(direccion: str):
     """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": direccion, "format": "json", "limit": 1}
-    headers = {"User-Agent": "TuAppDeFichajes/1.0"} # Nominatim exige un User-Agent válido
+    headers = {"User-Agent": "TuAppDeFichajes/1.0"} 
     
     async with httpx.AsyncClient() as client:
         response = await client.get(url, params=params, headers=headers)

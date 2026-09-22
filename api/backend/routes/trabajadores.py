@@ -1,5 +1,6 @@
 from datetime import date, datetime
 import os
+from pathlib import Path
 import shutil
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 from sqlalchemy.orm import Session, joinedload
@@ -7,6 +8,7 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from core.archivos import CARPETA_FOTOS_TRABAJADORES
 from models.contratos import Contratos
 from models.asignaciones_turno import AsignacionesTurno
 from models.usuarios_roles import UsuariosRoles
@@ -29,9 +31,6 @@ router = APIRouter(prefix="/api/trabajadores", tags=["Trabajadores"])
 
 # Configuración del limitador de tasa de peticiones por IP para prevenir ataques de fuerza bruta y abusos
 limiter = Limiter(key_func=get_remote_address)
-
-CARPETA_FOTOS_TRABAJADORES = "static/fotos_trabajadores"
-os.makedirs(CARPETA_FOTOS_TRABAJADORES, exist_ok=True)
 
 @router.get("/empresa/{id_empresa}", response_model=List[TrabajadorResponse], summary="Obtener trabajadores por empresa")
 @limiter.limit("60/minute") 

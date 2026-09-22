@@ -40,8 +40,10 @@ def inicializar_roles_sistema(db: Session):
     respetando los UUIDs predefinidos.
     """
     for rol_data in ROLES_SISTEMA_INICIALES:
+        print(f"Verificando rol: {rol_data['nombre']}")
         rol_existente = db.query(Roles).filter(Roles.id == rol_data["id"]).first()
         if not rol_existente:
+            print(f"Insertando rol: {rol_data['nombre']}")
             nuevo_rol = Roles(
                 id=rol_data["id"],
                 nombre=rol_data["nombre"],
@@ -49,3 +51,4 @@ def inicializar_roles_sistema(db: Session):
             )
             db.add(nuevo_rol)
     db.commit()
+    print("Inicialización de roles finalizada con éxito.")

@@ -6,12 +6,12 @@ from core.security import obtener_usuario_actual
 
 router = APIRouter(prefix="/api/archivos", tags=["Archivos"])
 
-# 1. Obtenemos la ruta absoluta del directorio actual de este archivo Python
-# 2. Navegamos hasta la carpeta 'backend' donde se encuentra 'static'.
-# (Ajusta los '.parent' según en qué subcarpeta exacta de 'backend' tengas guardado este archivo de rutas)
 DIRECCION_ACTUAL = Path(__file__).resolve()
-# Ejemplo: Si este archivo está en backend/routers/archivos.py, necesitamos subir 2 niveles para llegar a backend y entrar en static.
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent / "static" 
+BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
+
+CARPETA_FOTOS_TRABAJADORES = BASE_STATIC_DIR / "fotos_trabajadores"
+CARPETA_LOGOS = BASE_STATIC_DIR / "logos"
+CARPETA_FIRMAS = BASE_STATIC_DIR / "firmas"
 
 @router.get("/{subcarpeta}/{nombre_archivo}")
 def obtener_archivo_protegido(

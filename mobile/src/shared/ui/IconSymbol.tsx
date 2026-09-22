@@ -38,6 +38,8 @@ const MAPPING = {
   "vpn-key": "vpn-key",
   "check-circle": "check-circle",
   error: "error",
+  menu: "menu",
+  "menu-open": "menu-open",
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

@@ -5,6 +5,7 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from core.archivos import CARPETA_LOGOS
 from core.database import get_db
 from core.security import get_password_hash, obtener_usuario_actual, verificar_rol_requerido
 from core.enums import TipoUsuarioEnum
@@ -28,9 +29,6 @@ router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 # Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
-
-CARPETA_LOGOS = "static/logos" 
-os.makedirs(CARPETA_LOGOS, exist_ok=True)
 
 @router.post("", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED, summary="Crear empresa")
 @limiter.limit("10/minute")  

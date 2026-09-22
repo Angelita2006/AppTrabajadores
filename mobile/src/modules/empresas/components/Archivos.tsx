@@ -14,13 +14,23 @@ export const ImagenConToken = ({
   const [loading, setLoading] = useState(true);
   const { mostrarError } = useAppModal();
 
+  // 1. Si es una ruta local del dispositivo
+  const esRutaLocal =
+    rutaRelativa?.startsWith("file://") ||
+    rutaRelativa?.startsWith("content://") ||
+    rutaRelativa?.startsWith("blob:");
+
   useEffect(() => {
+    if (esRutaLocal) {
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
     const fetchProtectedImage = async () => {
       try {
         if (!rutaRelativa) return;
 
-        // Limpiamos y formateamos la ruta para Axios
         let endpoint = rutaRelativa;
         if (endpoint.startsWith("/static/")) {
           endpoint = endpoint.replace("/static/", "/api/archivos/");
@@ -28,12 +38,8 @@ export const ImagenConToken = ({
           endpoint = `/api/archivos${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
         }
 
-        // AQUÍ SÍ USAMOS AXIOS -> Se envía el token automáticamente en los headers
         const response = await api.get(endpoint, { responseType: "blob" });
 
-        // Convertimos el blob a una URI local utilizable por React Native / Web
-        // Nota: En React Native puro a veces se requiere un FileReader o librería de blob,
-        // pero en entorno Web / Expo funciona con URL.createObjectURL.
         const reader = new FileReader();
         reader.readAsDataURL(response.data);
         reader.onloadend = () => {
@@ -52,9 +58,17 @@ export const ImagenConToken = ({
     return () => {
       isMounted = false;
     };
-  }, [rutaRelativa]);
+  }, [rutaRelativa, esRutaLocal]);
 
-  if (loading) return <ActivityIndicator style={style} />;
+  if (loading && !esRutaLocal) return <ActivityIndicator style={style} />;
+
+  // 2. Si es local, devolvemos la imagen nativa directamente
+  if (esRutaLocal) {
+    return (
+      <Image source={{ uri: rutaRelativa }} style={style} resizeMode="cover" />
+    );
+  }
+
   if (!imgUri) return null;
 
   return <Image source={{ uri: imgUri }} style={style} resizeMode="cover" />;
