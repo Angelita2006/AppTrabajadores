@@ -18,7 +18,7 @@ export const ImagenConToken = ({
   const esRutaLocal =
     rutaRelativa?.startsWith("file://") ||
     rutaRelativa?.startsWith("content://") ||
-    rutaRelativa?.startsWith("blob:");
+    rutaRelativa?.startsWith("blob");
 
   useEffect(() => {
     if (esRutaLocal) {

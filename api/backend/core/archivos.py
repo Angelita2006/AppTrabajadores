@@ -7,7 +7,7 @@ from core.security import obtener_usuario_actual
 router = APIRouter(prefix="/api/archivos", tags=["Archivos"])
 
 DIRECCION_ACTUAL = Path(__file__).resolve()
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
+BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent.parent / "static" 
 
 CARPETA_FOTOS_TRABAJADORES = BASE_STATIC_DIR / "fotos_trabajadores"
 CARPETA_LOGOS = BASE_STATIC_DIR / "logos"
