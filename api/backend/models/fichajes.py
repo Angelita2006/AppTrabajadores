@@ -2,7 +2,7 @@ import datetime
 import decimal
 from typing import Any, Optional
 import uuid
-from sqlalchemy import INT, CheckConstraint, DateTime, Enum, ForeignKey, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
+from sqlalchemy import INT, BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, SmallInteger, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
@@ -46,7 +46,7 @@ class Fichajes(Base):
     dispositivo_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     latitud: Mapped[Optional[decimal.Decimal]] = mapped_column(Numeric(9, 6))
     longitud: Mapped[Optional[decimal.Decimal]] = mapped_column(Numeric(9, 6))
-    ip_address: Mapped[Optional[Any]] = mapped_column(INT)
+    ip_address: Mapped[Optional[int]] = mapped_column(BigInteger)
     fichaje_sustituido_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
     observaciones: Mapped[Optional[str]] = mapped_column(Text)
     firma_digital: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='Firma digitalizada en Base64 o URL del archivo.')
