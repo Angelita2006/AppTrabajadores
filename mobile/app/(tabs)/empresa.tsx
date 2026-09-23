@@ -26,6 +26,7 @@ import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tip
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
@@ -160,7 +161,7 @@ export default function EmpresasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar la información operativa y estructural de la empresa: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -184,7 +185,7 @@ export default function EmpresasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al obtener el catálogo de empresas autorizadas: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -213,7 +214,8 @@ export default function EmpresasScreen() {
       await cargarCatalogoEmpresas();
     } catch (error: any) {
       mostrarError(
-        "Error al guardar los datos fiscales de la empresa: " + error.message,
+        "Error al guardar los datos fiscales de la empresa: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -268,7 +270,8 @@ export default function EmpresasScreen() {
         mostrarMensaje("Éxito", "¡Logo actualizado correctamente!");
       } catch (error: any) {
         mostrarError(
-          "Error al actualizar el logotipo corporativo: " + error.message,
+          "Error al actualizar el logotipo corporativo: " +
+            obtenerMensajeAmigableError(error.message),
         );
       }
     }

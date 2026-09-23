@@ -7,6 +7,7 @@ import {
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha, formatearSegundos } from "@/src/utils/formaters";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
@@ -67,9 +68,10 @@ export default function HomeScreen() {
   const isDrawingRef = useRef(false);
 
   useEffect(() => {
-    // Si la sesión ya cargó y detectamos que es un rol administrativo,
-    // lo sacamos inmediatamente de la pantalla home hacia su sección permitida.
-    if (!cargandoSesionLocal) {
+    const esAdmin =
+      usuarioActual?.tipo_usuario === "Admin_empresa" ||
+      usuarioActual?.tipo_usuario === "Admin_gestoría";
+    if (!cargandoSesionLocal && esAdmin) {
       router.replace("/(tabs)/perfil");
     }
   }, [usuarioActual, cargandoSesionLocal]);
@@ -111,7 +113,7 @@ export default function HomeScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al calcular la fecha y hora ajustada a la zona horaria del centro: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
       return ahora.toISOString().replace("Z", "");
     }
@@ -282,7 +284,8 @@ export default function HomeScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los datos de la jornada actual: " + error.message,
+          "Error al cargar los datos de la jornada actual: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         if (isMounted) setCargando(false);
@@ -516,7 +519,7 @@ export default function HomeScreen() {
       if (forzarExtra) {
         mostrarError(
           "Error al registrar el fichaje como horas extra en festivo: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
         return;
       }
@@ -579,7 +582,8 @@ export default function HomeScreen() {
         }
       } else {
         mostrarError(
-          "Error al procesar tu solicitud de fichaje: " + error.message,
+          "Error al procesar tu solicitud de fichaje: " +
+            obtenerMensajeAmigableError(error.message),
         );
       }
     }

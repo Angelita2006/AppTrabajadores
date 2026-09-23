@@ -8,6 +8,7 @@ import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, {
@@ -116,7 +117,7 @@ export default function GestionAusenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar la lista de trabajadores de la empresa: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
       }
     }
@@ -153,7 +154,8 @@ export default function GestionAusenciasScreen() {
       setAusencias(ausenciasConTrabajador as AusenciaResponse[]);
     } catch (error: any) {
       mostrarError(
-        "Error al cargar las ausencias de la empresa: " + error.message,
+        "Error al cargar las ausencias de la empresa: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -205,7 +207,8 @@ export default function GestionAusenciasScreen() {
       setFechaFin("");
     } catch (error: any) {
       mostrarError(
-        "Error al solicitar o asignar la ausencia: " + error.message,
+        "Error al solicitar o asignar la ausencia: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);

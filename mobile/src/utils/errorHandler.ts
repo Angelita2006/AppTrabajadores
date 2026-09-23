@@ -1,4 +1,3 @@
-import { Alert, Platform } from "react-native";
 
 /**
  * Extrae y formatea mensajes de error amigables para el usuario a partir de respuestas HTTP o fallos de red.
@@ -62,31 +61,3 @@ export const obtenerMensajeAmigableError = (error: any): string => {
   // Mensaje genérico final si no se reconoce el tipo de error
   return error?.message || "Ocurrió un error desconocido. Inténtalo de nuevo.";
 };
-
-/**
- * Muestra un mensaje informativo adaptado a la plataforma actual (alerta web con window.alert
- * o cuadro de diálogo nativo en dispositivos móviles iOS y Android).
- *
- * @param mensaje - Texto informativo que se desea mostrar al usuario.
- */
-export function mostrarMensaje(tipoMensaje: string, mensaje: any) {
-  if (Platform.OS == "web") {
-    alert(`${tipoMensaje}: ` + mensaje);
-  } else if (Platform.OS == "android" || Platform.OS == "ios") {
-    Alert.alert(tipoMensaje, mensaje);
-  }
-}
-
-/**
- * Muestra una alerta de error adaptada a la plataforma en ejecución
- * (ventana de alerta en web o componente nativo Alert en entornos móviles).
- *
- * @param error - Descripción o mensaje del error a reportar.
- */
-export function mostrarError(error: any) {
-  if (Platform.OS == "web") {
-    alert("Error: " + error);
-  } else if (Platform.OS == "android" || Platform.OS == "ios") {
-    Alert.alert("Error", error);
-  }
-}

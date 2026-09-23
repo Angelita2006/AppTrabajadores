@@ -1,4 +1,3 @@
-import { registrarTokenDispositivo } from "@/src/modules/another-services/services";
 import { AppModalProvider } from "@/src/shared/ui/AppModalNotification";
 import {
   FontAwesome,
@@ -12,7 +11,7 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, BackHandler, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import {
   ProveedorSesion,
   useSesion,
@@ -37,7 +36,6 @@ function InitialLayout() {
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
 
-  // Control de sincronización inicial y Splash Screen nativo
   useEffect(() => {
     const timer = setTimeout(() => {
       setEstaListo(true);
@@ -51,107 +49,19 @@ function InitialLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Interceptor global del botón de retroceso (BackHandler) por rol
-  useEffect(() => {
-    const backAction = () => {
-      const currentRoute = segments[segments.length - 1];
-      const tipo = usuarioActual?.tipo_usuario;
-      const esAdminOControlador =
-        tipo === "Admin_empresa" ||
-        tipo === "Admin_gestoría" ||
-        tipo === "Auditor_itss" ||
-        tipo === "Representante_legal";
-
-      if (
-        esAdminOControlador &&
-        (currentRoute === "home" || currentRoute === "(tabs)")
-      ) {
-        router.replace("/(tabs)/empresa");
-        return true;
-      }
-
-      return false;
-    };
-
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      backAction,
-    );
-
-    return () => backHandler.remove();
-  }, [segments, usuarioActual, router]);
-
-  // Registrar token push y escuchar notificaciones al iniciar sesión
-  useEffect(() => {
-    if (!usuarioActual?.id) return;
-
-    registrarTokenDispositivo(usuarioActual.id);
-
-    const subRecibida = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log("Notificación recibida en primer plano:", notification);
-      },
-    );
-
-    const subRespuesta = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const data = response.notification.request.content.data;
-        console.log("Usuario presionó la notificación:", data);
-
-        if (data?.type === "OLVIDO_FICHAJE") {
-          router.push("/(tabs)/perfil");
-        }
-      },
-    );
-
-    return () => {
-      subRecibida.remove();
-      subRespuesta.remove();
-    };
-  }, [usuarioActual]);
-
-  // Efecto central de protección de rutas (Guard) antierrores
+  // Guard de navegación unificado: redirige siempre a perfil al iniciar sesión
   useEffect(() => {
     if (!estaListo || cargandoSesionLocal) return;
 
-    // Casteamos segments como string[] para evitar problemas con las tuplas estrictas de Expo Router
-    const segs = segments as string[];
-    const enGrupoAutenticacion = segs[0] === "(authentication)";
-    const esRutaPublica =
-      enGrupoAutenticacion || segs[0] === "politica-privacidad";
-
+    const enGrupoTabs = segments[0] === "(tabs)";
     const tieneSesion = usuarioActual !== null;
-    const segmentLength = segs.length;
 
-    const tipo = usuarioActual?.tipo_usuario;
-    const esAdminOControlador =
-      tipo === "Admin_empresa" ||
-      tipo === "Admin_gestoría" ||
-      tipo === "Auditor_itss" ||
-      tipo === "Representante_legal";
-
-    // Verificación segura utilizando el array casteado
-    const esRutaHomeTab =
-      segmentLength >= 2 && segs[0] === "(tabs)" && segs[1] === "home";
-
-    if (tieneSesion && esAdminOControlador && esRutaHomeTab) {
-      router.replace("/(tabs)/empresa");
-      return;
-    }
-
-    if (!tieneSesion && !esRutaPublica) {
+    if (tieneSesion && !enGrupoTabs) {
+      // Todos los usuarios van directamente al perfil tras iniciar sesión
+      router.replace("/(tabs)/perfil");
+    } else if (!tieneSesion && enGrupoTabs) {
+      // Si no hay sesión y está intentando ver las pestañas, lo mandamos al inicio
       router.replace("/");
-    } else if (
-      tieneSesion &&
-      ((enGrupoAutenticacion && segmentLength > 0) || segmentLength === 0)
-    ) {
-      if (segs[0] !== "politica-privacidad") {
-        if (esAdminOControlador) {
-          router.replace("/(tabs)/empresa");
-        } else {
-          router.replace("/(tabs)/perfil");
-        }
-      }
     }
   }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
 

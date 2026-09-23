@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Software de Control Horario y RRHH - FICHAPP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-white text-slate-900 font-sans antialiased">
+    <!-- Barra de aviso superior -->
+    <div
+      class="bg-indigo-600 text-white text-xs md:text-sm text-center py-2.5 font-medium px-4"
+    >
+      🚀 El registro horario de trabajadores ya es tan fácil como debería ser
+      ¡Descubre nuestra nueva app!
+    </div>
+
+    <!-- Header / Navegación Principal -->
+    <header class="sticky top-0 z-50 bg-white border-b border-slate-100">
+      <div
+        class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-10">
+          <span class="text-2xl font-black tracking-tight text-slate-900"
+            >FICHAPP</span
+          >
+          <nav
+            class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600"
+          >
+            <a href="producto.html" class="hover:text-indigo-600">Producto</a>
+            <a href="funcionalidades.html" class="hover:text-indigo-600"
+              >Funcionalidades</a
+            >
+            <a href="precios.html" class="hover:text-indigo-600">Precios</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a
+            href="https://app.registrohorariosimple.es"
+            class="text-sm font-bold text-slate-700 hover:text-indigo-600 px-4 py-2"
+            >Acceder</a
+          >
+          <a
+            href="#prueba-gratis"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition shadow-sm"
+            >Prueba gratuita</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section
+      class="max-w-7xl mx-auto px-6 pt-16 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center"
+    >
+      <div class="lg:col-span-6 space-y-6">
+        <h1
+          class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]"
+        >
+          Optimiza la gestión de empleados ahorrando tiempo, esfuerzo y dinero
+        </h1>
+        <p class="text-lg text-slate-600 font-normal leading-relaxed">
+          Y para que veas como funciona, te ofrecemos
+          <strong class="text-slate-900 font-bold"
+            >14 días de prueba totalmente gratuita</strong
+          >
+          sin compromiso.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+          <a
+            href="#registro"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-center font-bold px-8 py-4 rounded-xl transition shadow-lg shadow-indigo-100"
+          >
+            Prueba gratis →
+          </a>
+          <a
+            href="#demo"
+            class="border border-slate-300 hover:border-slate-400 text-slate-800 text-center font-bold px-8 py-4 rounded-xl transition"
+          >
+            Ver demo →
+          </a>
+        </div>
+      </div>
+      <div
+        class="lg:col-span-6 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-xl shadow-slate-100"
+      >
+        <!-- Simulación visual del panel de administración -->
+        <div class="bg-white rounded-xl border border-slate-100 p-4 space-y-4">
+          <div class="flex justify-between items-center border-b pb-3">
+            <span class="font-bold text-sm text-slate-800"
+              >Panel de Control de Empleados</span
+            >
+            <span
+              class="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-semibold"
+              >● En línea</span
+            >
+          </div>
+          <div class="space-y-2">
+            <div
+              class="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg text-xs font-medium"
+            >
+              <span>Ana García (Operaria)</span>
+              <span class="text-indigo-600 font-bold">7h 40min</span>
+            </div>
+            <div
+              class="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg text-xs font-medium"
+            >
+              <span>Carlos López (Administración)</span>
+              <span class="text-indigo-600 font-bold">4h 00min</span>
+            </div>
+            <div
+              class="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg text-xs font-medium"
+            >
+              <span>Lucía Pérez (Logística)</span>
+              <span class="text-indigo-600 font-bold">6h 12min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección de Módulos / Funcionalidades Estilo Sesame -->
+    <section
+      id="funcionalidades"
+      class="bg-slate-50/50 py-24 border-t border-slate-100"
+    >
+      <div class="max-w-7xl mx-auto px-6 text-center space-y-16">
+        <h2 class="text-3xl lg:text-4xl font-black tracking-tight">
+          El control horario que simplifica tu negocio
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+          <!-- Tarjeta 1 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:shadow-md transition"
+          >
+            <div
+              class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 text-xl font-bold"
+            >
+              ⏱️
+            </div>
+            <h3 class="text-xl font-bold">Time tracking</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              Los empleados pueden fichar con un solo clic. Hacer una pausa,
+              cambiar de tipo de trabajo o añadir detalles es muy sencillo.
+            </p>
+            <a
+              href="#"
+              class="text-indigo-600 font-bold text-sm inline-block pt-2"
+              >Más detalles →</a
+            >
+          </div>
+          <!-- Tarjeta 2 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:shadow-md transition"
+          >
+            <div
+              class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 text-xl font-bold"
+            >
+              📱
+            </div>
+            <h3 class="text-xl font-bold">APP mobile</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              Descarga nuestra app tanto en iOS como Android. Podrás fichar,
+              gestionar y aprobar tiempos de tu equipo desde cualquier lugar.
+            </p>
+            <a
+              href="#"
+              class="text-indigo-600 font-bold text-sm inline-block pt-2"
+              >Más detalles →</a
+            >
+          </div>
+          <!-- Tarjeta 3 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:shadow-md transition"
+          >
+            <div
+              class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 text-xl font-bold"
+            >
+              📅
+            </div>
+            <h3 class="text-xl font-bold">Planificación</h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              Crea calendarios de trabajo para los empleados, horarios y turnos
+              y haz que los reciban de forma inmediata y cómoda.
+            </p>
+            <a
+              href="#"
+              class="text-indigo-600 font-bold text-sm inline-block pt-2"
+              >Más detalles →</a
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bloque de Cumplimiento Legal (Estilo Verde Esmeralda) -->
+    <section class="bg-emerald-500 text-white py-20 px-6">
+      <div
+        class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
+      >
+        <div class="space-y-6">
+          <span
+            class="bg-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider"
+            >Cumplimos con la ley</span
+          >
+          <h2 class="text-3xl lg:text-4xl font-black">
+            Y por supuesto, estarás listo para cumplir con los requisitos de
+            cualquier inspección.
+          </h2>
+          <p class="text-emerald-50 text-sm leading-relaxed">
+            Genera informes automáticos listos para presentar ante las
+            autoridades laborales y mantén un registro de jornada seguro e
+            inalterable.
+          </p>
+          <button
+            class="bg-white text-emerald-800 font-bold px-6 py-3 rounded-xl shadow hover:bg-emerald-50 transition"
+          >
+            Solicita una consultoría aquí
+          </button>
+        </div>
+        <div
+          class="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm"
+        >
+          <div
+            class="bg-white text-slate-900 p-6 rounded-xl shadow-lg space-y-3"
+          >
+            <span class="text-xs font-bold text-indigo-600 uppercase"
+              >Responsable RRHH</span
+            >
+            <h4 class="font-extrabold text-lg">
+              Obligación de registro horario
+            </h4>
+            <p class="text-xs text-slate-500">
+              Toda la documentación centralizada en un único entorno digital
+              seguro y accesible.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Banner de Prueba Gratuita Final -->
+    <section
+      id="prueba-gratis"
+      class="bg-indigo-600 text-white py-24 px-6 text-center"
+    >
+      <div class="max-w-3xl mx-auto space-y-6">
+        <h2 class="text-3xl lg:text-5xl font-black">
+          Prueba gratis durante 14 días
+        </h2>
+        <p class="text-indigo-100 text-sm max-w-lg mx-auto">
+          Empieza hoy mismo a digitalizar el control horario de tu empresa sin
+          necesidad de configuraciones complejas.
+        </p>
+        <div class="flex flex-col sm:flex-row justify-center gap-3 pt-4">
+          <input
+            type="email"
+            placeholder="Correo de empresa"
+            class="px-6 py-4 rounded-xl text-slate-900 w-full sm:w-80 text-sm outline-none font-medium"
+          />
+          <button
+            class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-8 py-4 rounded-xl text-sm transition"
+          >
+            Prueba gratis →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer
+      class="bg-white border-t border-slate-100 py-12 px-6 text-slate-500 text-xs"
+    >
+      <div
+        class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6"
+      >
+        <span class="text-lg font-black text-slate-900">FICHAPP</span>
+        <div class="flex gap-6 font-semibold">
+          <a href="legal.html" class="hover:text-slate-900">Legal</a>
+          <a href="cookies.html" class="hover:text-slate-900">Cookies</a>
+          <a href="privacidad.html" class="hover:text-slate-900">Privacidad</a>
+          <a href="seguridad.html" class="hover:text-slate-900">Seguridad</a>
+        </div>
+        <p>© 2026 Fichapp. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+  </body>
+</html>

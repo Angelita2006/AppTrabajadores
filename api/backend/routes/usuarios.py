@@ -115,6 +115,8 @@ def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Sessi
     
     db.refresh(usuario)
     return usuario
+    
+
 
 
 @router.post("/login", summary="Inicio de sesión en la plataforma")

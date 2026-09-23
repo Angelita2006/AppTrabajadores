@@ -45,7 +45,7 @@ export interface UsuarioRegisterRequest {
   /** CIF de la empresa a la que se vincula. */
   empresa_cif: string;
   /** NIF o NIE del usuario. */
-  nif_nie: string;
+  dni_nif_nie: string;
   /** Correo electrónico de contacto. */
   email: string;
   /** Contraseña de acceso. */

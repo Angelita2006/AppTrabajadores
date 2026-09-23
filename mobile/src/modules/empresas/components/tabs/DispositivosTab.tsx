@@ -1,5 +1,6 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
@@ -107,7 +108,8 @@ export default function TabDispositivos({
       mostrarMensaje("Éxito", "Dispositivo registrado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al crear el dispositivo de fichaje: " + error.message,
+        "Error al crear el dispositivo de fichaje: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -155,7 +157,8 @@ export default function TabDispositivos({
       mostrarMensaje("Éxito", "Dispositivo actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar el dispositivo de fichaje: " + error.message,
+        "Error al actualizar el dispositivo de fichaje: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -183,7 +186,8 @@ export default function TabDispositivos({
         mostrarMensaje("Éxito", "Dispositivo enviado a la papelera.");
       } catch (error: any) {
         mostrarError(
-          "Error al eliminar el dispositivo de fichaje: " + error.message,
+          "Error al eliminar el dispositivo de fichaje: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         setGuardando(false);
@@ -223,7 +227,10 @@ export default function TabDispositivos({
       );
       mostrarMensaje("Éxito", "Dispositivo reactivado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al reactivar el dispositivo: " + error.message);
+      mostrarError(
+        "Error al reactivar el dispositivo: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }

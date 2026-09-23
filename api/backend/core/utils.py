@@ -98,7 +98,6 @@ async def obtener_coordenadas(direccion: str):
                 return float(data[0]["lat"]), float(data[0]["lon"])
     return None, None
 
-
 def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     """
     Envía el archivo PDF binario a Gemini para que extraiga visualmente

@@ -1,21 +1,22 @@
 import {
-    obtenerAusenciasTrabajador,
-    solicitarAusencia,
+  obtenerAusenciasTrabajador,
+  solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import {
-    AusenciaCreateRequest,
-    AusenciaResponse,
-    ItemAusencia,
-    TipoAusencia,
+  AusenciaCreateRequest,
+  AusenciaResponse,
+  ItemAusencia,
+  TipoAusencia,
 } from "@/src/modules/ausencias/types/ausencia";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -52,7 +53,7 @@ export default function VacacionesScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar el histórico de ausencias del trabajador: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setBuscandoInicial(false);
@@ -168,7 +169,8 @@ export default function VacacionesScreen() {
       setMotivo("");
     } catch (error: any) {
       mostrarError(
-        "Error al enviar la solicitud de ausencia: " + error.message,
+        "Error al enviar la solicitud de ausencia: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);

@@ -20,9 +20,7 @@ interface ModalAsignarTurnoTrabajadorProps {
   turnosEmpresa: Turno[];
   turnosSeleccionados: Turno[];
   setTurnosSeleccionados: (turnos: Turno[]) => void;
-  /** Listado original de turnos que ya tenía vigentes el trabajador antes de reasignar */
   turnosInicialesVigentes?: Turno[];
-  /** Función callback que ahora puede recibir los turnos a desvincular con fecha de ayer */
   onGuardar: (turnosADesactivar?: { id: string; fechaFin: string }[]) => void;
   onCancelar: () => void;
   procesando: boolean;

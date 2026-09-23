@@ -1,6 +1,7 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   validarDuracionPausa,
   validarFormatoHora,
@@ -128,7 +129,10 @@ export default function TabTurnos({
       setDuracionPausa("0");
       setMostrarFormTurno(false);
     } catch (error: any) {
-      mostrarError("Error al crear el turno laboral: " + error.message);
+      mostrarError(
+        "Error al crear el turno laboral: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -161,7 +165,10 @@ export default function TabTurnos({
       mostrarMensaje("Éxito", "Turno actualizado correctamente.");
       setTurnoEnEdicion(null);
     } catch (error: any) {
-      mostrarError("Error al actualizar el turno laboral: " + error.message);
+      mostrarError(
+        "Error al actualizar el turno laboral: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -234,7 +241,10 @@ export default function TabTurnos({
       );
       mostrarMensaje("Éxito", "Turno reactivado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al reactivar el turno: " + error.message);
+      mostrarError(
+        "Error al reactivar el turno: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }

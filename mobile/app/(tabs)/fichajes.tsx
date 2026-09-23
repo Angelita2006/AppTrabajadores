@@ -21,6 +21,7 @@ import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   capitalizar,
   extraerHora,
@@ -91,7 +92,7 @@ const firmaComoHtml = async (
 
     return `<img class="firma-fichaje" src="${escaparHtml(urlFirma)}" alt="Firma del trabajador" />`;
   } catch (error: any) {
-    if (mostrarError) mostrarError(error.message);
+    if (mostrarError) mostrarError(obtenerMensajeAmigableError(error.message));
   }
 };
 
@@ -213,7 +214,7 @@ export default function FichajesHistorialScreen() {
         ).catch((error: any) => {
           mostrarError(
             `No se pudieron obtener fichajes entre las fechas ${fechaInicio}-${fechaFin} : ` +
-              error.message,
+              obtenerMensajeAmigableError(error.message),
           );
           return [];
         }),
@@ -296,7 +297,7 @@ export default function FichajesHistorialScreen() {
             } catch (error: any) {
               mostrarError(
                 `No se pudo obtener el calendario para el trabajador ${idTrabajador}: ` +
-                  error.message,
+                  obtenerMensajeAmigableError(error.message),
               );
             }
           }
@@ -371,7 +372,7 @@ export default function FichajesHistorialScreen() {
         } catch (error: any) {
           mostrarError(
             `Error procesando datos del trabajador ${idTrabajador}: ` +
-              error.message,
+              obtenerMensajeAmigableError(error.message),
           );
         }
       }
@@ -380,7 +381,8 @@ export default function FichajesHistorialScreen() {
       setMapaTurnosObjetos(nuevoMapaObjetosTurnos);
     } catch (error: any) {
       mostrarError(
-        "Error general al cargar fichajes y turnos: " + error.message,
+        "Error general al cargar fichajes y turnos: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -609,7 +611,7 @@ export default function FichajesHistorialScreen() {
                     } catch (error: any) {
                       mostrarError(
                         `Error al obtener el tipo de evento (${m.tipo_evento_id}): ` +
-                          error.message,
+                          obtenerMensajeAmigableError(error.message),
                       );
                     }
                   }
@@ -710,7 +712,7 @@ export default function FichajesHistorialScreen() {
           try {
             logoEmpresa = (await obtenerUrlLogo(empresaActual?.logo_url)) || "";
           } catch (error: any) {
-            mostrarError(error.message);
+            mostrarError(obtenerMensajeAmigableError(error.message));
           }
           const fiscal = mapaDatosFiscales[t.id];
           const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
@@ -867,7 +869,8 @@ export default function FichajesHistorialScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al generar o exportar el documento PDF: " + error.message,
+          "Error al generar o exportar el documento PDF: " +
+            obtenerMensajeAmigableError(error.message),
         );
       }
     },

@@ -1,4 +1,6 @@
 import { confirmarCambioEmail } from "@/src/modules/usuarios/api/services";
+import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
@@ -12,25 +14,23 @@ export default function ConfirmarCambioEmailScreen() {
 
   const [cargando, setCargando] = useState(true);
   const [exito, setExito] = useState(false);
-  const [errorMensaje, setErrorMensaje] = useState("");
+  const { mostrarError } = useAppModal();
 
   useEffect(() => {
     const procesarConfirmacion = async () => {
       if (!token) {
         setCargando(false);
-        setErrorMensaje("No se ha proporcionado un token válido.");
+        mostrarError("No se ha proporcionado un token válido.");
         return;
       }
 
       try {
-        // Llama a tu servicio backend que procesa el token de cambio de email
         await confirmarCambioEmail(token);
         setExito(true);
       } catch (error: any) {
-        setErrorMensaje(
-          error?.response?.data?.detail ||
-            error.message ||
-            "El enlace ha expirado o no es válido.",
+        mostrarError(
+          "Error al confirmar el cambio de email: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         setCargando(false);
@@ -77,7 +77,6 @@ export default function ConfirmarCambioEmailScreen() {
               <ThemedText style={[styles.title, { color: "#DC2626" }]}>
                 No se pudo completar
               </ThemedText>
-              <ThemedText style={styles.subtitle}>{errorMensaje}</ThemedText>
               <Pressable
                 style={[styles.button, { backgroundColor: "#475569" }]}
                 onPress={() => router.replace("/(tabs)/perfil")}

@@ -1,4 +1,4 @@
-import { mostrarError } from "@/src/utils/errorHandler";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ReactNode, useEffect } from "react";
 import { create } from "zustand";
@@ -13,8 +13,8 @@ import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaj
 import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import {
-    obtenerEmpresaTrabajador,
-    obtenerTrabajador,
+  obtenerEmpresaTrabajador,
+  obtenerTrabajador,
 } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
@@ -74,6 +74,7 @@ interface SesionState {
   actualizarUsuarioSesion: (
     nuevoUsuario: UsuarioSesion | null,
   ) => Promise<void>;
+  cerrarSesionCompleta: () => Promise<void>;
 }
 
 export const useSesionStore = create<SesionState>((set) => ({
@@ -133,8 +134,54 @@ export const useSesionStore = create<SesionState>((set) => ({
       }
       set({ usuarioActual: nuevoUsuario });
     } catch (error: any) {
-      mostrarError(
-        "Error al actualizar la sesión del usuario: " + error.message,
+      console.error(
+        "Error al actualizar la sesión del usuario: " +
+          obtenerMensajeAmigableError(error.message),
+      );
+    }
+  },
+
+  // Cierre de sesión completo que limpia almacenamiento y fuerza redirección
+  cerrarSesionCompleta: async () => {
+    try {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEY_USUARIO,
+        STORAGE_KEY_EMPRESA,
+        STORAGE_KEY_CENTRO,
+        STORAGE_KEY_CONTRATO,
+        STORAGE_KEY_TURNO,
+        STORAGE_KEY_CALENDARIO,
+        STORAGE_KEY_DISPOSITIVO,
+        STORAGE_KEY_ROL,
+        STORAGE_KEY_DEPARTAMENTO,
+        STORAGE_KEY_TOKEN,
+      ]);
+
+      set({
+        usuarioActual: null,
+        empresas: [],
+        empresaActual: null,
+        trabajadores: [],
+        trabajadorActual: null,
+        contratos: [],
+        contratoActual: null,
+        turnos: [],
+        turnoActual: null,
+        centrosTrabajo: [],
+        centroTrabajoActual: null,
+        calendarios: [],
+        calendarioLaboralActual: null,
+        dispositivos: [],
+        dispositivoFichajeActual: null,
+        roles: [],
+        rolActual: null,
+        departamentos: [],
+        departamentoActual: null,
+      });
+    } catch (error: any) {
+      console.error(
+        "Error al cerrar la sesión: " +
+          obtenerMensajeAmigableError(error.message),
       );
     }
   },
@@ -217,8 +264,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (departamentoGuardado)
           setDepartamentoActual(JSON.parse(departamentoGuardado));
       } catch (error: any) {
-        mostrarError(
-          "Error al recuperar la sesión permanente: " + error.message,
+        console.error(
+          "Error al recuperar la sesión permanente: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         setCargandoSesionLocal(false);
@@ -300,8 +348,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         }
       } catch (error: any) {
         if (!isCancelled) {
-          mostrarError(
-            "Error al inicializar el entorno del usuario: " + error.message,
+          console.error(
+            "Error al inicializar el entorno del usuario: " +
+              obtenerMensajeAmigableError(error.message),
           );
         }
       }
@@ -354,7 +403,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
             if (!isCancelled) setCentroTrabajoActual(datosCentro);
           } catch (errCentro) {
             if (!isCancelled) {
-              mostrarError(
+              console.error(
                 "Error al cargar el centro de trabajo: " + errCentro,
               );
               setCentroTrabajoActual(null);
@@ -389,7 +438,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         setTurnoActual(turnoVigenteObj ? turnoVigenteObj.turno : null);
       } catch (error: any) {
         if (!isCancelled) {
-          mostrarError("Error al cargar la ficha laboral: " + error.message);
+          console.error(
+            "Error al cargar la ficha laboral: " +
+              obtenerMensajeAmigableError(error.message),
+          );
           setTrabajadorActual(null);
           setContratoActual(null);
           setTurnoActual(null);
@@ -474,7 +526,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           ]);
         }
       } catch (error: any) {
-        mostrarError("Error al persistir cambios de sesión: " + error.message);
+        console.error(
+          "Error al persistir cambios de sesión: " +
+            obtenerMensajeAmigableError(error.message),
+        );
       }
     }
     guardarEstadosEnDisco();

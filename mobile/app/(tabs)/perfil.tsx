@@ -11,9 +11,10 @@ import {
   solicitarCambioEmail,
   solicitarCambioPassword,
 } from "@/src/modules/usuarios/api/services";
-import { setAuthToken } from "@/src/service/api/api";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import { useFocusEffect } from "expo-router/build/useFocusEffect";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -44,6 +45,7 @@ export default function PerfilScreen() {
     contratoActual,
     centroTrabajoActual,
     setCentroTrabajoActual,
+    cerrarSesionCompleta,
   } = useSesion();
 
   const esAdminGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
@@ -123,7 +125,8 @@ export default function PerfilScreen() {
         }
       } catch (error: any) {
         mostrarError(
-          "Error al cargar los centros de trabajo: " + error.message,
+          "Error al cargar los centros de trabajo: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         if (isMounted) setCargandoCentros(false);
@@ -163,7 +166,10 @@ export default function PerfilScreen() {
         setFotoUrl(asset.uri);
       }
     } catch (error: any) {
-      mostrarError("Error al seleccionar imagen: " + error.message);
+      mostrarError(
+        "Error al seleccionar imagen: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     }
   };
 
@@ -211,7 +217,10 @@ export default function PerfilScreen() {
 
       mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al guardar perfil: " + error.message);
+      mostrarError(
+        "Error al guardar perfil: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -240,7 +249,10 @@ export default function PerfilScreen() {
       setIsEditingEmail(false);
       setNuevoEmail("");
     } catch (error: any) {
-      mostrarError("Error al actualizar el correo: " + error.message);
+      mostrarError(
+        "Error al actualizar el correo: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardandoEmail(false);
     }
@@ -279,18 +291,26 @@ export default function PerfilScreen() {
       setNuevaPassword("");
       setConfirmarPassword("");
     } catch (error: any) {
-      mostrarError("Error al actualizar la contraseña: " + error.message);
+      mostrarError(
+        "Error al actualizar la contraseña: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardandoPassword(false);
     }
   };
 
   const handleCierreSesion = async () => {
-    setAuthToken("");
-    setEmpresaActual(null);
-    setCentroTrabajoActual(null);
-    setCentrosDisponibles([]);
-    setUsuarioActual(null);
+    try {
+      await cerrarSesionCompleta();
+      setTimeout(() => {
+        router.replace({ pathname: "/" });
+      }, 50);
+    } catch (error: any) {
+      mostrarError(
+        "Error al cerrar sesión: " + obtenerMensajeAmigableError(error.message),
+      );
+    }
   };
 
   // Función para consultar los datos actualizados del usuario en el backend
@@ -306,7 +326,8 @@ export default function PerfilScreen() {
       }
     } catch (error: any) {
       mostrarError(
-        "No se pudieron refrescar los datos del usuario: " + error.message,
+        "No se pudieron refrescar los datos del usuario: " +
+          obtenerMensajeAmigableError(error.message),
       );
     }
   };

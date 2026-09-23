@@ -1,6 +1,7 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { Picker } from "@react-native-picker/picker";
 import React, { useRef, useState } from "react";
 import {
@@ -104,7 +105,10 @@ export default function TabDepartamentos({
       setMostrarFormDepartamento(false);
       mostrarMensaje("Éxito", "Departamento creado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el departamento: " + error.message);
+      mostrarError(
+        "Error al crear el departamento: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -145,7 +149,10 @@ export default function TabDepartamentos({
       setNombreDepto("");
       setCentroTrabajoId("");
     } catch (error: any) {
-      mostrarError("Error al actualizar el departamento: " + error.message);
+      mostrarError(
+        "Error al actualizar el departamento: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -169,7 +176,10 @@ export default function TabDepartamentos({
         );
         mostrarMensaje("Éxito", "Departamento enviado a la papelera.");
       } catch (error: any) {
-        mostrarError("Error al eliminar el departamento: " + error.message);
+        mostrarError(
+          "Error al eliminar el departamento: " +
+            obtenerMensajeAmigableError(error.message),
+        );
       } finally {
         setGuardando(false);
       }
@@ -211,7 +221,10 @@ export default function TabDepartamentos({
       );
       mostrarMensaje("Éxito", "Departamento reactivado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al reactivar el departamento: " + error.message);
+      mostrarError(
+        "Error al reactivar el departamento: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }

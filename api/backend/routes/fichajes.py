@@ -17,7 +17,7 @@ from models.centros_trabajo import CentrosTrabajo
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
 from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoUsuarioEnum
-from core.utils import calcular_distancia_metros, validar_dia_laboral_o_marcar_extra
+from core.utils import calcular_distancia_metros, procesar_y_guardar_firma, validar_dia_laboral_o_marcar_extra
 from models.empresas import Empresas
 from models.fichajes import Fichajes
 from models.correcciones_fichaje import CorreccionesFichaje
@@ -44,7 +44,6 @@ def filtro_fichajes_vigentes():
     return ~exists().where(
         FichajeSustituto.c.fichaje_sustituido_id == Fichajes.id
     )
-
 @router.post("", response_model=FichajeResponse, status_code=status.HTTP_201_CREATED, summary="Registrar fichaje")
 @limiter.limit("30/minute")
 def crear_fichaje(
@@ -174,16 +173,7 @@ def crear_fichaje(
 
     if data_firma and isinstance(data_firma, str):
         try:
-            data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
-            bytes_imagen = base64.b64decode(data_encoded)
-
-            nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
-            ruta_destino = os.path.join("static/firmas", nombre_archivo)
-
-            with open(ruta_destino, "wb") as buffer:
-                buffer.write(bytes_imagen)
-
-            ruta_relativa_firma = f"/api/archivos/firmas/{nombre_archivo}"
+            ruta_relativa_firma = procesar_y_guardar_firma(data_firma)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

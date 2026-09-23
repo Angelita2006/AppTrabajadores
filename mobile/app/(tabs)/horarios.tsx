@@ -14,6 +14,7 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   formatearAHorasYMinutos,
   horaAMinutos,
@@ -138,7 +139,7 @@ export default function HorariosScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los centros de trabajo de la empresa: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         if (isMounted) setCargando(false);

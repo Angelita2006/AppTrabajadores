@@ -11,10 +11,9 @@ from core.database import SessionLocal, engine
 from routes import (
     auth, asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, 
     centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, 
-    dispositivos_push, empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
+    empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
     resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
 )
-from core.fichajes_scheduler import iniciar_scheduler_fichajes
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -47,8 +46,6 @@ def startup_event():
     finally:
         db.close()
 
-    # Iniciar el cron de verificación de olvidos de fichaje
-    iniciar_scheduler_fichajes()
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -139,7 +136,6 @@ app.include_router(contratos.router)
 app.include_router(correcciones_fichaje.router)
 app.include_router(departamentos.router)
 app.include_router(dispositivos_fichaje.router)
-app.include_router(dispositivos_push.router)
 app.include_router(empresas.router)
 app.include_router(festivos.router)
 app.include_router(fichajes.router)

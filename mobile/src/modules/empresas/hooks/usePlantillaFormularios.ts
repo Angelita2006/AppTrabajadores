@@ -4,8 +4,8 @@ import { Contrato } from "@/src/modules/contratos/types/contrato";
 import { obtenerRoles } from "@/src/modules/roles/api/services";
 import { Rol } from "@/src/modules/roles/types/rol";
 import {
-  actualizarTrabajador,
-  crearTrabajador,
+    actualizarTrabajador,
+    crearTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { Turno } from "@/src/modules/turnos/types/turno";
@@ -72,7 +72,8 @@ export function usePlantillaFormularios(
       })
       .catch((error: any) => {
         mostrarError(
-          "Error al cargar los roles disponibles del sistema: " + error.message,
+          "Error al cargar los roles disponibles del sistema: " +
+            obtenerMensajeAmigableError(error.message),
         );
       });
   }, []);
@@ -153,7 +154,8 @@ export function usePlantillaFormularios(
       mostrarMensaje("Éxito", "Trabajador dado de alta correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al procesar el alta del trabajador: " + error.message,
+        "Error al procesar el alta del trabajador: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setProcesando(false);
@@ -192,7 +194,8 @@ export function usePlantillaFormularios(
       mostrarMensaje("Éxito", "Trabajador actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar los datos del trabajador: " + error.message,
+        "Error al actualizar los datos del trabajador: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setProcesando(false);
@@ -228,7 +231,8 @@ export function usePlantillaFormularios(
       mostrarMensaje("Éxito", "Contrato registrado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al guardar el nuevo contrato del trabajador: " + error.message,
+        "Error al guardar el nuevo contrato del trabajador: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setProcesando(false);
@@ -249,7 +253,7 @@ export function usePlantillaFormularios(
     } catch (error: any) {
       mostrarError(
         "Error al eliminar las asignaciones de turno del trabajador: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setProcesando(false);

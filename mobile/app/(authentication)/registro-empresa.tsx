@@ -22,6 +22,7 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
   validarCifNifOrganizacion,
   validarDniEspanol,
@@ -247,7 +248,7 @@ export default function RegistroOrganizacionScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudo completar el registro de la organización y su administrador debido a un error en el servidor: " +
-          error,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);

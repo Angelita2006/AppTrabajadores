@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Software de Control Horario para Empresas - FICHAPP</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-white text-slate-900 font-sans antialiased">
+    <!-- Barra de aviso superior -->
+    <div
+      class="bg-indigo-600 text-white text-xs md:text-sm text-center py-2.5 font-medium px-4"
+    >
+      🚀 El registro horario de trabajadores ya es tan fácil como debería ser.
+      ¡Descubre nuestra nueva app!
+    </div>
+
+    <!-- Header / Navegación Principal (Idéntico para mantener la coherencia) -->
+    <header
+      class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100"
+    >
+      <div
+        class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-10">
+          <a
+            href="index.html"
+            class="text-2xl font-black tracking-tight text-slate-900"
+            >FICHAPP</a
+          >
+          <nav
+            class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600"
+          >
+            <a href="producto.html" class="text-indigo-600 font-bold"
+              >Producto</a
+            >
+            <a
+              href="index.html#funcionalidades"
+              class="hover:text-indigo-600 transition"
+              >Funcionalidades</a
+            >
+            <a
+              href="index.html#precios"
+              class="hover:text-indigo-600 transition"
+              >Precios</a
+            >
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a
+            href="https://app.registrohorariosimple.es"
+            class="text-sm font-bold text-slate-700 hover:text-indigo-600 px-4 py-2 transition"
+            >Acceder</a
+          >
+          <a
+            href="index.html#prueba-gratis"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition shadow-sm"
+            >Prueba gratuita</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero de la Página de Producto -->
+    <section
+      class="max-w-7xl mx-auto px-6 pt-16 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center"
+    >
+      <div class="lg:col-span-6 space-y-6">
+        <h1
+          class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]"
+        >
+          Software de control horario para empresas
+        </h1>
+        <p class="text-lg text-slate-600 font-normal leading-relaxed">
+          Saber quién está presente, cuándo y durante cuánto tiempo es
+          fundamental para una gestión de RRHH rigurosa. Con el software de
+          control horario de
+          <strong class="text-slate-900 font-bold">FICHAPP</strong>, registras
+          entradas y salidas, haces seguimiento de ausencias y retrasos y
+          generas informes detallados de forma automática.
+        </p>
+        <p class="text-sm text-slate-500 leading-relaxed">
+          Reduces errores en el procesamiento de nóminas, cumples las
+          obligaciones legales de registro de tiempos de trabajo y tienes
+          siempre la información actualizada para tomar decisiones
+          fundamentadas.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+          <a
+            href="index.html#prueba-gratis"
+            class="bg-slate-900 hover:bg-slate-800 text-white text-center font-bold px-8 py-4 rounded-xl transition shadow-lg"
+          >
+            Pide una demo
+          </a>
+          <a
+            href="#detalles"
+            class="border border-slate-300 hover:border-slate-400 text-slate-800 text-center font-bold px-8 py-4 rounded-xl transition"
+          >
+            Ver demo
+          </a>
+        </div>
+      </div>
+
+      <!-- Mockup de Fichajes Principal (Estilo Sesame HR) -->
+      <div
+        class="lg:col-span-6 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 shadow-xl shadow-slate-100"
+      >
+        <div class="bg-white rounded-xl border border-slate-100 p-4 space-y-4">
+          <div class="flex justify-between items-center border-b pb-3">
+            <span class="font-bold text-sm text-slate-800">Fichajes</span>
+            <div class="flex gap-2">
+              <span
+                class="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-semibold"
+                >Entrar</span
+              >
+              <span
+                class="text-xs bg-rose-50 text-rose-600 px-3 py-1 rounded-full font-semibold"
+                >Salir</span
+              >
+            </div>
+          </div>
+          <!-- Barra de líneas de tiempo simulada -->
+          <div class="space-y-3 pt-2">
+            <div class="h-4 bg-slate-100 rounded w-full"></div>
+            <div class="h-6 bg-indigo-50 rounded w-full flex items-center px-3">
+              <div class="h-2 bg-indigo-500 rounded w-3/4"></div>
+            </div>
+            <div class="h-4 bg-slate-100 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Secciones de Características (3 Columnas con Tarjetas Estilo Referencia) -->
+    <section
+      id="detalles"
+      class="bg-slate-50/50 py-24 border-t border-slate-100"
+    >
+      <div class="max-w-7xl mx-auto px-6 text-center space-y-16">
+        <h2 class="text-3xl lg:text-4xl font-black tracking-tight">
+          Digitaliza los fichajes de tus empleados con el software de control
+          horario de FICHAPP
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+          <!-- Tarjeta 1 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4"
+          >
+            <div
+              class="h-40 bg-indigo-50/50 rounded-xl flex items-center justify-center border border-indigo-100/50 text-sm font-semibold text-indigo-600"
+            >
+              Informe de Asistencia
+            </div>
+            <h3 class="text-xl font-bold">
+              Registro de jornada laboral sin errores
+            </h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              El sistema de registro de asistencia de FICHAPP elimina los
+              apuntes manuales en papel o Excel. Cada fichaje queda registrado
+              automáticamente, con marca de tiempo, reduciendo errores.
+            </p>
+          </div>
+
+          <!-- Tarjeta 2 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4"
+          >
+            <div
+              class="h-40 bg-indigo-50/50 rounded-xl flex items-center justify-center border border-indigo-100/50 text-sm font-semibold text-indigo-600"
+            >
+              Cumplimiento Legal
+            </div>
+            <h3 class="text-xl font-bold">
+              Cumple con la nueva Ley de Control Horario
+            </h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              La nueva normativa de control horario plantea el uso de sistemas
+              electrónicos de fichaje para todas las empresas, garantizando el
+              cumplimiento estricto ante inspecciones.
+            </p>
+          </div>
+
+          <!-- Tarjeta 3 -->
+          <div
+            class="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm space-y-4"
+          >
+            <div
+              class="h-40 bg-indigo-50/50 rounded-xl flex items-center justify-center border border-indigo-100/50 text-sm font-semibold text-indigo-600"
+            >
+              Ahorro de Tiempo
+            </div>
+            <h3 class="text-xl font-bold">
+              Ahorro tiempo en la gestión y control horario
+            </h3>
+            <p class="text-slate-600 text-sm leading-relaxed">
+              FICHAPP registra la jornada laboral de tu equipo de forma
+              automática, por lo que dejas de invertir tiempo en procesos
+              operativos manuales.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer
+      class="bg-white border-t border-slate-100 py-12 px-6 text-slate-500 text-xs"
+    >
+      <div
+        class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6"
+      >
+        <span class="text-lg font-black text-slate-900">FICHAPP</span>
+        <div class="flex gap-6 font-semibold">
+          <a href="index.html" class="hover:text-slate-900">Inicio</a>
+          <a href="#" class="hover:text-slate-900">Legal</a>
+          <a href="#" class="hover:text-slate-900">Privacidad</a>
+        </div>
+        <p>© 2026 Fichapp. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+  </body>
+</html>

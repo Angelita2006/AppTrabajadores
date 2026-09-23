@@ -1,6 +1,7 @@
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useRef, useState } from "react";
 import {
   Alert,
@@ -135,7 +136,8 @@ export default function TabTipoEventos({
       mostrarMensaje("Éxito", "Tipo de evento registrado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al crear el tipo de evento de fichaje: " + error.message,
+        "Error al crear el tipo de evento de fichaje: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -178,7 +180,8 @@ export default function TabTipoEventos({
       mostrarMensaje("Éxito", "Tipo de evento actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar el tipo de evento de fichaje: " + error.message,
+        "Error al actualizar el tipo de evento de fichaje: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -203,7 +206,8 @@ export default function TabTipoEventos({
         );
       } catch (error: any) {
         mostrarError(
-          "Error al eliminar el tipo de evento de fichaje: " + error.message,
+          "Error al eliminar el tipo de evento de fichaje: " +
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         setGuardando(false);
@@ -245,7 +249,8 @@ export default function TabTipoEventos({
       mostrarMensaje("Éxito", "Tipo de evento reactivado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al reactivar el tipo de evento de fichaje: " + error.message,
+        "Error al reactivar el tipo de evento de fichaje: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);

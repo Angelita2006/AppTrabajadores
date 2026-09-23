@@ -1,6 +1,7 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -109,7 +110,10 @@ export default function TabCentros({
       setLongitudCentro(0);
       mostrarMensaje("Éxito", "Centro de trabajo creado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al crear el centro de trabajo: " + error.message);
+      mostrarError(
+        "Error al crear el centro de trabajo: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }
@@ -160,7 +164,8 @@ export default function TabCentros({
       setCentroEnEdicion(null);
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar el centro de trabajo: " + error.message,
+        "Error al actualizar el centro de trabajo: " +
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setGuardando(false);
@@ -229,7 +234,10 @@ export default function TabCentros({
       );
       mostrarMensaje("Éxito", "Centro de trabajo reactivado correctamente.");
     } catch (error: any) {
-      mostrarError("Error al reactivar el centro de trabajo: " + error.message);
+      mostrarError(
+        "Error al reactivar el centro de trabajo: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setGuardando(false);
     }

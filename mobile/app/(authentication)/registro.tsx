@@ -1,10 +1,10 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -92,25 +92,19 @@ export default function RegistroScreen() {
       // Llama al endpoint de registro de usuario vinculando el expediente existente
       await registrarUsuarioAcceso({
         empresa_cif: empresaCif.trim(),
-        nif_nie: nifNie.trim().toUpperCase(),
+        dni_nif_nie: nifNie.trim().toUpperCase(),
         email: email.trim().toLowerCase(),
         password: password,
       });
 
-      const mensajeExito =
-        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.";
-      if (Platform.OS === "web") {
-        alert(`Alta Consolidada: ${mensajeExito}`);
-        router.replace("/");
-      } else {
-        Alert.alert("Alta Consolidada", mensajeExito, [
-          { text: "Ir al Acceso", onPress: () => router.replace("/") },
-        ]);
-      }
+      mostrarMensaje(
+        "Alta Consolidada",
+        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.",
+      );
     } catch (error: any) {
       mostrarError(
         "Error al completar el registro y vinculación del usuario: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);

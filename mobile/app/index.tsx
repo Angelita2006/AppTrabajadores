@@ -6,6 +6,7 @@ import { setAuthToken } from "@/src/service/api/api";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -70,7 +71,8 @@ export default function RootIndexScreen() {
           }
         } catch (error: any) {
           mostrarError(
-            "No se han podido configurar las notificaciones: " + error.message,
+            "No se han podido configurar las notificaciones: " +
+              obtenerMensajeAmigableError(error.message),
           );
         }
       }
@@ -100,7 +102,10 @@ export default function RootIndexScreen() {
       try {
         respuestaLogin = await iniciarSesion(email, password);
       } catch (error: any) {
-        mostrarError("Error al iniciar sesión: " + error.message);
+        mostrarError(
+          "Error al iniciar sesión: " +
+            obtenerMensajeAmigableError(error.message),
+        );
         return;
       }
 
@@ -120,7 +125,7 @@ export default function RootIndexScreen() {
         } catch (error: any) {
           mostrarError(
             "No se pudieron cargar los datos de la empresa administradora: " +
-              error.message,
+              obtenerMensajeAmigableError(error.message),
           );
         }
       } else if (usuario.trabajador_id) {
@@ -134,12 +139,16 @@ export default function RootIndexScreen() {
           }
         } catch (error: any) {
           mostrarError(
-            "No se pudieron cargar empresas del trabajador: " + error.message,
+            "No se pudieron cargar empresas del trabajador: " +
+              obtenerMensajeAmigableError(error.message),
           );
         }
       }
     } catch (error: any) {
-      mostrarError("Ha fallado el proceso de autenticación: " + error.message);
+      mostrarError(
+        "Ha fallado el proceso de autenticación: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     } finally {
       setCargando(false);
       isAuthenticatingGlobal = false;

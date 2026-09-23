@@ -61,7 +61,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
       ).catch((error: any) => {
         throw new Error(
           "Error al obtener la lista de trabajadores de la empresa: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
       });
 

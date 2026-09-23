@@ -5,11 +5,11 @@ import {
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -81,7 +81,7 @@ export default function RecuperarPasswordScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudo solicitar el código de recuperación debido a un error en el servidor: " +
-          error,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -106,20 +106,14 @@ export default function RecuperarPasswordScreen() {
         nueva_password: nuevaPassword,
       });
 
-      const mensajeFinal =
-        "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.";
-      if (Platform.OS === "web") {
-        window.alert(mensajeFinal);
-        router.replace("/");
-      } else {
-        Alert.alert("Éxito", mensajeFinal, [
-          { text: "Ir al Login", onPress: () => router.replace("/") },
-        ]);
-      }
+      mostrarMensaje(
+        "Éxito",
+        "Tu contraseña ha sido actualizada. Ya puedes ingresar al sistema.",
+      );
     } catch (error: any) {
       mostrarError(
         "No se pudo completar el restablecimiento de la contraseña debido a un error en el servidor: " +
-          error,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);

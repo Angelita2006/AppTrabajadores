@@ -15,6 +15,7 @@ import {
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
@@ -146,7 +147,7 @@ export default function GestionIncidenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar la lista de trabajadores de la empresa: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
       }
     }
@@ -193,7 +194,7 @@ export default function GestionIncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar las incidencias y tipos de eventos globales: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -267,7 +268,7 @@ export default function GestionIncidenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los fichajes del trabajador seleccionado: " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
         setFichajesDisponibles([]);
       }
@@ -380,7 +381,7 @@ export default function GestionIncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al crear o reportar la nueva corrección de fichaje: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -433,7 +434,7 @@ export default function GestionIncidenciasScreen() {
           "Error al resolver la incidencia de fichaje (" +
             decision +
             "): " +
-            error.message,
+            obtenerMensajeAmigableError(error.message),
         );
       } finally {
         setProcesandoId(null);

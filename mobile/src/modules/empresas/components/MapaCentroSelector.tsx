@@ -1,12 +1,12 @@
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React, { useEffect, useState } from "react";
 import {
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+    Linking,
+    Platform,
+    Pressable,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 /**
@@ -80,7 +80,7 @@ export default function SelectorUbicacionMapa({
         .catch((error: any) => {
           mostrarError(
             "Error al cargar los componentes del mapa interactivo: " +
-              error.message,
+              obtenerMensajeAmigableError(error.message),
           );
         });
     }
@@ -104,7 +104,10 @@ export default function SelectorUbicacionMapa({
         );
       }
     } catch (error: any) {
-      mostrarError("Error al intentar abrir Google Maps: " + error.message);
+      mostrarError(
+        "Error al intentar abrir Google Maps: " +
+          obtenerMensajeAmigableError(error.message),
+      );
     }
   };
 

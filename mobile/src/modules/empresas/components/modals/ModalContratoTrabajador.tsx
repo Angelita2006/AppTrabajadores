@@ -40,7 +40,7 @@ interface ModalContratoTrabajadorProps {
   listaDepartamentos: Departamento[];
   listaCalendariosLaborales: CalendarioFestivo[];
   onGuardar: () => void;
-  onCancelar?: () => void; // Añadido soporte para cancelar
+  onCancelar?: () => void;
   procesando: boolean;
   styles: any;
   inputRefs?: {

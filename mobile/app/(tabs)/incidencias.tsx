@@ -12,6 +12,7 @@ import {
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
@@ -182,7 +183,7 @@ export default function IncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar los centros de trabajo de la empresa: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -288,7 +289,7 @@ export default function IncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar los centros de trabajo de la empresa: " +
-          error.message,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
@@ -332,7 +333,10 @@ export default function IncidenciasScreen() {
           ),
         );
       } catch (error: any) {
-        mostrarError("Error al resolver la corrección: " + error.message);
+        mostrarError(
+          "Error al resolver la corrección: " +
+            obtenerMensajeAmigableError(error.message),
+        );
       } finally {
         setCargando(false);
         setCorreccionResolviendo(null);
