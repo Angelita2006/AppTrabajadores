@@ -11,7 +11,7 @@ from core.database import Base # type: ignore
 from models import ( # type: ignore
     asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales,
     centros_trabajo, contratos, correcciones_fichaje, departamentos,
-    dispositivos_fichaje, dispositivos_push, empresas,  festivos, fichajes, motivos_pausa,
+    dispositivos_fichaje, empresas,  festivos, fichajes, motivos_pausa,
     permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
     tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios, vistas, licencias
 )
@@ -19,7 +19,7 @@ from models import ( # type: ignore
 _modelos = [
     empresas, trabajadores, turnos, asignaciones_turno, ausencias,
     fichajes, auditoria_accesos, vistas, calendarios_laborales, centros_trabajo,
-    contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, dispositivos_push,
+    contratos, correcciones_fichaje, departamentos, dispositivos_fichaje,
     festivos, motivos_pausa, permisos, politicas_retencion,
     resumenes_jornada, roles_permisos, roles, tipos_evento_fichaje, usuarios_roles, usuarios, licencias
 ]
