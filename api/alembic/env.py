@@ -1,9 +1,17 @@
+import os
 import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-_backend_path = r"C:\AppTrabajadores\api\backend"
+# Obtener dinámicamente la ruta absoluta del directorio actual y del backend
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+# Si env.py está dentro de 'alembic/' y 'backend' está al mismo nivel o dentro:
+_backend_path = os.path.abspath(os.path.join(_current_dir, "..", "backend"))
+if not os.path.exists(_backend_path):
+    # Por si env.py está directamente dentro de la raíz o estructurado diferente
+    _backend_path = os.path.abspath(os.path.join(_current_dir, ".."))
+
 if _backend_path not in sys.path:
     sys.path.insert(0, _backend_path)
 
