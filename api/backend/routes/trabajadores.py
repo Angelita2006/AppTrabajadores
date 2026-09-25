@@ -594,7 +594,7 @@ def actualizar_estado_trabajador(
     id_trabajador: UUID,
     obj_in: ActualizarEstadoRequest,
     db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios =  Depends(obtener_usuario_actual)
 ):
     """
     **PATCH /api/trabajadores/{id_trabajador}/estado**
