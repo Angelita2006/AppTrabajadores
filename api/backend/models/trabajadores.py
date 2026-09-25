@@ -1,7 +1,8 @@
 import datetime
+from enum import Enum
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, Date, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, CheckConstraint, text, Enum as SQLEnum
+from sqlalchemy import Boolean, Date, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, DateTime, Text, UniqueConstraint, Uuid, CheckConstraint, text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from core.enums import EstadoTrabajadorEnum
@@ -28,7 +29,7 @@ class Trabajadores(Base):
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(150), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
-    estado: Mapped[EstadoTrabajadorEnum] = mapped_column(SQLEnum(EstadoTrabajadorEnum, name="estadotrabajadorenum", native_enum=False, values_callable=lambda obj: [e.value for e in obj]), nullable=False, server_default="Inactivo", comment="Estado operativo actual del trabajador")
+    estado: Mapped[EstadoTrabajadorEnum] = mapped_column(Enum(EstadoTrabajadorEnum, values_callable=lambda cls: [member.value for member in cls], name='estado_trabajador_enum'), nullable=False, server_default="Inactivo", comment="Estado operativo actual del trabajador")
     fecha_alta_empresa: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
