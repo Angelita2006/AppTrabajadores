@@ -5,9 +5,9 @@ class EstadoTrabajadorEnum(str, enum.Enum):
     ACTIVO = "Activo"
     TRABAJANDO = "Trabajando"
     DESCANSANDO = "Descansando"
-    HORAS_EXTRA = "Haciendo horas extra"
-    VACACIONES = "De vacaciones"
-    BAJA = "De baja"
+    HORAS_EXTRA = "Haciendo_horas_extra"
+    VACACIONES = "De_vacaciones"
+    BAJA = "De_baja"
     AUSENTE = "Ausente"
 
 class AccionAuditoriaEnum(str, enum.Enum):
