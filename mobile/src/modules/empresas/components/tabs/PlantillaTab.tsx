@@ -5,9 +5,9 @@ import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/cal
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import {
-    actualizarContrato,
-    obtenerContratoActivoTrabajador,
-    rescindirContratoActivoTrabajador,
+  actualizarContrato,
+  obtenerContratoActivoTrabajador,
+  rescindirContratoActivoTrabajador,
 } from "@/src/modules/contratos/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
@@ -16,40 +16,41 @@ import { TIPOS_FICHAJE } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { obtenerTipoEventoPorId } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import {
-    actualizarAsignacionTurno,
-    actualizarTrabajador,
-    asignarTurnosTrabajador,
-    tramitarBajaTotalTrabajador,
-    verificarSiEsFestivo,
-    verificarSiSeHaLogueadoHoy,
-    verificarSiTieneBaja,
-    verificarSiTieneVacaciones,
+  actualizarAsignacionTurno,
+  actualizarTrabajador,
+  asignarTurnosTrabajador,
+  tramitarBajaTotalTrabajador,
+  verificarSiEsFestivo,
+  verificarSiSeHaLogueadoHoy,
+  verificarSiTieneBaja,
+  verificarSiTieneVacaciones,
 } from "@/src/modules/trabajadores/api/services";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
 import {
-    ESTADOS_TRABAJADOR,
-    Trabajador,
+  ESTADOS_TRABAJADOR,
+  Trabajador,
 } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextStyle,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextStyle,
+  View,
+  ViewStyle,
 } from "react-native";
 import {
-    TipoModal,
-    usePlantillaFormularios,
+  TipoModal,
+  usePlantillaFormularios,
 } from "../../hooks/usePlantillaFormularios";
 import { Empresa } from "../../types/empresa";
 import { ModalAltaEditarTrabajador } from "../modals/ModalAltaEditarTrabajador";

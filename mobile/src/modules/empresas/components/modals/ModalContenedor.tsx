@@ -60,21 +60,21 @@ export const ModalContenedor: React.FC<ModalContenedorProps> = ({
     return null;
   }
 
-  // Validación preventiva: verificar si el identificador activo existe en el catálogo de títulos
-  if (!TITULOS_MODALES[modalActivo]) {
-    mostrarError(
-      "El identificador del modal activo no es reconocido por el sistema.",
-    );
-  }
-
   /**
    * Manejador seguro para el evento de cierre del contenedor modal,
    * incorporando validaciones o avisos opcionales si fuera necesario.
    */
   const handleCerrarSeguro = () => {
-    // mostrarMensaje("Cierre de Ventana", "Cerrando el panel de gestión actual.");
     onCerrar();
   };
+
+  // Validación preventiva: verificar si el identificador activo existe en el catálogo de títulos
+  if (!TITULOS_MODALES[modalActivo]) {
+    handleCerrarSeguro();
+    mostrarError(
+      "El identificador del modal activo no es reconocido por el sistema.",
+    );
+  }
 
   return (
     <Modal visible={true} animationType="slide" transparent>

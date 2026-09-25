@@ -1,6 +1,7 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import React, { createContext, useContext, useState } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import ReactDOM from "react-dom";
+import { Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 
 type TipoModal = "mensaje" | "error";
 
@@ -15,7 +16,7 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [visible, setVisible] = useState(false);
-  const [tipo, setTipo] = useState<TipoModal>("mensaje");
+  const [tipo, setTipo] = useState("mensaje");
   const [titulo, setTitulo] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -37,45 +38,54 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
     setVisible(false);
   };
 
+  // 1. Preparamos la estructura del Modal
+  const componenteModal = (
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visible}
+      onRequestClose={cerrarModal}
+    >
+      <View style={styles.overlay}>
+        <View style={styles.modalContainer}>
+          <ThemedText
+            style={[
+              styles.titulo,
+              tipo === "error" ? styles.textoError : styles.textoMensaje,
+            ]}
+          >
+            {titulo}
+          </ThemedText>
+          <ThemedText style={styles.mensaje}>{mensaje}</ThemedText>
+          <Pressable
+            style={[
+              styles.boton,
+              tipo === "error" ? styles.botonError : styles.botonMensaje,
+            ]}
+            onPress={cerrarModal}
+          >
+            <ThemedText style={styles.textoBoton}>Aceptar</ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // 2. Si es Web y está visible, lo inyectamos directamente en el body del documento HTML
+  const renderModal = () => {
+    if (!visible) return null;
+
+    if (Platform.OS === "web") {
+      return ReactDOM.createPortal(componenteModal, document.body);
+    }
+
+    return componenteModal;
+  };
+
   return (
     <ModalContext.Provider value={{ mostrarMensaje, mostrarError }}>
       {children}
-
-      {/* Cuadro flotante / Modal personalizado propio de la app */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={visible}
-        onRequestClose={cerrarModal}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.modalContainer}>
-            {/* Cabecera / Título con color dinámico (Rojo para error, Azul/Verde para mensaje) */}
-            <ThemedText
-              style={[
-                styles.titulo,
-                tipo === "error" ? styles.textoError : styles.textoMensaje,
-              ]}
-            >
-              {titulo}
-            </ThemedText>
-
-            {/* Contenido / Descripción */}
-            <ThemedText style={styles.mensaje}>{mensaje}</ThemedText>
-
-            {/* Botón de aceptación propio */}
-            <Pressable
-              style={[
-                styles.boton,
-                tipo === "error" ? styles.botonError : styles.botonMensaje,
-              ]}
-              onPress={cerrarModal}
-            >
-              <ThemedText style={styles.textoBoton}>Aceptar</ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      {renderModal()}
     </ModalContext.Provider>
   );
 };
@@ -90,12 +100,29 @@ export const useAppModal = () => {
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  rootContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Fondo semitransparente oscuro
+    position: "relative",
+  },
+  overlay: {
+    ...Platform.select({
+      web: {
+        position: "fixed" as any,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      },
+      default: {
+        ...StyleSheet.absoluteFillObject,
+      },
+    }),
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    zIndex: 2147483647, // Valor máximo absoluto permitido para zIndex en navegadores web
+    elevation: 99999,
   },
   modalContainer: {
     width: "100%",
