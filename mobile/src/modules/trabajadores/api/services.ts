@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import api from "../../../service/api/api";
 import { Empresa } from "../../empresas/types/empresa";
 import {
+  Estado,
   Trabajador,
   TrabajadorCreate,
   TrabajadorUpdate,
@@ -111,6 +112,36 @@ export const actualizarTrabajador = async (
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar el trabajador.");
+  }
+};
+
+/**
+ * Actualiza de forma independiente el estado operativo de un trabajador.
+ * URI: PATCH /api/trabajadores/{id_trabajador}/estado
+ *
+ * @async
+ * @function actualizarEstadoTrabajador
+ * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
+ * @param {Estado} nuevoEstado - Nuevo estado operativo a aplicar.
+ * @returns {Promise} Promesa con el expediente actualizado del trabajador.
+ * @throws {Error} Lanza un error si la actualización de estado falla.
+ */
+export const actualizarEstadoTrabajador = async (
+  idTrabajador: string,
+  nuevoEstado: Estado,
+): Promise<any> => {
+  try {
+    const response = await api.patch(
+      `/api/trabajadores/${idTrabajador}/estado`,
+      { estado: nuevoEstado },
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.message || error?.response?.data?.detail;
+    throw new Error(
+      apiMessage || "Error al actualizar el estado del trabajador.",
+    );
   }
 };
 
@@ -324,70 +355,3 @@ export const actualizarAsignacionTurno = async (
     );
   }
 };
-
-export async function verificarSiSeHaLogueadoHoy(
-  idTrabajador: string,
-): Promise<boolean> {
-  try {
-    const respuesta = await api.get(
-      `/api/trabajadores/${idTrabajador}/verificar-login-hoy`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al verificar el registro de acceso de hoy.",
-    );
-  }
-}
-
-export async function verificarSiEsFestivo(
-  fecha: string,
-  idCentroTrabajo: string,
-): Promise<boolean> {
-  try {
-    const respuesta = await api.get(
-      `/api/festivos/${idCentroTrabajo}/verificar-dia?fecha=${fecha}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al verificar si el día es festivo.");
-  }
-}
-
-export async function verificarSiTieneVacaciones(
-  idTrabajador: string,
-  fecha: string,
-): Promise<boolean> {
-  try {
-    const respuesta = await api.get(
-      `/api/ausencias/${idTrabajador}/vacaciones?fecha=${fecha}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al actualizar la asignación de turno.",
-    );
-  }
-}
-
-export async function verificarSiTieneBaja(
-  trabajadorId: string,
-  fecha: string,
-): Promise<boolean> {
-  try {
-    const respuesta = await api.get(
-      `/api/ausencias/${trabajadorId}/bajas?fecha=${fecha}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al actualizar la asignación de turno.",
-    );
-  }
-}

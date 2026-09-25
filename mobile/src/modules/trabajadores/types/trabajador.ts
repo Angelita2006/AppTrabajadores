@@ -9,13 +9,14 @@ import { Rol } from "../../roles/types/rol";
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
 export const ESTADOS_TRABAJADOR = {
-  INACTIVO: 0,
-  ACTIVO: 1,
-  TRABAJANDO: 2,
-  DESCANSANDO: 3,
-  HORAS_EXTRA: 4,
-  VACACIONES: 5,
-  BAJA: 6,
+  INACTIVO: "Inactivo",
+  ACTIVO: "Activo",
+  TRABAJANDO: "Trabajando",
+  DESCANSANDO: "Descansando",
+  HORAS_EXTRA: "Haciendo horas extra",
+  VACACIONES: "De vacaciones",
+  BAJA: "De baja",
+  AUSENTE: "Ausente",
 } as const;
 
 /**
@@ -70,8 +71,8 @@ export interface TrabajadorUpdate {
   numero_seguridad_social?: string;
   /** Estado operativo del trabajador (true para activo, false para inactivo). */
   activo?: boolean;
-  /** Estado numérico complementario del trabajador. */
-  estado?: number | null;
+  /** Estado operativo en texto del trabajador. */
+  estado?: Estado | null;
   /** Fecha de baja laboral de la empresa si aplica en formato "AAAA-MM-DD". */
   fecha_baja_empresa?: string | null;
   /** Correo electrónico de contacto. */
@@ -80,6 +81,14 @@ export interface TrabajadorUpdate {
   telefono?: string | null;
   /** URL o ruta de la fotografía del trabajador. */
   foto_url?: string | null;
+}
+
+/**
+ * Estructura exclusiva para la petición de cambio de estado (PATCH /api/trabajadores/{id}/estado).
+ */
+export interface ActualizarEstadoRequest {
+  /** Nuevo estado operativo que se desea aplicar al trabajador. */
+  estado: Estado;
 }
 
 /**
@@ -104,8 +113,8 @@ export interface Trabajador {
   numero_seguridad_social: string;
   /** Estado operativo del trabajador (true por defecto). */
   activo: boolean;
-  /** Estado numérico complementario del trabajador basado en el enum Estado. */
-  estado?: number;
+  /** Estado operativo actual del trabajador basado en el tipo Estado. */
+  estado: Estado;
   /** Fecha formal de contratación en la empresa en formato "AAAA-MM-DD". */
   fecha_alta_empresa: string;
   /** Fecha de baja laboral de la empresa si aplica en formato "AAAA-MM-DD". */
@@ -158,7 +167,7 @@ export interface AsignarTurnosRequest {
  */
 export interface TrabajadorItem extends Trabajador {
   /** Estado numérico operativo del trabajador. */
-  estado: number;
+  estado: Estado;
   /** Contrato laboral activo actual del trabajador, o null si no dispone de uno vigente. */
   contratoActivo: Contrato | null;
   /** Lista de asignaciones de turnos vigentes del trabajador, o null si no tiene ninguna asignada actualmente. */

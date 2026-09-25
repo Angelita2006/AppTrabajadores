@@ -311,36 +311,3 @@ def obtener_festivos_por_calendario(
     )
 
     return resultados
-
-@router.get("/{id_centro}/verificar-dia", response_model=bool, summary="Verificar si una fecha es festiva")
-@limiter.limit("60/minute")
-def verificar_festivo(
-    request: Request,
-    fecha: date,
-    id_centro: Optional[UUID] = None,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    **GET /api/festivos?fecha=YYYY-MM-DD&centro_id=...**
-    
-    Verifica si una fecha específica es festiva de forma general o para un centro de trabajo concreto.
-    """
-    try:
-        # Consulta para comprobar si existe un festivo en esa fecha exactamene,
-        # validando si aplica de forma global (centro_id es NULL) o para el centro específico indicado.
-        query = db.query(Festivos).filter(Festivos.fecha == fecha)
-
-        if id_centro:
-            query = query.filter((Festivos.centro_id == id_centro) | (Festivos.centro_id.is_(None)))
-        
-        festivo_encontrado = query.first()
-
-        # Retorna true si existe el registro de festivo, de lo contrario false
-        return festivo_encontrado is not None
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al verificar el día festivo: {str(error)}"
-        )

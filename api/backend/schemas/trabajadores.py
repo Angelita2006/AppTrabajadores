@@ -2,9 +2,9 @@ import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import List, Optional
 from uuid import UUID
+from core.enums import EstadoTrabajadorEnum
 from schemas.empresas import EmpresaResponse
 from schemas.roles import RolResponse
-
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - TRABAJADORES
 # ==========================================
@@ -17,6 +17,7 @@ class TrabajadorBase(BaseModel):
     dni_nif_nie: str = Field(..., min_length=5, max_length=15, description="Número de identificación fiscal NIF o NIE")
     nombre: str = Field(..., min_length=2, max_length=150, description="Nombre de pila del empleado")
     apellidos: str = Field(..., min_length=2, max_length=150, description="Apellidos del empleado")
+    estado: EstadoTrabajadorEnum = Field(EstadoTrabajadorEnum.ACTIVO, description="Estado operativo actual del trabajador")
     email: Optional[EmailStr] = Field(None, max_length=255, description="Correo electrónico de contacto")
     telefono: Optional[str] = Field(None, max_length=30, description="Teléfono de contacto")
     numero_seguridad_social: Optional[str] = Field(None, max_length=20, description="Número de la Seguridad Social")
@@ -41,6 +42,7 @@ class TrabajadorUpdate(BaseModel):
     dni_nif_nie: Optional[str] = Field(None, min_length=5, max_length=15, description="Número de identificación fiscal NIF o NIE")
     nombre: Optional[str] = Field(None, min_length=2, max_length=150, description="Nombre de pila del empleado")
     apellidos: Optional[str] = Field(None, min_length=2, max_length=150, description="Apellidos del empleado")
+    estado: Optional[EstadoTrabajadorEnum] = Field(None, description="Estado operativo actual del trabajador")
     activo: Optional[bool] = Field(None, description="Estado operativo del trabajador")
     email: Optional[EmailStr] = Field(None, max_length=255, description="Correo electrónico de contacto")
     telefono: Optional[str] = Field(None, max_length=30, description="Teléfono de contacto")
@@ -83,4 +85,9 @@ class AsignarTurnosRequest(BaseModel):
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de vigencia de los turnos")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de fin opcional")
 
+    model_config = ConfigDict(from_attributes=True)
+
+class ActualizarEstadoRequest(BaseModel):
+    estado: EstadoTrabajadorEnum = Field(..., description="Nuevo estado operativo del trabajador")
+    
     model_config = ConfigDict(from_attributes=True)

@@ -16,7 +16,7 @@ from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido, verify_password
 from core.enums import TipoUsuarioEnum
 from schemas.empresas import EmpresaResponse
-from schemas.trabajadores import AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse, TrabajadorUpdate
+from schemas.trabajadores import ActualizarEstadoRequest, AsignarTurnosRequest, TrabajadorCreate, TrabajadorResponse, TrabajadorUpdate
 from schemas.usuarios import LoginRequest
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
@@ -587,6 +587,73 @@ async def actualizar_foto_trabajador(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se ha podido actualizar la URL de la foto en la base de datos: {str(error)}")
 
+@router.patch("/{id_trabajador}/estado", response_model=TrabajadorResponse, summary="Actualizar estado operativo del trabajador")
+@limiter.limit("20/minute")
+def actualizar_estado_trabajador(
+    request: Request,
+    id_trabajador: UUID,
+    obj_in: ActualizarEstadoRequest,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+):
+    """
+    **PATCH /api/trabajadores/{id_trabajador}/estado**
+    
+    Permite modificar de forma específica y rápida el estado operativo de un trabajador 
+    (ej. Trabajando, Descansando, De vacaciones, etc.) validando el ámbito de la empresa.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de cambio de estado para el trabajador {id_trabajador} a '{obj_in.estado}' desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Trabajador con ID {id_trabajador} no encontrado en el sistema."
+        )
+    
+    # Validar aislamiento multi-tenant
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar el estado de trabajadores de otra empresa."
+        )
+    
+    # Actualizar estado y marca de tiempo de modificación
+    trabajador.estado = obj_in.estado
+    trabajador.updated_at = datetime.now()
+
+    try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                "recurso": "trabajadores", 
+                "accion": "actualizar_estado", 
+                "entidad_id": str(id_trabajador), 
+                "detalles": f"Se actualizó el estado del trabajador {id_trabajador} a '{obj_in.estado}'"
+            }
+        )
+        db.commit()
+        
+        # Cargar relaciones para retornar el objeto completo de respuesta
+        trabajador_actualizado = db.query(Trabajadores).options(
+            joinedload(Trabajadores.empresa),
+            joinedload(Trabajadores.rol)
+        ).filter(Trabajadores.id == id_trabajador).first()
+        
+        return trabajador_actualizado
+
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se ha podido actualizar el estado del trabajador: {str(error)}"
+        )
+
 @router.post("/{id_trabajador}/baja-total", status_code=status.HTTP_200_OK, summary="Baja total y coordinada de un trabajador")
 @limiter.limit("10/minute")
 def baja_total_trabajador(
@@ -706,53 +773,4 @@ def eliminar_trabajador(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se puede eliminar el trabajador debido a restricciones de integridad referencial. Error: {str(error)}"
-        )
-
-@router.get("/{id_trabajador}/verificar-login-hoy", response_model=bool, summary="Verificar si un trabajador ha hecho login hoy")
-@limiter.limit("60/minute")
-def verificar_si_se_ha_logueado_hoy(
-    request: Request,
-    id_trabajador: UUID,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-):
-    """
-    **GET /api/trabajadores/verificar-login-hoy/{id_trabajador}**
-    
-    Verifica si el trabajador ha registrado algún acceso o actividad el día de hoy.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de verificación de login para el trabajador {id_trabajador} desde IP: {cliente_ip}")
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID {id_trabajador} no encontrado."
-        )
-
-    if usuario_actual.empresa_id != trabajador.empresa_id:
-        if not hasattr(usuario_actual, "trabajador_id") or usuario_actual.trabajador_id != id_trabajador:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para verificar esta información."
-            )
-
-    try:
-        hoy = date.today()
-
-        usuario_trabajador = db.query(Usuarios).filter(Usuarios.trabajador_id == trabajador.id).first()
-
-        if not usuario_trabajador:
-            return False
-        
-        if usuario_trabajador.ultimo_acceso:
-            return usuario_trabajador.ultimo_acceso.date() == hoy
-        
-        return False
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al verificar el registro de acceso: {str(error)}"
         )

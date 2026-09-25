@@ -72,9 +72,6 @@ class ContratoCreate(ContratoBase):
         return self
 
 class ContratoUpdate(BaseModel):
-    """
-    Esquema para la actualización parcial de un contrato laboral.
-    """
     empresa_id: Optional[UUID] = Field(None, description="ID de la empresa")
     centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo")
     tipo_contrato: Optional[TipoContratoEnum] = Field(None, description="Modalidad del contrato")
@@ -88,7 +85,15 @@ class ContratoUpdate(BaseModel):
     trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador")
     calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
+
+    @field_validator('fecha_fin', 'departamento_id', 'calendario_laboral_id', mode='before')
+    @classmethod
+    def limpiar_vacios(cls, v: Any) -> Any:
+        """Convierte cadenas vacías en None para evitar errores de parseo UUID/Date."""
+        if v == "" or v is None:
+            return None
+        return v
 
 class ContratoSimpleResponse(ContratoBase):
     """

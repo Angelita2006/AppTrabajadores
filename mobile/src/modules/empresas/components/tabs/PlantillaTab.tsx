@@ -11,24 +11,16 @@ import {
 } from "@/src/modules/contratos/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
-import { obtenerUltimoFichaje } from "@/src/modules/fichajes/api/services";
-import { TIPOS_FICHAJE } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
-import { obtenerTipoEventoPorId } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import {
   actualizarAsignacionTurno,
   actualizarTrabajador,
   asignarTurnosTrabajador,
-  tramitarBajaTotalTrabajador,
-  verificarSiEsFestivo,
-  verificarSiSeHaLogueadoHoy,
-  verificarSiTieneBaja,
-  verificarSiTieneVacaciones,
+  tramitarBajaTotalTrabajador
 } from "@/src/modules/trabajadores/api/services";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
 import {
-  ESTADOS_TRABAJADOR,
-  Trabajador,
+  Trabajador
 } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
@@ -36,7 +28,6 @@ import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
-import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -232,16 +223,14 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
   const [trabajadoresValidosIds, setTrabajadoresValidosIds] = useState<
     string[] | null
   >(null);
-  const [plantillaConEstados, setPlantillaConEstados] = useState<any[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function procesarPlantillaYEstados() {
+    async function procesarPlantilla() {
       if (!plantilla || plantilla.length === 0) {
         if (isMounted) {
           setTrabajadoresValidosIds([]);
-          setPlantillaConEstados([]);
         }
         return;
       }
@@ -268,103 +257,31 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         const mapaRoles = new Map(resultadosRoles.map((r) => [r.rolId, r.rol]));
         const idsValidos: string[] = [];
 
-        // Procesar en paralelo la obtención de estados de cada trabajador
-        const resultadoPlantillaConEstados = await Promise.all(
-          plantilla.map(async (item: Trabajador) => {
-            // 1. Filtrado de administradores
-            let esAdmin = false;
-            if (item.rol_id) {
-              const rol = mapaRoles.get(item.rol_id);
-              esAdmin =
-                Boolean(rol?.nombre?.toLowerCase().includes("admin")) ||
-                Boolean(rol?.descripcion?.toLowerCase().includes("admin"));
-            }
+        plantilla.forEach((item: Trabajador) => {
+          let esAdmin = false;
+          if (item.rol_id) {
+            const rol = mapaRoles.get(item.rol_id);
+            esAdmin =
+              Boolean(rol?.nombre?.toLowerCase().includes("admin")) ||
+              Boolean(rol?.descripcion?.toLowerCase().includes("admin"));
+          }
 
-            if (!esAdmin) {
-              idsValidos.push(item.id);
-            }
-
-            // 2. Cálculo de estados según las reglas de negocio
-            let estadoCalculado = ESTADOS_TRABAJADOR.INACTIVO.toString();
-
-            try {
-              const [
-                ultimoFichaje,
-                seHaLogueadoHoy,
-                esFestivoHoy,
-                tieneVacacionesHoy,
-                tieneBajaHoy,
-              ] = await Promise.all([
-                obtenerUltimoFichaje(item.id),
-                verificarSiSeHaLogueadoHoy(item.id).catch(() => false),
-                verificarSiEsFestivo(
-                  formatearFecha(new Date()),
-                  centroTrabajoId,
-                ).catch(() => false),
-                verificarSiTieneVacaciones(
-                  formatearFecha(new Date()),
-                  item.id,
-                ).catch(() => false),
-                verificarSiTieneBaja(formatearFecha(new Date()), item.id).catch(
-                  () => false,
-                ),
-              ]);
-              if (tieneVacacionesHoy) {
-                estadoCalculado = ESTADOS_TRABAJADOR.VACACIONES.toString();
-              } else if (tieneBajaHoy) {
-                estadoCalculado = ESTADOS_TRABAJADOR.BAJA.toString();
-              } else if (ultimoFichaje != undefined) {
-                const tipoFichaje = await obtenerTipoEventoPorId(
-                  ultimoFichaje.tipo_evento_id,
-                );
-
-                if (tipoFichaje.codigo === TIPOS_FICHAJE.ENTRADA.toString()) {
-                  if (esFestivoHoy) {
-                    estadoCalculado = ESTADOS_TRABAJADOR.HORAS_EXTRA.toString();
-                  } else {
-                    estadoCalculado = ESTADOS_TRABAJADOR.TRABAJANDO.toString();
-                  }
-                } else if (
-                  tipoFichaje.codigo === TIPOS_FICHAJE.INICIO_PAUSA.toString()
-                ) {
-                  estadoCalculado = ESTADOS_TRABAJADOR.DESCANSANDO.toString();
-                } else if (
-                  tipoFichaje.codigo === TIPOS_FICHAJE.SALIDA.toString()
-                ) {
-                  estadoCalculado = seHaLogueadoHoy
-                    ? ESTADOS_TRABAJADOR.ACTIVO.toString()
-                    : ESTADOS_TRABAJADOR.INACTIVO.toString();
-                }
-              } else if (seHaLogueadoHoy) {
-                estadoCalculado = ESTADOS_TRABAJADOR.ACTIVO.toString();
-              }
-            } catch (error: any) {
-              mostrarError(
-                `Error calculando estado para el trabajador ${item.id}: ` +
-                  obtenerMensajeAmigableError(error.message),
-              );
-            }
-
-            return {
-              ...item,
-              estado: estadoCalculado,
-            };
-          }),
-        );
+          if (!esAdmin) {
+            idsValidos.push(item.id);
+          }
+        });
 
         if (isMounted) {
           setTrabajadoresValidosIds(idsValidos);
-          setPlantillaConEstados(resultadoPlantillaConEstados);
         }
       } catch {
         if (isMounted) {
           setTrabajadoresValidosIds(plantilla.map((t: Trabajador) => t.id));
-          setPlantillaConEstados(plantilla);
         }
       }
     }
 
-    procesarPlantillaYEstados();
+    procesarPlantilla();
 
     return () => {
       isMounted = false;
@@ -373,9 +290,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
 
   const plantillaFiltrada = useMemo(() => {
     if (!trabajadoresValidosIds) return [];
-    // Se puede filtrar utilizando plantillaConEstados o plantilla según prefieras consumir los estados actualizados
-    const fuenteDatos =
-      plantillaConEstados.length > 0 ? plantillaConEstados : plantilla;
+    const fuenteDatos = plantilla.length > 0 ? plantilla : plantilla;
     return fuenteDatos.filter((item: Trabajador) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
       if (esElJefeActual && esAdminEmpresa) return false;
@@ -388,7 +303,6 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     });
   }, [
     plantilla,
-    plantillaConEstados,
     filtroEstado,
     usuarioActual,
     esGestoria,

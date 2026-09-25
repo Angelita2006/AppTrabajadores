@@ -2,10 +2,12 @@ import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/a
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import {
+  actualizarEstadoTrabajador,
   actualizarFotoTrabajador,
   actualizarTrabajador,
   obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
+import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
 import {
   obtenerUsuarioActual,
   solicitarCambioEmail,
@@ -306,6 +308,10 @@ export default function PerfilScreen() {
       setTimeout(() => {
         router.replace({ pathname: "/" });
       }, 50);
+      actualizarEstadoTrabajador(
+        usuarioActual?.trabajador_id!,
+        ESTADOS_TRABAJADOR.INACTIVO,
+      );
     } catch (error: any) {
       mostrarError(
         "Error al cerrar sesión: " + obtenerMensajeAmigableError(error.message),

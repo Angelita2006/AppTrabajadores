@@ -158,18 +158,18 @@ export const obtenerContratoActivoTrabajador = async (
 export const actualizarContrato = async (
   idContrato: string,
   payload: {
-    trabajador_id: string;
-    empresa_id: string;
-    centro_trabajo_id: string;
-    departamento_id: string;
-    calendario_laboral_id: string;
-    tipo_contrato: string;
-    tipo_jornada: string;
-    puesto_trabajo: string;
-    categoria_profesional: string;
-    horas_semana: number;
-    fecha_inicio: string;
-    fecha_fin?: string;
+    trabajador_id?: string;
+    empresa_id?: string;
+    centro_trabajo_id?: string;
+    departamento_id?: string | null;
+    calendario_laboral_id?: string | null;
+    tipo_contrato?: string;
+    tipo_jornada?: string;
+    puesto_trabajo?: string;
+    categoria_profesional?: string;
+    horas_semana?: number;
+    fecha_inicio?: string;
+    fecha_fin?: string | null;
   },
 ): Promise<Contrato> => {
   try {

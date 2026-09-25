@@ -1,4 +1,8 @@
-import { obtenerEmpresaTrabajador } from "@/src/modules/trabajadores/api/services";
+import {
+  actualizarEstadoTrabajador,
+  obtenerEmpresaTrabajador,
+} from "@/src/modules/trabajadores/api/services";
+import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { NotificationService } from "@/src/notifications/NotificationService";
@@ -144,6 +148,11 @@ export default function RootIndexScreen() {
           );
         }
       }
+
+      actualizarEstadoTrabajador(
+        usuarioActual?.trabajador_id!,
+        ESTADOS_TRABAJADOR.ACTIVO,
+      );
     } catch (error: any) {
       mostrarError(
         "Ha fallado el proceso de autenticación: " +

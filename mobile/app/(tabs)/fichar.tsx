@@ -6,6 +6,7 @@ import {
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
+import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha, formatearSegundos } from "@/src/utils/formaters";
@@ -24,7 +25,10 @@ import {
   View,
 } from "react-native";
 import SignatureCanvas from "react-native-signature-canvas";
-import { Estado } from "../../src/modules/trabajadores/types/trabajador";
+import {
+  Estado,
+  ESTADOS_TRABAJADOR,
+} from "../../src/modules/trabajadores/types/trabajador";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
@@ -40,7 +44,10 @@ export default function HomeScreen() {
   } = useSesion();
 
   const [horaActual, setHoraActual] = useState("");
-  const [estadoActual, setEstadoActual] = useState<Estado>(1);
+  const [estadoActual, setEstadoActual] = useState<Estado>(
+    ESTADOS_TRABAJADOR.INACTIVO,
+  );
+  const [etiquetaEstadoTexto, setEtiquetaEstadoTexto] = useState("Cargando...");
   const [cargando, setCargando] = useState(true);
 
   const [segundosAcumuladosHoy, setSegundosAcumuladosHoy] = useState<number>(0);
@@ -51,7 +58,6 @@ export default function HomeScreen() {
 
   const { mostrarError, mostrarMensaje } = useAppModal();
 
-  // Mapeo sincronizado de tipos de evento: { ENTRADA: "uuid-1", SALIDA: "uuid-2", ... }
   const [mapaTiposEvento, setMapaTiposEvento] = useState<
     Record<string, string>
   >({});
@@ -119,26 +125,31 @@ export default function HomeScreen() {
     }
   }
 
-  const obtenerEtiquetaEstado = (estado: Estado): string => {
-    switch (estado) {
-      case 2:
-        return "Trabajando";
-      case 3:
-        return "En Descanso";
-      case 4:
-        return "Haciendo horas extra";
-      case 5:
-        return "De vacaciones";
-      case 6:
-        return "De baja";
-      case 1:
-        return "Activo";
-      case 0:
-        return "Inactivo";
-      default:
-        return "Desconocido";
+  // Función asíncrona para obtener la etiqueta del estado
+  const obtenerEtiquetaEstado = async (): Promise<string> => {
+    if (!usuarioActual?.trabajador_id) return ESTADOS_TRABAJADOR.INACTIVO;
+    try {
+      const trabajador = await obtenerTrabajador(usuarioActual.trabajador_id);
+      return trabajador?.estado
+        ? String(trabajador.estado)
+        : ESTADOS_TRABAJADOR.INACTIVO;
+    } catch (error) {
+      return ESTADOS_TRABAJADOR.INACTIVO;
     }
   };
+
+  // Efecto para actualizar la variable de forma síncrona para la interfaz
+  useEffect(() => {
+    let isMounted = true;
+    obtenerEtiquetaEstado().then((etiqueta) => {
+      if (isMounted) {
+        setEtiquetaEstadoTexto(etiqueta);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [usuarioActual?.trabajador_id, estadoActual]);
 
   // Reloj local de hora actual en el centro
   useEffect(() => {
@@ -155,7 +166,8 @@ export default function HomeScreen() {
           hour12: false,
         });
         setHoraActual(horaCentroStr);
-      } catch (e) {
+      } catch (error: any) {
+        console.error(error.message);
         setHoraActual(ahora.toLocaleTimeString("es-ES", { hour12: false }));
       }
     };
@@ -201,7 +213,7 @@ export default function HomeScreen() {
         if (!isMounted) return;
 
         if (fichajesHoy.length === 0) {
-          setEstadoActual(1);
+          setEstadoActual(ESTADOS_TRABAJADOR.INACTIVO);
           setSegundosAcumuladosHoy(0);
           setTiempoFormateado("00:00:00");
           setTimestampBaseActual(null);
@@ -249,13 +261,13 @@ export default function HomeScreen() {
         const ultimoEventoUuid = ultimoFichaje.tipo_evento_id;
 
         if (ultimoEventoUuid === mapa["SALIDA"]) {
-          setEstadoActual(1);
+          setEstadoActual(ESTADOS_TRABAJADOR.ACTIVO);
           setTimestampBaseActual(null);
         } else if (ultimoEventoUuid === mapa["INICIO_PAUSA"]) {
-          setEstadoActual(3);
+          setEstadoActual(ESTADOS_TRABAJADOR.DESCANSANDO);
           setTimestampBaseActual(marcaPausaActiva);
         } else {
-          setEstadoActual(2);
+          setEstadoActual(ESTADOS_TRABAJADOR.TRABAJANDO);
           setTimestampBaseActual(marcaEntradaActiva);
         }
 
@@ -304,7 +316,11 @@ export default function HomeScreen() {
     let intervalo: any;
 
     const actualizarRelojDiferencial = () => {
-      if (estadoActual === 1 || timestampBaseActual === null) return;
+      if (
+        estadoActual === ESTADOS_TRABAJADOR.ACTIVO ||
+        timestampBaseActual === null
+      )
+        return;
       const segundosTramoAbierto = Math.max(
         0,
         Math.floor((Date.now() - timestampBaseActual) / 1000),
@@ -314,7 +330,11 @@ export default function HomeScreen() {
       );
     };
 
-    if (estadoActual !== 1 && !cargando && timestampBaseActual !== null) {
+    if (
+      estadoActual !== ESTADOS_TRABAJADOR.ACTIVO &&
+      !cargando &&
+      timestampBaseActual !== null
+    ) {
       actualizarRelojDiferencial();
       intervalo = setInterval(actualizarRelojDiferencial, 1000);
     }
@@ -648,8 +668,12 @@ export default function HomeScreen() {
       <Row>
         <StatCard
           label="Tu Estado Actual"
-          value={obtenerEtiquetaEstado(estadoActual)}
-          tone={estadoActual === 2 ? "success" : "warning"}
+          value={etiquetaEstadoTexto}
+          tone={
+            estadoActual === ESTADOS_TRABAJADOR.TRABAJANDO
+              ? "success"
+              : "warning"
+          }
         />
         <StatCard
           label="Puesto Asignado"
@@ -726,14 +750,16 @@ export default function HomeScreen() {
       </ThemedText>
 
       <View style={styles.panelAcciones}>
-        {estadoActual === 1 && (
+        {estadoActual === ESTADOS_TRABAJADOR.ACTIVO && (
           <Pressable
             style={[
               styles.botonAccion,
               styles.botonEntrada,
               cargando && styles.botonDeshabilitado,
             ]}
-            onPress={() => iniciarProcesoFichaje(2, "ENTRADA")}
+            onPress={() =>
+              iniciarProcesoFichaje(ESTADOS_TRABAJADOR.TRABAJANDO, "ENTRADA")
+            }
             disabled={cargando}
           >
             <IconSymbol name="play-circle" size={24} color="#FFFFFF" />
@@ -741,41 +767,57 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        {estadoActual !== 1 && (
+        {estadoActual !== ESTADOS_TRABAJADOR.ACTIVO && (
           <Pressable
             style={[
               styles.botonAccion,
-              estadoActual === 3 ? styles.botonEntrada : styles.botonPausa,
+              estadoActual === ESTADOS_TRABAJADOR.DESCANSANDO
+                ? styles.botonEntrada
+                : styles.botonPausa,
               cargando && styles.botonDeshabilitado,
             ]}
             onPress={() => {
-              if (estadoActual === 3) {
-                iniciarProcesoFichaje(2, "FIN_PAUSA");
+              if (estadoActual === ESTADOS_TRABAJADOR.DESCANSANDO) {
+                iniciarProcesoFichaje(
+                  ESTADOS_TRABAJADOR.TRABAJANDO,
+                  "FIN_PAUSA",
+                );
               } else {
-                iniciarProcesoFichaje(3, "INICIO_PAUSA");
+                iniciarProcesoFichaje(
+                  ESTADOS_TRABAJADOR.DESCANSANDO,
+                  "INICIO_PAUSA",
+                );
               }
             }}
             disabled={cargando}
           >
             <IconSymbol
-              name={estadoActual === 3 ? "play-circle" : "pause"}
+              name={
+                estadoActual === ESTADOS_TRABAJADOR.DESCANSANDO
+                  ? "play-circle"
+                  : "pause"
+              }
               size={24}
               color="#FFFFFF"
             />
             <ThemedText style={styles.textoBoton}>
-              {estadoActual === 3 ? "Reanudar Jornada" : "Iniciar Descanso"}
+              {estadoActual === ESTADOS_TRABAJADOR.DESCANSANDO
+                ? "Reanudar Jornada"
+                : "Iniciar Descanso"}
             </ThemedText>
           </Pressable>
         )}
 
-        {estadoActual !== 1 && (
+        {estadoActual !== ESTADOS_TRABAJADOR.ACTIVO && (
           <Pressable
             style={[
               styles.botonAccion,
               styles.botonSalida,
               cargando && styles.botonDeshabilitado,
             ]}
-            onPress={() => iniciarProcesoFichaje(1, "SALIDA")}
+            onPress={() =>
+              iniciarProcesoFichaje(ESTADOS_TRABAJADOR.ACTIVO, "SALIDA")
+            }
             disabled={cargando}
           >
             <IconSymbol name="stop" size={24} color="#FFFFFF" />

@@ -1,5 +1,15 @@
 import enum
 
+class EstadoTrabajadorEnum(str, enum.Enum):
+    INACTIVO = "Inactivo"
+    ACTIVO = "Activo"
+    TRABAJANDO = "Trabajando"
+    DESCANSANDO = "Descansando"
+    HORAS_EXTRA = "Haciendo horas extra"
+    VACACIONES = "De vacaciones"
+    BAJA = "De baja"
+    AUSENTE = "Ausente"
+
 class AccionAuditoriaEnum(str, enum.Enum):
     CONSULTA = 'Consulta'
     CREACION = 'Creación'
