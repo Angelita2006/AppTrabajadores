@@ -32,7 +32,7 @@ class Trabajadores(Base):
         SQLEnum(EstadoTrabajadorEnum), 
         nullable=False, 
         server_default=EstadoTrabajadorEnum.ACTIVO.value,
-        description="Estado operativo actual del trabajador"
+        comment="Estado operativo actual del trabajador"
     )
     fecha_alta_empresa: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
