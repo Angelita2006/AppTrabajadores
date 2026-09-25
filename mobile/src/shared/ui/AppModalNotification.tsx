@@ -1,5 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 
@@ -38,7 +38,38 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
     setVisible(false);
   };
 
-  // 1. Preparamos la estructura del Modal
+  const [portalNode, setPortalNode] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Solo ejecutamos lógica de DOM si estamos en la Web
+    if (Platform.OS === "web") {
+      // 1. Buscamos si ya existe nuestro contenedor de alertas prioritarias
+      let node = document.getElementById(
+        "app-high-priority-alerts-root",
+      ) as HTMLDivElement;
+
+      if (!node) {
+        // 2. Si no existe, lo creamos dinámicamente
+        node = document.createElement("div");
+        node.id = "app-high-priority-alerts-root";
+
+        // 3. Forzamos un estilo CSS en línea ultra-agresivo para producción
+        node.style.position = "fixed";
+        node.style.top = "0";
+        node.style.left = "0";
+        node.style.width = "100vw";
+        node.style.height = "100vh";
+        node.style.zIndex = "999999999"; // Rompe cualquier stacking context de producción
+        node.style.pointerEvents = "none"; // Evita bloquear la app si está oculto
+
+        document.body.appendChild(node);
+      }
+
+      setPortalNode(node);
+    }
+  }, []);
+
+  // Estructura del modal (Sigue igual que antes)
   const componenteModal = (
     <Modal
       animationType="fade"
@@ -46,7 +77,13 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
       visible={visible}
       onRequestClose={cerrarModal}
     >
-      <View style={styles.overlay}>
+      {/* Añadimos pointerEvents: 'auto' aquí para que el modal sí reciba clicks */}
+      <View
+        style={[
+          styles.overlay,
+          Platform.OS === "web" && ({ pointerEvents: "auto" } as any),
+        ]}
+      >
         <View style={styles.modalContainer}>
           <ThemedText
             style={[
@@ -71,12 +108,15 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
     </Modal>
   );
 
-  // 2. Si es Web y está visible, lo inyectamos directamente en el body del documento HTML
   const renderModal = () => {
     if (!visible) return null;
 
     if (Platform.OS === "web") {
-      return ReactDOM.createPortal(componenteModal, document.body);
+      // Si el nodo aún no está listo en el DOM, esperamos
+      if (!portalNode) return null;
+
+      // En vez de inyectarlo al body libre, lo metemos en nuestro contenedor blindado
+      return ReactDOM.createPortal(componenteModal, portalNode);
     }
 
     return componenteModal;
