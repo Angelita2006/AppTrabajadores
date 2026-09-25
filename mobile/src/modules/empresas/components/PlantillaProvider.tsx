@@ -1,4 +1,5 @@
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { createContext, useCallback, useContext, useState } from "react";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
@@ -74,7 +75,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
                   (error: any) => {
                     mostrarError(
                       `Error al obtener los contratos del trabajador ${trabajador.id}: ` +
-                        error,
+                        obtenerMensajeAmigableError(error.message),
                     );
                     return [] as Contrato[];
                   },
@@ -83,7 +84,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
                   (error: any) => {
                     mostrarError(
                       `Error al obtener las asignaciones de turno del trabajador ${trabajador.id}: ` +
-                        error,
+                        obtenerMensajeAmigableError(error.message),
                     );
                     return [] as AsignacionTurno[];
                   },
@@ -98,7 +99,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
                   } catch (error: any) {
                     mostrarError(
                       `Error al obtener el detalle del turno ${asig.turno_id}: ` +
-                        error,
+                        obtenerMensajeAmigableError(error.message),
                     );
                     return { ...asig, turno: null };
                   }
@@ -115,7 +116,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
             } catch (error: any) {
               mostrarError(
                 `Error procesando la información del trabajador ${trabajador.id}: ` +
-                  error,
+                  obtenerMensajeAmigableError(error.message),
               );
               return null;
             }
@@ -132,7 +133,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error: any) {
       mostrarError(
         "Error crítico de carga y sincronización de la plantilla de personal: " +
-          error,
+          obtenerMensajeAmigableError(error.message),
       );
     } finally {
       setCargando(false);
