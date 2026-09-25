@@ -101,6 +101,7 @@ export default function RegistroScreen() {
         "Alta Consolidada",
         "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.",
       );
+      router.replace("/");
     } catch (error: any) {
       mostrarError(
         "Error al completar el registro y vinculación del usuario: " +
