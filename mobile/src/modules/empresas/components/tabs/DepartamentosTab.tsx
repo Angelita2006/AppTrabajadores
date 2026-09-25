@@ -401,38 +401,48 @@ export default function TabDepartamentos({
                 <ThemedText style={styles.formularioTitulo}>
                   Editar: {dept.nombre}
                 </ThemedText>
-                <TextInput
-                  ref={editarInputRef}
-                  style={styles.inputForm}
-                  value={nombreDepto}
-                  onChangeText={setNombreDepto}
-                  editable={!guardando}
-                  returnKeyType="done"
-                  onSubmitEditing={handleEditarDepartamento}
-                  blurOnSubmit={false}
-                />
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={centroTrabajoId}
-                    onValueChange={(val) => setCentroTrabajoId(val)}
-                    style={styles.picker}
-                    enabled={!guardando}
-                  >
-                    <Picker.Item
-                      label="Seleccionar centro..."
-                      value=""
-                      enabled={false}
-                    />
-                    {centrosEmpresa
-                      .filter((ct) => ct.activo === true)
-                      .map((ct: CentroTrabajo) => (
-                        <Picker.Item
-                          key={ct.id}
-                          label={ct.nombre}
-                          value={ct.id}
-                        />
-                      ))}
-                  </Picker>
+                <View style={styles.campoFormulario}>
+                  <ThemedText style={styles.labelInput}>
+                    Nombre del Departamento *
+                  </ThemedText>
+                  <TextInput
+                    ref={editarInputRef}
+                    style={styles.inputForm}
+                    value={nombreDepto}
+                    onChangeText={setNombreDepto}
+                    editable={!guardando}
+                    returnKeyType="done"
+                    onSubmitEditing={handleEditarDepartamento}
+                    blurOnSubmit={false}
+                  />
+                </View>
+                <View style={styles.campoFormulario}>
+                  <ThemedText style={styles.labelInput}>
+                    Centro de Trabajo
+                  </ThemedText>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={centroTrabajoId}
+                      onValueChange={(val) => setCentroTrabajoId(val)}
+                      style={styles.picker}
+                      enabled={!guardando}
+                    >
+                      <Picker.Item
+                        label="Seleccionar centro..."
+                        value=""
+                        enabled={false}
+                      />
+                      {centrosEmpresa
+                        .filter((ct) => ct.activo === true)
+                        .map((ct: CentroTrabajo) => (
+                          <Picker.Item
+                            key={ct.id}
+                            label={ct.nombre}
+                            value={ct.id}
+                          />
+                        ))}
+                    </Picker>
+                  </View>
                 </View>
                 <Pressable
                   style={[
