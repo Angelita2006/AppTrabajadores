@@ -32,6 +32,7 @@
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
+      "publicPath": "/mobile/dist/",
       "output": "static",
       "favicon": "./assets/icons/favicon.png"
     },
