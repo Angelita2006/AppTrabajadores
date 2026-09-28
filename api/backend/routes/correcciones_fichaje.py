@@ -8,7 +8,7 @@ from typing import List, Any
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from core.utils import calcular_hash_fichaje
+from core.utils import calcular_hash_fichaje, procesar_y_guardar_firma
 from models.centros_trabajo import CentrosTrabajo
 from models.correcciones_fichaje import CorreccionesFichaje
 from models.contratos import Contratos
@@ -30,20 +30,6 @@ router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 # Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
-
-def guardar_firma(data_firma: str | None) -> str | None:
-    if not data_firma:
-        return None
-    try:
-        data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
-        bytes_imagen = base64.b64decode(data_encoded)
-        nombre_archivo = f"firma_correccion_{uuid.uuid4().hex}.png"
-        os.makedirs("static/firmas", exist_ok=True)
-        with open(os.path.join("static/firmas", nombre_archivo), "wb") as buffer:
-            buffer.write(bytes_imagen)
-        return f"/api/archivos/firmas/{nombre_archivo}"
-    except Exception as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se pudo procesar la firma: {error}")
 
 @router.post("", response_model=CorreccionFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Solicitar corrección")
 @limiter.limit("20/minute")  
@@ -95,6 +81,18 @@ def solicitar_correccion(
                 detail=f"Fichaje afectado con ID ({obj_in.fichaje_afectado_id}) no encontrado."
             )
 
+    ruta_relativa_firma = None
+    data_firma = getattr(obj_in, "firma_solicitante", None)
+
+    if data_firma and isinstance(data_firma, str):
+        try:
+            ruta_relativa_firma = procesar_y_guardar_firma(data_firma)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No se pudo procesar la imagen de la firma digital del solicitante adjunta: {str(e)}"
+            )
+
     nueva_correccion = CorreccionesFichaje(
         empresa_id=obj_in.empresa_id,
         trabajador_id=obj_in.trabajador_id,
@@ -105,7 +103,7 @@ def solicitar_correccion(
         solicitado_por_usuario_id=usuario_actual.id,
         fichaje_afectado_id=obj_in.fichaje_afectado_id,
         valor_anterior=obj_in.valor_anterior,
-        firma_solicitante=guardar_firma(obj_in.firma_solicitante),
+        firma_solicitante=ruta_relativa_firma,
         estado=EstadoCorreccionEnum.PENDIENTE
     )
 
@@ -183,11 +181,22 @@ def resolver_incidencia(
             detail="La resolución debe incluir la firma digital de quien la valida o rechaza.",
         )
 
+    ruta_relativa_firma = None
+
+    if firma_resolutor and isinstance(firma_resolutor, str):
+        try:
+            ruta_relativa_firma = procesar_y_guardar_firma(firma_resolutor)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No se pudo procesar la imagen de la firma digital del resolutor adjunta: {str(e)}"
+            )
+
     try:
         incidencia.estado = nuevo_estado
         incidencia.aprobado_por_usuario_id = usuario_actual.id  
         incidencia.fecha_resolucion = datetime.now()
-        incidencia.firma_resolutor = guardar_firma(firma_resolutor)
+        incidencia.firma_resolutor = ruta_relativa_firma
 
         fecha_hora_propuesta: datetime | None = None
 

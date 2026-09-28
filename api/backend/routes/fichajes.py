@@ -44,6 +44,7 @@ def filtro_fichajes_vigentes():
     return ~exists().where(
         FichajeSustituto.c.fichaje_sustituido_id == Fichajes.id
     )
+
 @router.post("", response_model=FichajeResponse, status_code=status.HTTP_201_CREATED, summary="Registrar fichaje")
 @limiter.limit("30/minute")
 def crear_fichaje(
