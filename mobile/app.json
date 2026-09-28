@@ -34,7 +34,8 @@
     "web": {
       "output": "static",
       "publicPath": "/app/",
-      "favicon": "./assets/icons/favicon.png"
+      "favicon": "./assets/icons/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       [
@@ -83,7 +84,8 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/app"
     },
     "extra": {
       "router": {},
