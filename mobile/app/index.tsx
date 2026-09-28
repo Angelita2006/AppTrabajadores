@@ -148,11 +148,11 @@ export default function RootIndexScreen() {
           );
         }
       }
-
-      actualizarEstadoTrabajador(
-        usuarioActual?.trabajador_id!,
-        ESTADOS_TRABAJADOR.ACTIVO,
-      );
+      if (usuario.trabajador_id)
+        actualizarEstadoTrabajador(
+          usuario.trabajador_id,
+          ESTADOS_TRABAJADOR.ACTIVO,
+        );
     } catch (error: any) {
       mostrarError(
         "Ha fallado el proceso de autenticación: " +

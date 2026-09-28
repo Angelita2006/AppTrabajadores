@@ -515,6 +515,75 @@ def actualizar_trabajador(
     return trabajador_actualizado
 
 
+
+@router.patch("/{id_trabajador}/estado", response_model=TrabajadorResponse, summary="Actualizar estado operativo del trabajador")
+@limiter.limit("20/minute")
+def actualizar_estado_trabajador(
+    request: Request,
+    id_trabajador: UUID,
+    obj_in: ActualizarEstadoRequest,
+    db: Session = Depends(get_db),
+    usuario_actual: Usuarios =  Depends(obtener_usuario_actual)
+):
+    """
+    **PATCH /api/trabajadores/{id_trabajador}/estado**
+    
+    Permite modificar de forma específica y rápida el estado operativo de un trabajador 
+    (ej. Trabajando, Descansando, De vacaciones, etc.) validando el ámbito de la empresa.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de cambio de estado para el trabajador {id_trabajador} a '{obj_in.estado}' desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Trabajador con ID {id_trabajador} no encontrado en el sistema."
+        )
+    
+    # Validar aislamiento multi-tenant
+    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para modificar el estado de trabajadores de otra empresa."
+        )
+    
+    # Actualizar estado y marca de tiempo de modificación
+    trabajador.estado = obj_in.estado
+    trabajador.updated_at = datetime.now()
+
+    try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario=usuario_actual,
+            empresa_id=trabajador.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                "recurso": "trabajadores", 
+                "accion": "actualizar_estado", 
+                "entidad_id": str(id_trabajador), 
+                "detalles": f"Se actualizó el estado del trabajador {id_trabajador} a '{obj_in.estado}'"
+            }
+        )
+        db.commit()
+        
+        # Cargar relaciones para retornar el objeto completo de respuesta
+        trabajador_actualizado = db.query(Trabajadores).options(
+            joinedload(Trabajadores.empresa),
+            joinedload(Trabajadores.rol)
+        ).filter(Trabajadores.id == id_trabajador).first()
+        
+        return trabajador_actualizado
+
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se ha podido actualizar el estado del trabajador: {str(error)}"
+        )
+    
+
 @router.put("/{id_trabajador}/foto", response_model=TrabajadorResponse, summary="Actualizar foto de trabajador")
 @limiter.limit("20/minute")
 async def actualizar_foto_trabajador(
@@ -587,72 +656,6 @@ async def actualizar_foto_trabajador(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No se ha podido actualizar la URL de la foto en la base de datos: {str(error)}")
 
-@router.patch("/{id_trabajador}/estado", response_model=TrabajadorResponse, summary="Actualizar estado operativo del trabajador")
-@limiter.limit("20/minute")
-def actualizar_estado_trabajador(
-    request: Request,
-    id_trabajador: UUID,
-    obj_in: ActualizarEstadoRequest,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios =  Depends(obtener_usuario_actual)
-):
-    """
-    **PATCH /api/trabajadores/{id_trabajador}/estado**
-    
-    Permite modificar de forma específica y rápida el estado operativo de un trabajador 
-    (ej. Trabajando, Descansando, De vacaciones, etc.) validando el ámbito de la empresa.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de cambio de estado para el trabajador {id_trabajador} a '{obj_in.estado}' desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"Trabajador con ID {id_trabajador} no encontrado en el sistema."
-        )
-    
-    # Validar aislamiento multi-tenant
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar el estado de trabajadores de otra empresa."
-        )
-    
-    # Actualizar estado y marca de tiempo de modificación
-    trabajador.estado = obj_in.estado
-    trabajador.updated_at = datetime.now()
-
-    try:
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario=usuario_actual,
-            empresa_id=trabajador.empresa_id,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                "recurso": "trabajadores", 
-                "accion": "actualizar_estado", 
-                "entidad_id": str(id_trabajador), 
-                "detalles": f"Se actualizó el estado del trabajador {id_trabajador} a '{obj_in.estado}'"
-            }
-        )
-        db.commit()
-        
-        # Cargar relaciones para retornar el objeto completo de respuesta
-        trabajador_actualizado = db.query(Trabajadores).options(
-            joinedload(Trabajadores.empresa),
-            joinedload(Trabajadores.rol)
-        ).filter(Trabajadores.id == id_trabajador).first()
-        
-        return trabajador_actualizado
-
-    except Exception as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido actualizar el estado del trabajador: {str(error)}"
-        )
 
 @router.post("/{id_trabajador}/baja-total", status_code=status.HTTP_200_OK, summary="Baja total y coordinada de un trabajador")
 @limiter.limit("10/minute")

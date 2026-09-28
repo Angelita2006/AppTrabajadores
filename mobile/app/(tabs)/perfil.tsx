@@ -308,10 +308,11 @@ export default function PerfilScreen() {
       setTimeout(() => {
         router.replace({ pathname: "/" });
       }, 50);
-      actualizarEstadoTrabajador(
-        usuarioActual?.trabajador_id!,
-        ESTADOS_TRABAJADOR.INACTIVO,
-      );
+      if (trabajadorActual?.id)
+        actualizarEstadoTrabajador(
+          trabajadorActual?.id,
+          ESTADOS_TRABAJADOR.INACTIVO,
+        );
     } catch (error: any) {
       mostrarError(
         "Error al cerrar sesión: " + obtenerMensajeAmigableError(error.message),

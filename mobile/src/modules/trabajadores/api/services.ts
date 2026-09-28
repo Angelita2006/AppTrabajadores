@@ -129,7 +129,7 @@ export const actualizarTrabajador = async (
 export const actualizarEstadoTrabajador = async (
   idTrabajador: string,
   nuevoEstado: Estado,
-): Promise<any> => {
+): Promise<Trabajador> => {
   try {
     const response = await api.patch(
       `/api/trabajadores/${idTrabajador}/estado`,
@@ -137,8 +137,7 @@ export const actualizarEstadoTrabajador = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.message || error?.response?.data?.detail;
+    const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al actualizar el estado del trabajador.",
     );
