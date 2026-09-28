@@ -84,7 +84,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true,
-      "baseUrl": "/app"
+      "baseUrl": "/mobile/dist"
     },
     "extra": {
       "router": {},
