@@ -33,7 +33,6 @@
     },
     "web": {
       "output": "static",
-      "publicPath": "/app/",
       "favicon": "./assets/icons/favicon.png",
       "bundler": "metro"
     },
