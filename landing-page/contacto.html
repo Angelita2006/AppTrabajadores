@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solicitar Información - FICHAPP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-800 font-sans antialiased">
+    <!-- Header / Navegación Principal -->
+    <header
+      class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm"
+    >
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-10">
+          <a
+            href="index.html"
+            class="text-2xl font-black text-slate-900 tracking-tight hover:text-indigo-600 transition-colors"
+            >FICHAPP</a
+          >
+          <nav
+            class="hidden md:flex items-center space-x-8 text-sm font-semibold text-slate-600"
+          >
+            <a
+              href="producto.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Producto</a
+            >
+            <a
+              href="funcionalidades.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Funcionalidades</a
+            >
+            <a
+              href="precios.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Precios</a
+            >
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a
+            href="/mobile/dist/"
+            class="text-sm font-bold text-slate-700 hover:text-indigo-600 transition-colors px-4 py-2"
+            >Acceder</a
+          >
+          <a
+            href="app-movil.html"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all shadow-sm"
+            >Descarga la app móvil</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenedor Principal Formulario de Consultoría -->
+    <main
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center"
+    >
+      <!-- Columna Izquierda: Información de la Consultoría y Beneficios -->
+      <section class="lg:col-span-5 space-y-6">
+        <span
+          class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider"
+        >
+          Información Gratuita
+        </span>
+        <h1
+          class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight"
+        >
+          Te ayudamos a resolver cualquier duda sobre el registro de jornada
+        </h1>
+        <p class="text-slate-600 text-base leading-relaxed">
+          Nuestros asesores expertos te mostrarán cómo adaptar FICHAPP a la
+          normativa de inspección laboral específica de tu sector de negocio.
+        </p>
+
+        <!-- Lista de Beneficios con Visual Anchors -->
+        <div class="space-y-4 pt-4 border-t border-slate-200">
+          <div class="flex gap-3 items-start">
+            <span
+              class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0"
+              >📊</span
+            >
+            <div>
+              <h4 class="font-bold text-sm text-slate-900">
+                Demostración personalizada
+              </h4>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Vemos juntos las herramientas de control que mejor encajan con
+                tu equipo.
+              </p>
+            </div>
+          </div>
+          <div class="flex gap-3 items-start">
+            <span
+              class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0"
+              >🛡️</span
+            >
+            <div>
+              <h4 class="font-bold text-sm text-slate-900">
+                Garantía frente a inspecciones
+              </h4>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Te enseñamos cómo se generan los informes inalterables que
+                exigen las autoridades.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Columna Derecha: Formulario de Solicitud Funcional -->
+      <section class="lg:col-span-7">
+        <div
+          class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 shadow-xl shadow-slate-100"
+        >
+          <h2 class="text-xl font-bold text-slate-900 mb-6">
+            Completa tus datos y te llamamos
+          </h2>
+
+          <form
+            id="info-form"
+            onsubmit="enviarSolicitudReal(event)"
+            class="space-y-4"
+          >
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >Tu Nombre</label
+                >
+                <!-- El atributo name es obligatorio para que llegue el dato al correo -->
+                <input
+                  type="text"
+                  name="nombre"
+                  required
+                  placeholder="Ej. Ana García"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+              <div>
+                <label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >Teléfono de Contacto</label
+                >
+                <input
+                  type="tel"
+                  name="telefono"
+                  required
+                  placeholder="Ej. 600 000 000"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >Nombre de la Empresa</label
+                >
+                <input
+                  type="text"
+                  name="empresa"
+                  required
+                  placeholder="Ej. Soluciones Digitales S.L."
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <!-- Mapeado como _replyto para que puedas pulsar "Responder" directamente desde Gmail -->
+                <label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >Correo Electrónico de Empresa</label
+                >
+                <input
+                  type="email"
+                  name="_replyto"
+                  required
+                  placeholder="contacto@empresa.com"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >¿Qué necesita tu negocio? (Opcional)</label
+                >
+                <textarea
+                  rows="3"
+                  name="mensaje"
+                  placeholder="Ej. Necesitamos gestionar turnos rotativos y geolocalización..."
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner resize-none"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Botón Enviar -->
+            <button
+              type="submit"
+              id="submit-btn"
+              class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-600/10 text-sm cursor-pointer mt-2"
+            >
+              Solicitar Información Gratuita
+            </button>
+          </form>
+
+          <!-- Bloque Informativo de Éxito Oculto (Se activa con JS) -->
+          <div id="success-block" class="hidden text-center py-8 space-y-4">
+            <div
+              class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-2xl mx-auto"
+            >
+              ✓
+            </div>
+            <h3 class="text-2xl font-black text-slate-900 tracking-tight">
+              ¡Solicitud Recibida!
+            </h3>
+            <p class="text-sm text-slate-600 max-w-sm mx-auto">
+              Un asesor especializado de FICHAPP revisará tus comentarios y se
+              pondrá en contacto contigo en menos de 24 horas laborables.
+            </p>
+            <div class="pt-4">
+              <a
+                href="index.html"
+                class="inline-block border border-slate-200 hover:border-slate-300 text-slate-600 font-semibold px-6 py-2.5 rounded-xl transition text-xs"
+              >
+                Volver a la Página Principal
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Unificado -->
+    <footer
+      class="bg-white border-t border-slate-200 text-slate-500 text-sm py-12 mt-12"
+    >
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6"
+      >
+        <span class="text-xl font-black text-slate-900 tracking-tight"
+          >FICHAPP</span
+        >
+        <div
+          class="flex flex-wrap justify-center gap-6 text-slate-400 font-medium"
+        >
+          <a href="legal.html" class="hover:text-slate-600 transition-colors"
+            >Legal</a
+          >
+          <a href="cookies.html" class="hover:text-slate-600 transition-colors"
+            >Cookies</a
+          >
+          <a
+            href="privacidad.html"
+            class="hover:text-slate-600 transition-colors"
+            >Privacidad</a
+          >
+          <a
+            href="seguridad.html"
+            class="hover:text-slate-600 transition-colors"
+            >Seguridad</a
+          >
+        </div>
+        <p class="text-xs text-slate-400">
+          © 2026 Fichapp. Todos los derechos reservados.
+        </p>
+      </div>
+    </footer>
+
+    <!-- Lógica de Envío Interactiva sin Recarga de Pantalla -->
+    <script>
+      async function enviarSolicitudReal(event) {
+        event.preventDefault(); // Detiene la recarga del navegador
+
+        const formulario = document.getElementById("info-form");
+        const bloqueExito = document.getElementById("success-block");
+        const botonSubmit = document.getElementById("submit-btn");
+
+        // 1. Cambia este enlace por la URL/Endpoint exacta que te dé Formspree en tu panel
+        const FORMSPREE_ENDPOINT = "https://formspree.io/f/xwlpapqn";
+
+        // Bloqueamos la interfaz visual
+        botonSubmit.disabled = true;
+        botonSubmit.textContent = "Transmitiendo datos seguros a soporte...";
+
+        // Recopilamos la información introducida por el cliente
+        const datosFormulario = new FormData(formulario);
+
+        try {
+          const respuesta = await fetch(FORMSPREE_ENDPOINT, {
+            method: "POST",
+            body: datosFormulario,
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          if (respuesta.ok) {
+            // El envío al Gmail de soporte ha sido procesado de forma real
+            formulario.classList.add("hidden");
+            bloqueExito.classList.remove("hidden");
+          } else {
+            // Gestión ante problemas de conexión o tokens inválidos
+            alert(
+              "Ocurrió un problema al procesar el envío. Por favor, inténtelo de nuevo o escriba directamente a fichapp.suport@gmail.com",
+            );
+            botonSubmit.disabled = false;
+            botonSubmit.textContent = "Solicitar Información Gratuita";
+          }
+        } catch (error) {
+          alert("Error de red. Compruebe su conexión a internet.");
+          botonSubmit.disabled = false;
+          botonSubmit.textContent = "Solicitar Información Gratuita";
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -4,47 +4,62 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Precios y Planes - FICHAPP</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Actualizado al motor estético unificado v4 idéntico al index y app-movil -->
+    <script src="https://jsdelivr.net"></script>
   </head>
 
-  <body class="bg-white text-slate-900 font-sans antialiased">
+  <body class="bg-slate-50 text-slate-800 font-sans antialiased">
     <!-- Barra de aviso superior -->
     <div
       class="bg-indigo-600 text-white text-xs md:text-sm text-center py-2.5 font-medium px-4"
     >
-      🚀 Planes flexibles adaptados al tamaño de tu empresa. Sin permanencia.
+      🚀 Un único plan con todas las herramientas ilimitadas para tu empresa.
+      Sin permanencia.
     </div>
 
     <!-- Header / Navegación Principal -->
-    <header class="sticky top-0 z-50 bg-white border-b border-slate-100">
+    <header
+      class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm"
+    >
       <div
-        class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between"
       >
         <div class="flex items-center gap-10">
-          <span class="text-2xl font-black tracking-tight text-slate-900"
-            ><a href="index.html" class="hover:text-indigo-600"
-              >FICHAPP</a
-            ></span
+          <a
+            href="index.html"
+            class="text-2xl font-black text-slate-900 tracking-tight hover:text-indigo-600 transition-colors"
+            >FICHAPP</a
           >
           <nav
-            class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600"
+            class="hidden md:flex space-x-8 text-sm font-semibold text-slate-600"
           >
-            <a href="producto.html" class="hover:text-indigo-600">Producto</a>
-            <a href="funcionalidades.html" class="hover:text-indigo-600"
+            <a
+              href="producto.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Producto</a
+            >
+            <a
+              href="funcionalidades.html"
+              class="hover:text-indigo-600 transition-colors"
               >Funcionalidades</a
             >
-            <a href="precios.html" class="hover:text-indigo-600">Precios</a>
+            <a
+              href="precios.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Precios</a
+            >
           </nav>
         </div>
         <div class="flex items-center gap-4">
+          <!-- Ruta limpia definitiva apuntando a mobile/dist/ sin index.html en la URL -->
           <a
             href="/mobile/dist/"
-            class="text-sm font-bold text-slate-700 hover:text-indigo-600 px-4 py-2"
+            class="text-sm font-bold text-slate-700 hover:text-indigo-600 transition-colors px-4 py-2"
             >Acceder</a
           >
           <a
             href="app-movil.html"
-            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition shadow-sm"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all shadow-sm"
             >Descarga la app móvil</a
           >
         </div>
@@ -52,155 +67,150 @@
     </header>
 
     <!-- Hero de Precios -->
-    <section class="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center space-y-6">
+    <section class="max-w-4xl mx-auto px-6 pt-20 pb-12 text-center space-y-6">
       <span
-        class="bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider"
-        >Tarifas Transparentes</span
+        class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider"
       >
-      <h1 class="text-4xl sm:text-5xl font-black tracking-tight leading-[1.1]">
-        Planes sencillos y sin costes ocultos
+        Tarifa Transparente y Única
+      </span>
+      <h1
+        class="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight"
+      >
+        Todo el poder de FICHAPP en un solo plan
       </h1>
       <p class="text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
-        Paga solo por lo que necesitas. Disfruta de todos los planes con 14 días
-        de prueba gratuita sin tarjeta de crédito.
+        Sin segmentación por módulos ni limitaciones artificiales. Accede a
+        todas las funcionalidades desde el primer momento con soporte integral
+        gratuito.
       </p>
     </section>
 
-    <!-- Tarjetas de Precios -->
-    <section
-      class="max-w-7xl mx-auto px-6 pb-24 grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch"
-    >
-      <!-- Plan Básico -->
+    <!-- Estructura de Plan Único Centrado -->
+    <section class="max-w-7xl mx-auto px-6 pb-24 flex justify-center">
+      <!-- Bloque Plan Profesional Todo Incluido -->
       <div
-        class="bg-slate-50 p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between space-y-8"
+        class="bg-white text-slate-800 p-8 sm:p-12 rounded-3xl border border-slate-200 flex flex-col md:flex-row justify-between gap-10 items-stretch shadow-xl max-w-4xl w-full relative overflow-hidden"
       >
-        <div class="space-y-4">
-          <span
-            class="text-xs font-bold text-slate-500 uppercase tracking-wider"
-            >Inicial</span
-          >
-          <h3 class="text-2xl font-black">Starter</h3>
-          <p class="text-sm text-slate-600">
-            Ideal para pequeños equipos que buscan digitalizar el fichaje
-            básico.
-          </p>
-          <div class="flex items-baseline gap-1 pt-4">
-            <span class="text-4xl font-black">2€</span>
-            <span class="text-slate-500 text-sm">/ empleado al mes</span>
+        <div class="absolute top-0 left-0 right-0 h-2 bg-indigo-600"></div>
+
+        <!-- Info Izquierda -->
+        <div class="space-y-6 md:w-3/5 flex flex-col justify-between">
+          <div class="space-y-4">
+            <span
+              class="text-xs font-bold text-indigo-600 uppercase tracking-widest block"
+              >Plan Profesional</span
+            >
+            <h3 class="text-3xl font-black text-slate-900 tracking-tight">
+              Acceso Total Ilimitado
+            </h3>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Diseñado para adaptarse al día a día de cualquier equipo de
+              trabajo, centralizando el control horario, turnos y la gestión de
+              la documentación laboral en un entorno robusto.
+            </p>
           </div>
-          <ul class="space-y-3 text-sm text-slate-700 pt-4">
-            <li class="flex items-center gap-2">✓ Fichaje web y móvil</li>
-            <li class="flex items-center gap-2">
-              ✓ Informes básicos de asistencia
+
+          <!-- Listado de Características en Dos Columnas -->
+          <ul
+            class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700 font-medium pt-2 border-t border-slate-100"
+          >
+            <li class="flex items-center gap-2 text-slate-800">
+              ⏱️ Fichaje Web y App Móvil
             </li>
-            <li class="flex items-center gap-2">
-              ✓ Soporte por correo electrónico
+            <li class="flex items-center gap-2 text-slate-800">
+              📅 Planificación de Turnos
+            </li>
+            <li class="flex items-center gap-2 text-slate-800">
+              📱 Modo Offline y Geolocalización
+            </li>
+            <li class="flex items-center gap-2 text-slate-800">
+              🛡️ Informes de Inspección de Ley
+            </li>
+            <li class="flex items-center gap-2 text-slate-800">
+              📁 Documentación Centralizada
+            </li>
+            <li class="flex items-center gap-2 text-slate-800">
+              💬 Soporte Técnico Gratuito
             </li>
           </ul>
         </div>
-        <a
-          href="index.html#prueba-gratis"
-          class="block bg-slate-900 hover:bg-slate-800 text-white text-center font-bold py-3.5 rounded-xl transition"
-        >
-          Empezar prueba
-        </a>
-      </div>
 
-      <!-- Plan Pro (Destacado) -->
-      <div
-        class="bg-indigo-900 text-white p-8 rounded-3xl border border-indigo-800 flex flex-col justify-between space-y-8 shadow-xl relative"
-      >
+        <!-- Bloque de Precio y Cierre de Venta (Derecha) -->
         <div
-          class="absolute -top-4 right-8 bg-indigo-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide"
+          class="bg-slate-50 border border-slate-200 rounded-2xl p-8 md:w-2/5 flex flex-col justify-between text-center space-y-6"
         >
-          Más Popular
-        </div>
-        <div class="space-y-4">
-          <span
-            class="text-xs font-bold text-indigo-300 uppercase tracking-wider"
-            >Avanzado</span
-          >
-          <h3 class="text-2xl font-black">Business</h3>
-          <p class="text-sm text-indigo-200">
-            Para empresas en crecimiento que exigen control de turnos y GPS.
-          </p>
-          <div class="flex items-baseline gap-1 pt-4">
-            <span class="text-4xl font-black">4€</span>
-            <span class="text-indigo-300 text-sm">/ empleado al mes</span>
+          <div class="space-y-2">
+            <span
+              class="text-xs font-bold text-slate-400 uppercase tracking-wider block"
+              >Suscripción Mensual</span
+            >
+            <!-- Marcador de posición para la tarifa -->
+            <div class="text-slate-900">
+              <span class="text-3xl font-black tracking-tight block"
+                >Tarifa Plana</span
+              >
+              <span
+                class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full inline-block mt-2"
+                >Consúltanos precio</span
+              >
+            </div>
+            <p class="text-xs text-slate-400 pt-2 leading-relaxed">
+              Facturación mensual simple adaptada a tu volumen. Sin permanencia
+              mínima.
+            </p>
           </div>
-          <ul class="space-y-3 text-sm text-indigo-100 pt-4">
-            <li class="flex items-center gap-2">✓ Todo lo del plan Starter</li>
-            <li class="flex items-center gap-2">
-              ✓ Geolocalización GPS y Modo Offline
-            </li>
-            <li class="flex items-center gap-2">
-              ✓ Cuadrantes y gestión de turnos
-            </li>
-            <li class="flex items-center gap-2">
-              ✓ Reportes listos para inspección
-            </li>
-          </ul>
-        </div>
-        <a
-          href="index.html#prueba-gratis"
-          class="block bg-white hover:bg-slate-100 text-slate-900 text-center font-bold py-3.5 rounded-xl transition"
-        >
-          Empezar prueba gratis
-        </a>
-      </div>
 
-      <!-- Plan Enterprise -->
-      <div
-        class="bg-slate-50 p-8 rounded-3xl border border-slate-200/80 flex flex-col justify-between space-y-8"
-      >
-        <div class="space-y-4">
-          <span
-            class="text-xs font-bold text-slate-500 uppercase tracking-wider"
-            >Corporativo</span
-          >
-          <h3 class="text-2xl font-black">Enterprise</h3>
-          <p class="text-sm text-slate-600">
-            Soluciones a medida para grandes organizaciones y normativas
-            complejas.
-          </p>
-          <div class="flex items-baseline gap-1 pt-4">
-            <span class="text-3xl font-black">A medida</span>
+          <div class="space-y-3">
+            <a
+              href="compra.html"
+              class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white text-center font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-600/10 text-sm"
+            >
+              Contratar Plan →
+            </a>
+            <a
+              href="index.html#prueba-gratis"
+              class="block w-full bg-white border border-slate-200 hover:border-slate-300 text-slate-600 text-center font-semibold py-3 rounded-xl transition text-xs"
+            >
+              Solicitar 14 días gratis
+            </a>
           </div>
-          <ul class="space-y-3 text-sm text-slate-700 pt-4">
-            <li class="flex items-center gap-2">✓ Todo lo del plan Business</li>
-            <li class="flex items-center gap-2">✓ Account manager dedicado</li>
-            <li class="flex items-center gap-2">
-              ✓ Integración con ERP / Nóminas
-            </li>
-            <li class="flex items-center gap-2">
-              ✓ SLA de disponibilidad garantizado
-            </li>
-          </ul>
         </div>
-        <a
-          href="index.html#prueba-gratis"
-          class="block bg-slate-900 hover:bg-slate-800 text-white text-center font-bold py-3.5 rounded-xl transition"
-        >
-          Contactar ventas
-        </a>
       </div>
     </section>
 
-    <!-- Footer -->
+    <!-- Footer Unificado -->
     <footer
-      class="bg-white border-t border-slate-100 py-12 px-6 text-slate-500 text-xs"
+      class="bg-white border-t border-slate-200 text-slate-500 text-sm py-12"
     >
       <div
-        class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6"
       >
-        <span class="text-lg font-black text-slate-900">FICHAPP</span>
-        <div class="flex gap-6 font-semibold">
-          <a href="legal.html" class="hover:text-slate-900">Legal</a>
-          <a href="cookies.html" class="hover:text-slate-900">Cookies</a>
-          <a href="privacidad.html" class="hover:text-slate-900">Privacidad</a>
-          <a href="seguridad.html" class="hover:text-slate-900">Seguridad</a>
+        <span class="text-xl font-black text-slate-900 tracking-tight"
+          >FICHAPP</span
+        >
+        <div
+          class="flex flex-wrap justify-center gap-6 text-slate-400 font-medium"
+        >
+          <a href="legal.html" class="hover:text-slate-600 transition-colors"
+            >Legal</a
+          >
+          <a href="cookies.html" class="hover:text-slate-600 transition-colors"
+            >Cookies</a
+          >
+          <a
+            href="privacidad.html"
+            class="hover:text-slate-600 transition-colors"
+            >Privacidad</a
+          >
+          <a
+            href="seguridad.html"
+            class="hover:text-slate-600 transition-colors"
+            >Seguridad</a
+          >
         </div>
-        <p>© 2026 Fichapp. Todos los derechos reservados.</p>
+        <p class="text-xs text-slate-400">
+          © 2026 Fichapp. Todos los derechos reservados.
+        </p>
       </div>
     </footer>
   </body>

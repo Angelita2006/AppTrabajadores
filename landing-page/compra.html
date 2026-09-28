@@ -1,55 +1,69 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Finalizar Compra - FICHAPP</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 1. SDK Oficial de Stripe para pagos reales -->
     <script src="https://stripe.com"></script>
   </head>
-  <body class="bg-slate-50 text-slate-900 font-sans antialiased">
+  <body class="bg-slate-50 text-slate-800 font-sans antialiased">
     <!-- Header / Navegación Principal -->
     <header
-      class="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm"
+      class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm"
     >
       <div
-        class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between"
       >
         <div class="flex items-center gap-10">
-          <span class="text-2xl font-black tracking-tight text-slate-900">
-            <a href="index.html" class="hover:text-indigo-600">FICHAPP</a>
-          </span>
-          <nav
-            class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600"
+          <a
+            href="index.html"
+            class="text-2xl font-black text-slate-900 tracking-tight hover:text-indigo-600 transition-colors"
+            >FICHAPP</a
           >
-            <a href="producto.html" class="hover:text-indigo-600">Producto</a>
-            <a href="funcionalidades.html" class="hover:text-indigo-600"
+          <nav
+            class="hidden md:flex space-x-8 text-sm font-semibold text-slate-600"
+          >
+            <a
+              href="producto.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Producto</a
+            >
+            <a
+              href="funcionalidades.html"
+              class="hover:text-indigo-600 transition-colors"
               >Funcionalidades</a
             >
-            <a href="precios.html" class="hover:text-indigo-600">Precios</a>
+            <a
+              href="precios.html"
+              class="hover:text-indigo-600 transition-colors"
+              >Precios</a
+            >
           </nav>
         </div>
         <div class="flex items-center gap-4">
           <span
-            class="text-xs text-slate-400 flex items-center gap-1.5 font-medium"
+            class="text-xs text-slate-400 flex items-center gap-1.5 font-semibold"
           >
-            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Conexión
-            cifrada SSL
+            <span
+              class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"
+            ></span>
+            Conexión cifrada SSL
           </span>
         </div>
       </div>
     </header>
 
+    <!-- Formulario Unificado Real -->
     <form id="payment-form">
       <main
-        class="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-10"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-12 gap-10"
       >
-        <!-- Columna Izquierda: Formulario de Registro y Stripe -->
+        <!-- Columna Izquierda: Datos del cliente y Pasarela -->
         <section class="lg:col-span-7 space-y-6 order-2 lg:order-1">
-          <!-- Datos de la Empresa -->
+          <!-- Bloque 1: Datos de la Empresa -->
           <div
-            class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm"
+            class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm"
           >
             <h2
               class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2"
@@ -63,7 +77,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label
-                  class="block text-xs font-bold text-slate-600 uppercase mb-1.5"
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
                   >Nombre de la Empresa</label
                 >
                 <input
@@ -71,41 +85,42 @@
                   id="company-name"
                   required
                   placeholder="Ej. Logística S.L."
-                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
                 />
               </div>
               <div>
                 <label
-                  class="block text-xs font-bold text-slate-600 uppercase mb-1.5"
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
                   >CIF / NIF</label
                 >
                 <input
                   type="text"
                   id="company-taxid"
                   required
+                  pattern="^[A-Z0-9]{9}$"
                   placeholder="Ej. B12345678"
-                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
                 />
               </div>
               <div class="sm:col-span-2">
                 <label
-                  class="block text-xs font-bold text-slate-600 uppercase mb-1.5"
-                  >Correo Electrónico del Administrador</label
+                  class="block text-xs font-bold text-slate-500 uppercase mb-1.5"
+                  >Correo del Administrador</label
                 >
                 <input
                   type="email"
                   id="company-email"
                   required
                   placeholder="admin@empresa.com"
-                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
                 />
               </div>
             </div>
           </div>
 
-          <!-- Pasarela de Pago Real Seguro (Stripe) -->
+          <!-- Bloque 2: Pasarela Blindada Stripe -->
           <div
-            class="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm"
+            class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm"
           >
             <h2
               class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2"
@@ -117,139 +132,194 @@
               Método de Pago Seguro
             </h2>
 
-            <!-- Contenedor donde Stripe inyectará los inputs reales validados por sus servidores -->
-            <div
-              class="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl"
-            >
-              <div id="card-element"></div>
-              <!-- Contenedor para mostrar errores de validación de tarjeta en tiempo real -->
+            <div class="space-y-4">
               <div
-                id="card-errors"
-                role="alert"
-                class="text-xs text-red-500 font-medium mt-3 hidden"
-              ></div>
+                class="p-4 border border-indigo-200 bg-indigo-50/40 rounded-xl flex items-center justify-between"
+              >
+                <div class="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    checked
+                    class="w-4 h-4 text-indigo-600"
+                    readonly
+                  />
+                  <span class="text-sm font-semibold text-slate-800"
+                    >Tarjeta de Crédito / Débito</span
+                  >
+                </div>
+                <div class="flex gap-1 text-slate-400 font-bold text-xs">
+                  <span class="px-1.5 py-0.5 border rounded bg-white"
+                    >VISA</span
+                  >
+                  <span class="px-1.5 py-0.5 border rounded bg-white">MC</span>
+                </div>
+              </div>
+
+              <!-- Input Dinámico inyectado por Stripe -->
+              <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div id="card-element"></div>
+                <!-- Alertas de error bancario en vivo -->
+                <div
+                  id="card-errors"
+                  role="alert"
+                  class="text-xs text-red-500 font-semibold mt-3 hidden"
+                ></div>
+              </div>
             </div>
           </div>
 
-          <!-- Botón de Ejecución de Pago -->
+          <!-- Botón de Ejecución -->
           <button
             type="submit"
             id="submit-button"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-2 cursor-pointer"
           >
-            🔒 Activar Plan FICHAPP
+            🔒 Activar Plan Profesional FICHAPP
           </button>
+          <p class="text-center text-xs text-slate-400">
+            Al confirmar, se iniciará el procesamiento del cobro bajo la
+            pasarela cifrada. Puedes modificar tus credenciales en cualquier
+            momento.
+          </p>
         </section>
 
-        <!-- Columna Derecha: Resumen de Compra -->
+        <!-- Columna Derecha: Resumen de Tarifa Fija FICHAPP -->
         <section class="lg:col-span-5 order-1 lg:order-2">
           <div
             class="bg-slate-900 text-white rounded-2xl p-6 shadow-xl sticky top-24 space-y-6"
           >
-            <h3 class="text-xl font-bold tracking-tight">
-              Resumen de tu suscripción
-            </h3>
-
-            <!-- Selector de Trabajadores -->
-            <div
-              class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3"
-            >
-              <label class="block text-xs font-bold text-slate-400 uppercase"
-                >Número de trabajadores</label
-              >
-              <div class="flex items-center justify-between gap-4">
-                <input
-                  type="range"
-                  id="rango-empleados"
-                  min="1"
-                  max="100"
-                  value="10"
-                  class="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                />
-                <span
-                  id="contador-empleados"
-                  class="bg-indigo-600 text-white font-black px-3 py-1 rounded-md text-sm shrink-0 min-w-[50px] text-center"
-                  >10</span
-                >
-              </div>
+            <div>
+              <h3 class="text-xl font-bold tracking-tight">
+                Resumen de tu suscripción
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Acceso total inmediato sin límites de trabajadores.
+              </p>
             </div>
 
-            <!-- Desglose -->
+            <!-- Desglose de Tarifa Fija -->
             <div class="space-y-3 text-sm border-b border-slate-800 pb-4">
               <div class="flex justify-between text-slate-400">
-                <span
-                  >Licencias (<span id="txt-calc-empleados">10</span> ×
-                  2€)</span
+                <span>Licencia Fichapp Plan Profesional</span>
+                <span class="text-white font-semibold">Activa</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Soporte Técnico</span>
+                <span class="text-emerald-400 font-bold">INCLUIDO (0€)</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Actualizaciones del marco legal</span>
+                <span class="text-emerald-400 font-bold">Garantizadas</span>
+              </div>
+            </div>
+
+            <!-- Total Fijo (Para cambiar el precio, edita el valor de abajo) -->
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="block text-sm font-bold text-slate-400"
+                  >Total Mensual</span
                 >
-                <span class="text-white font-semibold"
-                  ><span id="subtotal-dinamico">20</span>€/mes</span
+                <span class="text-xs text-slate-500"
+                  >(Impuestos no incluidos)</span
+                >
+              </div>
+              <div class="text-right">
+                <!-- Cuando decidas el precio final, edita este texto numérico -->
+                <span
+                  class="text-3xl font-black tracking-tight text-white"
+                  id="display-precio"
+                  >-- €</span
+                >
+                <span class="block text-xs text-indigo-400 font-medium"
+                  >Tarifa Plana</span
                 >
               </div>
             </div>
 
-            <!-- Total -->
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-bold text-slate-400"
-                >Total Mensual</span
-              >
-              <span class="text-3xl font-black tracking-tight text-white"
-                ><span id="total-dinamico">20</span>€</span
-              >
+            <div
+              class="bg-slate-800/40 p-4 border border-slate-800 rounded-xl space-y-2 text-xs text-slate-400"
+            >
+              <p>
+                ✅ Informes de registro listos ante cualquier inspección
+                laboral.
+              </p>
+              <p>✅ Sin compromiso de permanencia ni penalizaciones.</p>
             </div>
           </div>
         </section>
       </main>
     </form>
 
-    <!-- Modal de Carga / Éxito -->
+    <!-- Modal de Procesamiento de Pago -->
     <div
       id="status-modal"
       class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4"
     >
       <div
-        class="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl"
+        class="bg-white rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl border border-slate-100"
       >
-        <div id="modal-loading" class="space-y-4">
+        <!-- Spinner de carga -->
+        <div id="modal-loading" class="space-y-4 py-4">
           <div
             class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"
           ></div>
           <p class="font-bold text-slate-800 text-lg">
-            Procesando pago real...
+            Procesando pago real seguro...
+          </p>
+          <p class="text-xs text-slate-400">
+            Validando credenciales con tu entidad bancaria.
           </p>
         </div>
+        <!-- Éxito del cobro -->
         <div id="modal-success" class="hidden space-y-4">
           <div
             class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto"
           >
             ✓
           </div>
-          <h3 class="text-2xl font-black text-slate-900">¡Pago completado!</h3>
-          <p class="text-sm text-slate-600">
-            Tu suscripción ya está activa en Stripe.
+          <h3 class="text-2xl font-black text-slate-900 tracking-tight">
+            ¡Suscripción Activada!
+          </h3>
+          <p class="text-sm text-slate-500">
+            El pago se ha procesado correctamente a través de Stripe.
           </p>
+          <div
+            class="bg-slate-50 p-4 rounded-xl text-left text-xs text-slate-600 border space-y-1"
+          >
+            <p><strong>Concepto:</strong> Fichapp Plan Profesional Ilimitado</p>
+            <p><strong>Estado del eje Z:</strong> Procesado y Confirmado</p>
+          </div>
+          <!-- Enlace definitivo limpio a vuestra subcarpeta -->
+          <a
+            href="/mobile/dist/"
+            class="block w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition text-sm"
+          >
+            Entrar al Panel de Control →
+          </a>
         </div>
       </div>
     </div>
-
     <script>
-      // 1. Sustituye esto por tu clave pública de Stripe (ej: pk_live_...) o pk_test_... para pruebas
-      const stripe = Stripe("TU_STRIPE_PUBLIC_KEY");
+      // Usa el código con precaución.
+      // 1. IMPORTANTE: Sustituye esto por tu clave pública real de Stripe (ej: pk_live_...) o pk_test_... para desarrolloconst PRECIO_CONFIGURADO = "29€";
+      // Define el precio visual aquí provisionalmente
+      document.getElementById("display-precio").textContent =
+        PRECIO_CONFIGURADO;
+      const stripe = Stripe("pk_test_51PXYZ...TU_CLAVE_REAL_AQUÍ...");
       const elements = stripe.elements();
-
-      // Estilizar la pasarela de pago nativa de Stripe para que encaje con Tailwind
+      // Maquetar los campos nativos de la tarjeta para fusionarlos con Tailwind CSS
       const cardElement = elements.create("card", {
         style: {
           base: {
-            color: "#0f172a",
-            fontFamily: "ui-sans-serif, system-ui, sans-serif",
-            fontSize: "16px",
+            color: "#1e293b",
+            fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
+            fontSize: "15px",
             "::placeholder": { color: "#94a3b8" },
           },
         },
       });
       cardElement.mount("#card-element");
-
-      // Escuchar errores de validación de la tarjeta en vivo
+      // Escuchador de validaciones en vivo sobre la tarjeta
       const cardErrors = document.getElementById("card-errors");
       cardElement.on("change", (event) => {
         if (event.error) {
@@ -259,33 +329,13 @@
           cardErrors.classList.add("hidden");
         }
       });
-
-      // 2. Lógica matemática de la calculadora de licencias
-      const rango = document.getElementById("rango-empleados");
-      const contador = document.getElementById("contador-empleados");
-      const txtCalc = document.getElementById("txt-calc-empleados");
-      const subtotal = document.getElementById("subtotal-dinamico");
-      const total = document.getElementById("total-dinamico");
-      const PRECIO_POR_EMPLEADO = 2;
-
-      rango.addEventListener("input", (e) => {
-        const numEmpleados = e.target.value;
-        const coste = numEmpleados * PRECIO_POR_EMPLEADO;
-        contador.textContent = numEmpleados;
-        txtCalc.textContent = numEmpleados;
-        subtotal.textContent = coste;
-        total.textContent = coste;
-      });
-
-      // 3. Procesamiento real del formulario hacia Stripe
+      // 2. Procesamiento real de la compra hacia la pasarela
       const form = document.getElementById("payment-form");
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-
+        // Bloqueamos la interfaz y mostramos pantalla de carga bancaria
         document.getElementById("status-modal").classList.remove("hidden");
         document.getElementById("submit-button").disabled = true;
-
-        // Pasamos los datos del cliente a Stripe para crear el método de cobro
         const { paymentMethod, error } = await stripe.createPaymentMethod({
           type: "card",
           card: cardElement,
@@ -294,18 +344,14 @@
             email: document.getElementById("company-email").value,
           },
         });
-
         if (error) {
-          // Si la tarjeta es rechazada o inválida
+          // Si el banco rechaza la tarjeta por falta de fondos, número erróneo, etc.
           document.getElementById("status-modal").classList.add("hidden");
           document.getElementById("submit-button").disabled = false;
           cardErrors.textContent = error.message;
           cardErrors.classList.remove("hidden");
         } else {
-          // El pago ha sido procesado por Stripe con éxito. En este punto envías el token al backend.
-          console.log("ID del método de pago real generado:", paymentMethod.id);
-          //Aquí realizas el fetch() a tu API / Backend para guardar el usuario:
-          //await fetch('/api/v1/subscribirse', {method: 'POST',body: JSON.stringify({ paymentMethodId: paymentMethod.id, empleados: rango.value })});
+          // El pago se ha efectuado y tokenizado en Stripe de forma exitosaconsole.log('ID del método de pago real generado:', paymentMethod.id);/*Aquí es donde enganchas el código con tu base de datos:await fetch('/api/v1/checkout', {method: 'POST',body: JSON.stringify({ tokenBancario: paymentMethod.id, email: document.getElementById('company-email').value })});*/
           document.getElementById("modal-loading").classList.add("hidden");
           document.getElementById("modal-success").classList.remove("hidden");
         }
