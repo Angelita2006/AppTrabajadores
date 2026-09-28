@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Descargar App Móvil - FICHAPP</title>
+    <script src="https://tailwindcss.com"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased">
+    <!-- Header / Navegación Principal -->
+    <header
+      class="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm"
+    >
+      <div
+        class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-10">
+          <span class="text-2xl font-black tracking-tight text-slate-900">
+            <a href="index.html" class="hover:text-indigo-600">FICHAPP</a>
+          </span>
+          <nav
+            class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600"
+          >
+            <a href="producto.html" class="hover:text-indigo-600">Producto</a>
+            <a href="funcionalidades.html" class="hover:text-indigo-600"
+              >Funcionalidades</a
+            >
+            <a href="precios.html" class="hover:text-indigo-600">Precios</a>
+          </nav>
+        </div>
+        <div class="flex items-center gap-4">
+          <a
+            href="https://registrohorariosimple.es"
+            class="text-sm font-bold text-slate-700 hover:text-indigo-600 px-4 py-2"
+            >Acceder</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Sección Principal de Descarga -->
+    <main class="max-w-4xl mx-auto px-6 py-16 text-center space-y-12">
+      <div class="space-y-4">
+        <span
+          class="bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider"
+        >
+          Versión Android Disponible
+        </span>
+        <h1
+          class="text-4xl md:text-5xl font-black tracking-tight max-w-2xl mx-auto leading-tight"
+        >
+          Lleva el control horario en tu bolsillo con nuestra App
+        </h1>
+        <p class="text-slate-600 text-lg max-w-xl mx-auto">
+          Gestiona tus fichajes, pausas y jornadas desde cualquier lugar de
+          forma rápida y sencilla.
+        </p>
+      </div>
+
+      <!-- Tarjeta de Descarga Directa del APK desde Plesk -->
+      <div
+        class="bg-white border border-slate-200/80 rounded-3xl p-8 max-w-md mx-auto shadow-xl shadow-slate-100/70 space-y-6"
+      >
+        <div
+          class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto"
+        >
+          🤖
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">FICHAPP para Android</h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Archivo de instalación directa (.APK)
+          </p>
+        </div>
+
+        <!-- Enlace de descarga enrutado a /downloads/ dentro de httpdocs de Plesk -->
+        <a
+          href="/downloads/Fichapp(1.0.0v).apk"
+          download="Fichapp(1.0.0v).apk"
+          class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-indigo-100/50 text-sm"
+        >
+          📥 Descargar APK
+        </a>
+
+        <div
+          class="border-t border-slate-100 pt-4 flex justify-between text-xs text-slate-500 font-medium"
+        >
+          <span>Versión: 1.0.0 (Estable)</span>
+          <span>Tamaño: ~219 MB</span>
+        </div>
+      </div>
+
+      <!-- Guía de Instalación Rápida para los Empleados -->
+      <section
+        class="bg-white border border-slate-200/60 rounded-3xl p-8 max-w-2xl mx-auto text-left shadow-sm space-y-6"
+      >
+        <h3
+          class="text-lg font-bold text-slate-900 border-b pb-3 border-slate-100 flex items-center gap-2"
+        >
+          📖 Pasos para instalar el archivo APK
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="space-y-2">
+            <div
+              class="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600"
+            >
+              1
+            </div>
+            <h4 class="font-bold text-sm text-slate-800">
+              Descarga el archivo
+            </h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Haz clic en el botón de arriba y acepta la descarga del archivo en
+              tu móvil.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              class="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600"
+            >
+              2
+            </div>
+            <h4 class="font-bold text-sm text-slate-800">Permite orígenes</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Si Android te lo solicita, activa "Permitir la instalación desde
+              fuentes desconocidas" en los ajustes.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              class="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600"
+            >
+              3
+            </div>
+            <h4 class="font-bold text-sm text-slate-800">Instala y Ficha</h4>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Abre el archivo descargado, pulsa "Instalar" e inicia sesión con
+              las claves facilitadas por tu empresa.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer
+      class="bg-white border-t border-slate-100 text-slate-400 text-xs py-8 mt-12"
+    >
+      <div
+        class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4"
+      >
+        <span class="font-black text-slate-800 text-base">FICHAPP</span>
+        <p>© 2026 Fichapp. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+  </body>
+</html>

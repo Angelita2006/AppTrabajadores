@@ -304,15 +304,25 @@ export default function PerfilScreen() {
 
   const handleCierreSesion = async () => {
     try {
+      if (trabajadorActual?.id) {
+        try {
+          await actualizarEstadoTrabajador(
+            trabajadorActual.id,
+            ESTADOS_TRABAJADOR.INACTIVO,
+          );
+        } catch (error: any) {
+          console.error(
+            "No se pudo actualizar el estado a inactivo al salir: ",
+            error.message,
+          );
+        }
+      }
+
       await cerrarSesionCompleta();
+
       setTimeout(() => {
         router.replace({ pathname: "/" });
       }, 50);
-      if (trabajadorActual?.id)
-        actualizarEstadoTrabajador(
-          trabajadorActual?.id,
-          ESTADOS_TRABAJADOR.INACTIVO,
-        );
     } catch (error: any) {
       mostrarError(
         "Error al cerrar sesión: " + obtenerMensajeAmigableError(error.message),

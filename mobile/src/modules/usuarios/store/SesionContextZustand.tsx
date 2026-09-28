@@ -19,6 +19,9 @@ import {
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
 
+const STORAGE_KEY_VERSION = "@fichapp_cache_version";
+const CURRENT_VERSION = "2.0";
+
 const STORAGE_KEY_USUARIO = "@fichapp_usuario_sesion";
 const STORAGE_KEY_EMPRESA = "@fichapp_empresa_actual";
 const STORAGE_KEY_CENTRO = "@fichapp_centro_actual";
@@ -155,6 +158,7 @@ export const useSesionStore = create<SesionState>((set) => ({
         STORAGE_KEY_ROL,
         STORAGE_KEY_DEPARTAMENTO,
         STORAGE_KEY_TOKEN,
+        STORAGE_KEY_VERSION,
       ]);
 
       set({
@@ -229,6 +233,25 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function recuperarSesionPermanente() {
       try {
+        const versionGuardada = await AsyncStorage.getItem(STORAGE_KEY_VERSION);
+
+        if (versionGuardada !== CURRENT_VERSION) {
+          await AsyncStorage.multiRemove([
+            STORAGE_KEY_USUARIO,
+            STORAGE_KEY_EMPRESA,
+            STORAGE_KEY_CENTRO,
+            STORAGE_KEY_CONTRATO,
+            STORAGE_KEY_TURNO,
+            STORAGE_KEY_CALENDARIO,
+            STORAGE_KEY_DISPOSITIVO,
+            STORAGE_KEY_ROL,
+            STORAGE_KEY_DEPARTAMENTO,
+          ]);
+          await AsyncStorage.setItem(STORAGE_KEY_VERSION, CURRENT_VERSION);
+          setCargandoSesionLocal(false);
+          return;
+        }
+
         const [
           usuarioGuardado,
           empresaGuardada,
@@ -251,7 +274,15 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEY_DEPARTAMENTO),
         ]);
 
-        if (usuarioGuardado) setUsuarioActual(JSON.parse(usuarioGuardado));
+        if (usuarioGuardado) {
+          const parsedUsuario = JSON.parse(usuarioGuardado);
+          if (parsedUsuario && (parsedUsuario.id || parsedUsuario.email)) {
+            setUsuarioActual(parsedUsuario);
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEY_USUARIO);
+          }
+        }
+
         if (empresaGuardada) setEmpresaActual(JSON.parse(empresaGuardada));
         if (contratoGuardado) setContratoActual(JSON.parse(contratoGuardado));
         if (turnoGuardado) setTurnoActual(JSON.parse(turnoGuardado));
