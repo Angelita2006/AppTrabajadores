@@ -598,7 +598,6 @@ async def actualizar_foto_trabajador(
     
     Sube y actualiza la fotografía de perfil de un trabajador.
     """
-    # Registrar metadatos de red y auditoría de la subida de foto
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de subida de foto para el trabajador {id_trabajador} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
@@ -619,8 +618,20 @@ async def actualizar_foto_trabajador(
     if extension not in ["png", "jpg", "jpeg", "webp"]:
         extension = "png"
 
+    # 1. Asegurar que la carpeta física existe
+    os.makedirs(CARPETA_FOTOS_TRABAJADORES, exist_ok=True)
+
+    # 2. Eliminar fotos anteriores del trabajador con cualquier extensión (evita archivos basura y conflictos)
+    for ext_posible in ["png", "jpg", "jpeg", "webp"]:
+        archivo_antiguo = CARPETA_FOTOS_TRABAJADORES / f"trabajador_{id_trabajador}.{ext_posible}"
+        if archivo_antiguo.exists():
+            try:
+                os.remove(archivo_antiguo)
+            except Exception:
+                pass
+
     nombre_archivo = f"trabajador_{id_trabajador}.{extension}"
-    ruta_destino = os.path.join(CARPETA_FOTOS_TRABAJADORES, nombre_archivo)
+    ruta_destino = CARPETA_FOTOS_TRABAJADORES / nombre_archivo
 
     try:
         with open(ruta_destino, "wb") as buffer:
@@ -631,7 +642,10 @@ async def actualizar_foto_trabajador(
             detail=f"No se ha podido guardar el archivo de imagen en el servidor: {str(error)}"
         )
 
-    ruta_relativa = f"/api/archivos/fotos_trabajadores/{nombre_archivo}"
+    # 3. Añadir timestamp (?t=...) para invalidar la caché del cliente móvil al instante
+    timestamp = int(datetime.now().timestamp())
+    ruta_relativa = f"/api/archivos/fotos_trabajadores/{nombre_archivo}?t={timestamp}"
+    
     trabajador.foto_url = ruta_relativa
     trabajador.updated_at = datetime.now()
 
