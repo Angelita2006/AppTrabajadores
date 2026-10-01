@@ -4,17 +4,18 @@ import axios from "axios";
 import { Platform } from "react-native";
 
 const getBaseURL = () => {
-  // if (Platform.OS === "web") {
-  //   return "http://127.0.0.1:8080"; // Para el navegador web
-  // }
-  // if (Platform.OS === "android") {
-  //   return "http://10.0.2.2:8080"; // Para el emulador de Android
-  // }
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
 
-  // return "http://127.0.0.1:8080"; // Para iOS (emulador) u otros
+  if (Platform.OS === "web") {
+    return "http://127.0.0.1:8080"; // Para local en navegador web
+  }
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:8080"; // Para local en emulador de Android
+  }
 
-  // URL de producción (dominio en servidor Plesk)
-  return "https://www.registrohorariosimple.es";
+  return "http://127.0.0.1:8080"; // Para local en otros dispositivos
 };
 
 const api = axios.create({
