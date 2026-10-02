@@ -4,19 +4,19 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import LottieBackground from "../../src/shared/ui/Background.native";
@@ -105,7 +105,7 @@ export default function RegistroScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al completar el registro y vinculación del usuario: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);

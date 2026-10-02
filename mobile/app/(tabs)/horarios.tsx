@@ -2,8 +2,8 @@ import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-t
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerFichajesTurnoActual } from "@/src/modules/fichajes/api/services";
 import {
-  DIAS_SEMANA,
-  RegistroFichaje,
+    DIAS_SEMANA,
+    RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerResumenesPorTrabajador } from "@/src/modules/resumenes-jornada/api/services";
 import { ResumenJornada } from "@/src/modules/resumenes-jornada/types/resumen-jornada";
@@ -16,9 +16,9 @@ import { AppScreen, Card, Row, StatCard } from "@/src/shared/ui/AppSurface";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
-  formatearAHorasYMinutos,
-  horaAMinutos,
-  obtenerMinutosFichaje,
+    formatearAHorasYMinutos,
+    horaAMinutos,
+    obtenerMinutosFichaje,
 } from "@/src/utils/formaters";
 import { cumpleDiasSemana } from "@/src/utils/validators";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -139,7 +139,7 @@ export default function HorariosScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los centros de trabajo de la empresa: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         if (isMounted) setCargando(false);

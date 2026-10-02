@@ -1,19 +1,19 @@
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 
 import { registrarOrganizacionCompleta } from "@/src/modules/another-services/services";
@@ -24,11 +24,11 @@ import VideoBackground from "@/src/shared/ui/Background.web";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
-  validarCifNifOrganizacion,
-  validarDniEspanol,
-  validarEmail,
-  validarPassword,
-  validarTextoObligatorio,
+    validarCifNifOrganizacion,
+    validarDniEspanol,
+    validarEmail,
+    validarPassword,
+    validarTextoObligatorio,
 } from "@/src/utils/validators";
 
 /**
@@ -248,7 +248,7 @@ export default function RegistroOrganizacionScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudo completar el registro de la organización y su administrador debido a un error en el servidor: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);

@@ -71,6 +71,7 @@ class AsignacionTurnoSimpleResponse(AsignacionTurnoBase):
     para pintar el calendario o la jornada teórica del operario.
     """
     id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
+    empresa_id: UUID = Field(..., description="Empresa común del trabajador y el turno asignado")
     fecha_fin: Optional[date] = Field(None, description="Fecha de finalización de la asignación")
     created_at: Optional[datetime] = Field(None, description="Fecha de creación del registro")
 

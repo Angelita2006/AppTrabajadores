@@ -2,16 +2,16 @@ import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/a
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import {
-  actualizarEstadoTrabajador,
-  actualizarFotoTrabajador,
-  actualizarTrabajador,
-  obtenerTrabajador,
+    actualizarEstadoTrabajador,
+    actualizarFotoTrabajador,
+    actualizarTrabajador,
+    obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
 import {
-  obtenerUsuarioActual,
-  solicitarCambioEmail,
-  solicitarCambioPassword,
+    obtenerUsuarioActual,
+    solicitarCambioEmail,
+    solicitarCambioPassword,
 } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -20,16 +20,16 @@ import { router } from "expo-router";
 import { useFocusEffect } from "expo-router/build/useFocusEffect";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -128,7 +128,7 @@ export default function PerfilScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los centros de trabajo: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         if (isMounted) setCargandoCentros(false);
@@ -169,8 +169,7 @@ export default function PerfilScreen() {
       }
     } catch (error: any) {
       mostrarError(
-        "Error al seleccionar imagen: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al seleccionar imagen: " + obtenerMensajeAmigableError(error),
       );
     }
   };
@@ -220,8 +219,7 @@ export default function PerfilScreen() {
       mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al guardar perfil: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al guardar perfil: " + obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -252,8 +250,7 @@ export default function PerfilScreen() {
       setNuevoEmail("");
     } catch (error: any) {
       mostrarError(
-        "Error al actualizar el correo: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al actualizar el correo: " + obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardandoEmail(false);
@@ -295,7 +292,7 @@ export default function PerfilScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al actualizar la contraseña: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardandoPassword(false);
@@ -313,7 +310,7 @@ export default function PerfilScreen() {
         } catch (error: any) {
           console.error(
             "No se pudo actualizar el estado a inactivo al salir: ",
-            error.message,
+            error,
           );
         }
       }
@@ -325,7 +322,7 @@ export default function PerfilScreen() {
       }, 50);
     } catch (error: any) {
       mostrarError(
-        "Error al cerrar sesión: " + obtenerMensajeAmigableError(error.message),
+        "Error al cerrar sesión: " + obtenerMensajeAmigableError(error),
       );
     }
   };
@@ -344,7 +341,7 @@ export default function PerfilScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudieron refrescar los datos del usuario: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     }
   };

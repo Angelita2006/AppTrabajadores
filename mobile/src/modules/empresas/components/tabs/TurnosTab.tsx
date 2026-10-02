@@ -3,16 +3,16 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
-  validarDuracionPausa,
-  validarFormatoHora,
-  validarTextoObligatorio,
+    validarDuracionPausa,
+    validarFormatoHora,
+    validarTextoObligatorio,
 } from "@/src/utils/validators";
 import React, { useRef, useState } from "react";
 import { Alert, Platform, Pressable, TextInput, View } from "react-native";
 import {
-  crearTurno,
-  editarTurno,
-  eliminarTurno,
+    crearTurno,
+    editarTurno,
+    eliminarTurno,
 } from "../../../turnos/api/services";
 import { TabTurnosProps, Turno } from "../../../turnos/types/turno";
 
@@ -131,7 +131,7 @@ export default function TabTurnos({
     } catch (error: any) {
       mostrarError(
         "Error al crear el turno laboral: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -167,7 +167,7 @@ export default function TabTurnos({
     } catch (error: any) {
       mostrarError(
         "Error al actualizar el turno laboral: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -242,8 +242,7 @@ export default function TabTurnos({
       mostrarMensaje("Éxito", "Turno reactivado correctamente.");
     } catch (error: any) {
       mostrarError(
-        "Error al reactivar el turno: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al reactivar el turno: " + obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);

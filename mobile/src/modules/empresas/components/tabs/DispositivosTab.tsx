@@ -5,14 +5,14 @@ import React, { useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import {
-  crearDispositivo,
-  editarDispositivo,
-  eliminarDispositivo,
+    crearDispositivo,
+    editarDispositivo,
+    eliminarDispositivo,
 } from "../../../dispositivos-fichaje/api/services";
 import {
-  Dispositivo,
-  TIPOS_DISPOSITIVO,
-  TipoDispositivo,
+    Dispositivo,
+    TIPOS_DISPOSITIVO,
+    TipoDispositivo,
 } from "../../../dispositivos-fichaje/types/dispositivo-fichaje";
 import { Empresa } from "../../types/empresa";
 import ItemDispositivo from "../ItemDispositivo";
@@ -109,7 +109,7 @@ export default function TabDispositivos({
     } catch (error: any) {
       mostrarError(
         "Error al crear el dispositivo de fichaje: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -158,7 +158,7 @@ export default function TabDispositivos({
     } catch (error: any) {
       mostrarError(
         "Error al actualizar el dispositivo de fichaje: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -187,7 +187,7 @@ export default function TabDispositivos({
       } catch (error: any) {
         mostrarError(
           "Error al eliminar el dispositivo de fichaje: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         setGuardando(false);
@@ -229,7 +229,7 @@ export default function TabDispositivos({
     } catch (error: any) {
       mostrarError(
         "Error al reactivar el dispositivo: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);

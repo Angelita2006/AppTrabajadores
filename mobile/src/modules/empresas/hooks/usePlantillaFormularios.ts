@@ -73,7 +73,7 @@ export function usePlantillaFormularios(
       .catch((error: any) => {
         mostrarError(
           "Error al cargar los roles disponibles del sistema: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       });
   }, []);
@@ -155,7 +155,7 @@ export function usePlantillaFormularios(
     } catch (error: any) {
       mostrarError(
         "Error al procesar el alta del trabajador: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setProcesando(false);
@@ -195,7 +195,7 @@ export function usePlantillaFormularios(
     } catch (error: any) {
       mostrarError(
         "Error al actualizar los datos del trabajador: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setProcesando(false);
@@ -232,7 +232,7 @@ export function usePlantillaFormularios(
     } catch (error: any) {
       mostrarError(
         "Error al guardar el nuevo contrato del trabajador: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setProcesando(false);
@@ -253,7 +253,7 @@ export function usePlantillaFormularios(
     } catch (error: any) {
       mostrarError(
         "Error al eliminar las asignaciones de turno del trabajador: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setProcesando(false);

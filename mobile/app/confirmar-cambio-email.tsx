@@ -30,7 +30,7 @@ export default function ConfirmarCambioEmailScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al confirmar el cambio de email: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         setCargando(false);

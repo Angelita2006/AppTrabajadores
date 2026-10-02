@@ -23,7 +23,6 @@ from models.fichajes import Fichajes
 from models.correcciones_fichaje import CorreccionesFichaje
 from models.usuarios import Usuarios
 from schemas.fichajes import FichajeCreate, FichajeResponse
-from models.tipos_evento_fichaje import TiposEventoFichaje
 from models.trabajadores import Trabajadores
 from models.turnos import Turnos
 from core.jornada import recalcular_resumen_jornada
@@ -139,17 +138,6 @@ def crear_fichaje(
                 detail=f"Ubicación fuera de rango. Te encuentras a {round(distancia, 2)} metros del centro de trabajo (el límite máximo permitido es de 500 metros)."
             )
 
-    tipo_evento_obj = db.query(TiposEventoFichaje).filter(
-        TiposEventoFichaje.id == obj_in.tipo_evento_id,
-        TiposEventoFichaje.activo.is_(True),
-    ).first()
-    if not tipo_evento_obj:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="El tipo de evento de fichaje indicado no es válido o no existe en la base de datos."
-        )
-    id_real_evento = tipo_evento_obj.id
-
     ip_a_procesar = getattr(obj_in, "ip_address", None)
     if not ip_a_procesar and request.client:
         ip_a_procesar = request.client.host
@@ -161,7 +149,7 @@ def crear_fichaje(
         except ValueError:
             pass
 
-    datos_crudos = f"{obj_in.trabajador_id}-{obj_in.empresa_id}-{id_real_evento}-{fecha_a_validar.isoformat()}"
+    datos_crudos = f"{obj_in.trabajador_id}-{obj_in.empresa_id}-{obj_in.tipo_evento.value}-{fecha_a_validar.isoformat()}"
     sha256_calculado = hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
 
     observaciones_finales = obj_in.observaciones
@@ -185,7 +173,7 @@ def crear_fichaje(
         empresa_id=obj_in.empresa_id,
         trabajador_id=obj_in.trabajador_id,
         centro_trabajo_id=obj_in.centro_trabajo_id,
-        tipo_evento_id=id_real_evento,
+        tipo_evento=obj_in.tipo_evento,
         fecha_hora=fecha_a_validar,
         metodo_fichaje=MetodoFichajeEnum(obj_in.metodo_fichaje) if isinstance(obj_in.metodo_fichaje, str) else obj_in.metodo_fichaje,
         origen=OrigenFichajeEnum(obj_in.origen) if hasattr(obj_in, 'origen') and obj_in.origen else OrigenFichajeEnum.TRABAJADOR,
@@ -223,7 +211,6 @@ def crear_fichaje(
         db.commit()
         
         fichaje_creado = db.query(Fichajes).options(
-            joinedload(Fichajes.tipo_evento),
             joinedload(Fichajes.trabajador),
             joinedload(Fichajes.centro_trabajo),
             joinedload(Fichajes.empresa)
@@ -270,7 +257,6 @@ def obtener_fichajes_trabajador_empresa(
         )
 
     resultados = db.query(Fichajes).options(
-        joinedload(Fichajes.tipo_evento),
         joinedload(Fichajes.trabajador),
         joinedload(Fichajes.centro_trabajo)
     ).filter(
@@ -341,7 +327,6 @@ def obtener_fichajes_turno_actual(
     fichajes_turno = (
         db.query(Fichajes)
         .options(
-            joinedload(Fichajes.tipo_evento),
             joinedload(Fichajes.trabajador),
             joinedload(Fichajes.centro_trabajo)
         )
@@ -396,7 +381,6 @@ def obtener_ultimo_fichaje_trabajador(
         )
 
     ultimo_fichaje = db.query(Fichajes).options(
-        joinedload(Fichajes.tipo_evento),
         joinedload(Fichajes.trabajador),
         joinedload(Fichajes.centro_trabajo)
     ).filter(
@@ -442,7 +426,6 @@ def listar_fichajes_empresa_entre_fechas(
             db.query(Fichajes)
             .options(
                 joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.tipo_evento),
                 joinedload(Fichajes.centro_trabajo)
             )
             .filter(
@@ -469,9 +452,7 @@ def listar_fichajes_empresa_entre_fechas(
 
         payload_respuesta = []
         for fichaje in resultados:
-            codigo_evento = ""
-            if fichaje.tipo_evento:
-                codigo_evento = getattr(fichaje.tipo_evento, "codigo", "")
+            codigo_evento = fichaje.tipo_evento.value
 
             if fichaje.fecha_hora_dispositivo:
                 fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
@@ -507,7 +488,7 @@ def listar_fichajes_empresa_entre_fechas(
                 "correccion_aprobada": correccion_serializada,
                 "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
                 "fecha_hora": fecha_hora_str, 
-                "tipo_evento_id": str(fichaje.tipo_evento_id) if fichaje.tipo_evento_id else None,
+                "tipo_evento": fichaje.tipo_evento.value,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
                 "observaciones": fichaje.observaciones,
                 "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado),
@@ -557,7 +538,6 @@ def listar_fichajes_trabajador_entre_fechas(
             db.query(Fichajes)
             .options(
                 joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.tipo_evento),
                 joinedload(Fichajes.centro_trabajo)
             )
             .filter(
@@ -584,9 +564,7 @@ def listar_fichajes_trabajador_entre_fechas(
 
         payload_respuesta = []
         for fichaje in resultados:
-            codigo_evento = ""
-            if fichaje.tipo_evento:
-                codigo_evento = getattr(fichaje.tipo_evento, "codigo", "")
+            codigo_evento = fichaje.tipo_evento.value
 
             if fichaje.fecha_hora_dispositivo:
                 fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
@@ -622,7 +600,7 @@ def listar_fichajes_trabajador_entre_fechas(
                 "correccion_aprobada": correccion_serializada,
                 "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
                 "fecha_hora": fecha_hora_str, 
-                "tipo_evento_id": str(fichaje.tipo_evento_id) if fichaje.tipo_evento_id else None,
+                "tipo_evento": fichaje.tipo_evento.value,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
                 "observaciones": fichaje.observaciones,
                 "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado),
@@ -667,7 +645,6 @@ def obtener_fichaje(
     print(f"Petición de detalle del fichaje {id_fichaje} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
     fichaje = db.query(Fichajes).options(
-        joinedload(Fichajes.tipo_evento),
         joinedload(Fichajes.trabajador),
         joinedload(Fichajes.centro_trabajo)
     ).filter(Fichajes.id == id_fichaje).first()

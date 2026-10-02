@@ -53,9 +53,12 @@ def asignar_turno_trabajador(
     if not turno:
         print(f"Turno con ID {obj_in.turno_id} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Turno no encontrado.")
+    if turno.empresa_id != trabajador.empresa_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El turno y el trabajador deben pertenecer a la misma empresa.")
 
     # 2. Mapeo y volcado directo al modelo físico de la base de datos
     nueva_asignacion = AsignacionesTurno(
+        empresa_id=trabajador.empresa_id,
         trabajador_id=obj_in.trabajador_id,
         turno_id=obj_in.turno_id,
         fecha_inicio=obj_in.fecha_inicio,
@@ -133,8 +136,11 @@ def asignar_turnos_masivamente(
             if not turno:
                 print(f"Turno con ID {turno_id} no encontrado durante asignación masiva.")
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Turno {turno_id} no encontrado.")
+            if turno.empresa_id != trabajador.empresa_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El turno {turno_id} no pertenece a la empresa del trabajador.")
             
             nueva_asignacion = AsignacionesTurno(
+                empresa_id=trabajador.empresa_id,
                 trabajador_id=obj_in.trabajador_id,
                 turno_id=turno_id,
                 fecha_inicio=obj_in.fecha_inicio,

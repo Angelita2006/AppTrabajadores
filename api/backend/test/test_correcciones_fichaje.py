@@ -17,7 +17,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import main
 
-from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum
+from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum, TipoEventoFichajeEnum
 from routes.correcciones_fichaje import (
     solicitar_correccion,
     resolver_incidencia,
@@ -38,7 +38,7 @@ def test_solicitar_correccion():
         trabajador_id=uuid4(),
         empresa_id=empresa_id,
         tipo_correccion=TipoCorreccionEnum.ALTA_MANUAL,
-        tipo_evento_id=uuid4(),
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         motivo="Motivo de la corrección",
         firma_solicitante="ZmlybWE="
     )
@@ -114,14 +114,14 @@ def test_obtener_correcciones_por_trabajador():
             empresa_id = empresa_id,
             trabajador_id = id_trabajador,
             tipo_correccion=TipoCorreccionEnum.ALTA_MANUAL,
-            tipo_evento_id=uuid4(),
+            tipo_evento=TipoEventoFichajeEnum.ENTRADA,
             motivo="Motivo de la corrección"
         ),
         SimpleNamespace(
             empresa_id = empresa_id,
             trabajador_id = id_trabajador,
             tipo_correccion=TipoCorreccionEnum.ALTA_MANUAL,
-            tipo_evento_id=uuid4(),
+            tipo_evento=TipoEventoFichajeEnum.ENTRADA,
             motivo="Motivo de la corrección"
         )
     ]
@@ -151,14 +151,14 @@ def test_obtener_correcciones_por_empresa():
             empresa_id = empresa_id,
             trabajador_id = id_trabajador,
             tipo_correccion=TipoCorreccionEnum.ALTA_MANUAL,
-            tipo_evento_id=uuid4(),
+            tipo_evento=TipoEventoFichajeEnum.ENTRADA,
             motivo="Motivo de la corrección"
         ),
         SimpleNamespace(
             empresa_id = empresa_id,
             trabajador_id = id_trabajador,
             tipo_correccion=TipoCorreccionEnum.ALTA_MANUAL,
-            tipo_evento_id=uuid4(),
+            tipo_evento=TipoEventoFichajeEnum.ENTRADA,
             motivo="Motivo de la corrección"
         )
     ]

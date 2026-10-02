@@ -1,6 +1,5 @@
 import { Empresa } from "../../empresas/types/empresa";
-import { RegistroFichaje } from "../../fichajes/types/registrofichaje";
-import { TipoEventoFichaje } from "../../tipos_eventos_fichaje/types/tipos_evento_fichaje";
+import { RegistroFichaje, TipoFichaje } from "../../fichajes/types/registrofichaje";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { UsuarioResponse } from "../../usuarios/types/usuario";
 
@@ -56,7 +55,7 @@ export interface CorreccionFichajeBase {
   /** Tipo de rectificación horaria solicitada. */
   tipo_correccion: TipoCorreccion;
   /** ID único UUID del tipo de evento de fichaje correspondiente. */
-  tipo_evento_id: string;
+  tipo_evento: TipoFichaje;
   /** ID del fichaje original que se desea corregir o anular. */
   fichaje_afectado_id?: string | null;
   /** Valores previos almacenados en formato JSON. */
@@ -124,8 +123,6 @@ export interface CorreccionFichajeResponse extends CorreccionFichajeSimpleRespon
   empresa?: Empresa | null;
   /** Detalles del trabajador afectado. */
   trabajador?: Trabajador | null;
-  /** Detalles del tipo de evento asociado. */
-  tipo_evento?: TipoEventoFichaje | null;
   /** Detalles del usuario solicitante. */
   solicitado_por_usuario?: UsuarioResponse | null;
   /** Detalles del fichaje original afectado. */

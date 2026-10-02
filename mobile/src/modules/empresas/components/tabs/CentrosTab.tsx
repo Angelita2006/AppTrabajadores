@@ -4,19 +4,19 @@ import { Row } from "@/src/shared/ui/AppSurface";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  Switch,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Platform,
+    Pressable,
+    Switch,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  actualizarCentroTrabajo,
-  cambiarEstadoCentroTrabajo,
-  crearCentroTrabajo,
-  eliminarCentroTrabajo,
+    actualizarCentroTrabajo,
+    cambiarEstadoCentroTrabajo,
+    crearCentroTrabajo,
+    eliminarCentroTrabajo,
 } from "../../../centros-trabajo/api/services";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../types/empresa";
@@ -112,7 +112,7 @@ export default function TabCentros({
     } catch (error: any) {
       mostrarError(
         "Error al crear el centro de trabajo: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -165,7 +165,7 @@ export default function TabCentros({
     } catch (error: any) {
       mostrarError(
         "Error al actualizar el centro de trabajo: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -236,7 +236,7 @@ export default function TabCentros({
     } catch (error: any) {
       mostrarError(
         "Error al reactivar el centro de trabajo: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);

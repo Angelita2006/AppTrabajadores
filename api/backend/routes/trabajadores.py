@@ -366,8 +366,14 @@ def asignar_turnos_trabajador(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"El turno con ID {turno_id} no existe en el catálogo."
                 )
+            if turno_existe.empresa_id != trabajador.empresa_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El turno con ID {turno_id} no pertenece a la empresa del trabajador."
+                )
             
             nueva_asignacion = AsignacionesTurno(
+                empresa_id=trabajador.empresa_id,
                 trabajador_id=id_trabajador,
                 turno_id=turno_id,
                 fecha_inicio=obj_in.fecha_inicio, 

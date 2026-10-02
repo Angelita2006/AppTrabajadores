@@ -1,4 +1,4 @@
-import { TipoEventoFichaje } from "../modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
+import { TipoFichaje } from "../modules/fichajes/types/registrofichaje";
 
 export const formatearSegundos = (totales: number): string => {
   const horas = Math.floor(totales / 3600)
@@ -58,13 +58,11 @@ export const obtenerMinutosFichaje = (fechaHoraIso: string): number => {
   return horaAMinutos(horaLimpia);
 };
 
-export const obtenerConfiguracionEvento = (
-  tipoEvento?: TipoEventoFichaje | null,
-) => {
-  if (!tipoEvento || !tipoEvento.codigo) {
+export const obtenerConfiguracionEvento = (tipoEvento?: TipoFichaje | null) => {
+  if (!tipoEvento) {
     return { icono: "clock-outline", color: "#475569", texto: "DESCONOCIDO" };
   }
-  const tipoStr = tipoEvento.codigo.trim().toUpperCase();
+  const tipoStr = tipoEvento.trim().toUpperCase();
   if (tipoStr === "ENTRADA") {
     return { icono: "door-open", color: "#16A34A", texto: "ENTRADA" };
   } else if (tipoStr === "SALIDA") {

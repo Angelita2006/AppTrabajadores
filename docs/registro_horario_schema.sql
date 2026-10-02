@@ -300,13 +300,9 @@
 -- CREATE TRIGGER set_updated_at BEFORE UPDATE ON dispositivos_fichaje
 --     FOR EACH ROW EXECUTE FUNCTION trg_set_updated_at();
 
--- CREATE TABLE tipos_evento_fichaje (
---     id                      SMALLSERIAL PRIMARY KEY,
---     codigo                  VARCHAR(30) NOT NULL UNIQUE,
---     descripcion             VARCHAR(150) NOT NULL,
---     computa_como_trabajo    BOOLEAN NOT NULL DEFAULT TRUE
+-- CREATE TYPE tipo_evento_fichaje_enum AS ENUM (
+--     'ENTRADA', 'SALIDA', 'INICIO_PAUSA', 'FIN_PAUSA'
 -- );
--- COMMENT ON TABLE tipos_evento_fichaje IS 'Catálogo global: ENTRADA, SALIDA, INICIO_PAUSA, FIN_PAUSA, etc.';
 
 
 -- CREATE TABLE motivos_pausa (
@@ -323,7 +319,7 @@
 --     empresa_id              UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
 --     trabajador_id           UUID NOT NULL REFERENCES trabajadores(id) ON DELETE RESTRICT,
 --     centro_trabajo_id       UUID NOT NULL REFERENCES centros_trabajo(id) ON DELETE RESTRICT,
---     tipo_evento_id          SMALLINT NOT NULL REFERENCES tipos_evento_fichaje(id) ON DELETE RESTRICT,
+--     tipo_evento             tipo_evento_fichaje_enum NOT NULL,
 --     motivo_pausa_id         SMALLINT REFERENCES motivos_pausa(id) ON DELETE RESTRICT,
 --     fecha_hora              TIMESTAMPTZ NOT NULL,
 --     fecha_hora_dispositivo  TIMESTAMPTZ,
@@ -446,7 +442,7 @@
 --     NEW.hash_integridad := encode(
 --         digest(
 --             concat_ws('|',
---                 NEW.empresa_id, NEW.trabajador_id, NEW.tipo_evento_id,
+--                 NEW.empresa_id, NEW.trabajador_id, NEW.tipo_evento,
 --                 NEW.fecha_hora, NEW.metodo_fichaje, NEW.dispositivo_id,
 --                 NEW.created_at
 --             ),
@@ -526,14 +522,6 @@
 -- -- ============================================================================
 -- -- 13. DATOS SEMILLA (catálogos globales)
 -- -- ============================================================================
-
--- INSERT INTO tipos_evento_fichaje (codigo, descripcion, computa_como_trabajo) VALUES
---     ('ENTRADA',        'Entrada a la jornada',            TRUE),
---     ('SALIDA',         'Salida de la jornada',            TRUE),
---     ('INICIO_PAUSA',   'Inicio de pausa o descanso',       FALSE),
---     ('FIN_PAUSA',      'Fin de pausa o descanso',          TRUE),
---     ('INICIO_VIAJE',   'Inicio de desplazamiento laboral', TRUE),
---     ('FIN_VIAJE',      'Fin de desplazamiento laboral',    TRUE);
 
 -- INSERT INTO motivos_pausa (empresa_id, nombre, computa_como_trabajo, duracion_max_minutos) VALUES
 --     (NULL, 'Comida',                FALSE, 60),

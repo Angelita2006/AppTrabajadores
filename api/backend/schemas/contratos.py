@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from typing import Any, Optional
+from typing import Any, Optional, List
 from uuid import UUID
 from core.enums import TipoContratoEnum, TipoJornadaEnum
 from schemas.calendarios_festivos import CalendarioLaboralSimpleResponse
@@ -19,7 +19,6 @@ class ContratoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un contrato laboral
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
     centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
@@ -29,6 +28,7 @@ class ContratoBase(BaseModel):
     # Mapeado como Decimal para respetar la precisión Numeric(5, 2) de la base de datos
     horas_semana: Decimal = Field(..., gt=Decimal('0'), max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio del contrato en formato AAAA-MM-DD")
+    departamento_id: UUID = Field(..., description="Departamento obligatorio del contrato")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,8 +37,7 @@ class ContratoCreate(ContratoBase):
     Esquema utilizado para registrar un nuevo contrato en el sistema.
     Valida las restricciones lógicas y de negocio antes de la inserción.
     """
-    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
-    departamento_id: Optional[UUID] = Field(None, description="ID único UUID del departamento asignado")
+    calendario_ids: List[UUID] = Field(..., min_length=1, description="Calendarios anuales del centro que cubren la vigencia del contrato")
     puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Denominación del puesto laboral")
     categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría según convenio profesional")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
@@ -72,28 +71,32 @@ class ContratoCreate(ContratoBase):
         return self
 
 class ContratoUpdate(BaseModel):
-    empresa_id: Optional[UUID] = Field(None, description="ID de la empresa")
-    centro_trabajo_id: Optional[UUID] = Field(None, description="ID del centro de trabajo")
     tipo_contrato: Optional[TipoContratoEnum] = Field(None, description="Modalidad del contrato")
     tipo_jornada: Optional[TipoJornadaEnum] = Field(None, description="Tipo de jornada pactada")
     horas_semana: Optional[Decimal] = Field(None, gt=Decimal('0'), max_digits=5, decimal_places=2, description="Horas semanales")
     fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
-    departamento_id: Optional[UUID] = Field(None, description="ID del departamento")
+    departamento_id: Optional[UUID] = Field(None, description="ID del departamento; no puede quedar vacío")
     puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Puesto de trabajo")
     categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría profesional")
-    trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador")
-    calendario_laboral_id: Optional[UUID] = Field(None, description="ID único UUID del calendario laboral asignado")
+    calendario_ids: Optional[List[UUID]] = Field(None, description="Calendarios anuales que aplican al contrato")
 
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
-    @field_validator('fecha_fin', 'departamento_id', 'calendario_laboral_id', mode='before')
+    @field_validator('fecha_fin', 'departamento_id', mode='before')
     @classmethod
     def limpiar_vacios(cls, v: Any) -> Any:
         """Convierte cadenas vacías en None para evitar errores de parseo UUID/Date."""
         if v == "" or v is None:
             return None
         return v
+
+class ContratoCalendarioResponse(BaseModel):
+    calendario_id: UUID
+    calendario: Optional[CalendarioLaboralSimpleResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ContratoSimpleResponse(ContratoBase):
     """
@@ -104,8 +107,7 @@ class ContratoSimpleResponse(ContratoBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
 
-    calendario_laboral_id: Optional[UUID] = Field(None, description="ID del calendario laboral asignado")
-    departamento_id: Optional[UUID] = Field(None, description="ID del departamento")
+    calendarios_asociados: List["ContratoCalendarioResponse"] = Field(default_factory=list, description="Calendarios anuales del centro asociados al contrato")
     puesto_trabajo: Optional[str] = Field(None, description="Puesto de trabajo")
     categoria_profesional: Optional[str] = Field(None, description="Categoría profesional")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
@@ -120,6 +122,5 @@ class ContratoResponse(ContratoSimpleResponse):
     centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
     trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
     departamento: Optional[DepartamentoSimpleResponse] = Field(None, description="Detalles del departamento asociado")
-    calendario_laboral: Optional[CalendarioLaboralSimpleResponse] = Field(None, description="Detalles del calendario laboral asociado")
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
-from models.roles import Roles 
+from models.roles import Roles
+from models.permisos import Permisos
+from models.politicas_retencion import PoliticasRetencion
+from core.enums import AccionPermisoEnum, AccionRetencionEnum, TipoPermisoEnum
 
 ROLES_SISTEMA_INICIALES = [
     {
@@ -49,3 +52,31 @@ def inicializar_roles_sistema(db: Session):
             )
             db.add(nuevo_rol)
     db.commit()
+
+
+def inicializar_permisos_sistema(db: Session) -> None:
+    """Inicializa los permisos para todas las parejas de recurso y acción."""
+    permisos_existentes = set(db.query(Permisos.tipo, Permisos.accion).all())
+
+    for tipo in TipoPermisoEnum:
+        for accion in AccionPermisoEnum:
+            if (tipo, accion) in permisos_existentes:
+                continue
+            descripcion = f"Permite {accion.value} sobre {tipo.value.replace('_', ' ')}."
+            db.add(Permisos(tipo=tipo, accion=accion, descripcion=descripcion))
+
+    db.commit()
+
+
+def inicializar_politica_retencion_global(db: Session) -> None:
+    """Crea la política global legal mínima si no existe todavía."""
+    politica = db.query(PoliticasRetencion).filter(
+        PoliticasRetencion.empresa_id.is_(None)
+    ).first()
+    if politica is None:
+        db.add(PoliticasRetencion(
+            empresa_id=None,
+            anios_conservacion=4,
+            accion_tras_periodo=AccionRetencionEnum.ARCHIVAR,
+        ))
+        db.commit()

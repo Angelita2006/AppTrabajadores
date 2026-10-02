@@ -17,6 +17,7 @@ from models.trabajadores import Trabajadores
 from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
 from models.contratos import Contratos
+from models.contratos_calendarios import ContratosCalendarios
 from core.auditoria import registrar_auditoria
 from core.enums import AccionAuditoriaEnum
 
@@ -76,26 +77,41 @@ def crear_contrato(
             detail=f"Centro de trabajo con ID ({obj_in.centro_trabajo_id}) no encontrado."
         )
 
-    calendario = db.query(CalendariosLaborales).filter(
-        CalendariosLaborales.id == obj_in.calendario_laboral_id,
-        CalendariosLaborales.activo.is_(True),
+    if trabajador.empresa_id != obj_in.empresa_id or centro.empresa_id != obj_in.empresa_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Trabajador, centro y contrato deben pertenecer a la misma empresa.")
+
+    departamento = db.query(Departamentos).filter(
+        Departamentos.id == obj_in.departamento_id,
+        Departamentos.empresa_id == obj_in.empresa_id,
+        Departamentos.activo.is_(True),
     ).first()
-    if not calendario:
+    if not departamento:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"Calendario laboral con ID ({obj_in.calendario_laboral_id}) no encontrado."
+            detail=f"Departamento con ID ({obj_in.departamento_id}) no encontrado en la empresa."
         )
 
-    if obj_in.departamento_id:
-        departamento = db.query(Departamentos).filter(
-            Departamentos.id == obj_in.departamento_id,
-            Departamentos.activo.is_(True),
-        ).first()
-        if not departamento:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail=f"Departamento con ID ({obj_in.departamento_id}) no encontrado."
-            )
+    contrato_activo = db.query(Contratos).filter(
+        Contratos.empresa_id == obj_in.empresa_id,
+        Contratos.trabajador_id == obj_in.trabajador_id,
+        Contratos.activo.is_(True),
+    ).first()
+    if contrato_activo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El trabajador ya tiene un contrato marcado activo en esta empresa; finaliza el anterior antes de crear otro.")
+
+    calendarios = db.query(CalendariosLaborales).filter(
+        CalendariosLaborales.id.in_(obj_in.calendario_ids),
+        CalendariosLaborales.empresa_id == obj_in.empresa_id,
+        CalendariosLaborales.centro_trabajo_id == obj_in.centro_trabajo_id,
+        CalendariosLaborales.activo.is_(True),
+    ).all()
+    if len(calendarios) != len(set(obj_in.calendario_ids)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Todos los calendarios deben existir, estar activos y pertenecer al centro del contrato.")
+    calendario_por_anio = {calendario.anio: calendario for calendario in calendarios}
+    ultimo_anio_requerido = obj_in.fecha_fin.year if obj_in.fecha_fin else max(obj_in.fecha_inicio.year, date.today().year)
+    anios_requeridos = set(range(obj_in.fecha_inicio.year, ultimo_anio_requerido + 1))
+    if not anios_requeridos.issubset(calendario_por_anio):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Asocia un calendario del centro por cada año cubierto por el contrato.")
 
     nuevo_contrato = Contratos(
         trabajador_id=obj_in.trabajador_id,
@@ -109,12 +125,20 @@ def crear_contrato(
         puesto_trabajo=obj_in.puesto_trabajo,
         categoria_profesional=obj_in.categoria_profesional,
         fecha_fin=obj_in.fecha_fin, 
-        calendario_laboral_id=obj_in.calendario_laboral_id,
         activo=True 
     )
 
     try:
         db.add(nuevo_contrato)
+        db.flush()
+        for calendario in calendarios:
+            db.add(ContratosCalendarios(
+                empresa_id=obj_in.empresa_id,
+                centro_trabajo_id=obj_in.centro_trabajo_id,
+                contrato_id=nuevo_contrato.id,
+                calendario_id=calendario.id,
+            ))
+        db.flush()
         db.commit()
         
         contrato_creado = db.query(Contratos).options(
@@ -122,7 +146,7 @@ def crear_contrato(
             joinedload(Contratos.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         ).filter(Contratos.id == nuevo_contrato.id).first()
         
         registrar_auditoria(
@@ -172,20 +196,66 @@ def actualizar_contrato(
             detail="Acceso denegado. No tienes permisos para modificar este contrato."
         )
 
-    update_data = obj_in.dict(exclude_unset=True)
+    update_data = obj_in.model_dump(exclude_unset=True)
+    calendario_ids = update_data.pop('calendario_ids', None)
 
-    if "departamento_id" in update_data and update_data["departamento_id"]:
+    if "departamento_id" in update_data:
+        if update_data["departamento_id"] is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Todo contrato debe conservar un departamento asociado.")
         depto = db.query(Departamentos).filter(Departamentos.id == update_data["departamento_id"]).first()
-        if not depto:
+        if not depto or depto.empresa_id != contrato.empresa_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
-                detail=f"Departamento con ID ({update_data['departamento_id']}) no encontrado."
+                detail=f"Departamento con ID ({update_data['departamento_id']}) no encontrado en la empresa del contrato."
             )
+
+    fecha_inicio_nueva = update_data.get('fecha_inicio', contrato.fecha_inicio)
+    fecha_fin_nueva = update_data.get('fecha_fin', contrato.fecha_fin)
+    if calendario_ids is not None:
+        calendarios = db.query(CalendariosLaborales).filter(
+            CalendariosLaborales.id.in_(calendario_ids),
+            CalendariosLaborales.empresa_id == contrato.empresa_id,
+            CalendariosLaborales.centro_trabajo_id == contrato.centro_trabajo_id,
+            CalendariosLaborales.activo.is_(True),
+        ).all()
+        if len(calendarios) != len(set(calendario_ids)):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los calendarios deben pertenecer al centro del contrato y estar activos.")
+        to_year = fecha_fin_nueva.year if fecha_fin_nueva else max(fecha_inicio_nueva.year, date.today().year)
+        if not set(range(fecha_inicio_nueva.year, to_year + 1)).issubset({c.anio for c in calendarios}):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debe haber un calendario asociado por cada año cubierto por el contrato.")
+    else:
+        calendarios = None
 
     for field, value in update_data.items():
         setattr(contrato, field, value)
 
     try:
+        if calendarios is not None:
+            db.query(ContratosCalendarios).filter(
+                ContratosCalendarios.contrato_id == contrato.id
+            ).delete(synchronize_session=False)
+            db.flush()
+            db.add_all([
+                ContratosCalendarios(
+                    empresa_id=contrato.empresa_id,
+                    centro_trabajo_id=contrato.centro_trabajo_id,
+                    contrato_id=contrato.id,
+                    calendario_id=calendario.id,
+                )
+                for calendario in calendarios
+            ])
+        elif 'fecha_inicio' in update_data or 'fecha_fin' in update_data:
+            years_linked = {
+                year
+                for (year,) in db.query(CalendariosLaborales.anio)
+                .join(ContratosCalendarios, ContratosCalendarios.calendario_id == CalendariosLaborales.id)
+                .filter(ContratosCalendarios.contrato_id == contrato.id)
+                .all()
+            }
+            to_year = fecha_fin_nueva.year if fecha_fin_nueva else max(fecha_inicio_nueva.year, date.today().year)
+            if not set(range(fecha_inicio_nueva.year, to_year + 1)).issubset(years_linked):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El nuevo periodo requiere calendarios anuales; envía calendario_ids para asociarlos.")
+        contrato.updated_at = datetime.now()
         db.commit()
         
         contrato_actualizado = db.query(Contratos).options(
@@ -193,7 +263,7 @@ def actualizar_contrato(
             joinedload(Contratos.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         ).filter(Contratos.id == id_contrato).first()
         
         registrar_auditoria(
@@ -262,7 +332,7 @@ def rescindir_contrato(
             joinedload(Contratos.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         ).filter(Contratos.id == id_contrato).first()
         
         registrar_auditoria(
@@ -379,7 +449,7 @@ def obtener_contratos_por_trabajador(
             joinedload(Contratos.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         )
         .filter(Contratos.trabajador_id == id_trabajador)
         .all()
@@ -426,7 +496,7 @@ def obtener_contratos_por_empresa(
             joinedload(Contratos.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         )
         .filter(Contratos.empresa_id == id_empresa)
         .all()
@@ -477,7 +547,7 @@ def obtener_contrato_activo_trabajador_empresa(
             joinedload(Contratos.centro_trabajo),
             joinedload(CentrosTrabajo.empresa) if False else joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendario_laboral)
+            joinedload(Contratos.calendarios_asociados).joinedload(ContratosCalendarios.calendario)
         )
         .filter(
             Contratos.trabajador_id == id_trabajador,

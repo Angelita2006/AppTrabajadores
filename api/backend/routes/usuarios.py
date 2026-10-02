@@ -20,7 +20,6 @@ from models.usuarios import Usuarios
 from models.trabajadores import Trabajadores
 from core.database import get_db
 from fastapi.security import OAuth2PasswordRequestForm
-from models.usuarios_roles import UsuariosRoles
 import secrets
 
 

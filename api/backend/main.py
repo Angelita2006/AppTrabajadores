@@ -5,14 +5,14 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core import archivos
-from core.init_db import inicializar_roles_sistema
+from core.init_db import inicializar_permisos_sistema, inicializar_politica_retencion_global, inicializar_roles_sistema
 from core.config import settings
 from core.database import SessionLocal, engine
 from routes import (
     auth, asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales, 
     centros_trabajo, contratos, correcciones_fichaje, departamentos, dispositivos_fichaje, 
     empresas, festivos, fichajes, motivos_pausa, permisos, politicas_retencion, 
-    resumenes_jornada, roles, tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios
+    resumenes_jornada, roles, trabajadores, turnos, usuarios_roles, usuarios
 )
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -40,6 +40,8 @@ def startup_event():
     db = SessionLocal()
     try:
         inicializar_roles_sistema(db)
+        inicializar_permisos_sistema(db)
+        inicializar_politica_retencion_global(db)
         logger.info("Roles del sistema verificados/inicializados correctamente.")
     except Exception as e:
         logger.error(f"Error crítico al inicializar los roles del sistema: {e}")
@@ -144,7 +146,6 @@ app.include_router(permisos.router)
 app.include_router(politicas_retencion.router)
 app.include_router(resumenes_jornada.router)
 app.include_router(roles.router)
-app.include_router(tipos_evento_fichaje.router)
 app.include_router(trabajadores.router)
 app.include_router(turnos.router)
 app.include_router(usuarios_roles.router)

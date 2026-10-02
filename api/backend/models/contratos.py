@@ -2,7 +2,7 @@ import datetime
 import decimal
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, Numeric, PrimaryKeyConstraint, String, Uuid, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, Index, Numeric, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 from core.enums import TipoContratoEnum, TipoJornadaEnum
@@ -10,34 +10,39 @@ from core.enums import TipoContratoEnum, TipoJornadaEnum
 class Contratos(Base):
     __tablename__ = 'contratos'
     __table_args__ = (
-        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check'),
-        CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check'),
-        ForeignKeyConstraint(['calendario_laboral_id'], ['calendarios_laborales.id'], ondelete='SET NULL', name='contratos_calendario_laboral_id_fkey'),        ForeignKeyConstraint(['centro_trabajo_id'], ['centros_trabajo.id'], ondelete='RESTRICT', name='contratos_centro_trabajo_id_fkey'),
-        ForeignKeyConstraint(['departamento_id'], ['departamentos.id'], ondelete='SET NULL', name='contratos_departamento_id_fkey'),
-        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='contratos_empresa_id_fkey'),
-        ForeignKeyConstraint(['trabajador_id'], ['trabajadores.id'], ondelete='RESTRICT', name='contratos_trabajador_id_fkey'),
-        PrimaryKeyConstraint('id', name='contratos_pkey')
+        PrimaryKeyConstraint('id', name='contratos_pkey', comment='Identificador único del contrato.'),
+        ForeignKeyConstraint(['empresa_id', 'centro_trabajo_id'], ['centros_trabajo.empresa_id', 'centros_trabajo.id'], ondelete='RESTRICT', name='contratos_empresa_centro_fkey', comment='El contrato debe pertenecer a la misma empresa y centro de trabajo.'),
+        ForeignKeyConstraint(['empresa_id', 'departamento_id'], ['departamentos.empresa_id', 'departamentos.id'], ondelete='RESTRICT', name='contratos_empresa_departamento_fkey', comment='El contrato debe pertenecer al mismo departamento.'),
+        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='contratos_empresa_id_fkey', comment='El contrato debe pertenecer a la misma empresa.'),
+        ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='contratos_empresa_trabajador_fkey', comment='El contrato debe pertenecer a la misma empresa y trabajador.'),
+        UniqueConstraint('empresa_id', 'centro_trabajo_id', 'id', name='contratos_empresa_centro_id_key', comment='Cada contrato es único por empresa y centro de trabajo.'),
+        Index('contratos_un_activo_por_trabajador_empresa_key', 'empresa_id', 'trabajador_id', unique=True, postgresql_where=text('activo IS TRUE'), compiled=True, comment='Cada trabajador puede tener un único contrato activo por empresa.'),
+        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check', compiled=True, comment='La fecha de fin del contrato debe ser mayor o igual a la fecha de inicio, si aplica.'),
+        CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check', compiled=True, comment='El número de horas semanales del contrato debe ser mayor que cero.'),
+        {'comment': 'Contratos de trabajo de los trabajadores. Incluye información sobre el tipo de contrato, jornada, horas semanales, fechas de inicio y fin, y otros detalles relevantes.'}
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=text('gen_random_uuid()'))
-    trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
-    calendario_laboral_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
-    tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False)
-    tipo_jornada: Mapped[TipoJornadaEnum] = mapped_column(Enum(TipoJornadaEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_jornada_enum'), nullable=False)
-    horas_semana: Mapped[decimal.Decimal] = mapped_column(Numeric(5, 2), nullable=False)
-    fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False)
-    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'))
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'))
-    departamento_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
-    puesto_trabajo: Mapped[Optional[str]] = mapped_column(String(150))
-    categoria_profesional: Mapped[Optional[str]] = mapped_column(String(150))
-    fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date)
-
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='contratos') # type: ignore
-    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos') # type: ignore
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos') # type: ignore
-    calendario_laboral: Mapped[Optional['CalendariosLaborales']] = relationship('CalendariosLaborales') # type: ignore
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único del contrato.')
+    empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador de la empresa a la que pertenece el contrato.')
+    trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del trabajador al que corresponde el contrato.')
+    centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del centro de trabajo al que pertenece el contrato.')
+    departamento_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Departamento al que pertenece el contrato.')
+    
+    tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False, server_default=TipoContratoEnum.TEMPORAL, comment='Tipo de contrato.')
+    tipo_jornada: Mapped[TipoJornadaEnum] = mapped_column(Enum(TipoJornadaEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_jornada_enum'), nullable=False, server_default=TipoJornadaEnum.COMPLETA, comment='Tipo de jornada.')
+    horas_semana: Mapped[decimal.Decimal] = mapped_column(Numeric(5, 2), nullable=False, comment='Número de horas semanales del contrato.')
+    puesto_trabajo: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, comment='Puesto de trabajo del contratado.')
+    categoria_profesional: Mapped[Optional[str]] = mapped_column(String(150), nullable=True, comment='Categoría profesional del contratado.')
+    fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha de inicio del contrato.')
+    fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de fin del contrato. Si es NULL, el contrato está activo hasta que se indique lo contrario.')
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment='Indica si el contrato está activo.')
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del contrato.')
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del contrato.')
+    
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos', comment='Empresa a la que pertenece el contrato.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos', comment='Trabajador al que corresponde el contrato.') # type: ignore
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='contratos', comment='Centro de trabajo al que pertenece el contrato.') # type: ignore
+    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos', comment='Departamento al que pertenece el contrato.') # type: ignore
+    
+    calendarios_asociados: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', back_populates='contrato', cascade='all, delete-orphan') # type: ignore

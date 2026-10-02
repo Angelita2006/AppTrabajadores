@@ -1,14 +1,14 @@
 import {
-  crearCorreccion,
-  obtenerCorreccionesPorEmpresa,
-  obtenerCorreccionesPorTrabajador,
-  resolverCorreccion,
+    crearCorreccion,
+    obtenerCorreccionesPorEmpresa,
+    obtenerCorreccionesPorTrabajador,
+    resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import {
-  obtenerTipoEventoPorId,
-  obtenerTiposEventosEmpresa,
+    obtenerTipoEventoPorId,
+    obtenerTiposEventosEmpresa,
 } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
@@ -18,17 +18,17 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  CorreccionFichajeCreate,
-  CorreccionFichajeResponse,
-  EstadoCorreccion,
-  TipoCorreccion,
+    CorreccionFichajeCreate,
+    CorreccionFichajeResponse,
+    EstadoCorreccion,
+    TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
@@ -183,7 +183,7 @@ export default function IncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar los centros de trabajo de la empresa: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -289,7 +289,7 @@ export default function IncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar los centros de trabajo de la empresa: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -335,7 +335,7 @@ export default function IncidenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al resolver la corrección: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         setCargando(false);

@@ -1,6 +1,6 @@
 import {
-  actualizarEstadoTrabajador,
-  obtenerEmpresaTrabajador,
+    actualizarEstadoTrabajador,
+    obtenerEmpresaTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
@@ -14,19 +14,19 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { obtenerEmpresa } from "../src/modules/empresas/api/services";
 import { ThemedText } from "../src/shared/components/ThemedText";
@@ -76,7 +76,7 @@ export default function RootIndexScreen() {
         } catch (error: any) {
           mostrarError(
             "No se han podido configurar las notificaciones: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         }
       }
@@ -107,8 +107,7 @@ export default function RootIndexScreen() {
         respuestaLogin = await iniciarSesion(email, password);
       } catch (error: any) {
         mostrarError(
-          "Error al iniciar sesión: " +
-            obtenerMensajeAmigableError(error.message),
+          "Error al iniciar sesión: " + obtenerMensajeAmigableError(error),
         );
         return;
       }
@@ -129,7 +128,7 @@ export default function RootIndexScreen() {
         } catch (error: any) {
           mostrarError(
             "No se pudieron cargar los datos de la empresa administradora: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         }
       } else if (usuario.trabajador_id) {
@@ -144,7 +143,7 @@ export default function RootIndexScreen() {
         } catch (error: any) {
           mostrarError(
             "No se pudieron cargar empresas del trabajador: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         }
       }
@@ -156,7 +155,7 @@ export default function RootIndexScreen() {
     } catch (error: any) {
       mostrarError(
         "Ha fallado el proceso de autenticación: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);

@@ -1,7 +1,7 @@
 import {
-  obtenerAusenciasEmpresa,
-  resolverSolicitudAusencia,
-  solicitarAusencia,
+    obtenerAusenciasEmpresa,
+    resolverSolicitudAusencia,
+    solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
@@ -12,27 +12,27 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  AusenciaCreateRequest,
-  AusenciaResponse,
-  EstadoAusencia,
-  ItemAusencia,
-  TipoAusencia,
-  TIPOS_AUSENCIA,
-  TIPOS_AUSENCIA_LABELS,
+    AusenciaCreateRequest,
+    AusenciaResponse,
+    EstadoAusencia,
+    ItemAusencia,
+    TipoAusencia,
+    TIPOS_AUSENCIA,
+    TIPOS_AUSENCIA_LABELS,
 } from "../../src/modules/ausencias/types/ausencia";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -117,7 +117,7 @@ export default function GestionAusenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar la lista de trabajadores de la empresa: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     }
@@ -155,7 +155,7 @@ export default function GestionAusenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar las ausencias de la empresa: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -208,7 +208,7 @@ export default function GestionAusenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al solicitar o asignar la ausencia: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);

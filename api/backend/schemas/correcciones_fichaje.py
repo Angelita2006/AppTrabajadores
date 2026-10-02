@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Any, Dict
 from uuid import UUID
-from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum
+from core.enums import TipoCorreccionEnum, EstadoCorreccionEnum, TipoEventoFichajeEnum
 from schemas.empresas import EmpresaResponse
 from schemas.trabajadores import TrabajadorSimpleResponse
 from schemas.usuarios import UsuarioSimpleResponse
@@ -18,7 +18,7 @@ class CorreccionFichajeBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
     tipo_correccion: TipoCorreccionEnum = Field(..., description="Tipo de rectificación horaria solicitada")
-    tipo_evento_id: UUID = Field(..., description="ID único UUID del tipo de evento de fichaje correspondiente")
+    tipo_evento: TipoEventoFichajeEnum = Field(..., description="Tipo fijo del evento de fichaje correspondiente")
     fichaje_afectado_id: Optional[UUID] = Field(None, description="ID del fichaje original que se desea corregir o anular")
     valor_anterior: Optional[Dict[str, Any]] = Field(None, description="Valores previos almacenados en formato JSON")
     valor_nuevo: Optional[Dict[str, Any]] = Field(None, description="Nuevos valores propuestos en formato JSON")

@@ -7,14 +7,9 @@ import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import { obtenerFichajesEmpresaEntreFechas } from "@/src/modules/fichajes/api/services";
 import {
-  DIAS_SEMANA,
-  RegistroFichaje,
+    DIAS_SEMANA,
+    RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
-import {
-  obtenerTipoEventoPorId,
-  obtenerTiposEventosEmpresa,
-} from "@/src/modules/tipos_eventos_fichaje/api/services";
-import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
@@ -23,26 +18,26 @@ import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
-  capitalizar,
-  extraerHora,
-  formatearFecha,
-  horaAMinutos,
-  obtenerConfiguracionEvento,
+    capitalizar,
+    extraerHora,
+    formatearFecha,
+    horaAMinutos,
+    obtenerConfiguracionEvento,
 } from "@/src/utils/formaters";
 import {
-  FontAwesome5,
-  Ionicons,
-  MaterialCommunityIcons,
+    FontAwesome5,
+    Ionicons,
+    MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View,
 } from "react-native";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
@@ -92,7 +87,7 @@ const firmaComoHtml = async (
 
     return `<img class="firma-fichaje" src="${escaparHtml(urlFirma)}" alt="Firma del trabajador" />`;
   } catch (error: any) {
-    if (mostrarError) mostrarError(obtenerMensajeAmigableError(error.message));
+    if (mostrarError) mostrarError(obtenerMensajeAmigableError(error));
   }
 };
 
@@ -102,8 +97,6 @@ export default function FichajesHistorialScreen() {
   const [tipoVista, setTipoVista] = useState<"semana" | "mes" | "trimestre">(
     "semana",
   );
-  const [tiposEventosEmpresa, setTiposEventosEmpresa] =
-    useState<TipoEventoFichaje[]>();
   const [, setCalendariosFestivos] = useState<CalendarioFestivo[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [fechaReferencia, setFechaReferencia] = useState<Date>(new Date());
@@ -214,7 +207,7 @@ export default function FichajesHistorialScreen() {
         ).catch((error: any) => {
           mostrarError(
             `No se pudieron obtener fichajes entre las fechas ${fechaInicio}-${fechaFin} : ` +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
           return [];
         }),
@@ -236,11 +229,6 @@ export default function FichajesHistorialScreen() {
         );
       });
       setFichajesPeriodo(fichajesValidos);
-
-      const tiposEventosEmpresaData = await obtenerTiposEventosEmpresa(
-        empresaActual!.id,
-      );
-      setTiposEventosEmpresa(tiposEventosEmpresaData);
 
       const idTrabajadoresUnicos = Array.from(
         new Set(fichajesValidos.map((f: RegistroFichaje) => f.trabajador_id)),
@@ -297,7 +285,7 @@ export default function FichajesHistorialScreen() {
             } catch (error: any) {
               mostrarError(
                 `No se pudo obtener el calendario para el trabajador ${idTrabajador}: ` +
-                  obtenerMensajeAmigableError(error.message),
+                  obtenerMensajeAmigableError(error),
               );
             }
           }
@@ -372,7 +360,7 @@ export default function FichajesHistorialScreen() {
         } catch (error: any) {
           mostrarError(
             `Error procesando datos del trabajador ${idTrabajador}: ` +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         }
       }
@@ -382,7 +370,7 @@ export default function FichajesHistorialScreen() {
     } catch (error: any) {
       mostrarError(
         "Error general al cargar fichajes y turnos: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -601,20 +589,7 @@ export default function FichajesHistorialScreen() {
 
                 for (const m of listaEventos) {
                   const hora = extraerHora(m.fecha_hora, false);
-                  let tipoCodigo = "";
-                  if (m.tipo_evento_id) {
-                    try {
-                      const tipoObj = await obtenerTipoEventoPorId(
-                        m.tipo_evento_id,
-                      );
-                      tipoCodigo = tipoObj?.codigo || "";
-                    } catch (error: any) {
-                      mostrarError(
-                        `Error al obtener el tipo de evento (${m.tipo_evento_id}): ` +
-                          obtenerMensajeAmigableError(error.message),
-                      );
-                    }
-                  }
+                  const tipoCodigo = m.tipo_evento;
                   const tipoUpper = String(tipoCodigo).toUpperCase();
                   const esEntrada = tipoUpper.includes("ENTRADA");
                   const esSalida = tipoUpper.includes("SALIDA");
@@ -712,7 +687,7 @@ export default function FichajesHistorialScreen() {
           try {
             logoEmpresa = (await obtenerUrlLogo(empresaActual?.logo_url)) || "";
           } catch (error: any) {
-            mostrarError(obtenerMensajeAmigableError(error.message));
+            mostrarError(obtenerMensajeAmigableError(error));
           }
           const fiscal = mapaDatosFiscales[t.id];
           const dniTrabajador = fiscal?.dni_nif_nie || "N/A";
@@ -870,7 +845,7 @@ export default function FichajesHistorialScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al generar o exportar el documento PDF: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     },
@@ -1127,13 +1102,9 @@ export default function FichajesHistorialScreen() {
                                   </View>
                                   <View style={{ gap: 4, marginTop: 2 }}>
                                     {eventos.map((item: RegistroFichaje) => {
-                                      const tipoEvento =
-                                        tiposEventosEmpresa?.find(
-                                          (t: TipoEventoFichaje) =>
-                                            t.id == item.tipo_evento_id,
-                                        );
-                                      const config =
-                                        obtenerConfiguracionEvento(tipoEvento);
+                                      const config = obtenerConfiguracionEvento(
+                                        item.tipo_evento,
+                                      );
                                       const horaLimpia = extraerHora(
                                         item.fecha_hora,
                                         false,

@@ -1,6 +1,6 @@
 import {
-  confirmarCambioPassword,
-  solicitarCodigoRecuperacion,
+    confirmarCambioPassword,
+    solicitarCodigoRecuperacion,
 } from "@/src/modules/another-services/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
@@ -9,20 +9,20 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
@@ -81,7 +81,7 @@ export default function RecuperarPasswordScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudo solicitar el código de recuperación debido a un error en el servidor: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -113,7 +113,7 @@ export default function RecuperarPasswordScreen() {
     } catch (error: any) {
       mostrarError(
         "No se pudo completar el restablecimiento de la contraseña debido a un error en el servidor: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);

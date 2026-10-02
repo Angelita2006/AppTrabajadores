@@ -1,11 +1,10 @@
 import { obtenerDispositivosCentro } from "@/src/modules/dispositivos-fichaje/api/services";
 import { Dispositivo } from "@/src/modules/dispositivos-fichaje/types/dispositivo-fichaje";
 import {
-  obtenerFichajesTrabajadorEntreFechas,
-  registrarFichaje,
+    obtenerFichajesTrabajadorEntreFechas,
+    registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
-import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -15,19 +14,19 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  AppState,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    AppState,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View,
 } from "react-native";
 import SignatureCanvas from "react-native-signature-canvas";
 import {
-  Estado,
-  ESTADOS_TRABAJADOR,
+    Estado,
+    ESTADOS_TRABAJADOR,
 } from "../../src/modules/trabajadores/types/trabajador";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -58,16 +57,12 @@ export default function HomeScreen() {
 
   const { mostrarError, mostrarMensaje } = useAppModal();
 
-  const [mapaTiposEvento, setMapaTiposEvento] = useState<
-    Record<string, string>
-  >({});
-
   // Estados y referencias para la firma digital
   const [modalFirmaVisible, setModalFirmaVisible] = useState(false);
   const [accionPendiente, setAccionPendiente] = useState<{
     nuevoEstado: Estado;
     tipoEventoCodigo: string;
-    tipoEventoId: string;
+    tipoEvento: string;
   } | null>(null);
   const signatureRef = useRef<any>(null);
   const webCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -119,7 +114,7 @@ export default function HomeScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al calcular la fecha y hora ajustada a la zona horaria del centro: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
       return ahora.toISOString().replace("Z", "");
     }
@@ -167,7 +162,7 @@ export default function HomeScreen() {
         });
         setHoraActual(horaCentroStr);
       } catch (error: any) {
-        console.error(error.message);
+        console.error(error);
         setHoraActual(ahora.toLocaleTimeString("es-ES", { hour12: false }));
       }
     };
@@ -178,7 +173,7 @@ export default function HomeScreen() {
     return () => clearInterval(intervaloReloj);
   }, [centroTrabajoActual?.id, centroTrabajoActual?.zona_horaria]);
 
-  // Sincronizar tipos de eventos y fichajes de hoy
+  // Sincronizar los fichajes de hoy
   useEffect(() => {
     let isMounted = true;
 
@@ -190,15 +185,6 @@ export default function HomeScreen() {
 
       try {
         if (isMounted) setCargando(true);
-
-        // 1. Cargar y mapear los tipos de evento de fichaje
-        const tiposEvento = await obtenerTiposEventosEmpresa(empresaActual!.id);
-        const mapa: Record<string, string> = {};
-        tiposEvento.forEach((tipo: { id: string; codigo: string }) => {
-          mapa[tipo.codigo] = tipo.id;
-        });
-
-        if (isMounted) setMapaTiposEvento(mapa);
 
         const hoy = formatearFecha(new Date());
 
@@ -232,9 +218,9 @@ export default function HomeScreen() {
         eventos.forEach((fichaje) => {
           const tMs = new Date(fichaje.fecha_hora).getTime();
 
-          if (fichaje.tipo_evento_id === mapa["ENTRADA"]) {
+          if (fichaje.tipo_evento === "ENTRADA") {
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === mapa["INICIO_PAUSA"]) {
+          } else if (fichaje.tipo_evento === "INICIO_PAUSA") {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.max(
                 0,
@@ -243,10 +229,10 @@ export default function HomeScreen() {
               marcaEntradaActiva = null;
             }
             marcaPausaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === mapa["FIN_PAUSA"]) {
+          } else if (fichaje.tipo_evento === "FIN_PAUSA") {
             marcaPausaActiva = null;
             marcaEntradaActiva = tMs;
-          } else if (fichaje.tipo_evento_id === mapa["SALIDA"]) {
+          } else if (fichaje.tipo_evento === "SALIDA") {
             if (marcaEntradaActiva !== null) {
               segundosCalculados += Math.max(
                 0,
@@ -258,12 +244,12 @@ export default function HomeScreen() {
         });
 
         const ultimoFichaje = eventos[eventos.length - 1];
-        const ultimoEventoUuid = ultimoFichaje.tipo_evento_id;
+        const ultimoEvento = ultimoFichaje.tipo_evento;
 
-        if (ultimoEventoUuid === mapa["SALIDA"]) {
+        if (ultimoEvento === "SALIDA") {
           setEstadoActual(ESTADOS_TRABAJADOR.ACTIVO);
           setTimestampBaseActual(null);
-        } else if (ultimoEventoUuid === mapa["INICIO_PAUSA"]) {
+        } else if (ultimoEvento === "INICIO_PAUSA") {
           setEstadoActual(ESTADOS_TRABAJADOR.DESCANSANDO);
           setTimestampBaseActual(marcaPausaActiva);
         } else {
@@ -274,14 +260,14 @@ export default function HomeScreen() {
         setSegundosAcumuladosHoy(segundosCalculados);
 
         const timestampBase =
-          ultimoEventoUuid === mapa["INICIO_PAUSA"]
+          ultimoEvento === "INICIO_PAUSA"
             ? marcaPausaActiva
             : marcaEntradaActiva;
 
         if (
-          (ultimoEventoUuid === mapa["ENTRADA"] ||
-            ultimoEventoUuid === mapa["FIN_PAUSA"] ||
-            ultimoEventoUuid === mapa["INICIO_PAUSA"]) &&
+          (ultimoEvento === "ENTRADA" ||
+            ultimoEvento === "FIN_PAUSA" ||
+            ultimoEvento === "INICIO_PAUSA") &&
           timestampBase !== null
         ) {
           const tramoActual = Math.max(
@@ -297,7 +283,7 @@ export default function HomeScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los datos de la jornada actual: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         if (isMounted) setCargando(false);
@@ -367,20 +353,10 @@ export default function HomeScreen() {
       return;
     }
 
-    const tipoEventoUuid = mapaTiposEvento[codigoEvento];
-
-    if (!tipoEventoUuid) {
-      mostrarMensaje(
-        "Configuración Faltante",
-        `El tipo de fichaje '${codigoEvento}' no se encuentra configurado. Contacte con administración.`,
-      );
-      return;
-    }
-
     setAccionPendiente({
       nuevoEstado,
       tipoEventoCodigo: codigoEvento,
-      tipoEventoId: tipoEventoUuid,
+      tipoEvento: codigoEvento,
     });
     setModalFirmaVisible(true);
   };
@@ -389,11 +365,11 @@ export default function HomeScreen() {
     setModalFirmaVisible(false);
     if (!accionPendiente) return;
 
-    const { nuevoEstado, tipoEventoCodigo, tipoEventoId } = accionPendiente;
+    const { nuevoEstado, tipoEventoCodigo, tipoEvento } = accionPendiente;
     await registrarMarcajeHorario(
       nuevoEstado,
       tipoEventoCodigo,
-      tipoEventoId,
+      tipoEvento,
       signatureUri,
       false,
     );
@@ -403,7 +379,7 @@ export default function HomeScreen() {
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
     tipoEventoCodigo: string,
-    tipoEventoId: string,
+    tipoEvento: string,
     signatureUri: string,
     forzarExtra: boolean = false,
   ) => {
@@ -460,7 +436,7 @@ export default function HomeScreen() {
         trabajador_id: String(usuarioActual.trabajador_id),
         empresa_id: String(empresaActual.id),
         centro_trabajo_id: String(centroTrabajoActual.id),
-        tipo_evento_id: tipoEventoId,
+        tipo_evento: tipoEvento,
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
         estado: "Válido",
@@ -539,7 +515,7 @@ export default function HomeScreen() {
       if (forzarExtra) {
         mostrarError(
           "Error al registrar el fichaje como horas extra en festivo: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
         return;
       }
@@ -570,7 +546,7 @@ export default function HomeScreen() {
             registrarMarcajeHorario(
               nuevoEstado,
               tipoEventoCodigo,
-              tipoEventoId,
+              tipoEvento,
               signatureUri,
               true,
             );
@@ -591,7 +567,7 @@ export default function HomeScreen() {
                   registrarMarcajeHorario(
                     nuevoEstado,
                     tipoEventoCodigo,
-                    tipoEventoId,
+                    tipoEvento,
                     signatureUri,
                     true,
                   );
@@ -603,7 +579,7 @@ export default function HomeScreen() {
       } else {
         mostrarError(
           "Error al procesar tu solicitud de fichaje: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     }

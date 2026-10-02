@@ -1,7 +1,7 @@
 from sqlalchemy import Column, DateTime, Enum, Numeric, SmallInteger, String, Table, Text, Uuid, MetaData
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy_views import CreateView
-from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum
+from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoEventoFichajeEnum
 
 # Metadata exclusivo para vistas (separado de Base.metadata)
 views_metadata = MetaData()
@@ -12,7 +12,7 @@ t_v_fichajes_vigentes = Table(
     Column('empresa_id', Uuid),
     Column('trabajador_id', Uuid),
     Column('centro_trabajo_id', Uuid),
-    Column('tipo_evento_id', Uuid),  
+    Column('tipo_evento', Enum(TipoEventoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_evento_fichaje_enum', create_type=False)),
     Column('motivo_pausa_id', SmallInteger),
     Column('fecha_hora', DateTime(True)),
     Column('fecha_hora_dispositivo', DateTime(True)),
@@ -32,7 +32,7 @@ t_v_fichajes_vigentes = Table(
 
 sql_v_fichajes_vigentes = """
 SELECT 
-    f.id, f.empresa_id, f.trabajador_id, f.centro_trabajo_id, f.tipo_evento_id,
+    f.id, f.empresa_id, f.trabajador_id, f.centro_trabajo_id, f.tipo_evento,
     f.motivo_pausa_id, f.fecha_hora, f.fecha_hora_dispositivo, f.metodo_fichaje,
     f.dispositivo_id, f.latitud, f.longitud, f.ip_address, f.origen,
     f.estado, f.fichaje_sustituido_id, f.hash_integridad, f.observaciones, f.created_at

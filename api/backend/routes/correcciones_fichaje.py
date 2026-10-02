@@ -14,7 +14,7 @@ from models.correcciones_fichaje import CorreccionesFichaje
 from models.contratos import Contratos
 from core.database import get_db
 from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum, TipoFichajeEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
+from core.enums import TipoUsuarioEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum
 from models.empresas import Empresas
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
@@ -97,7 +97,7 @@ def solicitar_correccion(
         empresa_id=obj_in.empresa_id,
         trabajador_id=obj_in.trabajador_id,
         tipo_correccion=obj_in.tipo_correccion,
-        tipo_evento_id=obj_in.tipo_evento_id,
+        tipo_evento=obj_in.tipo_evento,
         valor_nuevo=obj_in.valor_nuevo,
         motivo=obj_in.motivo,
         solicitado_por_usuario_id=usuario_actual.id,
@@ -219,7 +219,7 @@ def resolver_incidencia(
                 sha256_calculado = calcular_hash_fichaje(
                     trabajador_id=str(incidencia.trabajador_id),
                     empresa_id=str(incidencia.empresa_id),
-                    tipo_evento_id=str(incidencia.tipo_evento_id),
+                    tipo_evento=incidencia.tipo_evento.value,
                     fecha_iso=fecha_hora_propuesta.isoformat()
                 )
 
@@ -250,7 +250,7 @@ def resolver_incidencia(
                     empresa_id=incidencia.empresa_id,
                     trabajador_id=incidencia.trabajador_id,
                     centro_trabajo_id=centro_id,  
-                    tipo_evento_id=incidencia.tipo_evento_id,
+                    tipo_evento=incidencia.tipo_evento,
                     fecha_hora=fecha_hora_propuesta,
                     fecha_hora_dispositivo=fecha_hora_propuesta,
                     metodo_fichaje=MetodoFichajeEnum.WEB,  

@@ -1,4 +1,3 @@
-import { TipoEventoFichaje } from "../../tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 
 /**
@@ -63,7 +62,7 @@ export interface FichajeBase {
   /** Identificador único UUID del centro de trabajo. */
   centro_trabajo_id: string;
   /** Identificador único UUID del tipo de evento. */
-  tipo_evento_id: string;
+  tipo_evento: TipoFichaje;
   /** Método utilizado para realizar el marcaje. */
   metodo_fichaje: string;
 }
@@ -79,7 +78,7 @@ export interface FichajeCreateParams {
   /** Identificador UUID del centro de trabajo asignado. */
   centro_trabajo_id: string;
   /** Identificador del tipo de evento horario. */
-  tipo_evento_id: string;
+  tipo_evento: TipoFichaje;
   /** Canal: app_movil, web, qr, etc. */
   metodo_fichaje: string;
   /** Origen del fichaje. */
@@ -148,8 +147,6 @@ export interface FichajeSimpleResponse extends FichajeBase {
 export interface RegistroFichaje extends FichajeSimpleResponse {
   /** Nombre del turno laboral asignado al trabajador en el momento del fichaje (campo complementario). */
   turno_nombre: string;
-  /** Detalles del tipo de evento asociado. */
-  tipo_evento: TipoEventoFichaje;
   /** Detalles del trabajador asociado. */
   trabajador: Trabajador;
   correccion_aprobada?: {

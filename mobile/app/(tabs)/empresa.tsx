@@ -7,9 +7,9 @@ import { Departamento } from "@/src/modules/departamentos/types/departamento";
 import { obtenerDispositivosEmpresa } from "@/src/modules/dispositivos-fichaje/api/services";
 import { Dispositivo } from "@/src/modules/dispositivos-fichaje/types/dispositivo-fichaje";
 import {
-  actualizarLogoEmpresa,
-  guardarDatosEmpresa,
-  obtenerEmpresas,
+    actualizarLogoEmpresa,
+    guardarDatosEmpresa,
+    obtenerEmpresas,
 } from "@/src/modules/empresas/api/services";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import TabCalendario from "@/src/modules/empresas/components/tabs/CalendariosTab";
@@ -18,11 +18,8 @@ import TabDepartamentos from "@/src/modules/empresas/components/tabs/Departament
 import TabDispositivos from "@/src/modules/empresas/components/tabs/DispositivosTab";
 import TabFiscal from "@/src/modules/empresas/components/tabs/FiscalTab";
 import PlantillaTab from "@/src/modules/empresas/components/tabs/PlantillaTab";
-import TabTipoEventos from "@/src/modules/empresas/components/tabs/TiposFichajesTab";
 import TabTurnos from "@/src/modules/empresas/components/tabs/TurnosTab";
 import { Rol } from "@/src/modules/roles/types/rol";
-import { obtenerTiposEventosEmpresa } from "@/src/modules/tipos_eventos_fichaje/api/services";
-import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
@@ -30,12 +27,12 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import { Empresa } from "../../src/modules/empresas/types/empresa";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
@@ -49,8 +46,7 @@ type TabConfig =
   | "turnos"
   | "departamentos"
   | "calendario"
-  | "dispositivos"
-  | "tipoeventos";
+  | "dispositivos";
 
 export default function EmpresasScreen() {
   const { usuarioActual, empresaActual, setEmpresaActual } = useSesion();
@@ -70,9 +66,6 @@ export default function EmpresasScreen() {
   const [dispositivosEmpresa, setDispositivosEmpresa] = useState<Dispositivo[]>(
     [],
   );
-  const [tiposEventosEmpresa, setTiposEventosEmpresa] = useState<
-    TipoEventoFichaje[]
-  >([]);
   const [rolesEmpresa, setRolesEmpresa] = useState<Rol[]>([]);
 
   const [tabActiva, setTabActiva] = useState<TabConfig>("fiscal");
@@ -134,14 +127,12 @@ export default function EmpresasScreen() {
         datosTurnos,
         datosDepartamentos,
         datosDispositivos,
-        datosTiposEventos,
       ] = await Promise.all([
         obtenerCentrosTrabajoPorEmpresa(empresaId),
         obtenerCalendariosFestivosPorEmpresa(empresaId),
         obtenerTurnosEmpresa(empresaId),
         obtenerDepartamentosEmpresa(empresaId),
         obtenerDispositivosEmpresa(empresaId),
-        obtenerTiposEventosEmpresa(empresaId),
       ]);
 
       setCentrosEmpresa(datosCentros);
@@ -149,7 +140,6 @@ export default function EmpresasScreen() {
       setTurnosEmpresa(datosTurnos);
       setDepartamentosEmpresa(datosDepartamentos);
       setDispositivosEmpresa(datosDispositivos);
-      setTiposEventosEmpresa(datosTiposEventos);
 
       if (datosCalendarios.length > 0) {
         const primerCalendario: CalendarioFestivo = datosCalendarios[0];
@@ -161,7 +151,7 @@ export default function EmpresasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al cargar la información operativa y estructural de la empresa: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -185,7 +175,7 @@ export default function EmpresasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al obtener el catálogo de empresas autorizadas: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -215,7 +205,7 @@ export default function EmpresasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al guardar los datos fiscales de la empresa: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -271,7 +261,7 @@ export default function EmpresasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al actualizar el logotipo corporativo: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     }
@@ -548,19 +538,6 @@ export default function EmpresasScreen() {
                     centrosEmpresa,
                     dispositivosEmpresa,
                     setDispositivosEmpresa,
-                    empresaActual,
-                    guardando,
-                    setGuardando,
-                    styles,
-                  }}
-                />
-              )}
-
-              {tabActiva === "tipoeventos" && (
-                <TabTipoEventos
-                  {...{
-                    tiposEventosEmpresa,
-                    setTiposEventosEmpresa,
                     empresaActual,
                     guardando,
                     setGuardando,

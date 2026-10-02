@@ -3,8 +3,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, IPvAnyAddress, ConfigDict
 from typing import Optional
 from uuid import UUID
-from core.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
-from schemas.tipos_evento_fichaje import TipoEventoFichajeSimpleResponse
+from core.enums import MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum, TipoEventoFichajeEnum
 from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
@@ -19,7 +18,7 @@ class FichajeBase(BaseModel):
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador")
     centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo")
-    tipo_evento_id: UUID = Field(..., description="ID único UUID del tipo de evento")
+    tipo_evento: TipoEventoFichajeEnum = Field(..., description="Tipo fijo del evento de fichaje")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Método utilizado para realizar el marcaje")
 
 class FichajeCreate(BaseModel):
@@ -31,7 +30,7 @@ class FichajeCreate(BaseModel):
     trabajador_id: UUID = Field(..., description="ID UUID del expediente del empleado")
     centro_trabajo_id: UUID = Field(..., description="ID UUID del centro de trabajo asignado")
     
-    tipo_evento_id: UUID = Field(..., description="ID numérico del tipo de evento horario")
+    tipo_evento: TipoEventoFichajeEnum = Field(..., description="Tipo fijo del evento de fichaje")
     metodo_fichaje: MetodoFichajeEnum = Field(..., description="Canal: app_movil, web, qr, etc.")
     
     origen: OrigenFichajeEnum = Field(default=OrigenFichajeEnum.TRABAJADOR, description="Origen del fichaje")
@@ -76,7 +75,6 @@ class FichajeResponse(FichajeSimpleResponse):
     """
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
-    tipo_evento: Optional[TipoEventoFichajeSimpleResponse] = Field(None, description="Detalles del tipo de evento asociado")
     trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
 
     model_config = ConfigDict(from_attributes=True)

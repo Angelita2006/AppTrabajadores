@@ -13,8 +13,8 @@ import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaj
 import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import {
-  obtenerEmpresaTrabajador,
-  obtenerTrabajador,
+    obtenerEmpresaTrabajador,
+    obtenerTrabajador,
 } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
@@ -139,7 +139,7 @@ export const useSesionStore = create<SesionState>((set) => ({
     } catch (error: any) {
       console.error(
         "Error al actualizar la sesión del usuario: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     }
   },
@@ -184,8 +184,7 @@ export const useSesionStore = create<SesionState>((set) => ({
       });
     } catch (error: any) {
       console.error(
-        "Error al cerrar la sesión: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al cerrar la sesión: " + obtenerMensajeAmigableError(error),
       );
     }
   },
@@ -297,7 +296,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       } catch (error: any) {
         console.error(
           "Error al recuperar la sesión permanente: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         setCargandoSesionLocal(false);
@@ -381,7 +380,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (!isCancelled) {
           console.error(
             "Error al inicializar el entorno del usuario: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         }
       }
@@ -471,7 +470,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (!isCancelled) {
           console.error(
             "Error al cargar la ficha laboral: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
           setTrabajadorActual(null);
           setContratoActual(null);
@@ -559,7 +558,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       } catch (error: any) {
         console.error(
           "Error al persistir cambios de sesión: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     }

@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from core.archivos import CARPETA_FIRMAS
 from core.config import settings
 from models.contratos import Contratos
+from models.contratos_calendarios import ContratosCalendarios
+from models.calendarios_laborales import CalendariosLaborales
 from models.festivos import Festivos
 
 # Configuración
@@ -48,11 +50,18 @@ def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fe
         (Contratos.fecha_fin == None) | (Contratos.fecha_fin >= fecha_fichaje)
     ).first()
 
-    if not contrato or not contrato.calendario_laboral_id:
+    if not contrato:
         return "Válido"
 
-    es_festivo = db.query(Festivos).filter(
-        Festivos.calendario_id == contrato.calendario_laboral_id,
+    es_festivo = db.query(Festivos).join(
+        CalendariosLaborales, Festivos.calendario_id == CalendariosLaborales.id
+    ).join(
+        ContratosCalendarios,
+        ContratosCalendarios.calendario_id == CalendariosLaborales.id,
+    ).filter(
+        CalendariosLaborales.anio == fecha_fichaje.year,
+        CalendariosLaborales.centro_trabajo_id == contrato.centro_trabajo_id,
+        ContratosCalendarios.contrato_id == contrato.id,
         Festivos.fecha == fecha_fichaje.date()
     ).first()
 
@@ -61,9 +70,9 @@ def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fe
         
     return "Válido"
 
-def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento_id: str, fecha_iso: str) -> str:
+def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento: str, fecha_iso: str) -> str:
     """Genera el hash inmutable SHA-256 para auditoría legal."""
-    datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento_id}-{fecha_iso}"
+    datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento}-{fecha_iso}"
     return hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
 
 def procesar_y_guardar_firma(data_firma: str) -> str:

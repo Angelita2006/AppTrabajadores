@@ -80,7 +80,7 @@ export default function SelectorUbicacionMapa({
         .catch((error: any) => {
           mostrarError(
             "Error al cargar los componentes del mapa interactivo: " +
-              obtenerMensajeAmigableError(error.message),
+              obtenerMensajeAmigableError(error),
           );
         });
     }
@@ -106,7 +106,7 @@ export default function SelectorUbicacionMapa({
     } catch (error: any) {
       mostrarError(
         "Error al intentar abrir Google Maps: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     }
   };

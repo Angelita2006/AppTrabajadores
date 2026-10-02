@@ -21,7 +21,8 @@ from models import ( # type: ignore
     centros_trabajo, contratos, correcciones_fichaje, departamentos,
     dispositivos_fichaje, empresas,  festivos, fichajes, motivos_pausa,
     permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
-    tipos_evento_fichaje, trabajadores, turnos, usuarios_roles, usuarios, vistas, licencias
+    trabajadores, turnos, usuarios, vistas, licencias,
+    usuarios_empresas, gestorias_empresas, usuarios_roles, contratos_calendarios
 )
 
 _modelos = [
@@ -29,7 +30,8 @@ _modelos = [
     fichajes, auditoria_accesos, vistas, calendarios_laborales, centros_trabajo,
     contratos, correcciones_fichaje, departamentos, dispositivos_fichaje,
     festivos, motivos_pausa, permisos, politicas_retencion,
-    resumenes_jornada, roles_permisos, roles, tipos_evento_fichaje, usuarios_roles, usuarios, licencias
+    resumenes_jornada, roles_permisos, roles, usuarios,
+    licencias, usuarios_empresas, gestorias_empresas, usuarios_roles, contratos_calendarios
 ]
 
 for modelo in _modelos:

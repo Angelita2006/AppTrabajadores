@@ -5,7 +5,6 @@ from core.enums import EstadoCorreccionEnum, EstadoFichajeEnum
 from models.correcciones_fichaje import CorreccionesFichaje
 from models.fichajes import Fichajes
 from models.resumenes_jornada import ResumenesJornada
-from models.tipos_evento_fichaje import TiposEventoFichaje
 
 
 def recalcular_resumen_jornada(
@@ -16,8 +15,7 @@ def recalcular_resumen_jornada(
 ) -> ResumenesJornada:
     """Recalcula el agregado diario a partir de los fichajes vigentes."""
     fichajes = (
-        db.query(Fichajes, TiposEventoFichaje.codigo)
-        .join(TiposEventoFichaje, TiposEventoFichaje.id == Fichajes.tipo_evento_id)
+        db.query(Fichajes)
         .filter(
             Fichajes.empresa_id == empresa_id,
             Fichajes.trabajador_id == trabajador_id,
@@ -41,8 +39,8 @@ def recalcular_resumen_jornada(
     salida = None
     pausas: list[tuple[datetime.datetime, datetime.datetime]] = []
     pausa_inicio = None
-    for fichaje, codigo in fichajes:
-        codigo = codigo.upper()
+    for fichaje in fichajes:
+        codigo = fichaje.tipo_evento.value
         if codigo == "ENTRADA" and entrada is None:
             entrada = fichaje.fecha_hora
         elif codigo == "SALIDA":

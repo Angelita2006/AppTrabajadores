@@ -1,4 +1,3 @@
-
 /**
  * Extrae y formatea mensajes de error amigables para el usuario a partir de respuestas HTTP o fallos de red.
  *
@@ -6,35 +5,12 @@
  * @returns Cadena de texto limpia y comprensible para mostrar al usuario final.
  */
 export const obtenerMensajeAmigableError = (error: any): string => {
-  const mensaje = error?.response?.data;
-
-  if (mensaje) {
-    // Maneja arrays de validación uniendo los mensajes
-    if (Array.isArray(mensaje.detail)) {
-      return (
-        mensaje.detail.map((err: any) => err.msg).join(", ") ||
-        "Error de validación en los datos."
-      );
-    }
-
-    // Mensaje estructurado enviado como propiedad 'message' en JSON
-    if (typeof mensaje.message === "string") {
-      return mensaje.message;
-    }
-
-    // Respuesta de error directa en texto plano
-    if (typeof mensaje === "string") {
-      return mensaje;
-    }
-  }
-
-  // Identifica caídas de conexión o ausencia de respuesta del servidor
-  if (mensaje?.message === "Network Error" || !mensaje?.response) {
-    return "No se pudo establecer conexión con el servidor. Comprueba tu conexión a internet.";
+  if (error.message) {
+    return error.message;
   }
 
   // Traducción de códigos de estado HTTP a mensajes comprensibles
-  const status = mensaje?.response?.status;
+  const status = error.status;
   if (status) {
     switch (status) {
       case 400:
@@ -59,5 +35,5 @@ export const obtenerMensajeAmigableError = (error: any): string => {
   }
 
   // Mensaje genérico final si no se reconoce el tipo de error
-  return error?.message || "Ocurrió un error desconocido. Inténtalo de nuevo.";
+  return error.message || "Ocurrió un error desconocido. Inténtalo de nuevo.";
 };

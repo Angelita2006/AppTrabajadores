@@ -18,7 +18,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import main
 
-from core.enums import TipoUsuarioEnum, MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum
+from core.enums import TipoUsuarioEnum, MetodoFichajeEnum, OrigenFichajeEnum, EstadoFichajeEnum, TipoEventoFichajeEnum
 from routes.fichajes import (
     crear_fichaje,
     obtener_fichajes_trabajador_empresa,
@@ -48,7 +48,7 @@ def test_crear_fichaje():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -72,7 +72,7 @@ def test_crear_fichaje():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -103,7 +103,7 @@ def test_obtener_fichajes_trabajador_empresa():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -141,7 +141,7 @@ def test_obtener_fichajes_turno_actual():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -181,7 +181,7 @@ def test_obtener_ultimo_fichaje_trabajador():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -190,7 +190,7 @@ def test_obtener_ultimo_fichaje_trabajador():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -229,7 +229,7 @@ def test_obtener_fichaje():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.VALIDO
@@ -272,7 +272,7 @@ def test_validar_fichaje():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.PENDIENTE_REVISION
@@ -311,7 +311,7 @@ def test_eliminar_fichaje():
         empresa_id=id_empresa,
         trabajador_id=id_trabajador,
         centro_trabajo_id=id_centro,
-        tipo_evento_id=id_tipo_evento,
+        tipo_evento=TipoEventoFichajeEnum.ENTRADA,
         metodo_fichaje= MetodoFichajeEnum.APP_MOVIL,
         origen=OrigenFichajeEnum.TRABAJADOR,
         estado=EstadoFichajeEnum.PENDIENTE_REVISION

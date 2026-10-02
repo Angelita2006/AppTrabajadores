@@ -1,18 +1,17 @@
 import {
-  crearCorreccion,
-  obtenerCorreccionesPorEmpresa,
-  resolverCorreccion,
+    crearCorreccion,
+    obtenerCorreccionesPorEmpresa,
+    resolverCorreccion,
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
 import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
-import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
+import {
+    RegistroFichaje,
+    TipoFichaje,
+    TIPOS_FICHAJE,
+} from "@/src/modules/fichajes/types/registrofichaje";
 // Ya no necesitamos obtenerRolPorId ni obtenerTrabajador uno a uno si el backend puede devolver los datos poblados o si filtramos por rol_id directamente si viene incluido en el objeto Trabajador.
 import { obtenerRolPorId } from "@/src/modules/roles/api/services";
-import {
-  obtenerTipoEventoPorId,
-  obtenerTiposEventosEmpresa,
-} from "@/src/modules/tipos_eventos_fichaje/api/services";
-import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -20,24 +19,24 @@ import { formatearFecha } from "@/src/utils/formaters";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  CorreccionFichajeCreate,
-  CorreccionFichajeResponse,
-  EstadoCorreccion,
-  TipoCorreccion,
+    CorreccionFichajeCreate,
+    CorreccionFichajeResponse,
+    EstadoCorreccion,
+    TipoCorreccion,
 } from "../../src/modules/correcciones-fichaje/types/correccion";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { SignatureCapture } from "../../src/shared/components/SignatureCapture";
@@ -62,9 +61,6 @@ export default function GestionIncidenciasScreen() {
   const [fichajesDisponibles, setFichajesDisponibles] = useState<
     FichajeSimplificado[]
   >([]);
-  const [tiposEventosEmpresa, setTiposEventosEmpresa] = useState<
-    TipoEventoFichaje[]
-  >([]);
   const [cargando, setCargando] = useState(true);
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<"todas" | "pendientes">(
@@ -76,8 +72,9 @@ export default function GestionIncidenciasScreen() {
   const [fichajeAfectadoId, setFichajeAfectadoId] = useState("");
   const [fechaAfectada, setFechaAfectada] = useState("");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
-  const [tipoEventoIdSolicitado, setTipoEventoIdSolicitado] =
-    useState<string>("");
+  const [tipoEventoSolicitado, setTipoEventoSolicitado] = useState<TipoFichaje>(
+    TIPOS_FICHAJE.ENTRADA,
+  );
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
   const [firmaSolicitante, setFirmaSolicitante] = useState<string | null>(null);
@@ -147,7 +144,7 @@ export default function GestionIncidenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar la lista de trabajadores de la empresa: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       }
     }
@@ -162,17 +159,9 @@ export default function GestionIncidenciasScreen() {
     }
     try {
       setCargando(true);
-      const [eventosEmpresa, datosGlobales] = await Promise.all([
-        obtenerTiposEventosEmpresa(empresaActual.id),
-        obtenerCorreccionesPorEmpresa(empresaActual.id),
-      ]);
-
-      if (Array.isArray(eventosEmpresa)) {
-        setTiposEventosEmpresa(eventosEmpresa);
-        setTipoEventoIdSolicitado((prev) =>
-          !prev && eventosEmpresa.length > 0 ? eventosEmpresa[0].id : prev,
-        );
-      }
+      const datosGlobales = await obtenerCorreccionesPorEmpresa(
+        empresaActual.id,
+      );
 
       // Creamos un diccionario rápido de trabajadores en memoria para evitar llamadas repetidas
       const mapaTrabajadores = new Map(trabajadores.map((t) => [t.id, t]));
@@ -193,8 +182,8 @@ export default function GestionIncidenciasScreen() {
       setIncidencias(incidenciasConTrabajador);
     } catch (error: any) {
       mostrarError(
-        "Error al cargar las incidencias y tipos de eventos globales: " +
-          obtenerMensajeAmigableError(error.message),
+        "Error al cargar las incidencias: " +
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -239,14 +228,11 @@ export default function GestionIncidenciasScreen() {
                 !fichaje ||
                 !fichaje.estado ||
                 fichaje.estado.toString() !== "Válido" ||
-                !fichaje.tipo_evento_id
+                !fichaje.tipo_evento
               )
                 return null;
 
-              const tipoEventoStr = await obtenerTipoEventoPorId(
-                fichaje.tipo_evento_id,
-              );
-              const codigoEvento = tipoEventoStr?.codigo?.toUpperCase() || "";
+              const codigoEvento = fichaje.tipo_evento;
               const fechaHoraStr = fichaje.fecha_hora || "";
               const [fecha, horaCompleta] = fechaHoraStr.includes("T")
                 ? fechaHoraStr.split("T")
@@ -268,7 +254,7 @@ export default function GestionIncidenciasScreen() {
       } catch (error: any) {
         mostrarError(
           "Error al cargar los fichajes del trabajador seleccionado: " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
         setFichajesDisponibles([]);
       }
@@ -339,7 +325,7 @@ export default function GestionIncidenciasScreen() {
         empresa_id: empresaActual.id,
         trabajador_id: trabajadorSeleccionadoId,
         tipo_correccion: tipoCorreccion,
-        tipo_evento_id: tipoEventoIdSolicitado,
+        tipo_evento: tipoEventoSolicitado,
         solicitado_por_usuario_id: usuarioActual.id,
         firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
@@ -350,7 +336,7 @@ export default function GestionIncidenciasScreen() {
             ? {
                 fecha_descuadre: fechaAfectada.trim(),
                 hora_propuesta: horaRealPropuesta.trim(),
-                tipo_evento_id: tipoEventoIdSolicitado,
+                tipo_evento: tipoEventoSolicitado,
               }
             : {},
         valor_anterior:
@@ -381,7 +367,7 @@ export default function GestionIncidenciasScreen() {
     } catch (error: any) {
       mostrarError(
         "Error al crear o reportar la nueva corrección de fichaje: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setCargando(false);
@@ -392,7 +378,7 @@ export default function GestionIncidenciasScreen() {
     fichajeAfectadoId,
     fechaAfectada,
     horaRealPropuesta,
-    tipoEventoIdSolicitado,
+    tipoEventoSolicitado,
     horaAnterior,
     usuarioActual,
     trabajadorSeleccionadoId,
@@ -434,7 +420,7 @@ export default function GestionIncidenciasScreen() {
           "Error al resolver la incidencia de fichaje (" +
             decision +
             "): " +
-            obtenerMensajeAmigableError(error.message),
+            obtenerMensajeAmigableError(error),
         );
       } finally {
         setProcesandoId(null);
@@ -660,24 +646,24 @@ export default function GestionIncidenciasScreen() {
 
               <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
               <View style={styles.selectorTipos}>
-                {tiposEventosEmpresa.map((evento) => (
+                {Object.values(TIPOS_FICHAJE).map((evento) => (
                   <Pressable
-                    key={evento.id}
+                    key={evento}
                     style={[
                       styles.opcionTipo,
-                      tipoEventoIdSolicitado === evento.id &&
+                      tipoEventoSolicitado === evento &&
                         styles.opcionTipoActiva,
                     ]}
-                    onPress={() => setTipoEventoIdSolicitado(evento.id)}
+                    onPress={() => setTipoEventoSolicitado(evento)}
                   >
                     <ThemedText
                       style={[
                         styles.textoOpcion,
-                        tipoEventoIdSolicitado === evento.id &&
+                        tipoEventoSolicitado === evento &&
                           styles.textoOpcionActiva,
                       ]}
                     >
-                      {evento.codigo.replace("_", " ").toUpperCase()}
+                      {evento.replace("_", " ").toUpperCase()}
                     </ThemedText>
                   </Pressable>
                 ))}

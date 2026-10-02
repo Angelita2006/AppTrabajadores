@@ -7,26 +7,26 @@ import { validarAnioRango } from "@/src/utils/validators";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    TextInput,
+    View,
 } from "react-native";
 import {
-  actualizarCalendarioLaboral,
-  crearCalendarioLaboral,
-  eliminarCalendarioLaboral,
-  importarCalendarioPDF,
+    actualizarCalendarioLaboral,
+    crearCalendarioLaboral,
+    eliminarCalendarioLaboral,
+    importarCalendarioPDF,
 } from "../../../calendarios-laborales/api/services";
 import {
-  CalendarioFestivo,
-  CalendarioLaboralCreate,
-  CalendarioLaboralResponse,
-  CalendarioLaboralUpdate,
+    CalendarioFestivo,
+    CalendarioLaboralCreate,
+    CalendarioLaboralResponse,
+    CalendarioLaboralUpdate,
 } from "../../../calendarios-laborales/types/calendario";
 import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import { crearFestivo, editarFestivo } from "../../../festivos/api/services";
@@ -207,7 +207,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al crear el calendario laboral en el servidor: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -267,7 +267,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al actualizar la información del calendario: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -300,7 +300,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al intentar eliminar el calendario laboral: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -322,7 +322,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al reactivar el calendario laboral: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -441,7 +441,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al guardar o actualizar el día festivo: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setGuardando(false);
@@ -517,7 +517,7 @@ export function useTabCalendario({
     } catch (error: any) {
       mostrarError(
         "Error al procesar e importar el archivo PDF del calendario: " +
-          obtenerMensajeAmigableError(error.message),
+          obtenerMensajeAmigableError(error),
       );
     } finally {
       setImportandoPdf(false);

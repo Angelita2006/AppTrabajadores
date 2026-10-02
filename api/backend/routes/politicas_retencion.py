@@ -149,6 +149,15 @@ def crear_politica_retencion(
             detail="No tienes permisos para registrar políticas de retención globales o para otra empresa."
         )
 
+    politica_global = db.query(PoliticasRetencion).filter(
+        PoliticasRetencion.empresa_id.is_(None)
+    ).first()
+    if politica_global and obj_in.anios_conservacion < politica_global.anios_conservacion:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La política de empresa no puede conservar menos tiempo que la política global.",
+        )
+
     try:
         if obj_in.empresa_id:
             empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
@@ -244,6 +253,16 @@ def actualizar_anios_retencion(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Acción denegada. La normativa vigente exige una conservación mínima de 4 años para los registros horarios."
         )
+
+    if politica.empresa_id is not None:
+        politica_global = db.query(PoliticasRetencion).filter(
+            PoliticasRetencion.empresa_id.is_(None)
+        ).first()
+        if politica_global and nuevos_anios < politica_global.anios_conservacion:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La política de empresa no puede conservar menos tiempo que la política global.",
+            )
         
     setattr(politica, "anios_conservacion", nuevos_anios)
     
