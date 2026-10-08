@@ -4,21 +4,21 @@ from email.mime.text import MIMEText
 import hashlib
 import json
 import math
-import os
+from pathlib import Path
 import smtplib
 import uuid
 from datetime import datetime
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
 from google import genai
 from google.genai import types
 import httpx
 from sqlalchemy.orm import Session
-from core.archivos import CARPETA_FIRMAS
 from core.config import settings
 from models.contratos import Contratos
 from models.contratos_calendarios import ContratosCalendarios
 from models.calendarios_laborales import CalendariosLaborales
 from models.festivos import Festivos
+from twilio.rest import Client
 
 # Configuración
 SMTP_SERVER = settings.SMTP_SERVER
@@ -26,6 +26,21 @@ SMTP_PORT = settings.SMTP_PORT
 SMTP_USER = settings.SMTP_USER
 SMTP_PASSWORD = settings.SMTP_PASSWORD
 EMAILS_FROM = settings.EMAILS_FROM
+
+# Rutas base de archivos estáticos adaptadas al nuevo esquema centralizado
+DIRECCION_ACTUAL = Path(__file__).resolve()
+# Ajusta los niveles de .parent según dónde ubiques este archivo de utilidades respecto a la raíz 'static'
+BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
+
+CARPETAS_ARCHIVOS_MAP = {
+    "firmas_fichajes": BASE_STATIC_DIR / "firmas_fichajes",
+    "firmas_solicitudes_correcciones_fichajes": BASE_STATIC_DIR / "firmas_solicitudes_correcciones_fichajes",
+    "firmas_resoluciones_correcciones_fichajes": BASE_STATIC_DIR / "firmas_resoluciones_correcciones_fichajes",
+    "fotos_trabajadores": BASE_STATIC_DIR / "fotos_trabajadores",
+    "logos_empresas": BASE_STATIC_DIR / "logos_empresas",
+    "justificantes_ausencias": BASE_STATIC_DIR / "justificantes_ausencias",
+    "contratos": BASE_STATIC_DIR / "contratos",
+}
 
 def calcular_distancia_metros(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calcula la distancia en metros entre dos puntos geográficos usando Haversine."""
@@ -75,8 +90,8 @@ def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento: str,
     datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento}-{fecha_iso}"
     return hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
 
-def procesar_y_guardar_firma(data_firma: str) -> str:
-    """Decodifica una firma en base64 y la guarda en disco, devolviendo la ruta relativa."""
+def procesar_y_guardar_firma(data_firma: str, tipo_carpeta: str = "firmas_fichajes") -> str:
+    """Decodifica una firma en base64 y la guarda en la subcarpeta correspondiente, devolviendo la ruta relativa."""
     if not data_firma or not isinstance(data_firma, str):
         return ""
         
@@ -85,13 +100,17 @@ def procesar_y_guardar_firma(data_firma: str) -> str:
 
     nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
     
-    CARPETA_FIRMAS.mkdir(parents=True, exist_ok=True)
-    ruta_destino = CARPETA_FIRMAS / nombre_archivo
+    # Seleccionamos la carpeta del diccionario (por defecto firmas_fichajes)
+    carpeta_destino = CARPETAS_ARCHIVOS_MAP.get(tipo_carpeta, CARPETAS_ARCHIVOS_MAP["firmas_fichajes"])
+    
+    carpeta_destino.mkdir(parents=True, exist_ok=True)
+    ruta_destino = carpeta_destino / nombre_archivo
 
     with open(ruta_destino, "wb") as buffer:
         buffer.write(bytes_imagen)
 
-    return f"/api/archivos/firmas/{nombre_archivo}"
+    # Devuelve la URL formateada para que encaje perfectamente con el endpoint genérico /api/archivos/{subcarpeta}/{nombre_archivo}
+    return f"/api/archivos/{tipo_carpeta}/{nombre_archivo}"
 
 async def obtener_coordenadas(direccion: str):
     """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""
@@ -112,16 +131,13 @@ def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     Envía el archivo PDF binario a Gemini para que extraiga visualmente
     todos los días festivos en un formato JSON limpio.
     """
-    # Inicializa el cliente usando la clave de entorno GEMINI_API_KEY
     client = genai.Client(api_key=settings.GEMINI_API_KEY.__str__())
     
-    # Preparamos el archivo binario para enviarlo directamente como InlineData
     documento_pdf = types.Part.from_bytes(
         data=contenido_pdf,
         mime_type="application/pdf",
     )
     
-    # Creamos el prompt pidiéndole estrictamente un JSON estructurado
     prompt = (
         "Analiza visualmente este calendario laboral en PDF. "
         "Identifica todos los días festivos indicados (generalmente marcados en color o listados). "
@@ -130,14 +146,12 @@ def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
         "No incluyas explicaciones ni bloques de código markdown, solo el JSON crudo."
     )
     
-    # Llamamos al modelo idóneo para procesamiento de documentos mutimodales
     response = client.models.generate_content(
         model='gemini-2.5-flash',
         contents=[documento_pdf, prompt]
     )
     
     try:
-        # Limpiamos posibles espacios o formatos de texto sobrantes de la respuesta
         texto_limpio = response.text.strip() if response.text else ""
         if texto_limpio.startswith("```json"):
             texto_limpio = texto_limpio.split("```json")[1].split("```")[0].strip()
@@ -147,10 +161,9 @@ def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
         return json.loads(texto_limpio)
     except Exception as e:
         print(f"Error al parsear el JSON de Gemini: {e}")
-        # Retorno de emergencia si la IA no estructuró bien la respuesta
         return []
 
-def enviar_correo_recuperacion(destinatario: str, codigo: str):
+def enviar_correo_recuperacion_contraseña(destinatario: str, codigo: str):
     """Función auxiliar para enviar el correo mediante SMTP"""
     try:
         mensaje = MIMEMultipart("alternative")
@@ -188,12 +201,11 @@ def enviar_correo_recuperacion(destinatario: str, codigo: str):
             detail="No se pudo enviar el correo electrónico de recuperación. Inténtalo más tarde."
         )
 
-
 def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
     """Función auxiliar para enviar el correo mediante SMTP"""
     try:
         mensaje = MIMEMultipart("alternative")
-        mensaje.add_header("Subject", "Código de cambio de contraseña - Fichapp")
+        mensaje.add_header("Subject", "Notificación de cambio de contraseña - Fichapp")
         mensaje["From"] = EMAILS_FROM
         mensaje["To"] = destinatario
 
@@ -202,12 +214,8 @@ def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
           <body style="font-family: Arial, sans-serif; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 5px;">
               <h2 style="color: #2563EB;">Cambio de Contraseña</h2>
-              <p>Has solicitado cambiar tu contraseña en <strong>Fichapp</strong>.</p>
-              <p>Tu código de verificación de 6 dígitos es:</p>
-              <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1f2937; border-radius: 4px;">
-                {codigo}
-              </div>
-              <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
+              <p>Has cambiado tu contraseña en <strong>Fichapp</strong>.</p>
+              <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">Si fuiste quien hizo este cambio, puedes ignorar este mensaje.</p>
             </div>
           </body>
         </html>
@@ -229,8 +237,7 @@ def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
 
 def enviar_correo_cambio_email(destinatario: str, token: str):
     """Función auxiliar para enviar el enlace de confirmación de cambio de correo mediante SMTP"""
-    # Ajusta esta URL a la ruta de tu frontend o aplicación que procesará el token
-    url_confirmacion = f"http://localhost:8081/confirmar-cambio-email?token={token}"
+    url_confirmacion = f"http://www.registrohorariosimple.es/confirmar-cambio-email?token={token}"
     
     try:
         mensaje = MIMEMultipart("alternative")
@@ -268,4 +275,75 @@ def enviar_correo_cambio_email(destinatario: str, token: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo enviar el correo electrónico de confirmación. Inténtalo más tarde."
+        )
+
+def enviar_sms_recuperacion_contraseña(destinatario: str, codigo: str):
+    """Función auxiliar para enviar el código de recuperación mediante SMS con Twilio"""
+    try:
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        
+        cuerpo_sms = (
+            f"Fichapp: Has solicitado restablecer tu contraseña. "
+            f"Tu código de verificación de 6 dígitos es: {codigo}"
+        )
+
+        client.messages.create(
+            body=cuerpo_sms,
+            from_=settings.TWILIO_PHONE_NUMBER,
+            to=destinatario
+        )
+            
+    except Exception as e:
+        print(f"Error al enviar el SMS con Twilio: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo enviar el mensaje SMS de recuperación. Inténtalo más tarde."
+        )
+
+def enviar_sms_cambio_contraseña(destinatario: str):
+    """Función auxiliar para enviar la notificación de cambio de contraseña mediante SMS con Twilio"""
+    try:
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        
+        cuerpo_sms = (
+            "Fichapp: Has cambiado tu contraseña de forma exitosa. "
+            "Si no fuiste tú, por favor contacta con soporte de inmediato."
+        )
+
+        client.messages.create(
+            body=cuerpo_sms,
+            from_=settings.TWILIO_PHONE_NUMBER,
+            to=destinatario
+        )
+            
+    except Exception as e:
+        print(f"Error al enviar el SMS con Twilio: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo enviar el mensaje SMS de notificación. Inténtalo más tarde."
+        )
+
+def enviar_sms_cambio_telefono(destinatario: str, token: str):
+    """Función auxiliar para enviar el enlace de confirmación de cambio de teléfono mediante SMS con Twilio"""
+    url_confirmacion = f"http://www.registrohorariosimple.es/confirmar-cambio-telefono?token={token}"
+    
+    try:
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        
+        cuerpo_sms = (
+            f"Fichapp: Has solicitado cambiar tu número de teléfono. "
+            f"Confirma tu nuevo teléfono accediendo al siguiente enlace: {url_confirmacion}"
+        )
+
+        client.messages.create(
+            body=cuerpo_sms,
+            from_=settings.TWILIO_PHONE_NUMBER,
+            to=destinatario
+        )
+            
+    except Exception as e:
+        print(f"Error al enviar el SMS con Twilio: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo enviar el mensaje SMS de confirmación. Inténtalo más tarde."
         )

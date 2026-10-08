@@ -72,14 +72,6 @@ class TipoJornadaEnum(str, enum.Enum):
     COMPLETA = 'Completa'
     PARCIAL = 'Parcial'
 
-class TipoUsuarioEnum(str, enum.Enum):
-    ADMIN_GESTORIA = 'Admin_gestoría'
-    ADMIN_EMPRESA = 'Admin_empresa'
-    RRHH = 'Rrhh'
-    REPRESENTANTE_LEGAL = 'Representante_legal'
-    TRABAJADOR = 'Trabajador'
-    AUDITOR_ITSS = 'Auditor_itss'
-
 class TipoAusenciaEnum(str, enum.Enum):
     VACACIONES = "Vacaciones"
     BAJA_TEMPORAL = "Baja_temporal"
@@ -99,36 +91,49 @@ class TipoFestivoEnum(str, enum.Enum):
     AUTONOMICO = "Autonómico"
     NACIONAL = "Nacional"
 
-class ModalidadLicenciaEnum(str, enum.Enum):
-    PAGO_UNICO = "Pago_unico"
-    SUSCRIPCION_MENSUAL = "Suscripcion_mensual"
+class PlanLicenciaEnum(str, enum.Enum):
+    BASICO = "Básico"         # Funcionalidades legales mínimas (fichaje web/app, informes)
+    PRO = "Pro"               # Vacaciones, ausencias, turnos rotativos, soporte prioritario
+    ENTERPRISE = "Enterprise" # Integraciones de nóminas (A3, Holded, SAP), biometría, API abierta
+
+class CicloFacturacionEnum(str, enum.Enum):
+    TRIAL = "Trial"           # Periodo de prueba gratuito (14 días)
+    MENSUAL = "Mensual"       # Facturación mes a mes
+    ANUAL = "Anual"           # Facturación anual con 15-20% de descuento
+
+class EstadoSuscripcionEnum(str, enum.Enum):
+    TRIALING = "Trialing"     # En periodo de prueba activo
+    ACTIVA = "Activa"         # Suscripción de pago al día
+    VENCIDA = "Vencida"       # Periodo expirado sin renovar
+    CANCELADA = "Cancelada"   # Cancelada por el usuario
 
 class TipoPermisoEnum(str, enum.Enum):
     """Recurso o área funcional sobre la que se concede el permiso."""
-    EMPRESAS = "empresas"
-    USUARIOS = "usuarios"
-    USUARIOS_EMPRESAS = "usuarios_empresas"
-    USUARIOS_ROLES = "usuarios_roles"
-    ROLES = "roles"
-    PERMISOS = "permisos"
-    TRABAJADORES = "trabajadores"
-    CONTRATOS = "contratos"
-    CENTROS_TRABAJO = "centros_trabajo"
-    DEPARTAMENTOS = "departamentos"
-    TURNOS = "turnos"
-    ASIGNACIONES_TURNO = "asignaciones_turno"
-    CALENDARIOS_LABORALES = "calendarios_laborales"
-    FESTIVOS = "festivos"
+    ASIGNACIONES_TURNO = "asignaciones_turno" 
+    AUDITORIA_ACCESOS = "auditoria_accesos" 
+    AUSENCIAS = "ausencias" 
+    CALENDARIOS_LABORALES = "calendarios_laborales" 
+    CENTROS_TRABAJO = "centros_trabajo" 
+    CONTRATOS_CALENDARIOS = "contratos_calendarios" 
+    CONTRATOS = "contratos" 
+    CORRECCIONES_FICHAJE = "correcciones_fichaje" 
+    DEPARTAMENTOS = "departamentos" 
     DISPOSITIVOS_FICHAJE = "dispositivos_fichaje"
+    EMPRESAS = "empresas"
+    FESTIVOS = "festivos"
     FICHAJES = "fichajes"
-    CORRECCIONES_FICHAJE = "correcciones_fichaje"
-    AUSENCIAS = "ausencias"
-    MOTIVOS_PAUSA = "motivos_pausa"
-    RESUMENES_JORNADA = "resumenes_jornada"
-    AUDITORIA_ACCESOS = "auditoria_accesos"
-    LICENCIAS = "licencias"
     GESTORIAS_EMPRESAS = "gestorias_empresas"
+    LICENCIAS = "licencias"
+    MOTIVOS_PAUSA = "motivos_pausa"
+    PERMISOS = "permisos"
     POLITICAS_RETENCION = "politicas_retencion"
+    RESUMENES_JORNADA = "resumenes_jornada"
+    ROLES_PERMISOS = "roles_permisos"
+    ROLES = "roles"
+    TRABAJADORES = "trabajadores"
+    TURNOS = "turnos"
+    USUARIOS_EMPRESAS = "usuarios_empresas"
+    USUARIOS = "usuarios"
 
 class AccionPermisoEnum(str, enum.Enum):
     """Operación que se puede autorizar sobre un recurso."""

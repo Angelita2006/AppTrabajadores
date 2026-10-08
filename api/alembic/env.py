@@ -4,34 +4,34 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
+
 # Obtener dinámicamente la ruta absoluta del directorio actual y del backend
 _current_dir = os.path.dirname(os.path.abspath(__file__))
-# Si env.py está dentro de 'alembic/' y 'backend' está al mismo nivel o dentro:
+# Si env.py está dentro de 'alembic/' y 'backend' está al mismo nivel:
 _backend_path = os.path.abspath(os.path.join(_current_dir, "..", "backend"))
-if not os.path.exists(_backend_path):
-    # Por si env.py está directamente dentro de la raíz o estructurado diferente
-    _backend_path = os.path.abspath(os.path.join(_current_dir, ".."))
 
 if _backend_path not in sys.path:
     sys.path.insert(0, _backend_path)
 
-from core.database import Base # type: ignore
-from models import ( # type: ignore
+from core.database import Base 
+from core import vistas
+
+from models import ( 
     asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales,
     centros_trabajo, contratos, correcciones_fichaje, departamentos,
     dispositivos_fichaje, empresas,  festivos, fichajes, motivos_pausa,
     permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
-    trabajadores, turnos, usuarios, vistas, licencias,
-    usuarios_empresas, gestorias_empresas, usuarios_roles, contratos_calendarios
+    trabajadores, turnos, usuarios, licencias, usuarios_empresas, gestorias_empresas, 
+    contratos_calendarios
 )
 
 _modelos = [
     empresas, trabajadores, turnos, asignaciones_turno, ausencias,
-    fichajes, auditoria_accesos, vistas, calendarios_laborales, centros_trabajo,
+    fichajes, auditoria_accesos, calendarios_laborales, centros_trabajo,
     contratos, correcciones_fichaje, departamentos, dispositivos_fichaje,
-    festivos, motivos_pausa, permisos, politicas_retencion,
-    resumenes_jornada, roles_permisos, roles, usuarios,
-    licencias, usuarios_empresas, gestorias_empresas, usuarios_roles, contratos_calendarios
+    festivos, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, 
+    roles_permisos, roles, usuarios, licencias, usuarios_empresas, gestorias_empresas, 
+    contratos_calendarios, vistas
 ]
 
 for modelo in _modelos:
@@ -48,7 +48,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-
 def run_migrations_offline() -> None:
     """Ejecución de migraciones en modo offline."""
     url = config.get_main_option("sqlalchemy.url")
@@ -61,7 +60,6 @@ def run_migrations_offline() -> None:
 
     with context.begin_transaction():
         context.run_migrations()
-
 
 def run_migrations_online() -> None:
     """Ejecución de migraciones en modo online."""
@@ -78,7 +76,6 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
-
 
 if context.is_offline_mode():
     run_migrations_offline()

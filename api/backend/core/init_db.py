@@ -47,26 +47,32 @@ def inicializar_roles_sistema(db: Session):
         if not rol_existente:
             nuevo_rol = Roles(
                 id=rol_data["id"],
+                empresa_id=None,
                 nombre=rol_data["nombre"],
                 descripcion=rol_data["descripcion"]
             )
             db.add(nuevo_rol)
     db.commit()
 
-
 def inicializar_permisos_sistema(db: Session) -> None:
-    """Inicializa los permisos para todas las parejas de recurso y acción."""
+    """
+    Inicializa los permisos globales del sistema para todas las parejas de recurso y acción,
+    asegurando que tengan empresa_id = NULL.
+    """
+    # Obtenemos los permisos existentes que sean del sistema global (empresa_id IS NULL)
     permisos_existentes = set(db.query(Permisos.tipo, Permisos.accion).all())
-
     for tipo in TipoPermisoEnum:
         for accion in AccionPermisoEnum:
             if (tipo, accion) in permisos_existentes:
                 continue
             descripcion = f"Permite {accion.value} sobre {tipo.value.replace('_', ' ')}."
-            db.add(Permisos(tipo=tipo, accion=accion, descripcion=descripcion))
+            db.add(Permisos(
+                tipo=tipo,
+                accion=accion,
+                descripcion=descripcion
+            ))
 
     db.commit()
-
 
 def inicializar_politica_retencion_global(db: Session) -> None:
     """Crea la política global legal mínima si no existe todavía."""

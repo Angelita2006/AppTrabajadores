@@ -17,7 +17,7 @@ from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.calendarios_laborales import CalendariosLaborales
 from models.usuarios import Usuarios
-from schemas.calendarios_festivos import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse, CalendarioLaboralUpdate, FestivoResponse2
+from schemas.calendarios_laborales import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse, CalendarioLaboralUpdate, FestivoResponse2
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de calendarios laborales bajo el prefijo "/api/calendarios-laborales".
 router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Laborales"])

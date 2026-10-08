@@ -8,10 +8,10 @@ from core.database import Base
 class AsignacionesTurno(Base):
     __tablename__ = 'asignaciones_turno'
     __table_args__ = (
-        PrimaryKeyConstraint('id', name='asignaciones_turno_pkey', comment='Identificador único de la asignación de turno.'),
-        ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='asignaciones_turno_empresa_trabajador_fkey', comment='La asignación de turno debe pertenecer al mismo trabajador y empresa.'),
-        ForeignKeyConstraint(['empresa_id', 'turno_id'], ['turnos.empresa_id', 'turnos.id'], ondelete='CASCADE', name='asignaciones_turno_empresa_turno_fkey', comment='La asignación de turno debe pertenecer al mismo turno y empresa.'),
-        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='asignaciones_turno_check', comment='La fecha de fin debe ser mayor o igual a la fecha de inicio, si aplica.'),
+        PrimaryKeyConstraint('id', name='asignaciones_turno_pkey'), # Identificador único de la asignación de turno
+        ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='asignaciones_turno_empresa_trabajador_fkey'), # La asignación de turno debe pertenecer al mismo trabajador y empresa.
+        ForeignKeyConstraint(['empresa_id', 'turno_id'], ['turnos.empresa_id', 'turnos.id'], ondelete='CASCADE', name='asignaciones_turno_empresa_turno_fkey'), # La asignación de turno debe pertenecer al mismo turno y empresa
+        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='asignaciones_turno_check'), # La fecha de fin debe ser mayor o igual a la fecha de inicio, si aplica
         {'comment': 'Asigna un turno a un trabajador durante un periodo de tiempo. '
                     'Si fecha_fin es NULL, la asignación es indefinida hasta que se '
                     'asigne otro turno o se desasigne el turno actual.'}
@@ -27,6 +27,6 @@ class AsignacionesTurno(Base):
     
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación de la asignación.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='asignaciones_turno', comment='Empresa a la que pertenece la asignación de turno.') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='asignaciones_turno', comment='Trabajador al que se le asigna el turno.') # type: ignore
-    turno: Mapped['Turnos'] = relationship('Turnos', back_populates='asignaciones_turno', comment='Turno que se asigna.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='asignaciones_turno', doc='Empresa a la que pertenece la asignación de turno.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='asignaciones_turno', doc='Trabajador al que se le asigna el turno.') # type: ignore
+    turno: Mapped['Turnos'] = relationship('Turnos', back_populates='asignaciones_turno', doc='Turno que se asigna.') # type: ignore

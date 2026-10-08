@@ -10,14 +10,14 @@ from core.enums import EstadoTrabajadorEnum
 class Trabajadores(Base):
     __tablename__ = 'trabajadores'
     __table_args__ = (
-        PrimaryKeyConstraint('id', name='trabajadores_pkey', comment='Identificador único del trabajador.'),
-        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='trabajadores_empresa_id_fkey', comment='Identificador de la empresa a la que pertenece el trabajador.'),
-        ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='SET NULL', name='trabajadores_rol_id_fkey', comment='Identificador del rol de acceso del trabajador; NULL si no tiene rol asignado.'),
-        CheckConstraint("dni_nif_nie ~ '^[XYZ0-9][0-9]{7}[A-Za-z]$'", name='check_dni_nif_nie_formato_valido', comment='Verifica que el DNI/NIF/NIE tenga un formato válido.'),
-        CheckConstraint("email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'", name='check_email_formato_valido', comment='Verifica que el correo electrónico tenga un formato válido.'),
-        UniqueConstraint('empresa_id', 'id', name='trabajadores_empresa_id_id_key', comment='Combinación única de empresa y trabajador.'),
-        UniqueConstraint('empresa_id', 'dni_nif_nie', name='trabajadores_empresa_id_dni_nif_nie_key', comment='Combinación única de empresa y DNI/NIF/NIE.'),
-        Index('trabajadores_email_activo_key', 'email', unique=True, postgresql_where=text('activo IS TRUE AND email IS NOT NULL'), comment='Índice único para trabajadores activos con correo electrónico no nulo.'),
+        PrimaryKeyConstraint('id', name='trabajadores_pkey'), # Identificador único del trabajador
+        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='trabajadores_empresa_id_fkey'), # Identificador de la empresa a la que pertenece el trabajador
+        ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='SET NULL', name='trabajadores_rol_id_fkey'), # Identificador del rol de acceso del trabajador; NULL si no tiene rol asignado
+        CheckConstraint("dni_nif_nie ~ '^[XYZ0-9][0-9]{7}[A-Za-z]$'", name='check_dni_nif_nie_formato_valido'), # Verifica que el DNI/NIF/NIE tenga un formato válido
+        CheckConstraint("email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'", name='check_email_formato_valido'), # Verifica que el correo electrónico tenga un formato válido
+        UniqueConstraint('empresa_id', 'id', name='trabajadores_empresa_id_id_key'), # Combinación única de empresa y trabajador
+        UniqueConstraint('empresa_id', 'dni_nif_nie', name='trabajadores_empresa_id_dni_nif_nie_key'), # Combinación única de empresa y DNI/NIF/NIE
+        Index('trabajadores_email_activo_key', 'email', unique=True, postgresql_where=text('activo IS TRUE AND email IS NOT NULL')), # Índice único para trabajadores activos con correo electrónico no nulo
         {'comment': 'Trabajadores de cada empresa cliente. El derecho de supresión '
                     '(art. 17 RGPD) no aplica mientras existan fichajes en periodo de '
                     'conservación legal (excepción art. 17.3.b RGPD); en su lugar se '
@@ -29,10 +29,8 @@ class Trabajadores(Base):
     rol_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del rol de acceso del trabajador; NULL si no tiene rol asignado.')
 
     dni_nif_nie: Mapped[str] = mapped_column(String(9), nullable=False, comment='DNI, NIF o NIE del trabajador; único por empresa.')
-    nombre: Mapped[str] = mapped_column(String(150), nullable=False, comment='Nombre del trabajador.')
-    apellidos: Mapped[str] = mapped_column(String(150), nullable=False, comment='Apellidos del trabajador.')
-    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Correo electrónico del trabajador; único por empresa si no es nulo.')
-    telefono: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment='Número de teléfono del trabajador; único por empresa si no es nulo.')
+    nombre: Mapped[str] = mapped_column(String(50), nullable=False, comment='Nombre del trabajador.')
+    apellidos: Mapped[str] = mapped_column(String(100), nullable=False, comment='Apellidos del trabajador.')
     numero_seguridad_social: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment='Número de la Seguridad Social del trabajador; único por empresa si no es nulo.')
     fecha_nacimiento: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de nacimiento del trabajador.')
     foto_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='URL de la foto del trabajador; se puede usar para identificación visual en fichajes.')
@@ -46,14 +44,14 @@ class Trabajadores(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación del trabajador.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización del trabajador.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores', comment='Empresa a la que pertenece el trabajador.') # type: ignore
-    rol: Mapped[Optional['Roles']] = relationship('Roles', foreign_keys=[rol_id], comment='Rol del trabajador.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores', doc='Empresa a la que pertenece el trabajador.') # type: ignore
+    rol: Mapped[Optional['Roles']] = relationship('Roles', foreign_keys=[rol_id], doc='Rol del trabajador.') # type: ignore
 
-    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador', comment='Asignaciones de turno del trabajador.') # type: ignore
-    resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='trabajador', comment='Resúmenes de jornada del trabajador.') # type: ignore
-    usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', uselist=False, back_populates='trabajador', comment='Usuario asociado al trabajador.') # type: ignore
-    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='trabajador', comment='Registros de auditoría de accesos del trabajador.') # type: ignore
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='trabajador', comment='Contratos del trabajador.') # type: ignore
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='trabajador', commment='Fichajes del trabajador.') # type: ignore
-    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='trabajador', comment='Correcciones de fichajes del trabajador.') # type: ignore
-    ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='trabajador', comment='Ausencias del trabajador.') # type: ignore
+    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador', doc='Asignaciones de turno del trabajador.') # type: ignore
+    resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='trabajador', doc='Resúmenes de jornada del trabajador.') # type: ignore
+    usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', uselist=False, back_populates='trabajador', doc='Usuario asociado al trabajador.') # type: ignore
+    auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='trabajador', doc='Registros de auditoría de accesos del trabajador.') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='trabajador', doc='Contratos del trabajador.') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='trabajador', doc='Fichajes del trabajador.') # type: ignore
+    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='trabajador', doc='Correcciones de fichajes del trabajador.') # type: ignore
+    ausencias: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='trabajador', doc='Ausencias del trabajador.') # type: ignore

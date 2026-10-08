@@ -25,7 +25,7 @@ from routes.festivos import(
     obtener_festivos_por_calendario
 )
 
-from schemas.calendarios_festivos import(
+from schemas.calendarios_laborales import(
     FestivoCreate,
     FestivoUpdate
 )

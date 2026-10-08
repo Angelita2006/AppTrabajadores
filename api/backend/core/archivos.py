@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -10,8 +9,12 @@ DIRECCION_ACTUAL = Path(__file__).resolve()
 BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent.parent / "static" 
 
 CARPETA_FOTOS_TRABAJADORES = BASE_STATIC_DIR / "fotos_trabajadores"
-CARPETA_LOGOS = BASE_STATIC_DIR / "logos"
-CARPETA_FIRMAS = BASE_STATIC_DIR / "firmas"
+CARPETA_LOGOS_EMPRESAS = BASE_STATIC_DIR / "logos_empresas"
+CARPETA_FIRMAS_FICHAJES = BASE_STATIC_DIR / "firmas_fichajes"
+CARPETA_FIRMAS_SOLICITUDES_CORRECCIONES_FICHAJES = BASE_STATIC_DIR / "firmas_solicitudes_correcciones_fichajes"
+CARPETA_FIRMAS_RESOLUCIONES_CORRECCIONES_FICHAJES = BASE_STATIC_DIR / "firmas_resoluciones_correcciones_fichajes"
+CARPETA_JUSTIFICANTES_AUSENCIAS = BASE_STATIC_DIR / "justificantes_ausencias"
+CARPETA_CONTRATOS = BASE_STATIC_DIR / "contratos"
 
 @router.get("/{subcarpeta}/{nombre_archivo}")
 def obtener_archivo_protegido(
@@ -24,7 +27,7 @@ def obtener_archivo_protegido(
     (logos, firmas, fotos_trabajadores) validando que el usuario esté autenticado.
     """
     # Lista blanca de subcarpetas permitidas por seguridad
-    CARPETAS_PERMITIDAS = ["firmas", "logos", "fotos_trabajadores"]
+    CARPETAS_PERMITIDAS = ["fotos_trabajadores", "logos_empresas", "firmas_fichajes", "firmas_solicitudes_correcciones_fichajes", "firmas_resoluciones_correcciones_fichajes", "justificantes_ausencias", "contratos"]
     
     if subcarpeta not in CARPETAS_PERMITIDAS:
         raise HTTPException(

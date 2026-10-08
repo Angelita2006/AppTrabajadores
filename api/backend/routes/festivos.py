@@ -11,7 +11,7 @@ from core.enums import TipoUsuarioEnum
 from models.calendarios_laborales import CalendariosLaborales
 from models.usuarios import Usuarios
 from models.festivos import Festivos
-from schemas.calendarios_festivos import FestivoCreate, FestivoUpdate, FestivoResponse
+from schemas.calendarios_laborales import FestivoCreate, FestivoUpdate, FestivoResponse
 from core.auditoria import registrar_auditoria
 from core.enums import AccionAuditoriaEnum
 

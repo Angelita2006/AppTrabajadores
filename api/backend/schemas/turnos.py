@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional
 from uuid import UUID
-from schemas.empresas import EmpresaResponse
+from schemas.empresas import EmpresaSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - TURNOS
@@ -49,12 +49,15 @@ class TurnoUpdate(BaseModel):
     """
     Esquema para actualizar datos de un turno.
     """
-    nombre: Optional[str] = Field(None, min_length=2, max_length=150, description="Nombre identificativo del turno")
-    hora_inicio: Optional[datetime.time] = Field(None, description="Hora de entrada teórica en formato HH:MM:SS")
-    hora_fin: Optional[datetime.time] = Field(None, description="Hora de salida teórica en formato HH:MM:SS")
-    duracion_pausa_minutos: Optional[int] = Field(None, ge=0, description="Minutos de descanso reglamentarios")
+    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del trabajador")
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
+    
+    nombre: str = Field(..., max_length=150, description="Nombre identificativo del turno")
+    hora_inicio: datetime.time = Field(..., description="Hora de entrada teórica en formato HH:MM:SS")
+    hora_fin: datetime.time = Field(..., description="Hora de salida teórica en formato HH:MM:SS")
+    duracion_pausa_minutos: Optional[int] = Field(None, description="Minutos de descanso reglamentarios")
     dias_semana: Optional[List[int]] = Field(None, description="Días laborables del turno (1=lunes ... 7=domingo)")
-    activo: Optional[bool] = Field(None, description="Indica si el turno está activo")
+    activo: Optional[bool] = Field(None, description="Indica si el turno está activo o no")
 
     @field_validator('dias_semana')
     @classmethod
@@ -76,9 +79,8 @@ class TurnoSimpleResponse(TurnoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON que el servidor envía a las aplicaciones.
     """
-    id: UUID = Field(..., description="Identificador único UUID del turno autogenerado (gen_random_uuid)")
-    activo: bool = Field(..., description="Indica si el turno está activo")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la creación del cuadrante (now)")
+    updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,6 +88,6 @@ class TurnoResponse(TurnoSimpleResponse):
     """
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
-    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
 
     model_config = ConfigDict(from_attributes=True)

@@ -27,7 +27,7 @@ from routes.calendarios_laborales import (
     obtener_calendario_laboral,
 )
 
-from schemas.calendarios_festivos import (
+from schemas.calendarios_laborales import (
     CalendarioLaboralCreate,
     CalendarioLaboralUpdate,
 )

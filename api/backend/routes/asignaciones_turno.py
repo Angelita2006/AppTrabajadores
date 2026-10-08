@@ -42,6 +42,7 @@ def asignar_turno_trabajador(
         Trabajadores.id == obj_in.trabajador_id,
         Trabajadores.activo.is_(True),
     ).first()
+    
     if not trabajador:
         print(f"Trabajador con ID {obj_in.trabajador_id} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")

@@ -2,9 +2,6 @@ import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from core.enums import TipoUsuarioEnum
-from schemas.empresas import EmpresaResponse
-from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - USUARIOS
@@ -15,66 +12,51 @@ class UsuarioBase(BaseModel):
     Propiedades comunes compartidas para la validación de un usuario
     basada en el modelo relacional mapeado por sqlacodegen.
     """
-    nombre: str = Field(..., min_length=2, max_length=150, description="Nombre identificativo de la cuenta")
-    email: EmailStr = Field(..., max_length=255, description="Correo electrónico único de acceso")
-    tipo_usuario: TipoUsuarioEnum = Field(..., description="Categoría de usuario (admin_gestoria, admin_empresa, trabajador, etc.)")
+    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del usuario")
+
+    nombre: str = Field(..., max_length=150, description="Nombre completo del usuario")
+
+    email: EmailStr = Field(..., max_length=30, description="Correo electrónico único de acceso")
+    telefono: str = Field(..., max_length=30, description="Número de teléfono único de acceso")
+
+    activo: Optional[bool] = Field(None, description="Indica si el usuario está activo o no")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class UsuarioCreate(UsuarioBase):
     """
     Esquema utilizado para recibir los datos durante la creación de una cuenta.
     Exige la contraseña y permite vincular de forma opcional la empresa o el trabajador.
     """
-    password_raw: str = Field(..., min_length=6, max_length=255, description="Contraseña en texto plano antes del hash")
-    empresa_id: Optional[UUID] = Field(None, description="ID único UUID de la empresa cliente asignada")
-    trabajador_id: Optional[UUID] = Field(None, description="ID único UUID del expediente de trabajador vinculado")
+    model_config = ConfigDict(from_attributes=True)
 
-class UsuarioRegisterCreate(BaseModel):
+class UsuarioRegisterCreate(UsuarioBase):
     """
     Esquema utilizado para validar los datos enviados desde la app móvil
     al registrar un nuevo usuario vinculándolo a un trabajador existente.
     """
-    empresa_cif: str = Field(..., min_length=5, max_length=20, description="CIF de la empresa cliente para localizar el tenant")
-    dni_nif_nie: str = Field(..., min_length=5, max_length=15, description="Número de identificación fiscal del trabajador")
-    email: EmailStr = Field(..., max_length=255, description="Correo electrónico único de acceso")
-    password: str = Field(..., min_length=6, max_length=255, description="Contraseña de acceso del usuario")
-
     model_config = ConfigDict(from_attributes=True)
 
-class UsuarioSimpleResponse(BaseModel):
+class UsuarioSimpleResponse(UsuarioBase):
     """
     Esquema utilizado para empaquetar los datos del perfil que se envían al cliente.
     Excluye por completo el hash de la contraseña para evitar brechas de seguridad.
     """
-    nombre: str = Field(..., min_length=2, max_length=150, description="Nombre identificativo de la cuenta")
-    email: Optional[str] = Field(None, description="Correo electrónico de acceso, si está informado")
-    tipo_usuario: TipoUsuarioEnum = Field(..., description="Categoría de usuario")
-    id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
-    mfa_habilitado: bool = Field(..., description="Determina si tiene activa la autenticación de doble factor")
-    activo: bool = Field(..., description="Determina si el usuario tiene permitido el acceso a la plataforma")
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de creación de la cuenta (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación (now)")
-    
-    empresa_id: Optional[UUID] = Field(None, description="ID de la empresa asociada")
-    trabajador_id: Optional[UUID] = Field(None, description="ID del trabajador asociado")
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
 
-    model_config = ConfigDict(from_attributes=True)
+    codigo_recuperacion: Optional[str] = Field(None, description='Código de recuperación para restablecimiento de contraseña')
+    codigo_expira_at: Optional[datetime.datetime] = Field(None, description='Fecha de expiración del código de recuperación')
 
-class UsuarioResponse(UsuarioSimpleResponse):
-    """
-    Esquema completo que extiende al simple añadiendo las relaciones anidadas.
-    """
-    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
-    trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
+    email_pendiente_verificacion: Optional[str] = Field(None, description='Dirección de correo electrónico pendiente de verificación')
+    token_cambio_email: Optional[str] = Field(None, description='Token para cambiar la dirección de correo electrónico')
+    token_cambio_email_expira_at: Optional[str] = Field(None, description='Fecha de expiracion del token para cambiar el correo electrónico')
 
-    model_config = ConfigDict(from_attributes=True)
-
-class LoginRequest(BaseModel):
-    """
-    Esquema simplificado utilizado exclusivamente para validar las credenciales
-    recibidas en las peticiones de inicio de sesión de la API.
-    """
-    email: EmailStr = Field(..., description="Correo electrónico de la cuenta")
-    password: str = Field(..., description="Contraseña de acceso")
+    telefono_pendiente_verificacion: Optional[str] = Field(None, description='Número de teléfono pendiente de verificación')
+    token_cambio_telefono: Optional[str] = Field(None, description='Token para cambiar el número de teléfono')
+    token_cambio_telefono_expira_at: Optional[str] = Field(None, description='Fecha de expiración del token para cambiar el número de teléfono')
 
     model_config = ConfigDict(from_attributes=True)
+
+

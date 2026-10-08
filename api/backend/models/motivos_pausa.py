@@ -1,6 +1,7 @@
+import datetime
 from typing import Optional
 import uuid
-from sqlalchemy import Boolean, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, Uuid, text
+from sqlalchemy import Boolean, DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, SmallInteger, String, Uuid, text
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
@@ -8,8 +9,8 @@ from core.database import Base
 class MotivosPausa(Base):
     __tablename__ = 'motivos_pausa'
     __table_args__ = (
-        PrimaryKeyConstraint('id', name='motivos_pausa_pkey', comment='Identificador único del motivo de pausa.'), 
-        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='motivos_pausa_empresa_id_fkey', comment='NULL = motivo del catálogo global (ej. comida, descanso legal); con valor = motivo propio de una empresa.'),
+        PrimaryKeyConstraint('id', name='motivos_pausa_pkey'), # Identificador único del motivo de pausa
+        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='motivos_pausa_empresa_id_fkey'), # NULL = motivo del catálogo global (ej. comida, descanso legal); con valor = motivo propio de una empresa
         {'comment': 'Motivos de pausa que pueden ser utilizados en los fichajes de los trabajadores. Pueden ser motivos globales (empresa_id = NULL) o motivos propios de una empresa (empresa_id = valor).'},
     )
 
@@ -20,6 +21,9 @@ class MotivosPausa(Base):
     computa_como_trabajo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('false'), comment='Indica si el tiempo de pausa con este motivo se computa como tiempo trabajado o no.')
     duracion_max_minutos: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True, comment='Duración máxima en minutos para este motivo de pausa.')
 
-    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='motivos_pausa', comment='Empresa a la que pertenece el motivo de pausa.') # type: ignore
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la licencia.')
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización de la licencia.')
+
+    empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='motivos_pausa', doc='Empresa a la que pertenece el motivo de pausa.') # type: ignore
     
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='motivo_pausa', comment='Fichajes que utilizan este motivo de pausa.') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='motivo_pausa', doc='Fichajes que utilizan este motivo de pausa.') # type: ignore

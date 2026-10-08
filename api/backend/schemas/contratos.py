@@ -1,13 +1,12 @@
 import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from typing import Any, Optional, List
+from typing import Any, Optional
 from uuid import UUID
 from core.enums import TipoContratoEnum, TipoJornadaEnum
-from schemas.calendarios_festivos import CalendarioLaboralSimpleResponse
 from schemas.centros_trabajo import CentroTrabajoSimpleResponse
 from schemas.departamentos import DepartamentoSimpleResponse
-from schemas.empresas import EmpresaResponse
+from schemas.empresas import EmpresaSimpleResponse
 from schemas.trabajadores import TrabajadorSimpleResponse
 
 # ==========================================
@@ -19,16 +18,24 @@ class ContratoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un contrato laboral
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
+    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del contrato")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
     centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
+    departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
+
     tipo_contrato: TipoContratoEnum = Field(..., description="Modalidad del contrato (indefinido, temporal, etc.)")
     tipo_jornada: TipoJornadaEnum = Field(..., description="Tipo de jornada pactada (completa o parcial)")
-    
-    # Mapeado como Decimal para respetar la precisión Numeric(5, 2) de la base de datos
-    horas_semana: Decimal = Field(..., gt=Decimal('0'), max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
+    horas_semana: Decimal = Field(..., max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
+    puesto_trabajo: Optional[str] = Field(None, max_length=50, description="Puesto de trabajo del contratado")
+    categoria_profesional: Optional[str] = Field(None, max_length=50, description="Categoría profesional del contratado")
+
+    pdf_url: Optional[str] = Field(None, description="Url o ruta del archivo en pdf del contrato")
+
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio del contrato en formato AAAA-MM-DD")
-    departamento_id: UUID = Field(..., description="Departamento obligatorio del contrato")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
+
+    activo: Optional[bool] = Field(None, description="Indica si el contrato está activo o no")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,11 +44,6 @@ class ContratoCreate(ContratoBase):
     Esquema utilizado para registrar un nuevo contrato en el sistema.
     Valida las restricciones lógicas y de negocio antes de la inserción.
     """
-    calendario_ids: List[UUID] = Field(..., min_length=1, description="Calendarios anuales del centro que cubren la vigencia del contrato")
-    puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Denominación del puesto laboral")
-    categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría según convenio profesional")
-    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
-
     @field_validator('fecha_fin', mode='before')
     @classmethod
     def limpiar_fecha_vacancia(cls, v: Any) -> Optional[datetime.date]:
@@ -70,19 +72,13 @@ class ContratoCreate(ContratoBase):
             
         return self
 
+    model_config = ConfigDict(from_attributes=True)
+
 class ContratoUpdate(BaseModel):
-    tipo_contrato: Optional[TipoContratoEnum] = Field(None, description="Modalidad del contrato")
-    tipo_jornada: Optional[TipoJornadaEnum] = Field(None, description="Tipo de jornada pactada")
-    horas_semana: Optional[Decimal] = Field(None, gt=Decimal('0'), max_digits=5, decimal_places=2, description="Horas semanales")
-    fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio")
-    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
-    departamento_id: Optional[UUID] = Field(None, description="ID del departamento; no puede quedar vacío")
-    puesto_trabajo: Optional[str] = Field(None, max_length=150, description="Puesto de trabajo")
-    categoria_profesional: Optional[str] = Field(None, max_length=150, description="Categoría profesional")
-    calendario_ids: Optional[List[UUID]] = Field(None, description="Calendarios anuales que aplican al contrato")
-
-    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
-
+    """
+    Esquema para la actualización parcial de un contrato.
+    Todos los campos son opcionales para permitir actualizaciones 'patch'.
+    """
     @field_validator('fecha_fin', 'departamento_id', mode='before')
     @classmethod
     def limpiar_vacios(cls, v: Any) -> Any:
@@ -91,34 +87,19 @@ class ContratoUpdate(BaseModel):
             return None
         return v
 
-class ContratoCalendarioResponse(BaseModel):
-    calendario_id: UUID
-    calendario: Optional[CalendarioLaboralSimpleResponse] = None
-
     model_config = ConfigDict(from_attributes=True)
-
 
 class ContratoSimpleResponse(ContratoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia el frontend móvil o web.
     """
-    id: UUID = Field(..., description="Identificador único UUID autogenerado (gen_random_uuid)")
-    activo: bool = Field(..., description="Determina si el contrato se encuentra vigente")
-    created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
-    updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
-
-    calendarios_asociados: List["ContratoCalendarioResponse"] = Field(default_factory=list, description="Calendarios anuales del centro asociados al contrato")
-    puesto_trabajo: Optional[str] = Field(None, description="Puesto de trabajo")
-    categoria_profesional: Optional[str] = Field(None, description="Categoría profesional")
-    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización")
-
     model_config = ConfigDict(from_attributes=True)
 
 class ContratoResponse(ContratoSimpleResponse):
     """
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
-    empresa: Optional[EmpresaResponse] = Field(None, description="Detalles de la empresa asociada")
+    empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
     centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
     trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
     departamento: Optional[DepartamentoSimpleResponse] = Field(None, description="Detalles del departamento asociado")
