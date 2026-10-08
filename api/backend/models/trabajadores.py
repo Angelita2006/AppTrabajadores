@@ -14,10 +14,8 @@ class Trabajadores(Base):
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='trabajadores_empresa_id_fkey'), # Identificador de la empresa a la que pertenece el trabajador
         ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='SET NULL', name='trabajadores_rol_id_fkey'), # Identificador del rol de acceso del trabajador; NULL si no tiene rol asignado
         CheckConstraint("dni_nif_nie ~ '^[XYZ0-9][0-9]{7}[A-Za-z]$'", name='check_dni_nif_nie_formato_valido'), # Verifica que el DNI/NIF/NIE tenga un formato válido
-        CheckConstraint("email ~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'", name='check_email_formato_valido'), # Verifica que el correo electrónico tenga un formato válido
         UniqueConstraint('empresa_id', 'id', name='trabajadores_empresa_id_id_key'), # Combinación única de empresa y trabajador
         UniqueConstraint('empresa_id', 'dni_nif_nie', name='trabajadores_empresa_id_dni_nif_nie_key'), # Combinación única de empresa y DNI/NIF/NIE
-        Index('trabajadores_email_activo_key', 'email', unique=True, postgresql_where=text('activo IS TRUE AND email IS NOT NULL')), # Índice único para trabajadores activos con correo electrónico no nulo
         {'comment': 'Trabajadores de cada empresa cliente. El derecho de supresión '
                     '(art. 17 RGPD) no aplica mientras existan fichajes en periodo de '
                     'conservación legal (excepción art. 17.3.b RGPD); en su lugar se '

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from core.config import settings
@@ -10,7 +10,7 @@ Base = declarative_base()
 
 def get_db():
     """
-    Generador de sesiones de base de datos estándar (sin contexto de tenant estricto).
+    Generador de sesiones de base de datos estándar (sin contexto de seguridad estricto).
     Útil para tareas públicas o de login inicial.
     """
     db = SessionLocal()
@@ -19,25 +19,31 @@ def get_db():
     finally:
         db.close()
 
-def get_db_with_tenant(empresa_id: Optional[str] = None, is_gestoria_admin: bool = False):
+def get_db_with_advanced_security(
+    is_superadmin: bool = False,
+    is_gestoria_or_inspector: bool = False,
+    allowed_empresa_ids: Optional[List[str]] = None,
+    current_empresa_id: Optional[str] = None
+):
     """
-    Generador de sesiones adaptado al modelo SaaS multiempresa. 
-    Configura las variables de sesión de PostgreSQL para activar las políticas RLS 
-    definidas en el esquema SQL (app.current_empresa_id y app.is_gestoria_admin).
+    Generador de sesiones avanzado para SaaS multiempresa con control de permisos jerárquico.
     """
     db = SessionLocal()
     try:
-        # Configurar variables de sesión para Row Level Security (RLS)
-        if is_gestoria_admin:
-            db.execute(text("SET LOCAL app.is_gestoria_admin = 'true'"))
+        if is_superadmin:
+            # El superadmin desactiva las restricciones de tenant a nivel de sesión
+            db.execute(text("SET LOCAL app.is_superadmin = 'true'"))
         else:
-            db.execute(text("SET LOCAL app.is_gestoria_admin = 'false'"))
+            db.execute(text("SET LOCAL app.is_superadmin = 'false'"))
             
-        if empresa_id:
-            db.execute(text(f"SET LOCAL app.current_empresa_id = '{empresa_id}'"))
-        else:
-            db.execute(text("SET LOCAL app.current_empresa_id = NULL"))
-            
+            if is_gestoria_or_inspector and allowed_empresa_ids:
+                # Pasamos la lista de IDs permitidos como un array de texto para PostgreSQL
+                ids_formatted = ",".join([f"'{eid}'" for eid in allowed_empresa_ids])
+                db.execute(text(f"SET LOCAL app.allowed_empresa_ids = ARRAY[{ids_formatted}]"))
+            elif current_empresa_id:
+                # Empresa individual normal
+                db.execute(text(f"SET LOCAL app.current_empresa_id = '{current_empresa_id}'"))
+                
         yield db
     finally:
         db.close()

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_PHONE_NUMBER: str = ""
+    URL: str = ""
     
     model_config = SettingsConfigDict(
         env_file=os.path.join(BASE_DIR, ".env"),

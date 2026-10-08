@@ -237,7 +237,7 @@ def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
 
 def enviar_correo_cambio_email(destinatario: str, token: str):
     """Función auxiliar para enviar el enlace de confirmación de cambio de correo mediante SMTP"""
-    url_confirmacion = f"http://www.registrohorariosimple.es/confirmar-cambio-email?token={token}"
+    url_confirmacion = "http://"+settings.URL+f"/confirmar-cambio-email?token={token}"
     
     try:
         mensaje = MIMEMultipart("alternative")
@@ -325,7 +325,7 @@ def enviar_sms_cambio_contraseña(destinatario: str):
 
 def enviar_sms_cambio_telefono(destinatario: str, token: str):
     """Función auxiliar para enviar el enlace de confirmación de cambio de teléfono mediante SMS con Twilio"""
-    url_confirmacion = f"http://www.registrohorariosimple.es/confirmar-cambio-telefono?token={token}"
+    url_confirmacion = "http://"+settings.URL+f"/confirmar-cambio-telefono?token={token}"
     
     try:
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)

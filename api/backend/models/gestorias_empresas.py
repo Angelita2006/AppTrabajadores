@@ -27,10 +27,11 @@ class GestoriasEmpresas(Base):
     
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'), comment='Fecha de inicio de la autorización.')
     fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de finalización de la autorización.')
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('True'), comment="Indica si la relacion entre la gestoría y la empresa cliente está activa o no.")
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la autorización.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización de la autorización.')
 
     empresa_gestora: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_gestora_id], back_populates='gestorias_como_gestora', doc='Gestoría a la que pertenece la autorización.')  # type: ignore
     empresa_cliente: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_cliente_id], back_populates='gestorias_como_cliente', doc='Empresa cliente sobre la que tiene autorización la gestoría.')  # type: ignore
-    usuario_creador: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[ususario_creador_id], back_populates='gestorias_empresas', doc='Usuario que creó la autorización.')  # type: ignore
+    usuario_creador: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[usuario_creador_id], back_populates='gestorias_empresas', doc='Usuario que creó la autorización.')  # type: ignore

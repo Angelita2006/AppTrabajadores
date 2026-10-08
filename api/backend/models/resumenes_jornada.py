@@ -22,6 +22,8 @@ class ResumenesJornada(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único del resumen de jornada.')
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador de la empresa a la que pertenece el resumen.')
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del trabajador al que corresponde el resumen.')
+
+    fecha: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha del resumen de jornada (solo fecha, sin hora).')
     
     minutos_trabajados: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text('0'), comment='Total de minutos trabajados en la jornada.')
     minutos_pausa: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text('0'), comment='Total de minutos de pausa en la jornada.')

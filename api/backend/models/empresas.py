@@ -9,9 +9,9 @@ class Empresas(Base):
     __tablename__ = 'empresas'
     __table_args__ = (
         PrimaryKeyConstraint('id', name='empresas_pkey'), # Identificador único de la empresa
-        ForeignKeyConstraint(['usuario_admin_id'], ['usuarios.id'], ondelete='RESTRICT', name='empresas_usuario_admin_id_fkey'), # Identificador del usuario administrador principal de la empresa
-        ForeignKeyConstraint(['usuario_admin_id', 'id'], ['usuarios_empresas.usuario_id', 'usuarios_empresas.empresa_id'], name='empresas_admin_membresia_fkey', deferrable=True, initially='DEFERRED', use_alter=True), # La relación usuario-empresa que representa al usuario administrador principal de la empresa
-        ForeignKeyConstraint(['usuario_admin_id', 'id'], ['usuarios_empresas.usuario_id', 'usuarios_empresas.empresa_id'], name='empresas_admin_miembro_fkey', deferrable=True, initially='DEFERRED'), # El usuario administrador principal de la empresa debe ser miembro de la empresa
+        # ForeignKeyConstraint(['usuario_admin_id'], ['usuarios.id'], ondelete='RESTRICT', name='empresas_usuario_admin_id_fkey'), # Identificador del usuario administrador principal de la empresa
+        # ForeignKeyConstraint(['usuario_admin_id', 'id'], ['usuarios_empresas.usuario_id', 'usuarios_empresas.empresa_id'], name='empresas_admin_membresia_fkey', deferrable=True, initially='DEFERRED', use_alter=True), # La relación usuario-empresa que representa al usuario administrador principal de la empresa
+        # ForeignKeyConstraint(['usuario_admin_id', 'id'], ['usuarios_empresas.usuario_id', 'usuarios_empresas.empresa_id'], name='empresas_admin_miembro_fkey', deferrable=True, initially='DEFERRED'), # El usuario administrador principal de la empresa debe ser miembro de la empresa
         UniqueConstraint('cif', name='empresas_cif_key'), # El CIF de la empresa debe ser único
         {'comment': 'Empresas cliente de la gestoría. Raíz de aislamiento multiempresa '
                 '(tenant).'}

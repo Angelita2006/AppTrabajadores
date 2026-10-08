@@ -4,7 +4,6 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-
 # Obtener dinámicamente la ruta absoluta del directorio actual y del backend
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 # Si env.py está dentro de 'alembic/' y 'backend' está al mismo nivel:
@@ -13,6 +12,7 @@ _backend_path = os.path.abspath(os.path.join(_current_dir, "..", "backend"))
 if _backend_path not in sys.path:
     sys.path.insert(0, _backend_path)
 
+from core.config import settings
 from core.database import Base 
 from core import vistas
 
@@ -63,8 +63,15 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Ejecución de migraciones en modo online."""
+    # 1. Obtenemos la sección de configuración de alembic (por defecto [alembic])
+    configuration = config.get_section(config.config_ini_section) or {}
+    
+    # 2. Inyectamos la URL de la base de datos de forma explícita y segura desde tus settings
+    configuration["sqlalchemy.url"] = str(settings.DATABASE_URL)
+
+    # 3. Creamos el motor con la configuración ya completa
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

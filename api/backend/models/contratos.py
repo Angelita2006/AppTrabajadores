@@ -16,9 +16,9 @@ class Contratos(Base):
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='contratos_empresa_id_fkey'), # El contrato debe pertenecer a la misma empresa
         ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='contratos_empresa_trabajador_fkey'), # El contrato debe pertenecer a la misma empresa y trabajador
         UniqueConstraint('empresa_id', 'centro_trabajo_id', 'id', name='contratos_empresa_centro_id_key'), # Cada contrato es único por empresa y centro de trabajo
-        Index('contratos_un_activo_por_trabajador_empresa_key', 'empresa_id', 'trabajador_id', unique=True, postgresql_where=text('activo IS TRUE'), compiled=True), # Cada trabajador puede tener un único contrato activo por empresa
-        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check', compiled=True), # La fecha de fin del contrato debe ser mayor o igual a la fecha de inicio, si aplica
-        CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check', compiled=True), # El número de horas semanales del contrato debe ser mayor que cero
+        Index('contratos_un_activo_por_trabajador_empresa_key', 'empresa_id', 'trabajador_id', unique=True, postgresql_where=text('activo IS TRUE')), # Cada trabajador puede tener un único contrato activo por empresa
+        CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check'), # La fecha de fin del contrato debe ser mayor o igual a la fecha de inicio, si aplica
+        CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check'), # El número de horas semanales del contrato debe ser mayor que cero
         {'comment': 'Contratos de trabajo de los trabajadores. Incluye información sobre el tipo de contrato, jornada, horas semanales, fechas de inicio y fin, y otros detalles relevantes.'}
     )
 

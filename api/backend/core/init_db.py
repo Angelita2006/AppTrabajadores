@@ -6,6 +6,11 @@ from core.enums import AccionPermisoEnum, AccionRetencionEnum, TipoPermisoEnum
 
 ROLES_SISTEMA_INICIALES = [
     {
+        "id": "6kdl163e-55m4-7860-8824-cfy23aj47834",
+        "nombre": "Superadministrador",
+        "descripcion": "Control total global de la plataforma SaaS, gestión de pasarela de pagos y administración maestra."
+    },
+    {
         "id": "5aca163e-53f3-4210-9924-cff25ab38444",
         "nombre": "Trabajador",
         "descripcion": "Realización de fichajes y consulta de cuadrante personal."

@@ -47,6 +47,6 @@ class CorreccionesFichaje(Base):
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='correcciones_fichaje', doc='Empresa a la que pertenece la corrección.') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='correcciones_fichaje', doc='Trabajador al que corresponde la corrección.') # type: ignore
-    usuario_solicitador: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[usuario_solicitador], back_populates='correcciones_fichaje_usuario_solicitador', doc='Usuario que solicita la corrección.') # type: ignore
-    usuario_aprobador: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[usuario_aprobador], back_populates='correcciones_fichaje_usuario_aprobador', doc='Usuario que aprueba la corrección.') # type: ignore
+    usuario_solicitador: Mapped['Usuarios'] = relationship('Usuarios', foreign_keys=[usuario_solicitador_id], back_populates='correcciones_fichaje_usuario_solicitador', doc='Usuario que solicita la corrección.') # type: ignore
+    usuario_aprobador: Mapped[Optional['Usuarios']] = relationship('Usuarios', foreign_keys=[usuario_aprobador_id], back_populates='correcciones_fichaje_usuario_aprobador', doc='Usuario que aprueba la corrección.') # type: ignore
     fichaje_afectado: Mapped[Optional['Fichajes']] = relationship('Fichajes', back_populates='correcciones_fichaje', doc='Fichaje afectado por la corrección.') # type: ignore

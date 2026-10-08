@@ -9,8 +9,8 @@ class ContratosCalendarios(Base):
     __table_args__ = (
         PrimaryKeyConstraint('id', name='contratos_calendarios_pkey'), # Identificador único de la relación contrato-calendario
         ForeignKeyConstraint(['empresa_id', 'centro_trabajo_id', 'contrato_id'], ['contratos.empresa_id', 'contratos.centro_trabajo_id', 'contratos.id'], ondelete='CASCADE', name='contratos_calendarios_contrato_centro_fkey'), # La relación contrato-calendario debe pertenecer al mismo contrato y centro de trabajo, si aplica
-        ForeignKeyConstraint(['empresa_id', 'centro_trabajo_id', 'calendario_id'], ['calendarios_laborales.empresa_id', 'calendarios_laborales.centro_trabajo_id', 'calendarios_laborales.id'], ondelete='RESTRICT', name='contratos_calendarios_calendario_centro_fkey'), # La relación contrato-calendario debe pertenecer al mismo calendario y centro de trabajo, si aplica
-        UniqueConstraint('contrato_id', 'calendario_id', name='contratos_calendarios_contrato_calendario_key'), # Cada contrato puede tener un único calendario asociado por año
+        ForeignKeyConstraint(['empresa_id', 'centro_trabajo_id', 'calendario_laboral_id'], ['calendarios_laborales.empresa_id', 'calendarios_laborales.centro_trabajo_id', 'calendarios_laborales.id'], ondelete='RESTRICT', name='contratos_calendarios_calendario_centro_fkey'), # La relación contrato-calendario debe pertenecer al mismo calendario y centro de trabajo, si aplica
+        UniqueConstraint('contrato_id', 'calendario_laboral_id', name='contratos_calendarios_contrato_calendario_key'), # Cada contrato puede tener un único calendario asociado por año
         {'comment': 'Asocia a cada contrato el calendario anual de su centro aplicable a cada año de vigencia.'},
     )
 

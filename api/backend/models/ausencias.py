@@ -13,7 +13,7 @@ class Ausencias(Base):
         PrimaryKeyConstraint('id', name='ausencias_pkey'), # Identificador único de la ausencia
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='ausencias_empresa_id_fkey'), # La ausencia debe pertenecer a la misma empresa que el trabajador
         ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='ausencias_empresa_trabajador_fkey'), # La ausencia debe pertenecer a la misma empresa que el trabajador
-        ForeignKeyConstraint(['validado_por_usuario_id'], ['usuarios.id'], ondelete='RESTRICT', name='ausencias_validado_por_usuario_id_fkey'), # Identificador del usuario que valida o resuelve la solicitud de ausencia
+        ForeignKeyConstraint(['usuario_validador_id'], ['usuarios.id'], ondelete='RESTRICT', name='ausencias_usuario_validador_id_fkey'), # Identificador del usuario que valida o resuelve la solicitud de ausencia
         CheckConstraint('fecha_fin >= fecha_inicio', name='ausencias_fechas_check'), # La fecha de fin debe ser mayor o igual a la fecha de inicio
         {'comment': 'Registra las ausencias de los trabajadores, incluyendo vacaciones, bajas médicas y otros tipos de ausencia. '
                     'Permite a la empresa gestionar y justificar las ausencias de los trabajadores, '}
@@ -41,4 +41,4 @@ class Ausencias(Base):
     
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='ausencias', doc='Empresa a la que pertenece la ausencia.') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='ausencias', doc='Trabajador que tiene la ausencia.') # type: ignore
-    validado_por_usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas', doc='Usuario que valida la solicitud de ausencia.') # type: ignore
+    usuario_validador: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas', doc='Usuario que valida la solicitud de ausencia.') # type: ignore
