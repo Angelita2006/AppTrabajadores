@@ -62,6 +62,33 @@ def crear_token_acceso(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def _obtener_y_validar_empresa(request: Request, db: Session) -> Empresas:
+    """
+    Función auxiliar privada para extraer, validar el formato UUID de la cabecera 
+    'Empresa-ID' y comprobar la existencia de la empresa en base de datos. (Principio DRY)
+    """
+    empresa_id = request.headers.get("Empresa-ID")
+    try:
+        empresa_uuid = uuid.UUID(empresa_id)
+    except TypeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="No se ha proporcionado un id de empresa en la cabecera de la petición."
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="El id de empresa proporcionado en la cabecera de la petición no es un id válido."
+        )
+
+    empresa = db.query(Empresas).filter(Empresas.id == empresa_uuid).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se ha podido encontrar ninguna empresa en la base de datos con el id proporcionado en la cabecera."
+        )
+    return empresa
+
 def obtener_usuario_actual(
     request: Request,
     db: Session = Depends(get_db)
@@ -121,10 +148,7 @@ def get_db_with_advanced_security(
     """
     db = SessionLocal()
     try:
-        # 1. Extraer el contexto de empresa desde la cabecera HTTP (enviada por el frontend)
-        empresa_id = request.headers.get("Empresa-ID")
-
-        # 2. Consultar membresías y roles del usuario en el sistema
+        # 1. Consultar membresías y roles del usuario en el sistema
         membresias = (
             db.query(UsuariosEmpresas)
             .outerjoin(Empresas, UsuariosEmpresas.empresa_id == Empresas.id)
@@ -145,31 +169,18 @@ def get_db_with_advanced_security(
             db.execute(text("SET LOCAL app.is_superadmin = 'true'"))
 
         else:
-            # Si no se ha proporcionado un id de empresa en la cabecera o no existe ninguna empresa con ese id y no tiene una relación global de superadministrador
-            try:
-                empresa_uuid = uuid.UUID(empresa_id)
-            except TypeError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se ha proporcionado un id de empresa en la cabecera de la petición.")
-            except ValueError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El id de empresa proporcionado en la cabecera de la petición no es un id válido.")
-
-            empresa = db.query(Empresas).filter(Empresas.id == empresa_uuid).first()
-
-            if not empresa:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se ha podido encontrar ninguna empresa en la base de datos con el id proporcionado en la cabecera de la petición.")
+            # Reutilizamos la función auxiliar DRY para validar la empresa actual
+            empresa = _obtener_y_validar_empresa(request, db)
 
             db.execute(text("SET LOCAL app.is_superadmin = 'false'"))
 
-            # Saber si hay alguna relación del usuario con la empresa si es una gestoría en la que sea admin
             is_admin_gestoria = any(m for m in membresias if m.rol.tipo == TipoRolEnum.ADMIN_GESTORIA and m.empresa_id is not None and m.empresa_id == empresa.id)
-            # Saber si hay alguna relación del usuario con la empresa en la que sea auditor
             is_inspector = any(m for m in membresias if m.rol.tipo == TipoRolEnum.AUDITOR_ITSS and m.empresa_id is not None and m.empresa_id == empresa.id)
             
             # -------------------------------------------------------------
             # CASO 2: ADMIN DE GESTORÍA (Acceso a sus empresas clientes)
             # -------------------------------------------------------------
             if is_admin_gestoria:
-                # Consultar empresas clientes vinculadas en gestorias_empresas
                 clientes = (
                     db.query(GestoriasEmpresas.empresa_cliente_id)
                     .filter(
@@ -178,8 +189,8 @@ def get_db_with_advanced_security(
                     )
                     .all()
                 )
-                allowed_ids = {c.empresa_cliente_id for c in clientes} # Incluir las empresas clientes
-                allowed_ids.add(empresa.id) # Incluir la propia gestoría
+                allowed_ids = {c.empresa_cliente_id for c in clientes}
+                allowed_ids.add(empresa.id)
 
                 ids_formatted = ",".join([f"'{eid}'" for eid in allowed_ids])
                 db.execute(text(f"SET LOCAL app.allowed_empresa_ids = ARRAY[{ids_formatted}]::uuid[]"))
@@ -188,15 +199,14 @@ def get_db_with_advanced_security(
             # CASO 3: AUDITOR ITSS / INSPECTOR (Acceso Multi-Empresa directo)
             # -------------------------------------------------------------
             elif is_inspector:
-                allowed_ids = [m.empresa_id for m in membresias if m.rol.tipo == TipoRolEnum.AUDITOR_ITSS and m.empresa_id is not None] # Incluir las empresas que tiene autorizadas para inspeccionar
+                allowed_ids = [m.empresa_id for m in membresias if m.rol.tipo == TipoRolEnum.AUDITOR_ITSS and m.empresa_id is not None]
                 ids_formatted = ",".join([f"'{eid}'" for eid in allowed_ids])
                 db.execute(text(f"SET LOCAL app.allowed_empresa_ids = ARRAY[{ids_formatted}]::uuid[]"))
 
             # -------------------------------------------------------------
-            # CASO 4: EMPRESA INDIVIDUAL (Admin Empresa, RRHH, Trabajador, Representante Legal, Otro (Personalizado de la empresa))
+            # CASO 4: EMPRESA INDIVIDUAL
             # -------------------------------------------------------------
             else:
-                # Utiliza el id de la empresa proporcionado en la cabecera Empresa-ID de la petición
                 is_miembro_empresa = any(m for m in membresias if m.empresa_id is not None and m.empresa_id == empresa.id)
 
                 if is_miembro_empresa:
@@ -208,79 +218,10 @@ def get_db_with_advanced_security(
     finally:
         db.close()
 
-def verificar_roles_permitidos(roles_permitidos: list[str]):
-    """
-    Dependencia de FastAPI que valida si el usuario actual posee 
-    al menos uno de los roles requeridos dentro de su empresa o ámbito 
-    utilizando el modelo relacional UsuariosEmpresas y Roles.
-    """
-    def dependencia_verificacion(
-        request: Request,
-        usuario_actual: Usuarios = Depends(obtener_usuario_actual),
-        db: Session = Depends(get_db)
-    ):
-        # Verificar si el usuario está activo
-        if not usuario_actual.activo:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="La cuenta de usuario se encuentra inactiva."
-            )
-
-        # Extraer el id de empresa desde la cabecera
-        empresa_id = request.headers.get("Empresa-ID")
-
-        # Consultar membresías y roles del usuario en el sistema
-        membresias = (
-            db.query(UsuariosEmpresas)
-            .outerjoin(Empresas, UsuariosEmpresas.empresa_id == Empresas.id)
-            .join(Usuarios, UsuariosEmpresas.usuario_id == Usuarios.id)
-            .join(Roles, UsuariosEmpresas.rol_id == Roles.id)
-            .filter(
-                UsuariosEmpresas.usuario_id == usuario_actual.id,
-                UsuariosEmpresas.activo.is_(True)
-            )
-        )
-
-        # Si hay una relación cuyo rol sea del tipo superadministrador y no tenga id de empresa
-        if any(m for m in membresias.all() if m.rol.tipo == TipoRolEnum.SUPERADMINISTRADOR and m.empresa_id is None):
-            rol_usuario = TipoRolEnum.SUPERADMINISTRADOR
-        else:
-            # Sacar el uuid a partir del id de empresa enviado en la cabecera, si aplica
-            try:
-                empresa_uuid = uuid.UUID(empresa_id)
-            except TypeError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se ha proporcionado un id de empresa en la cabecera de la petición.")
-            except ValueError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El id de empresa proporcionado en la cabecera de la petición no es un id válido.")
-
-            # Saca el objeto empresa con el uuid obtenido gracias a la cabecera, si aplica
-            empresa = db.query(Empresas).filter(Empresas.id == empresa_uuid).first()
-            if not empresa:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se ha podido encontrar ninguna empresa en la base de datos con el id proporcionado en la cabecera de la petición.")
-
-            # Filtra las membresias por la empresa proporcionada
-            membresias.filter(UsuariosEmpresas.empresa_id == empresa.id)
-
-            # El rol del usuario actual para la empresa proporcionada
-            rol_usuario = [m.rol.tipo for m in membresias.all() if m.rol.tipo]
-
-        # Comprobar si coincide con alguno de los roles permitidos
-        tiene_rol_requerido = any(rol in roles_permitidos for rol in rol_usuario)
-        if not tiene_rol_requerido:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {', '.join(roles_permitidos)}."
-            )
-        
-        return usuario_actual
-        
-    return dependencia_verificacion
-
 def verificar_permisos_requeridos(permisos_requeridos: list[str]):
     """
-    Dependencia de FastAPI que valida si el único rol activo que posee 
-    el usuario en la empresa actual (según la cabecera 'Empresa-ID') 
-    cuenta con al menos uno de los permisos requeridos (en formato 'accion-tipo').
+    Dependencia de FastAPI que valida si el rol activo que posee 
+    el usuario en la empresa actual cuenta con los permisos requeridos (en formato 'accion-tipo').
     """
     def dependencia_verificacion(
         request: Request,
@@ -294,7 +235,7 @@ def verificar_permisos_requeridos(permisos_requeridos: list[str]):
                 detail="La cuenta de usuario se encuentra inactiva."
             )
 
-        # 2. Comprobar si es Superadministrador global (bypass total mediante membresía global con empresa_id NULL)
+        # 2. Comprobar si es Superadministrador global
         is_superadministrador = (
             db.query(UsuariosEmpresas)
             .join(Roles, UsuariosEmpresas.rol_id == Roles.id)
@@ -309,27 +250,8 @@ def verificar_permisos_requeridos(permisos_requeridos: list[str]):
         if is_superadministrador:
             return usuario_actual
 
-        # 3. Extraer y validar el id de empresa desde la cabecera
-        empresa_id = request.headers.get("Empresa-ID")
-        try:
-            empresa_uuid = uuid.UUID(empresa_id)
-        except TypeError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="No se ha proporcionado un id de empresa en la cabecera de la petición."
-            )
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="El id de empresa proporcionado en la cabecera de la petición no es un id válido."
-            )
-
-        empresa = db.query(Empresas).filter(Empresas.id == empresa_uuid).first()
-        if not empresa:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="No se ha podido encontrar ninguna empresa en la base de datos con el id proporcionado en la cabecera."
-            )
+        # 3. Validar empresa mediante la función auxiliar DRY
+        empresa = _obtener_y_validar_empresa(request, db)
 
         # 4. Obtener la única membresía activa del usuario para esta empresa específica
         membresia = (
@@ -352,38 +274,24 @@ def verificar_permisos_requeridos(permisos_requeridos: list[str]):
 
         rol_id = membresia.rol_id
 
-        # 5. Comprobar si el rol único del usuario tiene asignado alguno de los permisos requeridos
-        tiene_permiso = False
+        # 5. Cargar TODOS los permisos del rol en una sola consulta
+        permisos_rol = (
+            db.query(Permisos)
+            .join(RolesPermisos, RolesPermisos.permiso_id == Permisos.id)
+            .filter(RolesPermisos.rol_id == rol_id)
+            .all()
+        )
         
+        # Convertir a un conjunto en memoria para validación rápida 
+        permisos_concedidos_set = {f"{p.accion}-{p.tipo}" for p in permisos_rol}
+
+        # 6. Validar que se cumplan los permisos requeridos
         for permiso_str in permisos_requeridos:
-            if "-" not in permiso_str:
-                tiene_permiso = False
-                break
-            
-            # Desglosar la cadena "accion-tipo"
-            accion_parte, tipo_parte = permiso_str.split("-", 1)
-
-            # Consultar si existe la relación en roles_permisos para este rol
-            asociacion = (
-                db.query(RolesPermisos)
-                .join(Permisos, RolesPermisos.permiso_id == Permisos.id)
-                .filter(
-                    RolesPermisos.rol_id == rol_id,
-                    Permisos.accion == accion_parte,
-                    Permisos.tipo == tipo_parte
+            if "-" not in permiso_str or permiso_str not in permisos_concedidos_set:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Acceso denegado. No dispones de los permisos requeridos para realizar esta acción."
                 )
-                .first()
-            )
-
-            if not asociacion:
-                tiene_permiso = False
-                break
-
-        if not tiene_permiso:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No dispones de los permisos requeridos para realizar esta acción."
-            )
         
         return usuario_actual
         

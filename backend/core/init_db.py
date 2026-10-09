@@ -95,7 +95,7 @@ def inicializar_permisos_sistema(db: Session) -> None:
 def inicializar_relaciones_roles_permisos(db: Session) -> None:
     """
     Asigna las matrices de permisos por defecto a cada rol del sistema
-    respetando los principios de最小 privilegio (Least Privilege) y normativa laboral.
+    respetando los principios de privilegio (Least Privilege) y normativa laboral.
     """
     # Mapeo de IDs de roles definidos arriba
     id_superadmin = "6kdl163e-55m4-7860-8824-cfy23aj47834"

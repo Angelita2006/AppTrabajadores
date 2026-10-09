@@ -30,7 +30,7 @@ EMAILS_FROM = settings.EMAILS_FROM
 # Rutas base de archivos estáticos adaptadas al nuevo esquema centralizado
 DIRECCION_ACTUAL = Path(__file__).resolve()
 # Ajusta los niveles de .parent según dónde ubiques este archivo de utilidades respecto a la raíz 'static'
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent.parent / "static" 
+BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
 
 CARPETAS_ARCHIVOS_MAP = {
     "firmas_fichajes": BASE_STATIC_DIR / "firmas_fichajes",
