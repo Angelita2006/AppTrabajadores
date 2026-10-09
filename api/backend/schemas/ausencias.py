@@ -14,24 +14,19 @@ from schemas.usuarios import UsuarioSimpleResponse
 class AusenciaBase(BaseModel):
     """
     Propiedades comunes compartidas para la validación de cualquier tipo de ausencia.
-    """
-    id: Optional[UUID] = Field(None, description="ID único UUID autogenerado (gen_random_uuid) de la ausencia")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
-    usuario_validador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que valida la ausencia, si aplica")
-    
-    tipo_ausencia: TipoAusenciaEnum = Field(..., description="Categoría legal de la ausencia")
-    estado: EstadoAusenciaEnum = Field(..., description="Estado de la ausencia (pendiente, aprobada, rechazada, cancelada)")
+    """    
+    tipo_ausencia: Optional[TipoAusenciaEnum] = Field(None, description="Categoría legal de la ausencia")
+    estado: Optional[EstadoAusenciaEnum] = Field(None, description="Estado de la ausencia (pendiente, aprobada, rechazada, cancelada)")
 
     fecha_inicio: datetime.date = Field(..., description="Fecha de inicio de la ausencia (AAAA-MM-DD)")
     fecha_fin: datetime.date = Field(..., description="Fecha de finalización de la ausencia (AAAA-MM-DD)")
 
     motivo: str = Field(..., max_length=255, description="Justificación detallada de la solicitud")
 
-    justificante_metadata: Optional[dict] = Field(default_factory=dict, description="Metadatos o enlaces al justificante de la ausencia")
+    justificante_url: Optional[str] = Field(None, description="URL de la ruta del archivo del justificante de la ausencia")
 
-    fecha_resolucion: datetime.datetime = Field(..., description="Fecha en que se resuelve la solicitud de ausencia")
-    observaciones_admin: str = Field(..., max_length=255, description="Notas añadidas por el validador al aprobar/rechazar la solicitud")
+    fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha en que se resuelve la solicitud de ausencia")
+    observaciones_admin: Optional[str] = Field(None, max_length=255, description="Notas añadidas por el validador al aprobar/rechazar la solicitud")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,6 +34,10 @@ class AusenciaCreate(AusenciaBase):
     """
     Esquema utilizado para recibir solicitudes de vacaciones o bajas.
     """
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
+    usuario_validador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que valida la ausencia, si aplica")
+    
     @model_validator(mode='after')
     def validar_rango_fechas(self) -> 'AusenciaCreate':
         """
@@ -51,17 +50,32 @@ class AusenciaCreate(AusenciaBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-class AusenciaUpdate(AusenciaBase):
+class AusenciaUpdate(BaseModel):
     """
     Esquema utilizado para modificar solicitudes de vacaciones o bajas.
     """
+    usuario_validador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que valida la ausencia, si aplica")
+
+    tipo_ausencia: Optional[TipoAusenciaEnum] = Field(None, description="Categoría legal de la ausencia")
+    estado: Optional[EstadoAusenciaEnum] = Field(None, description="Estado de la ausencia (pendiente, aprobada, rechazada, cancelada)")
+
+    fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio de la ausencia (AAAA-MM-DD)")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización de la ausencia (AAAA-MM-DD)")
+
+    motivo: Optional[str] = Field(None, max_length=255, description="Justificación detallada de la solicitud")
+
+    justificante_url: Optional[str] = Field(None, description="URL de la ruta del archivo del justificante de la ausencia")
+
+    fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha en que se resuelve la solicitud de ausencia")
+    observaciones_admin: Optional[str] = Field(None, max_length=255, description="Notas añadidas por el validador al aprobar/rechazar la solicitud")
+
     @model_validator(mode='after')
     def validar_rango_fechas(self) -> 'AusenciaUpdate':
         """
         Valida que la fecha de fin sea igual o posterior a la de inicio,
         evitando errores antes de que la consulta toque PostgreSQL.
         """
-        if self.fecha_fin < self.fecha_inicio:
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
             raise ValueError("La fecha de finalización no puede ser anterior a la fecha de inicio.")
         return self
 
@@ -71,6 +85,11 @@ class AusenciaSimpleResponse(AusenciaBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia la aplicación móvil o web.
     """
+    id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) de la ausencia")
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
+    usuario_validador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que valida la ausencia, si aplica")
+    
     model_config = ConfigDict(from_attributes=True)
 
 class AusenciaResponse(AusenciaSimpleResponse):

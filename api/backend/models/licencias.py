@@ -19,9 +19,11 @@ class Licencias(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único de la licencia.')
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado.')
 
-    plan: Mapped[PlanLicenciaEnum] = mapped_column(Enum(PlanLicenciaEnum, values_callable=lambda cls: [m.value for m in cls], name='plan_licencia_enum'), nullable=False, server_default='Básico', comment='Nivel del plan contratado (Básico, Pro, Enterprise).')
-    ciclo: Mapped[CicloFacturacionEnum] = mapped_column(Enum(CicloFacturacionEnum, values_callable=lambda cls: [m.value for m in cls], name='ciclo_facturacion_enum'), nullable=False, server_default='Trial', comment='Ciclo de facturación (Trial, Mensual, Anual).')
-    estado: Mapped[EstadoSuscripcionEnum] = mapped_column(Enum(EstadoSuscripcionEnum, values_callable=lambda cls: [m.value for m in cls], name='estado_suscripcion_enum'), nullable=False, server_default='Trialing', comment='Estado actual de la suscripción.')
+    codigo: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))"), comment='Código único para canjear la licencia comercial.')
+
+    plan: Mapped[PlanLicenciaEnum] = mapped_column(Enum(PlanLicenciaEnum, values_callable=lambda cls: [m.value for m in cls], name='plan_licencia_enum'), nullable=False, server_default=text("'Básico'::plan_licencia_enum"), comment='Nivel del plan contratado (Básico, Pro, Enterprise).')
+    ciclo: Mapped[CicloFacturacionEnum] = mapped_column(Enum(CicloFacturacionEnum, values_callable=lambda cls: [m.value for m in cls], name='ciclo_facturacion_enum'), nullable=False, server_default=text("'Trial'::ciclo_facturacion_enum"), comment='Ciclo de facturación (Trial, Mensual, Anual).')
+    estado: Mapped[EstadoSuscripcionEnum] = mapped_column(Enum(EstadoSuscripcionEnum, values_callable=lambda cls: [m.value for m in cls], name='estado_suscripcion_enum'), nullable=False, server_default=text("'Trialing'::estado_suscripcion_enum"), comment='Estado actual de la suscripción.')
 
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('current_date'), comment='Inicio del periodo actual de vigencia.')
     fecha_expiracion: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha exacta en que expira el periodo de prueba (Trial) o la suscripción pagada.')

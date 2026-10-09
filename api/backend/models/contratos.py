@@ -28,8 +28,8 @@ class Contratos(Base):
     centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del centro de trabajo al que pertenece el contrato.')
     departamento_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Departamento al que pertenece el contrato.')
     
-    tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False, server_default=TipoContratoEnum.TEMPORAL, comment='Tipo de contrato.')
-    tipo_jornada: Mapped[TipoJornadaEnum] = mapped_column(Enum(TipoJornadaEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_jornada_enum'), nullable=False, server_default=TipoJornadaEnum.COMPLETA, comment='Tipo de jornada.')
+    tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False, server_default=text("'Temporal'::tipo_contrato_enum"), comment='Tipo de contrato.')
+    tipo_jornada: Mapped[TipoJornadaEnum] = mapped_column(Enum(TipoJornadaEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_jornada_enum'), nullable=False, server_default=text("'Completa'::tipo_jornada_enum"), comment='Tipo de jornada.')
     horas_semana: Mapped[decimal.Decimal] = mapped_column(Numeric(5, 2), nullable=False, comment='Número de horas semanales del contrato.')
     puesto_trabajo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment='Puesto de trabajo del contratado.')
     categoria_profesional: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment='Categoría profesional del contratado.')
@@ -49,3 +49,4 @@ class Contratos(Base):
     departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos', doc='Departamento al que pertenece el contrato.') # type: ignore
     
     calendarios_laborales: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', back_populates='contrato', cascade='all, delete-orphan', doc='Calendarios laborales pertenecientes al contrato.') # type: ignore
+    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='contrato', doc='Asignaciones de turno del contrato.') # type: ignore

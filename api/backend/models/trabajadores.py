@@ -24,7 +24,7 @@ class Trabajadores(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único del trabajador.')
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador de la empresa a la que pertenece el trabajador.')
-    rol_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del rol de acceso del trabajador; NULL si no tiene rol asignado.')
+    rol_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=True, comment='Identificador del rol de acceso del trabajador.')
 
     dni_nif_nie: Mapped[str] = mapped_column(String(9), nullable=False, comment='DNI, NIF o NIE del trabajador; único por empresa.')
     nombre: Mapped[str] = mapped_column(String(50), nullable=False, comment='Nombre del trabajador.')
@@ -34,7 +34,7 @@ class Trabajadores(Base):
     foto_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='URL de la foto del trabajador; se puede usar para identificación visual en fichajes.')
 
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment='Indica si el trabajador está activo; se usa para cumplir con el derecho de supresión (art. 17 RGPD) mientras existan fichajes en periodo de conservación legal.')
-    estado: Mapped[EstadoTrabajadorEnum] = mapped_column(Enum(EstadoTrabajadorEnum, values_callable=lambda cls: [member.value for member in cls], name='estado_trabajador_enum'), nullable=False, server_default="Inactivo", comment="Estado operativo actual del trabajador")
+    estado: Mapped[EstadoTrabajadorEnum] = mapped_column(Enum(EstadoTrabajadorEnum, values_callable=lambda cls: [member.value for member in cls], name='estado_trabajador_enum'), nullable=False, server_default=text("'Inactivo'::estado_trabajador_enum"), comment="Estado operativo actual del trabajador")
 
     fecha_alta_empresa: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'), comment='Fecha de alta del trabajador en la empresa; se usa para cumplir con el derecho de supresión (art. 17 RGPD) mientras existan fichajes en periodo de conservación legal.')
     fecha_baja_empresa: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de baja del trabajador en la empresa; se usa para cumplir con el derecho de supresión (art. 17 RGPD) mientras existan fichajes en periodo de conservación legal.')
@@ -45,7 +45,6 @@ class Trabajadores(Base):
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='trabajadores', doc='Empresa a la que pertenece el trabajador.') # type: ignore
     rol: Mapped[Optional['Roles']] = relationship('Roles', foreign_keys=[rol_id], doc='Rol del trabajador.') # type: ignore
 
-    asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='trabajador', doc='Asignaciones de turno del trabajador.') # type: ignore
     resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='trabajador', doc='Resúmenes de jornada del trabajador.') # type: ignore
     usuario: Mapped[Optional['Usuarios']] = relationship('Usuarios', uselist=False, back_populates='trabajador', doc='Usuario asociado al trabajador.') # type: ignore
     auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='trabajador', doc='Registros de auditoría de accesos del trabajador.') # type: ignore

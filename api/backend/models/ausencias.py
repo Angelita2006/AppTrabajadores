@@ -31,7 +31,7 @@ class Ausencias(Base):
     fecha_fin: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha de fin de la ausencia.')
     motivo: Mapped[str] = mapped_column(String(255), nullable=False, comment='Explicación o causa legal de la ausencia.')
 
-    justificante_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"), comment='Metadatos adicionales sobre el justificante de la ausencia.')
+    justificante_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='URL o ruta del archivo PDF oficial del justificante de la ausencia.')
 
     fecha_resolucion: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True, comment='Fecha en que se resuelve la solicitud de ausencia.')
     observaciones_admin: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Notas añadidas por el validador al aprobar/rechazar.')

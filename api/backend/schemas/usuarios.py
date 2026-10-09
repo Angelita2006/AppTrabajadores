@@ -12,14 +12,12 @@ class UsuarioBase(BaseModel):
     Propiedades comunes compartidas para la validación de un usuario
     basada en el modelo relacional mapeado por sqlacodegen.
     """
-    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del usuario")
-
     nombre: str = Field(..., max_length=150, description="Nombre completo del usuario")
 
     email: EmailStr = Field(..., max_length=30, description="Correo electrónico único de acceso")
-    telefono: str = Field(..., max_length=30, description="Número de teléfono único de acceso")
+    telefono: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso")
 
-    activo: Optional[bool] = Field(None, description="Indica si el usuario está activo o no")
+    activo: Optional[bool] = Field(True, description="Indica si el usuario está activo o no")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,13 +26,24 @@ class UsuarioCreate(UsuarioBase):
     Esquema utilizado para recibir los datos durante la creación de una cuenta.
     Exige la contraseña y permite vincular de forma opcional la empresa o el trabajador.
     """
+    password: str = Field(..., description="Contraseña única de acceso")
+
     model_config = ConfigDict(from_attributes=True)
 
-class UsuarioRegisterCreate(UsuarioBase):
+class UsuarioUpdate(BaseModel):
     """
-    Esquema utilizado para validar los datos enviados desde la app móvil
-    al registrar un nuevo usuario vinculándolo a un trabajador existente.
+    Esquema utilizado para recibir los datos durante la creación de una cuenta.
+    Exige la contraseña y permite vincular de forma opcional la empresa o el trabajador.
     """
+    nombre: Optional[str] = Field(None, max_length=150, description="Nombre completo del usuario")
+
+    email: Optional[EmailStr] = Field(None, max_length=30, description="Correo electrónico único de acceso")
+    telefono: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso")
+
+    activo: Optional[bool] = Field(True, description="Indica si el usuario está activo o no")
+
+    password: Optional[str] = Field(None, description="Contraseña única de acceso")
+    
     model_config = ConfigDict(from_attributes=True)
 
 class UsuarioSimpleResponse(UsuarioBase):
@@ -42,6 +51,8 @@ class UsuarioSimpleResponse(UsuarioBase):
     Esquema utilizado para empaquetar los datos del perfil que se envían al cliente.
     Excluye por completo el hash de la contraseña para evitar brechas de seguridad.
     """
+    id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del usuario")
+
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de creación de la cuenta (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación (now)")
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")

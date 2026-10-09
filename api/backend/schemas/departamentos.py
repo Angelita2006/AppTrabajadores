@@ -14,10 +14,6 @@ class DepartamentoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un departamento
     basado en el modelo inmutable mapeado por sqlacodegen.
     """
-    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del departamento")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado")
-
     nombre: str = Field(..., max_length=255, description="Nombre descriptivo del departamento")
     activo: Optional[bool] = Field(None, description="Indica si el departamento está activo o no")
 
@@ -28,12 +24,18 @@ class DepartamentoCreate(DepartamentoBase):
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un departamento.
     Permite asociar opcionalmente el departamento a un centro de trabajo físico.
     """
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado")
+
     model_config = ConfigDict(from_attributes=True)
 
-class DepartamentoUpdate(DepartamentoBase):
+class DepartamentoUpdate(BaseModel):
     """
     Esquema para actualizar datos de un departamento.
     """
+    nombre: Optional[str] = Field(None, max_length=255, description="Nombre descriptivo del departamento")
+    activo: Optional[bool] = Field(None, description="Indica si el departamento está activo o no")
+
     model_config = ConfigDict(from_attributes=True)
 
 class DepartamentoSimpleResponse(DepartamentoBase):
@@ -41,6 +43,10 @@ class DepartamentoSimpleResponse(DepartamentoBase):
     Esquema utilizado para moldear las respuestas JSON que el servidor envía a la app.
     Incluye las propiedades automáticas y metadatos de auditoría temporal del sistema.
     """
+    id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del departamento")
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado")
+
     created_at: datetime.datetime = Field(..., description="Fecha y hora de inserción real calculada por el servidor (now)")
     updated_at: datetime.datetime = Field(..., description="Fecha y hora de la última modificación efectuada (now)")
 

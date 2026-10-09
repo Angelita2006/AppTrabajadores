@@ -38,7 +38,7 @@ class Fichajes(Base):
     fichaje_sustituido_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del fichaje que se sustituye, si aplica.')
     motivo_pausa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del motivo de la pausa, si aplica.')
 
-    tipo_evento: Mapped[TipoEventoFichajeEnum] = mapped_column(Enum(TipoEventoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_evento_fichaje_enum'), nullable=False, server_default=text("'ENTRADA'::tipo_evento_fichaje_enum"), comment='Tipo fijo del evento de fichaje.')
+    tipo_evento: Mapped[TipoEventoFichajeEnum] = mapped_column(Enum(TipoEventoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_evento_fichaje_enum'), nullable=False, server_default=text("'Entrada'::tipo_evento_fichaje_enum"), comment='Tipo fijo del evento de fichaje.')
     metodo_fichaje: Mapped[MetodoFichajeEnum] = mapped_column(Enum(MetodoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='metodo_fichaje_enum'), nullable=False, server_default=text("'Manual'::metodo_fichaje_enum"), comment='Método de fichaje.')
 
     fecha_hora: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, comment='Instante oficial del fichaje (referencia legal).')

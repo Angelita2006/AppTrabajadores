@@ -17,8 +17,8 @@ class Permisos(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único del permiso.')
    
-    tipo: Mapped[TipoPermisoEnum] = mapped_column(Enum(TipoPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_permiso_enum'), nullable=False, comment='Recurso o área funcional a la que aplica el permiso.')
-    accion: Mapped[AccionPermisoEnum] = mapped_column(Enum(AccionPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_permiso_enum'), nullable=False, comment='Operación autorizada sobre el recurso.')
+    tipo: Mapped[TipoPermisoEnum] = mapped_column(Enum(TipoPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_permiso_enum'), nullable=False, server_default=text("'usuarios'::tipo_permiso_enum"), comment='Recurso o área funcional a la que aplica el permiso.')
+    accion: Mapped[AccionPermisoEnum] = mapped_column(Enum(AccionPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_permiso_enum'), nullable=False, server_default=text("'consultar'::accion_permiso_enum"), comment='Operación autorizada sobre el recurso.')
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Descripción del permiso.')
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la licencia.')

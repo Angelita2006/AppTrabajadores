@@ -1,9 +1,10 @@
 import datetime
 import uuid
 from typing import Optional
-from sqlalchemy import DateTime, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, Uuid, text
+from sqlalchemy import DateTime, Enum, ForeignKeyConstraint, Index, PrimaryKeyConstraint, String, Uuid, text
 from core.database import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
+from core.enums import TipoRolEnum
 from models.roles_permisos import RolesPermisos
 
 class Roles(Base):
@@ -20,6 +21,7 @@ class Roles(Base):
     empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='NULL para rol de sistema; con empresa_id es un rol personalizado de esa empresa.')
     
     nombre: Mapped[str] = mapped_column(String(50), nullable=False, comment='Nombre del rol; único por empresa o global (empresa_id = NULL).')
+    tipo: Mapped[TipoRolEnum] = mapped_column(Enum(TipoRolEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_rol_enum'), nullable=False, server_default=text("'Otro'::tipo_rol_enum"), comment='Tipo de rol.')
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Descripción del rol.')
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del rol.')

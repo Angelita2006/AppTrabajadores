@@ -27,7 +27,7 @@ class GestoriasEmpresas(Base):
     
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'), comment='Fecha de inicio de la autorización.')
     fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de finalización de la autorización.')
-    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('True'), comment="Indica si la relacion entre la gestoría y la empresa cliente está activa o no.")
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment="Indica si la relacion entre la gestoría y la empresa cliente está activa o no.")
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la autorización.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización de la autorización.')

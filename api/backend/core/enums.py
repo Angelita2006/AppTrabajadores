@@ -80,6 +80,16 @@ class TipoAusenciaEnum(str, enum.Enum):
     ASUNTOS_PROPIOS = "Asuntos_propios"
     AUSENCIA_INJUSTIFICADA = "Ausencia_injustificada"
 
+class TipoRolEnum(str, enum.Enum):
+    SUPERADMINISTRADOR = 'Superadministrador'
+    ADMIN_GESTORIA = 'Admin_gestoría'
+    ADMIN_EMPRESA = 'Admin_empresa'
+    RRHH = 'Rrhh'
+    REPRESENTANTE_LEGAL = 'Representante_legal'
+    TRABAJADOR = 'Trabajador'
+    AUDITOR_ITSS = 'Auditor_itss'
+    OTRO = 'Otro'
+
 class EstadoAusenciaEnum(str, enum.Enum):
     PENDIENTE = "Pendiente"
     APROBADA = "Aprobada"

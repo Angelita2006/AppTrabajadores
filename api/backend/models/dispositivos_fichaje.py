@@ -22,7 +22,7 @@ class DispositivosFichaje(Base):
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador de la empresa a la que pertenece el dispositivo.')
     centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del centro de trabajo al que pertenece el dispositivo.')
     
-    tipo_dispositivo: Mapped[MetodoFichajeEnum] = mapped_column(Enum(MetodoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='metodo_fichaje_enum'), nullable=False, comment='Tipo de dispositivo de fichaje.')
+    tipo_dispositivo: Mapped[MetodoFichajeEnum] = mapped_column(Enum(MetodoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='metodo_fichaje_enum'), nullable=False, server_default=text("'Manual'::metodo_fichaje_enum"), comment='Tipo de dispositivo de fichaje.')
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment='Indica si el dispositivo de fichaje está activo.')
     
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del dispositivo de fichaje.')

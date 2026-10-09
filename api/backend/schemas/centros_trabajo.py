@@ -1,6 +1,7 @@
 import datetime
 import decimal
-from pydantic import BaseModel, Field, ConfigDict
+from zoneinfo import available_timezones
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional
 from uuid import UUID
 from schemas.empresas import EmpresaSimpleResponse
@@ -11,43 +12,64 @@ from schemas.empresas import EmpresaSimpleResponse
 
 class CentroTrabajoBase(BaseModel):
     """
-    Propiedades comunes compartidas para la validación de un centro de trabajo
-    basado en el modelo relacional mapeado por sqlacodegen.
+    Propiedades comunes de negocio para la validación.
     """
-    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del centro de trabajo")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-
     nombre: str = Field(..., max_length=50, description="Nombre identificativo del centro de trabajo")
     zona_horaria: str = Field("Europe/Madrid", max_length=50, description="Zona horaria específica del centro de trabajo")
-    codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización a la Seguridad Social del centro, si aplica")
-    direccion: Optional[str] = Field(None, max_length=50, description="Dirección postal o física del centro de trabajo")
-    latitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Latitud geográfica del centro de trabajo")  
-    longitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Longitud geográfica del centro de trabajo") 
-    activo: Optional[bool] = Field(None, description="Indica si el centro de trabajo está activo o inactivo")
+    codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización")
+    direccion: Optional[str] = Field(None, max_length=50, description="Dirección postal o física")
+    latitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Latitud geográfica")  
+    longitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Longitud geográfica") 
+    activo: Optional[bool] = Field(True, description="Indica si el centro de trabajo está activo")
+
+    @field_validator("zona_horaria")
+    @classmethod
+    def validar_zona_horaria(cls, v: str) -> str:
+        """Valida que el string pertenezca a la base de datos oficial IANA."""
+        if v not in available_timezones():
+            raise ValueError(f"Zona horaria no válida: '{v}'. Debe ser un identificador IANA correcto (ej. Europe/Madrid).")
+        return v
 
     model_config = ConfigDict(from_attributes=True)
 
 class CentroTrabajoCreate(CentroTrabajoBase):
     """
-    Esquema utilizado para recibir los datos desde el cliente al dar de alta un centro de trabajo.
-    Contiene campos de localización y registro de cotización opcionales.
+    Esquema para crear: Hereda el Base y añade obligatoriamente la empresa.
     """
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     model_config = ConfigDict(from_attributes=True)
     
 class CentroTrabajoUpdate(BaseModel):
     """
-    Esquema para la actualización parcial de un centro de trabajo.
-    Todos los campos son opcionales para permitir actualizaciones 'patch'.
+    Esquema para actualización parcial (PATCH). 
+    TODOS los campos son opcionales para que el cliente pueda enviar solo lo que cambie.
     """
+    nombre: Optional[str] = Field(None, max_length=50, description="Nombre identificativo del centro de trabajo")
+    zona_horaria: Optional[str] = Field(None, max_length=50, description="Zona horaria específica del centro de trabajo")
+    codigo_ccc: Optional[str] = Field(None, max_length=20, description="Código de Cuenta de Cotización")
+    direccion: Optional[str] = Field(None, max_length=50, description="Dirección postal o física")
+    latitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Latitud geográfica")
+    longitud: Optional[decimal.Decimal] = Field(None, max_digits=10, decimal_places=6, description="Longitud geográfica") 
+    activo: Optional[bool] = Field(True, description="Indica si el centro de trabajo está activo")
+
+    @field_validator("zona_horaria")
+    @classmethod
+    def validar_zona_horaria_opcional(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in available_timezones():
+            raise ValueError(f"Zona horaria no válida: '{v}'.")
+        return v
+
     model_config = ConfigDict(from_attributes=True)
 
 class CentroTrabajoSimpleResponse(CentroTrabajoBase):
     """
-    Esquema utilizado para estructurar las respuestas JSON hacia la interfaz móvil o web.
-    Muestra la vigencia operativa y los metadatos de auditoría temporal del sistema.
+    Esquema para respuestas: Añade el ID y metadatos generados por la BD.
     """
-    created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
-    updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última actualización efectuada (now)")
+    id: UUID = Field(..., description="ID único UUID autogenerado")
+    empresa_id: UUID = Field(..., description="ID de la empresa asociada")
+    
+    created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción")
+    updated_at: datetime.datetime = Field(..., description="Marca de tiempo de actualización")
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -13,15 +13,12 @@ class TurnoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un turno teórico
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     nombre: str = Field(..., min_length=2, max_length=150, description="Nombre identificativo del turno (Ej: 'Turno Mañana Rotativo')")
     hora_inicio: datetime.time = Field(..., description="Hora de entrada teórica en formato HH:MM:SS")
     hora_fin: datetime.time = Field(..., description="Hora de salida teórica en formato HH:MM:SS")
     duracion_pausa_minutos: int = Field(0, ge=0, description="Minutos de descanso reglamentarios incluidos (SmallInteger)")
-    dias_semana: List[int] = Field(
-        ..., 
-        description="Días laborables del turno. Formato: 1=lunes, 2=martes ... 7=domingo"
-    )
+    dias_semana: List[int] = Field(..., description="Días laborables del turno. Formato: 1=lunes, 2=martes ... 7=domingo")
+    activo: Optional[bool] = Field(True, description="Indica si el turno está activo o no")
 
     @field_validator('dias_semana')
     @classmethod
@@ -39,25 +36,26 @@ class TurnoBase(BaseModel):
                 
         return sorted(list(set(valores)))
 
+    model_config = ConfigDict(from_attributes=True)
+
 class TurnoCreate(TurnoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al configurar un nuevo turno.
     """
-    pass
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class TurnoUpdate(BaseModel):
     """
     Esquema para actualizar datos de un turno.
     """
-    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del trabajador")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
-    
-    nombre: str = Field(..., max_length=150, description="Nombre identificativo del turno")
-    hora_inicio: datetime.time = Field(..., description="Hora de entrada teórica en formato HH:MM:SS")
-    hora_fin: datetime.time = Field(..., description="Hora de salida teórica en formato HH:MM:SS")
+    nombre: Optional[str] = Field(None, max_length=150, description="Nombre identificativo del turno")
+    hora_inicio: Optional[datetime.time] = Field(None, description="Hora de entrada teórica en formato HH:MM:SS")
+    hora_fin: Optional[datetime.time] = Field(None, description="Hora de salida teórica en formato HH:MM:SS")
     duracion_pausa_minutos: Optional[int] = Field(None, description="Minutos de descanso reglamentarios")
     dias_semana: Optional[List[int]] = Field(None, description="Días laborables del turno (1=lunes ... 7=domingo)")
-    activo: Optional[bool] = Field(None, description="Indica si el turno está activo o no")
+    activo: Optional[bool] = Field(True, description="Indica si el turno está activo o no")
 
     @field_validator('dias_semana')
     @classmethod
@@ -79,6 +77,9 @@ class TurnoSimpleResponse(TurnoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON que el servidor envía a las aplicaciones.
     """
+    id: UUID = Field(..., description="ID único UUID del turno")
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
+
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la creación del cuadrante (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
 

@@ -30,8 +30,8 @@ class CorreccionesFichaje(Base):
     usuario_aprobador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del usuario que aprueba la corrección.')
     fichaje_afectado_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del fichaje afectado por la corrección.')
 
-    tipo_evento: Mapped[TipoEventoFichajeEnum] = mapped_column(Enum(TipoEventoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_evento_fichaje_enum', create_type=False), nullable=False, comment='Tipo fijo del evento de fichaje de la corrección.')
-    tipo_correccion: Mapped[TipoCorreccionEnum] = mapped_column(Enum(TipoCorreccionEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_correccion_enum'), nullable=False, comment='Tipo de corrección.')
+    tipo_evento: Mapped[TipoEventoFichajeEnum] = mapped_column(Enum(TipoEventoFichajeEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_evento_fichaje_enum'), nullable=False, server_default=text("'Entrada'::tipo_evento_fichaje_enum"), comment='Tipo fijo del evento de fichaje de la corrección.')
+    tipo_correccion: Mapped[TipoCorreccionEnum] = mapped_column(Enum(TipoCorreccionEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_correccion_enum'), nullable=False, server_default=text("'Alta_manual'::tipo_correccion_enum"), comment='Tipo de corrección.')
     
     valor_nuevo: Mapped[dict] = mapped_column(JSONB, nullable=False, comment='Valor nuevo de la corrección.')
     valor_anterior: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, comment='Valor anterior de la corrección.')

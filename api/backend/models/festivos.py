@@ -19,7 +19,7 @@ class Festivos(Base):
     calendario_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del calendario laboral al que pertenece el festivo.')
 
     fecha: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha del festivo.')
-    tipo: Mapped[TipoFestivoEnum] = mapped_column(Enum(TipoFestivoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_festivo_enum'), nullable=False, server_default=text("'Local'::character varying"), comment='Tipo de festivo.')
+    tipo: Mapped[TipoFestivoEnum] = mapped_column(Enum(TipoFestivoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_festivo_enum'), nullable=False, server_default=text("'Local'::tipo_festivo_enum"), comment='Tipo de festivo.')
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment='Indica si el festivo está activo.')
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Descripción del festivo.')
 

@@ -18,12 +18,6 @@ class ContratoBase(BaseModel):
     Propiedades comunes compartidas para la validación de un contrato laboral
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    id: Optional[UUID] = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del contrato")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
-    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
-    departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
-
     tipo_contrato: TipoContratoEnum = Field(..., description="Modalidad del contrato (indefinido, temporal, etc.)")
     tipo_jornada: TipoJornadaEnum = Field(..., description="Tipo de jornada pactada (completa o parcial)")
     horas_semana: Decimal = Field(..., max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
@@ -44,6 +38,11 @@ class ContratoCreate(ContratoBase):
     Esquema utilizado para registrar un nuevo contrato en el sistema.
     Valida las restricciones lógicas y de negocio antes de la inserción.
     """
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
+    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
+    departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
+
     @field_validator('fecha_fin', mode='before')
     @classmethod
     def limpiar_fecha_vacancia(cls, v: Any) -> Optional[datetime.date]:
@@ -79,6 +78,19 @@ class ContratoUpdate(BaseModel):
     Esquema para la actualización parcial de un contrato.
     Todos los campos son opcionales para permitir actualizaciones 'patch'.
     """
+    tipo_contrato: Optional[TipoContratoEnum] = Field(None, description="Modalidad del contrato (indefinido, temporal, etc.)")
+    tipo_jornada: Optional[TipoJornadaEnum] = Field(None, description="Tipo de jornada pactada (completa o parcial)")
+    horas_semana: Optional[Decimal] = Field(None, max_digits=5, decimal_places=2, description="Número de horas laborables semanales")
+    puesto_trabajo: Optional[str] = Field(None, max_length=50, description="Puesto de trabajo del contratado")
+    categoria_profesional: Optional[str] = Field(None, max_length=50, description="Categoría profesional del contratado")
+
+    pdf_url: Optional[str] = Field(None, description="Url o ruta del archivo en pdf del contrato")
+
+    fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio del contrato en formato AAAA-MM-DD")
+    fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
+
+    activo: Optional[bool] = Field(True, description="Indica si el contrato está activo o no")
+
     @field_validator('fecha_fin', 'departamento_id', mode='before')
     @classmethod
     def limpiar_vacios(cls, v: Any) -> Any:
@@ -87,12 +99,31 @@ class ContratoUpdate(BaseModel):
             return None
         return v
 
+    @model_validator(mode='after')
+    def validar_rango_fechas_update(self) -> 'ContratoUpdate':
+        """
+        Valida el rango solo si el usuario ha proporcionado ambas fechas en la petición.
+        (Si solo se actualiza una, el servicio de backend deberá cruzarla con la fecha existente en BD).
+        """
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValueError("La fecha de finalización del contrato no puede ser anterior a la fecha de inicio.")
+        return self
+
     model_config = ConfigDict(from_attributes=True)
 
 class ContratoSimpleResponse(ContratoBase):
     """
     Esquema utilizado para estructurar las respuestas JSON hacia el frontend móvil o web.
     """
+    id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del contrato")
+    empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
+    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
+    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
+    departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
+
+    created_at: datetime.datetime = Field(..., description="Fecha y hora de inserción real calculada por el servidor (now)")
+    updated_at: datetime.datetime = Field(..., description="Fecha y hora de la última modificación efectuada (now)")
+
     model_config = ConfigDict(from_attributes=True)
 
 class ContratoResponse(ContratoSimpleResponse):

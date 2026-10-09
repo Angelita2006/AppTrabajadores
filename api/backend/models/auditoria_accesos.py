@@ -29,7 +29,7 @@ class AuditoriaAccesos(Base):
     usuario_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del usuario que realiza la acción.')
     trabajador_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Identificador del trabajador relacionado con la acción.')
     
-    accion: Mapped[AccionAuditoriaEnum] = mapped_column(Enum(AccionAuditoriaEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_auditoria_enum'), nullable=False, comment='Tipo de acción realizada.')
+    accion: Mapped[AccionAuditoriaEnum] = mapped_column(Enum(AccionAuditoriaEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_auditoria_enum'), nullable=False, server_default=text("'Consulta'::accion_auditoria_enum"), comment='Tipo de acción realizada.')
     fecha_hora: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora en que se realiza la acción.')
     detalle: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, comment='Detalles adicionales sobre la acción realizada.')
     ip_address: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment='Dirección IP desde donde se realiza la acción.')

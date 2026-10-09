@@ -30,7 +30,7 @@ EMAILS_FROM = settings.EMAILS_FROM
 # Rutas base de archivos estáticos adaptadas al nuevo esquema centralizado
 DIRECCION_ACTUAL = Path(__file__).resolve()
 # Ajusta los niveles de .parent según dónde ubiques este archivo de utilidades respecto a la raíz 'static'
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
+BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent.parent / "static" 
 
 CARPETAS_ARCHIVOS_MAP = {
     "firmas_fichajes": BASE_STATIC_DIR / "firmas_fichajes",
@@ -41,6 +41,44 @@ CARPETAS_ARCHIVOS_MAP = {
     "justificantes_ausencias": BASE_STATIC_DIR / "justificantes_ausencias",
     "contratos": BASE_STATIC_DIR / "contratos",
 }
+
+def calcular_hash_fichaje(
+    id_fichaje: str,
+    empresa_id: str,
+    trabajador_id: str,
+    tipo_evento: str,
+    fecha_hora_iso: str,
+    metodo_fichaje: str,
+    firma_digital: str
+) -> str:
+    """
+    Genera el hash inmutable SHA-256 combinando los campos clave del fichaje
+    y la firma digital para asegurar la cadena de custodia legal.
+    """
+    payload = f"{id_fichaje}|{empresa_id}|{trabajador_id}|{tipo_evento}|{fecha_hora_iso}|{metodo_fichaje}|{firma_digital}"
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+def procesar_y_guardar_firma(data_firma: str, tipo_carpeta: str = "firmas_fichajes") -> str:
+    """Decodifica una firma en base64 y la guarda en la subcarpeta correspondiente, devolviendo la ruta relativa."""
+    if not data_firma or not isinstance(data_firma, str):
+        return ""
+        
+    data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
+    bytes_imagen = base64.b64decode(data_encoded)
+
+    nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
+    
+    # Seleccionamos la carpeta del diccionario (por defecto firmas_fichajes)
+    carpeta_destino = CARPETAS_ARCHIVOS_MAP.get(tipo_carpeta, CARPETAS_ARCHIVOS_MAP["firmas_fichajes"])
+    
+    carpeta_destino.mkdir(parents=True, exist_ok=True)
+    ruta_destino = carpeta_destino / nombre_archivo
+
+    with open(ruta_destino, "wb") as buffer:
+        buffer.write(bytes_imagen)
+
+    # Devuelve la URL formateada para que encaje perfectamente con el endpoint genérico /api/archivos/{subcarpeta}/{nombre_archivo}
+    return f"/api/archivos/{tipo_carpeta}/{nombre_archivo}"
 
 def calcular_distancia_metros(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calcula la distancia en metros entre dos puntos geográficos usando Haversine."""
@@ -55,6 +93,20 @@ def calcular_distancia_metros(lat1: float, lon1: float, lat2: float, lon2: float
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return radio_tierra_m * c
+
+async def obtener_coordenadas(direccion: str):
+    """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": direccion, "format": "json", "limit": 1}
+    headers = {"User-Agent": "TuAppDeFichajes/1.0"} 
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+    return None, None
 
 def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fecha_fichaje: datetime):
     """Valida si el día del fichaje es festivo o laborable."""
@@ -84,47 +136,6 @@ def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fe
         return f"Festivo: {es_festivo.descripcion}"
         
     return "Válido"
-
-def calcular_hash_fichaje(trabajador_id: str, empresa_id: str, tipo_evento: str, fecha_iso: str) -> str:
-    """Genera el hash inmutable SHA-256 para auditoría legal."""
-    datos_crudos = f"{trabajador_id}-{empresa_id}-{tipo_evento}-{fecha_iso}"
-    return hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
-
-def procesar_y_guardar_firma(data_firma: str, tipo_carpeta: str = "firmas_fichajes") -> str:
-    """Decodifica una firma en base64 y la guarda en la subcarpeta correspondiente, devolviendo la ruta relativa."""
-    if not data_firma or not isinstance(data_firma, str):
-        return ""
-        
-    data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
-    bytes_imagen = base64.b64decode(data_encoded)
-
-    nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
-    
-    # Seleccionamos la carpeta del diccionario (por defecto firmas_fichajes)
-    carpeta_destino = CARPETAS_ARCHIVOS_MAP.get(tipo_carpeta, CARPETAS_ARCHIVOS_MAP["firmas_fichajes"])
-    
-    carpeta_destino.mkdir(parents=True, exist_ok=True)
-    ruta_destino = carpeta_destino / nombre_archivo
-
-    with open(ruta_destino, "wb") as buffer:
-        buffer.write(bytes_imagen)
-
-    # Devuelve la URL formateada para que encaje perfectamente con el endpoint genérico /api/archivos/{subcarpeta}/{nombre_archivo}
-    return f"/api/archivos/{tipo_carpeta}/{nombre_archivo}"
-
-async def obtener_coordenadas(direccion: str):
-    """Consulta la API pública de Nominatim para obtener lat/lon a partir de un texto."""
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": direccion, "format": "json", "limit": 1}
-    headers = {"User-Agent": "TuAppDeFichajes/1.0"} 
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data:
-                return float(data[0]["lat"]), float(data[0]["lon"])
-    return None, None
 
 def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     """
