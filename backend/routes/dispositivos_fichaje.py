@@ -6,114 +6,112 @@ from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
+from core.security import get_db_with_advanced_security, obtener_usuario_actual, verificar_permisos_requeridos
 from models.empresas import Empresas
 from models.usuarios import Usuarios
 from models.centros_trabajo import CentrosTrabajo
 from models.dispositivos_fichaje import DispositivosFichaje
 from schemas.dispositivos_fichaje import DispositivoFichajeCreate, DispositivoFichajeResponse, DispositivoFichajeUpdate
 from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de dispositivos de fichaje bajo el prefijo "/api/dispositivos".
 router = APIRouter(prefix="/api/dispositivos", tags=["Dispositivos de Fichaje"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
-# Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
 
-
-@router.post("", response_model=DispositivoFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Registrar dispositivo de fichaje")
+@router.post("", response_model=DispositivoFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Crear dispositivo de fichaje")
 @limiter.limit("20/minute") 
-def registrar_dispositivo(
+def crear_dispositivo_fichaje(
     request: Request,
-    obj_in: DispositivoFichajeCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
+    payload: DispositivoFichajeCreate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.DISPOSITIVOS_FICHAJE])),
+    db: Session = Depends(get_db_with_advanced_security)):
     """
     **POST /api/dispositivos**
     
-    Registra y autoriza un nuevo terminal de fichaje dentro de una empresa y centro de trabajo.
+    Crea un nuevo dispositivo de fichaje dentro de una empresa y centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de dispositivo de fichaje desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de creación de dispositivo de fichaje desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para registrar dispositivos en esta empresa."
-        )
-
-    empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
+    # Validaciones estructurales básicas
+    empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
     if not empresa:
+        print(f"Empresa ({payload.empresa_id}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID ({obj_in.empresa_id}) no encontrada."
+            detail=f"Empresa no encontrada."
         )
 
-    if obj_in.centro_trabajo_id:
+    if payload.centro_trabajo_id:
         centro = db.query(CentrosTrabajo).filter(
-            CentrosTrabajo.id == obj_in.centro_trabajo_id,
+            CentrosTrabajo.id == payload.centro_trabajo_id,
             CentrosTrabajo.activo.is_(True),
         ).first()
         if not centro:
+            print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Centro de trabajo con ID ({obj_in.centro_trabajo_id}) no encontrado."
+                detail=f"Centro de trabajo no encontrado."
             )
 
     nuevo_dispositivo = DispositivosFichaje(
-        empresa_id=obj_in.empresa_id,
-        tipo_dispositivo=obj_in.tipo_dispositivo,
-        centro_trabajo_id=obj_in.centro_trabajo_id,
-        activo=obj_in.activo if obj_in.activo is not None else True
+        empresa_id=payload.empresa_id,
+        tipo_dispositivo=payload.tipo_dispositivo,
+        centro_trabajo_id=payload.centro_trabajo_id,
+        activo=payload.activo if payload.activo is not None else True
     )
     
     try:
         db.add(nuevo_dispositivo)
         db.commit()
         
-        dispositivo_creado = db.query(DispositivosFichaje).options(
+        dispositivo_creado = (
+            db.query(DispositivosFichaje).options(
             joinedload(DispositivosFichaje.empresa),
-            joinedload(DispositivosFichaje.centro_trabajo)
-        ).filter(DispositivosFichaje.id == nuevo_dispositivo.id).first()
+            joinedload(DispositivosFichaje.centro_trabajo))
+            .filter(DispositivosFichaje.id == nuevo_dispositivo.id)
+            .first()
+        )
         
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=obj_in.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "dispositivos_fichaje", "accion": "registrar", "entidad_id": str(nuevo_dispositivo.id), "detalles": f"Se registró el dispositivo de fichaje {nuevo_dispositivo.id}"}
+            detalle={"recurso": "dispositivos_fichaje", "accion": "crear"},
+            trabajador_id=None
         )
         
         return dispositivo_creado
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido crear el dispositivo de fichaje: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido registrar el dispositivo de fichaje: {str(error)}"
+            detail=f"No se ha podido crear el dispositivo de fichaje."
         )
 
 
-@router.put("/{id_dispositivo}/estado", response_model=DispositivoFichajeResponse, summary="Cambiar estado de dispositivo")
+@router.put("/{id_dispositivo}/estado", response_model=DispositivoFichajeResponse, summary="Modificar estado de dispositivo")
 @limiter.limit("20/minute")  
-def cambiar_estado_dispositivo(
+def modificar_estado_dispositivo_fichaje(
     request: Request,
     id_dispositivo: UUID, 
-    activo: bool, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    payload: DispositivoFichajeUpdate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/dispositivos/{id_dispositivo}/estado**
     
-    Permite activar o desactivar (dar de baja lógica) un terminal de fichaje.
+    Permite activar o desactivar un dispositivo de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de cambio de estado para el dispositivo {id_dispositivo} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación de estado para el dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
     dispositivo = db.query(DispositivosFichaje).options(
         joinedload(DispositivosFichaje.empresa),

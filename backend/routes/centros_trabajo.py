@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-import httpx
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from typing import List
@@ -7,16 +6,14 @@ from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from core.utils import obtener_coordenadas
-from models.contratos import Contratos
 from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
+from core.security import get_db_with_advanced_security, obtener_usuario_actual, verificar_permisos_requeridos
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.usuarios import Usuarios
 from schemas.centros_trabajo import CentroTrabajoCreate, CentroTrabajoResponse, CentroTrabajoUpdate
 from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de centros de trabajo bajo el prefijo "/api/centros-trabajo".
 router = APIRouter(prefix="/api/centros-trabajo", tags=["Centros de Trabajo"])
@@ -24,14 +21,13 @@ router = APIRouter(prefix="/api/centros-trabajo", tags=["Centros de Trabajo"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-
 @router.post("", response_model=CentroTrabajoResponse, status_code=status.HTTP_201_CREATED, summary="Crear centro de trabajo")
 @limiter.limit("20/minute") 
 async def crear_centro_trabajo(
     request: Request,
-    obj_in: CentroTrabajoCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    payload: CentroTrabajoCreate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/centros-trabajo**
@@ -39,34 +35,28 @@ async def crear_centro_trabajo(
     Registra una nueva sede física vinculada a una empresa cliente (tenant) validando los datos con Pydantic.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de centro de trabajo desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de creación de centro de trabajo desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
+    # Validaciones estructurales básicas
+    empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
+    if not empresa:
+        print(f"Empresa ({payload.empresa_id}) no encontrada.")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para crear centros de trabajo en esta empresa."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa no encontrada."
         )
 
+    latitud, longitud = payload.latitud, payload.longitud
+    if payload.direccion and (latitud is None or longitud is None):
+        latitud, longitud = await obtener_coordenadas(payload.direccion)
+    
     try:
-        # 1. Validación de seguridad: Verifica que la empresa exista
-        empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
-        if not empresa:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Empresa ({obj_in.empresa_id}) no encontrada."
-            )
-
-        # 2. Mapea los datos del esquema directamente al modelo físico de SQLAlchemy y consulta coordenadas si faltan
-        latitud, longitud = obj_in.latitud, obj_in.longitud
-        if obj_in.direccion and (latitud is None or longitud is None):
-            latitud, longitud = await obtener_coordenadas(obj_in.direccion)
-
         nuevo_centro = CentrosTrabajo(
-            empresa_id=obj_in.empresa_id,
-            nombre=obj_in.nombre,
-            zona_horaria=obj_in.zona_horaria,
-            codigo_ccc=obj_in.codigo_ccc,
-            direccion=obj_in.direccion,
+            empresa_id=payload.empresa_id,
+            nombre=payload.nombre,
+            zona_horaria=payload.zona_horaria,
+            codigo_ccc=payload.codigo_ccc,
+            direccion=payload.direccion,
             latitud=latitud,
             longitud=longitud,
             activo=True 
@@ -75,91 +65,40 @@ async def crear_centro_trabajo(
         db.add(nuevo_centro)
         db.commit()
         
-        centro_creado = db.query(CentrosTrabajo).options(
-            joinedload(CentrosTrabajo.empresa)
-        ).filter(CentrosTrabajo.id == nuevo_centro.id).first()
+        centro_creado = (
+            db.query(CentrosTrabajo)
+            .options(joinedload(CentrosTrabajo.empresa))
+            .filter(CentrosTrabajo.id == nuevo_centro.id)
+            .first()
+        )
         
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=obj_in.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "centros_trabajo", "accion": "crear", "entidad_id": str(nuevo_centro.id), "detalles": f"Se creó el centro de trabajo {nuevo_centro.nombre}"}
+            detalle={"recurso": "centros_trabajo", "accion": "crear"},
+            trabajador_id=None
         )
         
         return centro_creado
-
-    except HTTPException as http_error:
-        raise http_error
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido crear el centro de trabajo: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido crear el centro de trabajo: {str(error)}"
+            detail=f"No se ha podido crear el centro de trabajo."
         )
 
-
-@router.put("/{id_centro}/estado", response_model=CentroTrabajoResponse, summary="Cambiar estado de centro de trabajo")
+@router.put("/{id_centro}", response_model=CentroTrabajoResponse, summary="Modificar centro de trabajo")
 @limiter.limit("20/minute") 
-def cambiar_estado_centro(
+async def modificar_centro_trabajo(
     request: Request,
     id_centro: UUID, 
-    activo: bool, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
-    """
-    **PUT /api/centros-trabajo/{id_centro}/estado?activo=false**
-    
-    Permite activar o desactivar (dar de baja lógica) una sede sin destruir los registros históricos.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de cambio de estado del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
-    if not centro:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
-        )
-    
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != centro.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar el estado de este centro de trabajo."
-        )
-
-    # Modificación segura utilizando setattr para eludir advertencias estrictas de tipo en Pylance
-    setattr(centro, "activo", activo)
-    setattr(centro, "updated_at", datetime.now())
-    
-    db.commit()
-    
-    centro_actualizado = db.query(CentrosTrabajo).options(
-        joinedload(CentrosTrabajo.empresa)
-    ).filter(CentrosTrabajo.id == id_centro).first()
-    
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario=usuario_actual,
-        empresa_id=centro.empresa_id,
-        accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "centros_trabajo", "accion": "cambiar_estado", "entidad_id": str(centro.id), "detalles": f"Se cambió el estado del centro de trabajo {centro.id} a activo={activo}"}
-    )
-    
-    return centro_actualizado
-
-
-@router.put("/{id_centro}/editar", response_model=CentroTrabajoResponse, summary="Editar centro de trabajo")
-@limiter.limit("20/minute") 
-async def editar_centro(
-    request: Request,
-    id_centro: UUID, 
-    nuevos_datos: CentroTrabajoUpdate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    payload: CentroTrabajoUpdate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/centros-trabajo/{id_centro}/editar**
@@ -167,95 +106,89 @@ async def editar_centro(
     Permite editar los datos del centro de trabajo y recalcula las coordenadas si es necesario.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de edición del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
     if not centro:
+        print(f"Centro de trabajo ({id_centro}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
-        )
-    
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != centro.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para editar este centro de trabajo."
+            detail=f"Centro de trabajo no encontrado."
         )
 
     try:
-        # Recalcular coordenadas si la dirección cambió o si faltaban lat/lon
-        latitud = getattr(nuevos_datos, "latitud", None)
-        longitud = getattr(nuevos_datos, "longitud", None)
+        latitud = getattr(payload, "latitud", None)
+        longitud = getattr(payload, "longitud", None)
 
-        if nuevos_datos.direccion and (latitud is None or longitud is None or centro.direccion != nuevos_datos.direccion):
-            latitud, longitud = await obtener_coordenadas(nuevos_datos.direccion)
+        if payload.direccion and (latitud is None or longitud is None or centro.direccion != payload.direccion):
+            latitud, longitud = await obtener_coordenadas(payload.direccion)
         
-        # Si aun así vienen vacías en el update pero el centro ya tenía unas válidas, las conservamos
         if latitud is None:
             latitud = centro.latitud
         if longitud is None:
             longitud = centro.longitud
 
-        setattr(centro, "nombre", nuevos_datos.nombre)
-        setattr(centro, "zona_horaria", nuevos_datos.zona_horaria)
-        setattr(centro, "activo", nuevos_datos.activo)
-        setattr(centro, "codigo_ccc", nuevos_datos.codigo_ccc)
-        setattr(centro, "direccion", nuevos_datos.direccion)
+        setattr(centro, "nombre", payload.nombre)
+        setattr(centro, "zona_horaria", payload.zona_horaria)
+        setattr(centro, "activo", payload.activo)
+        setattr(centro, "codigo_ccc", payload.codigo_ccc)
+        setattr(centro, "direccion", payload.direccion)
         setattr(centro, "latitud", latitud)
         setattr(centro, "longitud", longitud)
         setattr(centro, "updated_at", datetime.now())
         
         db.commit()
         
-        centro_editado = db.query(CentrosTrabajo).options(
-            joinedload(CentrosTrabajo.empresa)
-        ).filter(CentrosTrabajo.id == id_centro).first()
+        centro_editado = (
+            db.query(CentrosTrabajo)
+            .options(joinedload(CentrosTrabajo.empresa))
+            .filter(CentrosTrabajo.id == id_centro)
+            .first()
+        )
         
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=centro.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "centros_trabajo", "accion": "editar", "entidad_id": str(centro.id), "detalles": f"Se editó el centro de trabajo {centro.id}"}
+            detalle={"recurso": "centros_trabajo", "accion": "modificar"},
+            trabajador_id=None
         )
         
         return centro_editado
-
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido actualizar el centro de trabajo: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido actualizar el centro de trabajo: {str(error)}"
+            detail=f"No se ha podido actualizar el centro de trabajo."
         )
 
-@router.put("/{id_centro}/desactivar", status_code=status.HTTP_200_OK, summary="Dar de baja lógica centro de trabajo")
+@router.put("/{id_centro}/desactivar", status_code=status.HTTP_200_OK, summary="Desactivar centro de trabajo")
 @limiter.limit("20/minute")  
-def dar_de_baja_centro_trabajo(
+def desactivar_centro_trabajo(
     request: Request,
     id_centro: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/centros-trabajo/{id_centro}/desactivar**
     
-    Da de baja un centro de trabajo previa validación de contratos activos.
+    Desactivar un centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de baja del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de desactivación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
     if not centro:
+        print(f"Centro de trabajo ({id_centro}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
-        )
-    
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != centro.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para modificar este centro de trabajo."
+            detail=f"Centro de trabajo no encontrado."
         )
 
     centro.activo = False
@@ -266,41 +199,40 @@ def dar_de_baja_centro_trabajo(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=centro.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "centros_trabajo", "accion": "desactivar", "entidad_id": str(centro.id), "detalles": f"Se dio de baja lógica el centro de trabajo {centro.id}"}
+            detalle={"recurso": "centros_trabajo", "accion": "desactivar"},
+            trabajador_id=None
         )
-        return {"detail": f"Centro de trabajo ({id_centro}) desactivado correctamente y enviado a la papelera."}
-    except Exception as error:
+
+        print(f"Centro de trabajo ({id_centro}) desactivado correctamente y enviado a la papelera.")
+        return {"detail": f"Centro de trabajo desactivado correctamente y enviado a la papelera."}
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido desactivar el centro de trabajo: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido desactivar el centro de trabajo: {str(error)}"
+            detail=f"No se ha podido desactivar el centro de trabajo: {str(e)}."
         )
 
 @router.get("/empresa/{id_empresa}", response_model=List[CentroTrabajoResponse], summary="Obtener centros de trabajo por empresa")
 @limiter.limit("60/minute")  
-def obtener_centros_empresa(
+def obtener_centros_trabajo_empresa(
     request: Request,
     id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/centros-trabajo/empresa/{id_empresa}**
     
-    Recupera de forma aislada las sedes físicas dadas de alta por una organización concreta (tenant).
+    Obtiene los centros de trabajo de la empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de centros para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta de centros de trabajo para la empresa ({id_empresa}) desde la IP ){cliente_ip} por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar los centros de trabajo de esta empresa."
-        )
-
+    # Validaciones estructurales básicas
     centros = (
         db.query(CentrosTrabajo)
         .options(joinedload(CentrosTrabajo.empresa))
@@ -311,30 +243,31 @@ def obtener_centros_empresa(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "centros_trabajo", "accion": "consultar_por_empresa"}
+        detalle={"recurso": "centros_trabajo", "accion": "consultar_empresa"},
+        trabajador_id=None
     )
 
     return centros
 
 
-@router.get("/{id_centro}", response_model=CentroTrabajoResponse, summary="Obtener centro de trabajo por ID")
+@router.get("/{id_centro}", response_model=CentroTrabajoResponse, summary="Obtener centro de trabajo por id")
 @limiter.limit("60/minute")  
-def obtener_centro_trabajo(
+def obtener_centro_trabajo_id(
     request: Request,
     id_centro: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/centros-trabajo/{id_centro}**
     
-    Busca la información de una sede mediante su identificador único UUID.
+    Obtiene los datos de un centro de trabajo por su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del centro {id_centro} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
     centro = (
         db.query(CentrosTrabajo)
@@ -343,24 +276,21 @@ def obtener_centro_trabajo(
         .first()
     )
     if not centro:
+        print(f"Centro de trabajo ({id_centro}) no encontrado.")
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo con ID {id_centro} no encontrado."
-        )
-
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != centro.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para consultar este centro de trabajo."
+            detail=f"Centro de trabajo no encontrado."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=centro.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "centros_trabajo", "accion": "consultar_por_id", "entidad_id": str(centro.id)}
+        detalle={"recurso": "centros_trabajo", "accion": "consultar"},
+        trabajador_id=None
     )
 
     return centro

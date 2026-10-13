@@ -5,192 +5,183 @@ from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from models.contratos import Contratos
 from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
+from core.security import get_db_with_advanced_security, obtener_usuario_actual, verificar_permisos_requeridos
 from models.empresas import Empresas
 from models.usuarios import Usuarios
 from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
 from schemas.departamentos import DepartamentoCreate, DepartamentoResponse, DepartamentoUpdate
 from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de departamentos bajo el prefijo "/api/departamentos".
 router = APIRouter(prefix="/api/departamentos", tags=["Departamentos"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
-# Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED, summary="Crear departamento")
 @limiter.limit("20/minute") 
 def crear_departamento(
     request: Request,
-    obj_in: DepartamentoCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
+    payload: DepartamentoCreate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.DEPARTAMENTOS])),
+    db: Session = Depends(get_db_with_advanced_security)):
     """
     **POST /api/departamentos**
     
-    Registra un nuevo departamento dentro de una empresa cliente.
+    Crea un nuevo departamento dentro de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de departamento desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de creación de departamento desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
+    # Validaciones estructurales básicas
+    empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
+    if not empresa:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para crear departamentos en esta empresa."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Empresa con ID ({payload.empresa_id}) no encontrada."
         )
 
-    try:
-        empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
-        if not empresa:
+    if payload.centro_trabajo_id:
+        centro = db.query(CentrosTrabajo).filter(
+            CentrosTrabajo.id == payload.centro_trabajo_id,
+            CentrosTrabajo.activo.is_(True),
+        ).first()
+        if not centro:
+            print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Empresa con ID ({obj_in.empresa_id}) no encontrada."
+                detail=f"Centro de trabajo no encontrado."
             )
-
-        if obj_in.centro_trabajo_id:
-            centro = db.query(CentrosTrabajo).filter(
-                CentrosTrabajo.id == obj_in.centro_trabajo_id,
-                CentrosTrabajo.activo.is_(True),
-            ).first()
-            if not centro:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Centro de trabajo con ID ({obj_in.centro_trabajo_id}) no encontrado."
-                )
-
+    
+    try:
         nuevo_departamento = Departamentos(
-            empresa_id=obj_in.empresa_id,
-            nombre=obj_in.nombre,
-            centro_trabajo_id=obj_in.centro_trabajo_id
+            empresa_id=payload.empresa_id,
+            nombre=payload.nombre,
+            centro_trabajo_id=payload.centro_trabajo_id
         )
         
         db.add(nuevo_departamento)
         db.commit()
         
-        departamento_creado = db.query(Departamentos).options(
+        departamento_creado = (
+            db.query(Departamentos).options(
             joinedload(Departamentos.empresa),
-            joinedload(Departamentos.centro_trabajo)
-        ).filter(Departamentos.id == nuevo_departamento.id).first()
+            joinedload(Departamentos.centro_trabajo))
+            .filter(Departamentos.id == nuevo_departamento.id)
+            .first()
+        )
         
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=obj_in.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "departamentos", "accion": "crear", "entidad_id": str(nuevo_departamento.id), "detalles": f"Se creó el departamento {nuevo_departamento.nombre}"}
+            detalle={"recurso": "departamentos", "accion": "crear"},
+            trabajador_id=None
         )
         
         return departamento_creado
-
-    except HTTPException as http_error:
-        raise http_error
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido crear el departamento: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido crear el departamento: {str(error)}"
+            detail=f"No se ha podido crear el departamento."
         )
 
-@router.put("/{id_departamento}", response_model=DepartamentoResponse, summary="Editar departamento")
+@router.put("/{id_departamento}", response_model=DepartamentoResponse, summary="Modificar departamento")
 @limiter.limit("20/minute") 
-def editar_departamento(
+def modificar_departamento(
     request: Request,
     id_departamento: UUID, 
-    obj_in: DepartamentoUpdate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
+    payload: DepartamentoUpdate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.DEPARTAMENTOS])),
+    db: Session = Depends(get_db_with_advanced_security)):
     """
     **PUT /api/departamentos/{id_departamento}**
     
-    Actualiza los campos permitidos de un departamento.
+    Modifica los datos de un departamento.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de edición del departamento {id_departamento} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    departamento = db.query(Departamentos).options(
+    # Validaciones estructurales básicas
+    departamento = (
+        db.query(Departamentos).options(
         joinedload(Departamentos.empresa),
-        joinedload(Departamentos.centro_trabajo)
-    ).filter(Departamentos.id == id_departamento).first()
+        joinedload(Departamentos.centro_trabajo))
+        .filter(Departamentos.id == id_departamento)
+        .first()
+    )
     
     if not departamento:
+        print(f"Departamento ({id_departamento}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Departamento con ID ({id_departamento}) no encontrado."
+            detail=f"Departamento no encontrado."
         )
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para editar este departamento."
-        )
-
-    update_data = obj_in.dict(exclude_unset=True)
+    update_data = payload.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(departamento, key, value)
-    
     departamento.updated_at = datetime.now()
     
     try:
         db.commit()
         
-        departamento_actualizado = db.query(Departamentos).options(
+        departamento_actualizado = (
+            db.query(Departamentos).options(
             joinedload(Departamentos.empresa),
-            joinedload(Departamentos.centro_trabajo)
-        ).filter(Departamentos.id == id_departamento).first()
+            joinedload(Departamentos.centro_trabajo))
+            .filter(Departamentos.id == id_departamento)
+            .first()
+        )
         
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=departamento.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "departamentos", "accion": "editar", "entidad_id": str(departamento.id), "detalles": f"Se actualizó el departamento {departamento.id}"}
+            detalle={"recurso": "departamentos", "accion": "modificar"},
+            trabajador_id=None
         )
         
         return departamento_actualizado
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido actualizar el departamento: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido actualizar el departamento: {str(error)}"
+            detail=f"No se ha podido actualizar el departamento."
         )
 
-@router.put("/{id_departamento}/desactivar", status_code=status.HTTP_200_OK, summary="Dar de baja lógica departamento")
+@router.put("/{id_departamento}/desactivar", status_code=status.HTTP_200_OK, summary="Desactivar departamento")
 @limiter.limit("20/minute") 
-def dar_de_baja_departamento(
+def desactivar_departamento(
     request: Request,
     id_departamento: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.DEPARTAMENTOS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/departamentos/{id_departamento}/desactivar**
     
-    Da de baja un departamento previa validación de contratos activos.
+    Desactivar un departamento.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de baja del departamento {id_departamento} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de desactivación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
     departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
     if not departamento:
+        print(f"Departamento ({id_departamento}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Departamento con ID ({id_departamento}) no encontrado."
-        )
-
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para modificar este departamento."
+            detail=f"Departamento no encontrado."
         )
 
     departamento.activo = False
@@ -202,18 +193,21 @@ def dar_de_baja_departamento(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=departamento.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "departamentos", "accion": "desactivar", "entidad_id": str(id_departamento), "detalles": f"Se dio de baja lógica el departamento {id_departamento}"}
+            detalle={"recurso": "departamentos", "accion": "desactivar"},
+            trabajador_id=None
         )
 
-        return {"detail": f"Departamento ({id_departamento}) desactivado correctamente y enviado a la papelera."}
-    except Exception as error:
+        print(f"Departamento ({id_departamento}) desactivado correctamente y enviado a la papelera.")
+        return {"detail": "Departamento desactivado correctamente y enviado a la papelera."}
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido desactivar el departamento: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido desactivar el departamento: {str(error)}"
+            detail=f"No se ha podido desactivar el departamento."
         )
 
 @router.get("/empresa/{id_empresa}", response_model=List[DepartamentoResponse], summary="Obtener departamentos por empresa")
@@ -221,29 +215,21 @@ def dar_de_baja_departamento(
 def obtener_departamentos_empresa(
     request: Request,
     id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/departamentos/empresa/{id_empresa}**
     
-    Recupera los departamentos de una organización específica.
+    Obtiene los departamentos de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de departamentos para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes autorización para consultar los departamentos de esta empresa."
-        )
+    print(f"Petición de consulta de departamentos para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
     resultados = (
-        db.query(Departamentos)
-        .options(
-            joinedload(Departamentos.empresa),
-            joinedload(Departamentos.centro_trabajo)
-        )
+        db.query(Departamentos).options(
+        joinedload(Departamentos.empresa),
+        joinedload(Departamentos.centro_trabajo))
         .filter(Departamentos.empresa_id == id_empresa, Departamentos.activo.is_(True))
         .all()
     )
@@ -251,55 +237,55 @@ def obtener_departamentos_empresa(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "departamentos", "accion": "consultar_por_empresa", "detalles": f"Se consultaron los departamentos de la empresa {id_empresa}"}
+        detalle={"recurso": "departamentos", "accion": "consultar_empresa"},
+        trabajador_id=None
     )
 
     return resultados
 
 
-@router.get("/{id_departamento}", response_model=DepartamentoResponse, summary="Obtener departamento por ID")
+@router.get("/{id_departamento}", response_model=DepartamentoResponse, summary="Obtener departamento por id")
 @limiter.limit("60/minute") 
-def obtener_departamento(
+def obtener_departamento_id(
     request: Request,
     id_departamento: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.DEPARTAMENTOS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/departamentos/{id_departamento}**
     
-    Busca la información de un departamento mediante su ID.
+    Obtiene un departamento mediante su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de detalle del departamento {id_departamento} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de detalle del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    departamento = db.query(Departamentos).options(
+    departamento = (
+        db.query(Departamentos).options(
         joinedload(Departamentos.empresa),
-        joinedload(Departamentos.centro_trabajo)
-    ).filter(Departamentos.id == id_departamento).first()
+        joinedload(Departamentos.centro_trabajo))
+        .filter(Departamentos.id == id_departamento)
+        .first()
+    )
     
     if not departamento:
+        print(f"Departamento ({id_departamento}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Departamento con ID ({id_departamento}) no encontrado."
-        )
-
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != departamento.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes autorización para consultar este departamento."
+            detail=f"Departamento no encontrado."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=departamento.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "departamentos", "accion": "consultar_por_id", "entidad_id": str(id_departamento), "detalles": f"Se consultó el departamento {id_departamento}"}
+        detalle={"recurso": "departamentos", "accion": "consultar"},
+        trabajador_id=None
     )
 
     return departamento

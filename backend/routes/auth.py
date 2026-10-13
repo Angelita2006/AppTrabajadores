@@ -128,10 +128,8 @@ def confirmar_password(
     print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
 
     # Validaciones estructurales básicas
-    medio = None
     usuario = None
     if payload.email:
-        medio = "email"
         usuario = db.query(Usuarios).filter(
             Usuarios.email == payload.email.strip(),
             Usuarios.activo.is_(True),
@@ -143,7 +141,6 @@ def confirmar_password(
                 detail="No consta ninguna cuenta registrada con esa dirección de correo electrónico."
             )
     elif payload.telefono:
-        medio = "telefono"
         usuario = db.query(Usuarios).filter(
             Usuarios.telefono == payload.telefono.strip(),
             Usuarios.activo.is_(True),
