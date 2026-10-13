@@ -10,7 +10,7 @@ export const obtenerMensajeAmigableError = (error: any): string => {
   }
 
   // Traducción de códigos de estado HTTP a mensajes comprensibles
-  const status = error.status;
+  const status = error.status_code;
   if (status) {
     switch (status) {
       case 400:

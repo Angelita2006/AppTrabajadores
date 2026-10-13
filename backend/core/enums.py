@@ -151,6 +151,5 @@ class AccionPermisoEnum(str, enum.Enum):
     CREAR = "crear"
     MODIFICAR = "modificar"
     ELIMINAR = "eliminar"
-    APROBAR = "aprobar"
+    IMPORTAR = "importar"
     EXPORTAR = "exportar"
-    FICHAR = "fichar"

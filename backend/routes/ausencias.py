@@ -1,17 +1,16 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from models.ausencias import Ausencias
-from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
+from core.security import get_db_with_advanced_security, verificar_permisos_requeridos
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 from models.empresas import Empresas
 from core.enums import EstadoAusenciaEnum
-from schemas.ausencias import AusenciaCreate, AusenciaResponse
+from schemas.ausencias import AusenciaCreate, AusenciaResponse, AusenciaUpdate
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from core.auditoria import registrar_auditoria
@@ -22,51 +21,49 @@ router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=AusenciaResponse, status_code=status.HTTP_201_CREATED, summary="Solicitar ausencia")
+@router.post("", response_model=AusenciaResponse, status_code=status.HTTP_201_CREATED, summary="Crear ausencia")
 @limiter.limit("20/minute") 
-def solicitar_ausencia(
+def crear_ausencia(
     request: Request,
-    obj_in: AusenciaCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    payload: AusenciaCreate, 
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.AUSENCIAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/ausencias**
     
-    Registra una nueva solicitud de ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.
+    Crea una nueva ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de ausencia para el trabajador ID {obj_in.trabajador_id} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de registro de ausencia para el trabajador ({payload.trabajador_id}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    # Validar permisos de tenant / empresa
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != obj_in.empresa_id:
+    # Validaciones estructurales básicas
+    if usuario_actual.empresa_id != payload.empresa_id:
         print(f"Acceso denegado: El usuario {usuario_actual.email} intentó registrar ausencia en otra empresa.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para registrar ausencias en esta empresa."
         )
 
-    # 1. Validaciones estructurales de aislamiento de datos (Tenant)
-    empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
+    empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
     if not empresa:
-        print(f"Empresa con ID {obj_in.empresa_id} no encontrada.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa no encontrada.")
+        print(f"Empresa ({payload.empresa_id}) no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Empresa no encontrada.")
 
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == obj_in.trabajador_id).first()
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == payload.trabajador_id).first()
     if not trabajador:
-        print(f"Trabajador con ID {obj_in.trabajador_id} no encontrado.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+        print(f"Trabajador ({payload.trabajador_id}) no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Trabajador no encontrado.")
 
-    # 2. Creación del registro físico en la base de datos
     nueva_ausencia = Ausencias(
-        empresa_id=obj_in.empresa_id,
-        trabajador_id=obj_in.trabajador_id,
-        tipo_ausencia=obj_in.tipo_ausencia,
-        fecha_inicio=obj_in.fecha_inicio,
-        fecha_fin=obj_in.fecha_fin,
-        motivo=obj_in.motivo,
-        justificante_metadata=obj_in.justificante_metadata,
-        estado=EstadoAusenciaEnum.PENDIENTE
+        empresa_id=payload.empresa_id,
+        trabajador_id=payload.trabajador_id,
+        tipo_ausencia=payload.tipo_ausencia,
+        estado=EstadoAusenciaEnum.PENDIENTE,
+        fecha_inicio=payload.fecha_inicio,
+        fecha_fin=payload.fecha_fin,
+        motivo=payload.motivo,
+        justificante_url=payload.justificante_url
     )
 
     try:
@@ -76,32 +73,28 @@ def solicitar_ausencia(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=obj_in.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
             detalle={"recurso": "ausencias", "accion": "crear"},
-            trabajador_id=obj_in.trabajador_id
+            trabajador_id=trabajador.id
         )
         
         ausencia_creada = (
             db.query(Ausencias)
-            .options(
-                joinedload(Ausencias.empresa),
-                joinedload(Ausencias.trabajador),
-                joinedload(Ausencias.validado_por_usuario)
-            )
+            .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
             .filter(Ausencias.id == nueva_ausencia.id)
             .first()
         )
         
-        print(f"Ausencia registrada con éxito con ID: {nueva_ausencia.id}")
+        print(f"Ausencia creada con éxito ({nueva_ausencia.id}).")
         return ausencia_creada
-    except Exception as error:
+    except Exception as e:
         db.rollback()
-        print(f"No se ha podido registrar ausencia: {str(error)}")
+        print(f"No se ha podido crear la ausencia: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido procesar la solicitud: {str(error)}"
+            detail=f"No se ha podido crear la ausencia."
         )
 
 @router.put("/{id_ausencia}/resolver", response_model=AusenciaResponse, summary="Resolver solicitud de ausencia")
@@ -109,27 +102,25 @@ def solicitar_ausencia(
 def resolver_solicitud_ausencia(
     request: Request,
     id_ausencia: UUID, 
-    nuevo_estado: EstadoAusenciaEnum, 
-    resolutor_usuario_id: UUID, 
-    observaciones: Optional[str] = None,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    payload: AusenciaUpdate,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
-    **PUT /api/ausencias/{id_ausencia}/resolver?nuevo_estado=aprobada&resolutor_usuario_id=UUID**
+    **PUT /api/ausencias/{id_ausencia}/resolver**
     
-    Tramita la resolución (aprobación/rechazo) de un periodo de ausencia por parte de administración.
+    Tramita la resolución (aprobación/rechazo) de una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de resolución para la ausencia {id_ausencia} con estado '{nuevo_estado}' desde la IP: {cliente_ip} por: {usuario_actual.email}")
+    print(f"Petición de resolución para la ausencia ({id_ausencia}) con estado '{payload.estado}' desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
     if not ausencia:
-        print(f"Solicitud de ausencia con ID {id_ausencia} no localizada.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud de ausencia no localizada.")
+        print(f"Ausencia ({id_ausencia}) no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ausencia no encontrada.")
 
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == ausencia.trabajador_id).first()
-    if usuario_actual.empresa_id and trabajador and usuario_actual.empresa_id != trabajador.empresa_id:
+    if usuario_actual.empresa_id != ausencia.empresa_id:
         print(f"Acceso denegado: Intento de resolución sobre ausencia de otra empresa por {usuario_actual.email}.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -138,22 +129,22 @@ def resolver_solicitud_ausencia(
 
     # Impide modificar una solicitud que ya fue procesada previamente
     if ausencia.estado != EstadoAusenciaEnum.PENDIENTE:
-        print(f"Intento de resolver una ausencia ya procesada (ID: {id_ausencia}, Estado actual: {ausencia.estado}).")
+        print(f"Intento de resolver una ausencia ya procesada ({id_ausencia}, Estado actual: {ausencia.estado}).")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta solicitud ya ha sido resuelta previamente.")
 
-    resolutor = db.query(Usuarios).filter(Usuarios.id == resolutor_usuario_id).first()
+    resolutor = db.query(Usuarios).filter(Usuarios.id == payload.usuario_validador_id).first()
     if not resolutor:
-        print(f"Usuario validador con ID {resolutor_usuario_id} no encontrado.")
+        print(f"Usuario validador con ID {payload.usuario_validador_id} no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario validador no encontrado.")
 
-    if nuevo_estado == EstadoAusenciaEnum.PENDIENTE:
+    if payload.estado == EstadoAusenciaEnum.PENDIENTE:
         print("Intento inválido de cambiar el estado a pendiente durante la resolución.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede devolver una solicitud al estado pendiente.")
 
-    # Inyección segura de los parámetros de resolución mediante setattr para silenciar a Pylance
-    setattr(ausencia, "estado", nuevo_estado)
-    setattr(ausencia, "validado_por_usuario_id", resolutor_usuario_id)
-    setattr(ausencia, "observaciones_admin", observaciones)
+    # Inyección de los parámetros de resolución 
+    setattr(ausencia, "estado", payload.estado)
+    setattr(ausencia, "usuario_validador_id", payload.usuario_validador_id)
+    setattr(ausencia, "observaciones_admin", payload.observaciones_admin)
     setattr(ausencia, "fecha_resolucion", datetime.datetime.now())
     setattr(ausencia, "updated_at", datetime.datetime.now())
 
@@ -162,7 +153,7 @@ def resolver_solicitud_ausencia(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=ausencia.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
         detalle={"recurso": "ausencias", "accion": "resolver"},
@@ -171,34 +162,31 @@ def resolver_solicitud_ausencia(
     
     ausencia_resuelta = (
         db.query(Ausencias)
-        .options(
-            joinedload(Ausencias.empresa),
-            joinedload(Ausencias.trabajador),
-            joinedload(Ausencias.validado_por_usuario)
-        )
+        .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.id == id_ausencia)
         .first()
     )
     
-    print(f"Ausencia {id_ausencia} resuelta exitosamente con estado '{nuevo_estado}'.")
+    print(f"Ausencia ({id_ausencia}) resuelta exitosamente con estado '{payload.estado}'.")
     return ausencia_resuelta
 
-
 @router.get("/empresa/{id_empresa}", response_model=List[AusenciaResponse], summary="Obtener ausencias por empresa")
-def obtener_ausencias_por_empresa(
+def obtener_ausencias_empresa(
     request: Request,
     id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUSENCIAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/ausencias/empresa/{id_empresa}**
     
-    Filtra las solicitudes dentro de una empresa cliente para el panel de recursos humanos.
+    Obtiene las ausencias de una empresa.
     """
-    print(f"Consulta de ausencias para la empresa ID {id_empresa} solicitada por: {usuario_actual.email}")
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de ausencias para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
+    # Validaciones estructurales básicas
+    if usuario_actual.empresa_id != id_empresa:
         print(f"Acceso denegado: {usuario_actual.email} intentó consultar ausencias de otra empresa.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -208,69 +196,65 @@ def obtener_ausencias_por_empresa(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "ausencias", "accion": "consulta_empresa"},
+        detalle={"recurso": "ausencias", "accion": "consultar_empresa"},
         trabajador_id=None
     )
 
-    return (
+    ausencias = (
         db.query(Ausencias)
-        .options(
-            joinedload(Ausencias.empresa),
-            joinedload(Ausencias.trabajador),
-            joinedload(Ausencias.validado_por_usuario)
-        )
+        .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.empresa_id == id_empresa)
         .all()
     )
 
+    return ausencias
 
 @router.get("/trabajador/{id_trabajador}", response_model=List[AusenciaResponse], summary="Obtener ausencias por trabajador")
-def obtener_ausencias_por_trabajador(
+def obtener_ausencias_trabajador(
     request: Request,
     id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUSENCIAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/ausencias/trabajador/{id_trabajador}**
     
-    Permite al operario consultar el estado de sus bajas o vacaciones desde la app móvil.
+    Obtiene las ausencias de un trabajador.
     """
-    print(f"Consulta de ausencias para el trabajador ID {id_trabajador} solicitada por: {usuario_actual.email}")
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de ausencias para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
-        print(f"Trabajador con ID {id_trabajador} no encontrado.")
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != trabajador.empresa_id:
-        if getattr(usuario_actual, "trabajador_id", None) != id_trabajador:
-            print(f"Acceso denegado: {usuario_actual.email} intentó consultar ausencias de un trabajador externo.")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para consultar las ausencias de este trabajador."
-            )
+    if usuario_actual.empresa_id != trabajador.empresa_id:
+        print(f"Acceso denegado: {usuario_actual.email} intentó consultar ausencias de un trabajador externo.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para consultar las ausencias de este trabajador."
+        )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "ausencias", "accion": "consulta_trabajador"},
+        detalle={"recurso": "ausencias", "accion": "consultar_trabajador"},
         trabajador_id=id_trabajador
     )
 
-    return (
+    ausencias = (
         db.query(Ausencias)
-        .options(
-            joinedload(Ausencias.empresa),
-            joinedload(Ausencias.trabajador),
-            joinedload(Ausencias.validado_por_usuario)
-        )
+        .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.trabajador_id == id_trabajador)
         .all()
     )
+
+    return ausencias

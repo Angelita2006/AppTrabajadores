@@ -1,7 +1,5 @@
 from datetime import datetime
-
 from core.utils import analizar_pdf_con_ia
-from models.contratos import Contratos
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
@@ -9,15 +7,15 @@ from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
+from core.security import get_db_with_advanced_security, obtener_usuario_actual, verificar_permisos_requeridos
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 from core.auditoria import registrar_auditoria
 from models.festivos import Festivos
 from models.empresas import Empresas
 from models.centros_trabajo import CentrosTrabajo
 from models.calendarios_laborales import CalendariosLaborales
 from models.usuarios import Usuarios
-from schemas.calendarios_laborales import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse, CalendarioLaboralUpdate, FestivoResponse2
+from schemas.calendarios_laborales import CalendarioConFestivosResponse, CalendarioLaboralCreate, CalendarioLaboralResponse, CalendarioLaboralUpdate
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de calendarios laborales bajo el prefijo "/api/calendarios-laborales".
 router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Laborales"])
@@ -25,55 +23,52 @@ router = APIRouter(prefix="/api/calendarios-laborales", tags=["Calendarios Labor
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post(
-    "/{calendario_id}/importar-pdf",
-    summary="Importar festivos de calendario desde PDF",
-    description="Extrae días festivos de un PDF y los incorpora al calendario laboral indicado.",
-)
+@router.post("/{id_calendario}/importar-pdf", summary="Importar festivos de calendario desde PDF", description="Extrae días festivos de un PDF y los incorpora al calendario laboral indicado.")
 @limiter.limit("10/minute") 
 async def importar_calendario_pdf(
     request: Request,
-    calendario_id: UUID, 
+    id_calendario: UUID, 
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.IMPORTAR+"-"+TipoPermisoEnum.CALENDARIOS_LABORALES])),
+    db: Session = Depends(get_db_with_advanced_security)):
     """
     **POST /api/calendarios-laborales/{calendario_id}/importar-pdf**
     
     Procesa un archivo PDF mediante IA para extraer e importar automáticamente los días festivos de un calendario laboral.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de importación de PDF para el calendario {calendario_id} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de importación de PDF para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == calendario_id).first()
+    # Validaciones estructurales básicas
+    calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == id_calendario).first()
     if not calendario:
-        raise HTTPException(status_code=404, detail="Calendario laboral no encontrado.")
+        print(f"Calendario laboral ({id_calendario}) no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario laboral no encontrado.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != calendario.empresa_id:
+    if usuario_actual.empresa_id != calendario.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para importar festivos en este calendario laboral."
         )
 
     if not file.filename or not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="El archivo debe ser un formato PDF válido.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo debe ser un formato PDF válido.")
         
     try:
         contenido_pdf = await file.read()
         
-        # 1. Extracción mediante Gemini
+        # Extracción mediante Gemini
         festivos_detectados = analizar_pdf_con_ia(contenido_pdf)
         
         festivos_finales_retorno = []
         
-        # 2. Procesamos cada festivo evitando violar la restricción unique de la Base de Datos
+        # Procesar cada festivo evitando violar la restricción unique de la Base de Datos
         for f in festivos_detectados:
             fecha_str = f["fecha"]
             
-            # Verificamos si ya existe un registro para ese calendario en esa misma fecha
+            # Verificar si ya existe un registro para ese calendario en esa misma fecha
             festivo_existente = db.query(Festivos).filter(
-                Festivos.calendario_id == calendario_id,
+                Festivos.calendario_id == id_calendario,
                 Festivos.fecha == fecha_str
             ).first()
             
@@ -82,9 +77,9 @@ async def importar_calendario_pdf(
                 festivo_existente.tipo = f["tipo"]
                 festivos_finales_retorno.append(festivo_existente)
             else:
-                # Si NO existe, creamos el registro desde cero de forma segura
+                # Si no existe, crear el registro desde cero de forma segura
                 nuevo_festivo = Festivos(
-                    calendario_id=calendario_id,
+                    calendario_id=id_calendario,
                     fecha=fecha_str,
                     tipo=f["tipo"],
                     descripcion=f["descripcion"] if f.get("descripcion") is not None else ""
@@ -92,39 +87,41 @@ async def importar_calendario_pdf(
                 db.add(nuevo_festivo)
                 festivos_finales_retorno.append(nuevo_festivo)
             
-        # 3. Guardamos los cambios de forma segura en una sola transacción
+        # Guardar los cambios de forma segura en una sola transacción
         if festivos_finales_retorno:
             db.commit()
-            # Refrescamos las instancias para recuperar los IDs reales
+            # Refrescar las instancias para recuperar los IDs reales
             for f in festivos_finales_retorno:
                 db.refresh(f)
                 
             registrar_auditoria(
                 db=db,
                 request=request,
-                usuario=usuario_actual,
+                usuario_id=usuario_actual.id,
                 empresa_id=calendario.empresa_id,
                 accion=AccionAuditoriaEnum.CREACION,
-                detalle={"recurso": "calendarios_laborales", "accion": "importar_pdf"}
+                detalle={"recurso": "calendarios_laborales", "accion": "importar_pdf"},
+                trabajador_id=None
             )
+
+        festivos = [
+            {
+                "id": f.id,
+                "calendario_id": f.calendario_id,
+                "fecha": f.fecha,
+                "tipo": f.tipo,
+                "descripcion": f.descripcion
+            } for f in festivos_finales_retorno
+        ]
             
         return {
-            "status": "success", 
             "total_importados": len(festivos_finales_retorno), 
-            "festivos": [
-                {
-                    "id": f.id,
-                    "calendario_id": f.calendario_id,
-                    "fecha": f.fecha,
-                    "tipo": f.tipo,
-                    "descripcion": f.descripcion
-                } for f in festivos_finales_retorno
-            ]
+            "festivos": festivos,
+            "detail": "Se han importado los festivos del PDF en el calendario seleccionado correctamente."
         }
-
     except Exception as e:
         db.rollback()  # Revierte cualquier cambio si ocurre un error imprevisto
-        print(f"Error detallado en la persistencia del PDF para el calendario {calendario_id}: {str(e)}")
+        print(f"Error detallado en la persistencia del PDF para el calendario {id_calendario}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al procesar y guardar el PDF: {str(e)}")
 
 @router.post("", response_model=CalendarioLaboralResponse, status_code=status.HTTP_201_CREATED, summary="Crear calendario laboral")

@@ -158,7 +158,7 @@ def analizar_pdf_con_ia(contenido_pdf: bytes) -> list:
     )
     
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-3.8-flash',
         contents=[documento_pdf, prompt]
     )
     

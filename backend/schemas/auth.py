@@ -57,21 +57,12 @@ class PasswordRecuperacionRequest(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class ConfirmarPasswordRecuperacionEmailRequest(BaseModel):
+class ConfirmarPasswordRecuperacionRequest(BaseModel):
     """
     Esquema para validar el código de 6 dígitos recibido y establecer una nueva contraseña.
     """
-    email: EmailStr = Field(..., description="Correo electrónico de la cuenta")
-    codigo_verificacion: str = Field(..., min_length=6, max_length=10, description="Código de verificación de 6 dígitos recibido por correo")
-    nueva_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña del usuario")
-
-    model_config = ConfigDict(from_attributes=True)
-
-class ConfirmarPasswordRecuperacionTelefonoRequest(BaseModel):
-    """
-    Esquema para validar el código de 6 dígitos recibido y establecer una nueva contraseña.
-    """
-    telefono: str = Field(..., description="Número de teléfono de la cuenta")
+    email: Optional[EmailStr] = Field(None, description="Correo electrónico de la cuenta")
+    telefono: Optional[str] = Field(None, description="Número de teléfono de la cuenta")
     codigo_verificacion: str = Field(..., min_length=6, max_length=10, description="Código de verificación de 6 dígitos recibido por correo")
     nueva_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña del usuario")
 
