@@ -1,40 +1,50 @@
-import base64
 from datetime import date, datetime
-import hashlib
-import ipaddress
-import os
-import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import exists, func
-from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from uuid import UUID
+import hashlib
+import ipaddress
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from models.ausencias import Ausencias
+from sqlalchemy import and_, exists, func, or_
+from sqlalchemy.orm import joinedload, Session
+
+from core.auditoria import registrar_auditoria
+from core.enums import (
+    AccionAuditoriaEnum,
+    AccionPermisoEnum,
+    EstadoFichajeEnum,
+    MetodoFichajeEnum,
+    OrigenFichajeEnum,
+    TipoPermisoEnum,
+    TipoRolEnum,
+)
+from core.jornada import calcular_resumen_jornada
+from core.security import (
+    get_db_with_advanced_security,
+    verificar_permisos_requeridos,
+)
+from core.utils import (
+    calcular_distancia_metros,
+    procesar_y_guardar_firma,
+    validar_dia_laboral_o_marcar_extra,
+)
 from models.asignaciones_turno import AsignacionesTurno
+from models.ausencias import Ausencias
 from models.centros_trabajo import CentrosTrabajo
-from core.database import get_db
-from core.security import obtener_usuario_actual, verificar_rol_requerido
-from core.enums import EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoUsuarioEnum
-from core.utils import calcular_distancia_metros, procesar_y_guardar_firma, validar_dia_laboral_o_marcar_extra
+from models.correcciones_fichaje import CorreccionesFichaje
 from models.empresas import Empresas
 from models.fichajes import Fichajes
-from models.correcciones_fichaje import CorreccionesFichaje
+from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
 from schemas.fichajes import FichajeCreate, FichajeResponse
-from models.trabajadores import Trabajadores
-from models.turnos import Turnos
-from core.jornada import recalcular_resumen_jornada
-from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
 from schemas.trabajadores import TrabajadorSimpleResponse
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de fichajes bajo el prefijo "/api/fichajes".
 router = APIRouter(prefix="/api/fichajes", tags=["Fichajes"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
-# Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
 
 FichajeSustituto = Fichajes.__table__.alias("fichaje_sustituto")
@@ -44,42 +54,52 @@ def filtro_fichajes_vigentes():
         FichajeSustituto.c.fichaje_sustituido_id == Fichajes.id
     )
 
-@router.post("", response_model=FichajeResponse, status_code=status.HTTP_201_CREATED, summary="Registrar fichaje")
+@router.post(
+    "",
+    response_model=FichajeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar fichaje",
+)
 @limiter.limit("30/minute")
 def crear_fichaje(
     request: Request,
-    obj_in: FichajeCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    obj_in: FichajeCreate,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **POST /api/fichajes**
-     
+
     Registra un nuevo fichaje para un trabajador, validando su ubicación GPS, festivos,
     integridad de los datos mediante hash SHA-256 y opcionalmente procesando una firma digital.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de fichaje desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de registro de fichaje desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
-    trabajador = db.query(Trabajadores).options(
-        joinedload(Trabajadores.empresa)
-    ).filter(Trabajadores.id == obj_in.trabajador_id, Trabajadores.activo.is_(True)).first()
+    trabajador = (
+        db.query(Trabajadores)
+        .options(
+            joinedload(Trabajadores.empresa),
+        )
+        .filter(Trabajadores.id == obj_in.trabajador_id, Trabajadores.activo.is_(True))
+        .first()
+    )
     if not trabajador:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"No se ha encontrado el trabajador con ID ({obj_in.trabajador_id}). Verifique los datos."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado el trabajador. Verifique los datos."
         )
-    
+
     empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
     if not empresa:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"No se ha encontrado la empresa con ID ({obj_in.empresa_id}). Verifique los datos."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado la empresa. Verifique los datos."
         )
 
-    if usuario_actual.empresa_id != obj_in.empresa_id:
+    if request.headers.get("Empresa-ID") != str(obj_in.empresa_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Acceso denegado. No tienes permisos para registrar fichajes en esta empresa."
         )
 
@@ -109,12 +129,17 @@ def crear_fichaje(
                 detail=f"Atención: El día seleccionado es festivo o no laborable ({validacion_dia}). Debe marcar la opción de forzar horas extra para continuar."
             )
 
-    centro_trabajo = db.query(CentrosTrabajo).options(
-        joinedload(CentrosTrabajo.empresa)
-    ).filter(CentrosTrabajo.id == obj_in.centro_trabajo_id, CentrosTrabajo.activo.is_(True)).first()
+    centro_trabajo = (
+        db.query(CentrosTrabajo)
+        .options(
+            joinedload(CentrosTrabajo.empresa),
+        )
+        .filter(CentrosTrabajo.id == obj_in.centro_trabajo_id, CentrosTrabajo.activo.is_(True))
+        .first()
+    )
     if not centro_trabajo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="El centro de trabajo especificado no existe en el sistema."
         )
 
@@ -124,11 +149,11 @@ def crear_fichaje(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Se requiere obligatoriamente la ubicación GPS del dispositivo para validar el fichaje en este centro de trabajo."
             )
-        
+
         distancia = calcular_distancia_metros(
-            float(centro_trabajo.latitud), 
+            float(centro_trabajo.latitud),
             float(centro_trabajo.longitud),
-            float(obj_in.latitud), 
+            float(obj_in.latitud),
             float(obj_in.longitud)
         )
 
@@ -164,9 +189,10 @@ def crear_fichaje(
         try:
             ruta_relativa_firma = procesar_y_guardar_firma(data_firma)
         except Exception as e:
+            print(f"Error al ejecutar crear_fichaje: {e}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No se pudo procesar la imagen de la firma digital adjunta: {str(e)}"
+                detail='No se pudo procesar la imagen de la firma digital adjunta'
             )
 
     nuevo_fichaje = Fichajes(
@@ -188,106 +214,125 @@ def crear_fichaje(
         motivo_pausa_id=obj_in.motivo_pausa_id,
         firma_digital=ruta_relativa_firma
     )
-    
+
     try:
         db.add(nuevo_fichaje)
-        recalcular_resumen_jornada(
+        calcular_resumen_jornada(
             db,
             obj_in.empresa_id,
             obj_in.trabajador_id,
             fecha_a_validar.date(),
         )
-        
+
         # Registro de auditoría para la creación del fichaje
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=obj_in.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "fichajes", "accion": "crear_fichaje", "entidad_id": str(nuevo_fichaje.id), "detalles": f"Se ha registrado un nuevo fichaje para el trabajador {obj_in.trabajador_id}"}
+            detalle={'recurso': 'fichajes', 'accion': 'crear_fichaje', 'entidad_id': str(nuevo_fichaje.id), 'detalles': f'Se ha registrado un nuevo fichaje para el trabajador {obj_in.trabajador_id}'},
+            trabajador_id=None,
         )
 
         db.commit()
-        
-        fichaje_creado = db.query(Fichajes).options(
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo),
-            joinedload(Fichajes.empresa)
-        ).filter(Fichajes.id == nuevo_fichaje.id).first()
-        
+
+        fichaje_creado = (
+            db.query(Fichajes)
+            .options(
+                joinedload(Fichajes.trabajador),
+                joinedload(Fichajes.centro_trabajo),
+                joinedload(Fichajes.empresa),
+            )
+            .filter(Fichajes.id == nuevo_fichaje.id)
+            .first()
+        )
+
         return fichaje_creado
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar crear_fichaje: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido guardar el fichaje en la base de datos: {str(e)}"
+            detail='No se ha podido guardar el fichaje en la base de datos'
         )
 
 
-@router.get("/trabajador/{id_trabajador}/empresa/{id_empresa}", response_model=List[FichajeResponse], summary="Obtener fichajes de trabajador por empresa")
-@limiter.limit("60/minute") 
+@router.get(
+    "/trabajador/{id_trabajador}/empresa/{id_empresa}",
+    response_model=List[FichajeResponse],
+    summary="Obtener fichajes de trabajador por empresa",
+)
+@limiter.limit("60/minute")
 def obtener_fichajes_trabajador_empresa(
     request: Request,
-    id_trabajador: UUID, 
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    id_trabajador: UUID,
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/fichajes/trabajador/{id_trabajador}/empresa/{id_empresa}**
-     
+
     Devuelve la lista completa de fichajes asociados a un trabajador específico dentro de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes del trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de listado de fichajes del trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El trabajador con ID ({id_trabajador}) no fue encontrado."
+            detail=f"El trabajador no fue encontrado."
         )
-    
+
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"La empresa con ID ({id_empresa}) no fue encontrada."
+            detail=f"La empresa no fue encontrada."
         )
 
-    resultados = db.query(Fichajes).options(
-        joinedload(Fichajes.trabajador),
-        joinedload(Fichajes.centro_trabajo)
-    ).filter(
-        Fichajes.trabajador_id == id_trabajador,
-        Fichajes.empresa_id == id_empresa,
-        filtro_fichajes_vigentes(),
-    ).all()
-    
+    resultados = (
+        db.query(Fichajes)
+        .options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo),
+        )
+        .filter(Fichajes.trabajador_id == id_trabajador, Fichajes.empresa_id == id_empresa, filtro_fichajes_vigentes())
+        .all()
+    )
+
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_por_trabajador_empresa", "entidad_id": str(id_trabajador), "detalles": f"Se consultaron los fichajes del trabajador {id_trabajador} en la empresa {id_empresa}"}
+        detalle={'recurso': 'fichajes', 'accion': 'consultar_por_trabajador_empresa', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultaron los fichajes del trabajador {id_trabajador} en la empresa {id_empresa}'},
+        trabajador_id=None,
     )
     db.commit()
     return resultados
-from datetime import date
-from sqlalchemy import or_, and_
 
-@router.get("/trabajador/{id_trabajador}/turno", response_model=List[FichajeResponse], summary="Obtener fichajes del turno actual")
-@limiter.limit("60/minute") 
+@router.get(
+    "/trabajador/{id_trabajador}/turno",
+    response_model=List[FichajeResponse],
+    summary="Obtener fichajes del turno actual",
+)
+@limiter.limit("60/minute")
 def obtener_fichajes_turno_actual(
     request: Request,
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    id_trabajador: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
+    """**GET /trabajador/{id_trabajador}/turno**
+
+    Gestiona la operaci?n `obtener_fichajes_turno_actual`.
+    """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de fichajes por turno para el trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de fichajes por turno para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
@@ -328,13 +373,9 @@ def obtener_fichajes_turno_actual(
         db.query(Fichajes)
         .options(
             joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo)
+            joinedload(Fichajes.centro_trabajo),
         )
-        .filter(
-            Fichajes.trabajador_id == id_trabajador,
-            filtro_fichajes_vigentes(),
-            or_(*condiciones_rangos_fechas)
-        )
+        .filter(Fichajes.trabajador_id == id_trabajador, filtro_fichajes_vigentes(), or_(*condiciones_rangos_fechas))
         .order_by(Fichajes.fecha_hora_dispositivo.asc())
         .all()
     )
@@ -342,109 +383,117 @@ def obtener_fichajes_turno_actual(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            "recurso": "fichajes", 
-            "accion": "consultar_fichajes_turno", 
-            "entidad_id": str(id_trabajador), 
-            "detalles": f"Se consultaron los fichajes del turno actual para el trabajador {id_trabajador}"
-        }
+        detalle={'recurso': 'fichajes', 'accion': 'consultar_fichajes_turno', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultaron los fichajes del turno actual para el trabajador {id_trabajador}'},
+        trabajador_id=None,
     )
     db.commit()
 
     return fichajes_turno
 
 
-@router.get("/trabajador/{id_trabajador}/ultimo", response_model=Optional[FichajeResponse], summary="Obtener último fichaje del trabajador")
+@router.get(
+    "/trabajador/{id_trabajador}/ultimo",
+    response_model=Optional[FichajeResponse],
+    summary="Obtener último fichaje del trabajador",
+)
 @limiter.limit("60/minute")
 def obtener_ultimo_fichaje_trabajador(
     request: Request,
-    id_trabajador: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    id_trabajador: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/fichajes/trabajador/{trabajador_id}/ultimo**
-     
+
     Devuelve estrictamente el último evento de fichaje registrado por el trabajador (ordenado de forma descendente).
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición del último fichaje para el trabajador {id_trabajador} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición del último fichaje para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador con ID ({id_trabajador}) no encontrado."
+            detail=f"Trabajador no encontrado."
         )
 
-    ultimo_fichaje = db.query(Fichajes).options(
-        joinedload(Fichajes.trabajador),
-        joinedload(Fichajes.centro_trabajo)
-    ).filter(
-        Fichajes.trabajador_id == id_trabajador
-    ).order_by(Fichajes.created_at.desc()).first()
-    
+    ultimo_fichaje = (
+        db.query(Fichajes)
+        .options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo),
+        )
+        .filter(Fichajes.trabajador_id == id_trabajador)
+        .order_by(Fichajes.created_at.desc())
+        .first()
+    )
+
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_ultimo_fichaje", "entidad_id": str(id_trabajador), "detalles": f"Se consultó el último fichaje del trabajador {id_trabajador}"}
+        detalle={'recurso': 'fichajes', 'accion': 'consultar_ultimo_fichaje', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultó el último fichaje del trabajador {id_trabajador}'},
+        trabajador_id=None,
     )
     db.commit()
 
     if not ultimo_fichaje:
         return None
-        
+
     return ultimo_fichaje
 
-@router.get("/empresa/{empresa_id}", status_code=status.HTTP_200_OK, summary="Listar fichajes de empresa entre fechas")
+@router.get(
+    "/empresa/{empresa_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Listar fichajes de empresa entre fechas",
+)
 @limiter.limit("60/minute")
 def listar_fichajes_empresa_entre_fechas(
     request: Request,
-    empresa_id: UUID, 
-    fecha_inicio: date, 
-    fecha_fin: date, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    empresa_id: UUID,
+    fecha_inicio: date,
+    fecha_fin: date,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/fichajes/empresa/{empresa_id}**
-     
+
     Lista detallada de todos los fichajes de una empresa para una fecha específica,
     adaptada y formateada para el consumo directo del frontend. Protegida por roles administrativos.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes por empresa y fecha desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de listado de fichajes por empresa y fecha desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     try:
         resultados = (
             db.query(Fichajes)
             .options(
                 joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.centro_trabajo)
+                joinedload(Fichajes.centro_trabajo),
             )
-            .filter(
-                Fichajes.empresa_id == empresa_id,
-                func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
-            )
+            .filter(Fichajes.empresa_id == empresa_id, func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin)
             .all()
         )
 
         fichaje_ids = [fichaje.id for fichaje in resultados]
         correcciones_aprobadas = {}
         if fichaje_ids:
-            correcciones = db.query(CorreccionesFichaje).options(
-                joinedload(CorreccionesFichaje.solicitado_por_usuario),
-                joinedload(CorreccionesFichaje.aprobado_por_usuario),
-            ).filter(
-                CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids),
-                CorreccionesFichaje.estado == "Aprobada",
-            ).all()
+            correcciones = (
+                db.query(CorreccionesFichaje)
+                .options(
+                    joinedload(CorreccionesFichaje.solicitado_por_usuario),
+                    joinedload(CorreccionesFichaje.aprobado_por_usuario),
+                )
+                .filter(CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids), CorreccionesFichaje.estado == 'Aprobada')
+                .all()
+            )
             correcciones_aprobadas = {
                 correccion.fichaje_afectado_id: correccion
                 for correccion in correcciones
@@ -487,7 +536,7 @@ def listar_fichajes_empresa_entre_fechas(
                 "trabajador": trabajador_serializado,
                 "correccion_aprobada": correccion_serializada,
                 "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
-                "fecha_hora": fecha_hora_str, 
+                "fecha_hora": fecha_hora_str,
                 "tipo_evento": fichaje.tipo_evento.value,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
                 "observaciones": fichaje.observaciones,
@@ -498,10 +547,11 @@ def listar_fichajes_empresa_entre_fechas(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=empresa_id,
             accion=AccionAuditoriaEnum.CONSULTA,
-            detalle={"recurso": "fichajes", "accion": "listar_fichajes_empresa_por_fecha", "entidad_id": str(empresa_id), "detalles": f"Se listaron los fichajes de la empresa {empresa_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}"}
+            detalle={'recurso': 'fichajes', 'accion': 'listar_fichajes_empresa_por_fecha', 'entidad_id': str(empresa_id), 'detalles': f'Se listaron los fichajes de la empresa {empresa_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}'},
+            trabajador_id=None,
         )
         db.commit()
 
@@ -509,54 +559,58 @@ def listar_fichajes_empresa_entre_fechas(
 
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar listar_fichajes_empresa_entre_fechas: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se han podido obtener los fichajes de la empresa: {str(e)}"
+            detail='No se han podido obtener los fichajes de la empresa'
         )
 
-@router.get("/trabajador/{trabajador_id}", status_code=status.HTTP_200_OK, summary="Listar fichajes de trabajador entre fechas")
+@router.get(
+    "/trabajador/{trabajador_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Listar fichajes de trabajador entre fechas",
+)
 @limiter.limit("60/minute")
 def listar_fichajes_trabajador_entre_fechas(
     request: Request,
-    trabajador_id: UUID, 
-    fecha_inicio: date, 
-    fecha_fin: date, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    trabajador_id: UUID,
+    fecha_inicio: date,
+    fecha_fin: date,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/fichajes/trabajador/{trabajador_id}**
-     
+
     Lista detallada de todos los fichajes de un trabajador para un período entre fechas específico,
     adaptada y formateada para el consumo directo del frontend. Protegida por roles administrativos.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes por trabajador entre fechas desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de listado de fichajes por trabajador entre fechas desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     try:
         resultados = (
             db.query(Fichajes)
             .options(
                 joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.centro_trabajo)
+                joinedload(Fichajes.centro_trabajo),
             )
-            .filter(
-                Fichajes.trabajador_id == trabajador_id,
-                func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin
-            )
+            .filter(Fichajes.trabajador_id == trabajador_id, func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin)
             .all()
         )
 
         fichaje_ids = [fichaje.id for fichaje in resultados]
         correcciones_aprobadas = {}
         if fichaje_ids:
-            correcciones = db.query(CorreccionesFichaje).options(
-                joinedload(CorreccionesFichaje.solicitado_por_usuario),
-                joinedload(CorreccionesFichaje.aprobado_por_usuario),
-            ).filter(
-                CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids),
-                CorreccionesFichaje.estado == "Aprobada",
-            ).all()
+            correcciones = (
+                db.query(CorreccionesFichaje)
+                .options(
+                    joinedload(CorreccionesFichaje.solicitado_por_usuario),
+                    joinedload(CorreccionesFichaje.aprobado_por_usuario),
+                )
+                .filter(CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids), CorreccionesFichaje.estado == 'Aprobada')
+                .all()
+            )
             correcciones_aprobadas = {
                 correccion.fichaje_afectado_id: correccion
                 for correccion in correcciones
@@ -599,7 +653,7 @@ def listar_fichajes_trabajador_entre_fechas(
                 "trabajador": trabajador_serializado,
                 "correccion_aprobada": correccion_serializada,
                 "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
-                "fecha_hora": fecha_hora_str, 
+                "fecha_hora": fecha_hora_str,
                 "tipo_evento": fichaje.tipo_evento.value,
                 "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
                 "observaciones": fichaje.observaciones,
@@ -610,11 +664,11 @@ def listar_fichajes_trabajador_entre_fechas(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=usuario_actual.empresa_id
-            ,
+            usuario_id=usuario_actual.id,
+            empresa_id=request.headers.get('Empresa-ID'),
             accion=AccionAuditoriaEnum.CONSULTA,
-            detalle={"recurso": "fichajes", "accion": "listar_fichajes_trabajador_entre_fechas", "entidad_id": str(usuario_actual.empresa_id), "detalles": f"Se listaron los fichajes del trabajador {trabajador_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}"}
+            detalle={'recurso': 'fichajes', 'accion': 'listar_fichajes_trabajador_entre_fechas', 'entidad_id': str(empresa_id), 'detalles': f'Se listaron los fichajes del trabajador {trabajador_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}'},
+            trabajador_id=None,
         )
         db.commit()
 
@@ -622,40 +676,50 @@ def listar_fichajes_trabajador_entre_fechas(
 
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar listar_fichajes_trabajador_entre_fechas: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se han podido obtener los fichajes de la empresa: {str(e)}"
+            detail='No se han podido obtener los fichajes de la empresa'
         )
 
 
-@router.get("/{id_fichaje}", response_model=FichajeResponse, summary="Obtener fichaje por ID")
-@limiter.limit("60/minute") 
+@router.get(
+    "/{id_fichaje}",
+    response_model=FichajeResponse,
+    summary="Obtener fichaje por ID",
+)
+@limiter.limit("60/minute")
 def obtener_fichaje(
     request: Request,
-    id_fichaje: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.RRHH, TipoUsuarioEnum.AUDITOR_ITSS]))
+    id_fichaje: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/fichajes/{id_fichaje}**
-     
+
     Obtiene los detalles completos de un fichaje a partir de su ID único universal.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de detalle del fichaje {id_fichaje} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de detalle del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
-    fichaje = db.query(Fichajes).options(
-        joinedload(Fichajes.trabajador),
-        joinedload(Fichajes.centro_trabajo)
-    ).filter(Fichajes.id == id_fichaje).first()
-    
+    fichaje = (
+        db.query(Fichajes)
+        .options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo),
+        )
+        .filter(Fichajes.id == id_fichaje)
+        .first()
+    )
+
     if not fichaje:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El fichaje con ID ({id_fichaje}) no existe."
+            detail=f"El fichaje no existe."
         )
-    
-    if usuario_actual.empresa_id != fichaje.empresa_id:
+
+    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para visualizar este registro de fichaje."
@@ -664,41 +728,48 @@ def obtener_fichaje(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=fichaje.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "fichajes", "accion": "consultar_fichaje_por_id", "entidad_id": str(id_fichaje), "detalles": f"Se consultaron los detalles del fichaje {id_fichaje}"}
+        detalle={'recurso': 'fichajes', 'accion': 'consultar_fichaje_por_id', 'entidad_id': str(id_fichaje), 'detalles': f'Se consultaron los detalles del fichaje {id_fichaje}'},
+        trabajador_id=None,
     )
     db.commit()
 
     return fichaje
 
 
-@router.patch("/{id_fichaje}/validar", response_model=FichajeResponse, status_code=status.HTTP_200_OK, summary="Validar fichaje")
-@limiter.limit("30/minute") 
+@router.patch(
+    "/{id_fichaje}/validar",
+    response_model=FichajeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Validar fichaje",
+)
+@limiter.limit("30/minute")
 def validar_fichaje(
     request: Request,
-    id_fichaje: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    id_fichaje: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **PATCH /api/fichajes/{id_fichaje}/validar**
-     
+
     Cambia el estado de un fichaje a Válido y recalcula su hash de seguridad.
     Exclusivo para administradores de empresa o gestoría.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de validación del fichaje {id_fichaje} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    # Validaciones estructurales básicas
 
     fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
     if not fichaje:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró el registro de fichaje solicitado con ID {id_fichaje}."
+            detail=f"No se encontró el registro de fichaje solicitado."
         )
 
-    if usuario_actual.tipo_usuario != TipoUsuarioEnum.ADMIN_GESTORIA and usuario_actual.empresa_id != fichaje.empresa_id:
+    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para validar fichajes correspondientes a otra empresa."
@@ -707,10 +778,11 @@ def validar_fichaje(
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=fichaje.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "fichajes", "accion": "intento_validacion_fichaje", "entidad_id": str(id_fichaje), "detalles": f"Intento de validación directa del fichaje inmutable {id_fichaje}"}
+        detalle={'recurso': 'fichajes', 'accion': 'intento_validacion_fichaje', 'entidad_id': str(id_fichaje), 'detalles': f'Intento de validación directa del fichaje inmutable {id_fichaje}'},
+        trabajador_id=None,
     )
     db.commit()
 
@@ -720,43 +792,48 @@ def validar_fichaje(
     )
 
 
-@router.delete("/{id_fichaje}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar fichaje")
-@limiter.limit("20/minute") 
+@router.delete(
+    "/{id_fichaje}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar fichaje",
+)
+@limiter.limit("20/minute")
 def eliminar_fichaje(
     request: Request,
-    id_fichaje: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    id_fichaje: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.ELIMINAR + "-" + TipoPermisoEnum.FICHAJES])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **DELETE /api/fichajes/{id_fichaje}**
-     
+
     Elimina un registro de fichaje existente. Requiere privilegios administrativos
     de gestoría o empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de eliminación del fichaje {id_fichaje} desde IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de eliminación del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
 
     fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
     if not fichaje:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="El registro de fichaje que intentas eliminar no ha sido encontrado."
         )
-    
-    if usuario_actual.tipo_usuario != TipoUsuarioEnum.ADMIN_GESTORIA and usuario_actual.empresa_id != fichaje.empresa_id:
+
+    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para eliminar registros de fichaje de otra empresa."
         )
-    
+
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=fichaje.empresa_id,
         accion=AccionAuditoriaEnum.ELIMINACION,
-        detalle={"recurso": "fichajes", "accion": "intento_eliminacion_fichaje", "entidad_id": str(id_fichaje), "detalles": f"Intento de eliminación directa del fichaje inmutable {id_fichaje}"}
+        detalle={'recurso': 'fichajes', 'accion': 'intento_eliminacion_fichaje', 'entidad_id': str(id_fichaje), 'detalles': f'Intento de eliminación directa del fichaje inmutable {id_fichaje}'},
+        trabajador_id=None,
     )
     db.commit()
 

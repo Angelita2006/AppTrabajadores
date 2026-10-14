@@ -1,19 +1,26 @@
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
-from models.contratos import Contratos
+from sqlalchemy.orm import Session, joinedload
+
 from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
 from core.security import get_db_with_advanced_security, verificar_permisos_requeridos
-from schemas.asignaciones_turno import AsignacionTurnoCreate, AsignacionTurnoMasivaCreate, AsignacionTurnoUpdate, AsignacionTurnoResponse
+from models.asignaciones_turno import AsignacionesTurno
+from models.contratos import Contratos
 from models.trabajadores import Trabajadores
 from models.turnos import Turnos
-from models.asignaciones_turno import AsignacionesTurno
 from models.usuarios import Usuarios
+from schemas.asignaciones_turno import (
+    AsignacionTurnoCreate,
+    AsignacionTurnoMasivaCreate,
+    AsignacionTurnoResponse,
+    AsignacionTurnoUpdate,
+)
 
 # APIRouter agrupa todos los endpoints relacionados con las asignaciones de turno bajo el prefijo "/api/asignaciones-turno".
 router = APIRouter(prefix="/api/asignaciones-turno", tags=["Asignaciones de Turno"])
@@ -21,17 +28,22 @@ router = APIRouter(prefix="/api/asignaciones-turno", tags=["Asignaciones de Turn
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=AsignacionTurnoResponse, status_code=status.HTTP_201_CREATED, summary="Asignar turno a contrato")
-@limiter.limit("20/minute") 
+@router.post(
+    "",
+    response_model=AsignacionTurnoResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Asignar turno a contrato",
+)
+@limiter.limit("20/minute")
 def asignar_turno_contrato(
     request: Request,
-    payload: AsignacionTurnoCreate, 
+    payload: AsignacionTurnoCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/asignaciones-turno**
-    
+
     Vincula un turno a un contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -77,14 +89,14 @@ def asignar_turno_contrato(
             detalle={"recurso": "asignaciones_turno", "accion": "crear"},
             trabajador_id=contrato.trabajador_id
         )
-        
+
         asignacion_creada = (
             db.query(AsignacionesTurno)
             .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
             .filter(AsignacionesTurno.id == nueva_asignacion.id)
             .first()
         )
-        
+
         print(f"Asignación de turno creada con éxito ({nueva_asignacion.id}).")
         return asignacion_creada
     except Exception as e:
@@ -95,17 +107,22 @@ def asignar_turno_contrato(
             detail=f"No se ha podido crear la asignación de turno."
         )
 
-@router.post("/masiva", response_model=List[AsignacionTurnoResponse], status_code=status.HTTP_201_CREATED, summary="Asignar masivamente turnos")
-@limiter.limit("20/minute") 
+@router.post(
+    "/masiva",
+    response_model=List[AsignacionTurnoResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Asignar masivamente turnos",
+)
+@limiter.limit("20/minute")
 def asignar_turnos_masivamente(
     request: Request,
-    payload: AsignacionTurnoMasivaCreate, 
+    payload: AsignacionTurnoMasivaCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/asignaciones-turno/masiva**
-    
+
     Vincula múltiples turnos a un contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -125,7 +142,7 @@ def asignar_turnos_masivamente(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Trabajador no encontrado.")
 
     nuevas_asignaciones_ids = []
-    
+
     try:
         for turno_id in payload.turnos_ids:
             # Validar que cada turno exista
@@ -139,7 +156,7 @@ def asignar_turnos_masivamente(
             if turno.empresa_id != contrato.empresa_id:
                 print(f"El turno ({turno_id}) no pertenece a la empresa del contrato.")
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El turno no pertenece a la empresa del contrato.")
-            
+
             nueva_asignacion = AsignacionesTurno(
                 empresa_id=contrato.empresa_id,
                 trabajador_id=trabajador.id,
@@ -162,14 +179,14 @@ def asignar_turnos_masivamente(
             detalle={"recurso": "asignaciones_turno", "accion": "crear_masivamente"},
             trabajador_id=trabajador.id
         )
-        
+
         asignaciones_creadas = (
             db.query(AsignacionesTurno)
             .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
             .filter(AsignacionesTurno.id.in_(nuevas_asignaciones_ids))
             .all()
         )
-            
+
         print(f"Asignación masiva completada con éxito: {len(asignaciones_creadas)}.")
         return asignaciones_creadas
     except Exception as e:
@@ -180,8 +197,12 @@ def asignar_turnos_masivamente(
             detail=f"No se han podido crear las asignaciones de turnos."
         )
 
-@router.put("/{id_asignacion}/modificar", response_model=AsignacionTurnoResponse, summary="Modificar asignación de turno")
-@limiter.limit("20/minute") 
+@router.put(
+    "/{id_asignacion}/modificar",
+    response_model=AsignacionTurnoResponse,
+    summary="Modificar asignación de turno",
+)
+@limiter.limit("20/minute")
 def modificar_asignacion_turno(
     request: Request,
     id_asignacion: UUID,
@@ -191,7 +212,7 @@ def modificar_asignacion_turno(
 ):
     """
     **PUT /api/asignaciones-turno/{id_asignacion}/modificar
-    
+
     Modifica los datos sobre una asignación de turno de un conrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -219,7 +240,7 @@ def modificar_asignacion_turno(
 
     if payload.fecha_fin is not None:
         setattr(asignacion, "fecha_fin", payload.fecha_fin)
-    
+
     db.commit()
 
     registrar_auditoria(
@@ -231,29 +252,33 @@ def modificar_asignacion_turno(
         detalle={"recurso": "asignaciones_turno", "accion": "modificar"},
         trabajador_id=asignacion.trabajador_id
     )
-    
+
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
         .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
         .filter(AsignacionesTurno.id == id_asignacion)
         .first()
     )
-    
+
     print(f"Asignación {id_asignacion} editada exitosamente.")
     return asignacion_actualizada
 
-@router.put("/{id_asignacion}/finalizar", response_model=AsignacionTurnoResponse, summary="Finalizar vigencia de asignación de turno")
-@limiter.limit("20/minute") 
+@router.put(
+    "/{id_asignacion}/finalizar",
+    response_model=AsignacionTurnoResponse,
+    summary="Finalizar vigencia de asignación de turno",
+)
+@limiter.limit("20/minute")
 def finalizar_vigencia_turno(
     request: Request,
-    id_asignacion: UUID, 
-    fecha_fin: date, 
+    id_asignacion: UUID,
+    fecha_fin: date,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/asignaciones-turno/{id_asignacion}/finalizar?fecha_fin=AAAA-MM-DD**
-    
+
     Establece la fecha de vencimiento de una asignación de turno para permitir rotaciones horarias.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -273,7 +298,7 @@ def finalizar_vigencia_turno(
         )
 
     setattr(asignacion, "fecha_fin", fecha_fin)
-    
+
     db.commit()
 
     registrar_auditoria(
@@ -285,28 +310,32 @@ def finalizar_vigencia_turno(
         detalle={"recurso": "asignaciones_turno", "accion": "finalizar"},
         trabajador_id=asignacion.trabajador_id
     )
-    
+
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
         .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
         .filter(AsignacionesTurno.id == id_asignacion)
         .first()
     )
-    
+
     print(f"Vigencia del turno {id_asignacion} finalizada correctamente.")
     return asignacion_actualizada
 
 
-@router.delete("/{id_asignacion}", status_code=status.HTTP_200_OK, summary="Eliminar asignación de turno")
+@router.delete(
+    "/{id_asignacion}",
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar asignación de turno",
+)
 def eliminar_asignacion_turno(
     request: Request,
-    id_asignacion: UUID, 
+    id_asignacion: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.ELIMINAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **DELETE /api/asignaciones-turno/{id_asignacion}**
-    
+
     Elimina una asignación de turno de un contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -336,16 +365,20 @@ def eliminar_asignacion_turno(
     return {"detail": f"Asignación de turno eliminada correctamente."}
 
 
-@router.delete("/contrato/{id_contrato}", status_code=status.HTTP_200_OK, summary="Eliminar asignaciones del contrato")
+@router.delete(
+    "/contrato/{id_contrato}",
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar asignaciones del contrato",
+)
 def eliminar_asignaciones_contrato(
     request: Request,
-    id_contrato: UUID, 
+    id_contrato: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.ELIMINAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **DELETE /api/asignaciones-turno/contrato/{id_contrato}**
-    
+
     Elimina todas las asignaciones de turno vinculadas al contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -359,19 +392,19 @@ def eliminar_asignaciones_contrato(
 
     try:
         asignaciones = db.query(AsignacionesTurno).filter(AsignacionesTurno.contrato_id == id_contrato).all()
-        
+
         if not asignaciones:
             print(f"No se encontraron asignaciones de turno activas en el contrato ({id_contrato}).")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No se encontraron asignaciones de turno activas en el contrato."
             )
 
         for asignacion in asignaciones:
             db.delete(asignacion)
-            
+
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -392,16 +425,20 @@ def eliminar_asignaciones_contrato(
             detail=f"No se ha podido eliminar las asignaciones de turno del contrato."
         )
 
-@router.get("/{id_asignacion}", response_model=List[AsignacionTurnoResponse], summary="Obtener asignación por id")
+@router.get(
+    "/{id_asignacion}",
+    response_model=List[AsignacionTurnoResponse],
+    summary="Obtener asignación por id",
+)
 def obtener_asignacion_id(
     request: Request,
-    id_asignacion: UUID, 
+    id_asignacion: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/asignaciones-turno/contrato/{id_contrato}**
-    
+
     Obtiene las asignaciones de turnos por contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -412,34 +449,38 @@ def obtener_asignacion_id(
     if not asignacion:
         print(f"Asignación de turno ({id_asignacion}) no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asiganción de turno no encontrada.")
-    
+
     contrato = db.query(Contratos).filter(Contratos.id == asignacion.contrato_id).first()
     if not contrato:
         print(f"Contrato ({asignacion.contrato_id}) no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Contrato no encontrado.")
-    
+
     registrar_auditoria(
         db=db,
         request=request,
         usuario_id=usuario_actual.id,
         empresa_id=asignacion.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "asignaciones_turno", "accion": "consultar"},
+        detalle={"recurso": "asignaciones_turno", "accion": "consultar_id"},
         trabajador_id=contrato.trabajador_id
     )
 
     return asignacion
 
-@router.get("/contrato/{id_contrato}", response_model=List[AsignacionTurnoResponse], summary="Obtener asignaciones por contrato")
+@router.get(
+    "/contrato/{id_contrato}",
+    response_model=List[AsignacionTurnoResponse],
+    summary="Obtener asignaciones por contrato",
+)
 def obtener_asignaciones_contrato(
     request: Request,
-    id_contrato: UUID, 
+    id_contrato: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.ASIGNACIONES_TURNO])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/asignaciones-turno/contrato/{id_contrato}**
-    
+
     Obtiene las asignaciones de turnos por contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"

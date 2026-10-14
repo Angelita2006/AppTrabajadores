@@ -2,7 +2,6 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from schemas.calendarios_laborales import CalendarioLaboralSimpleResponse
 from core.enums import TipoFestivoEnum
 
 # ==========================================
@@ -56,7 +55,7 @@ class FestivoResponse(BaseModel):
     """
     Esquema simplificado alternativo para respuestas de festivos.
     """
-    calendario: Optional[CalendarioLaboralSimpleResponse] = Field(None, description="Detalles del calendario laboral asociado")
+    calendario: Optional[dict] = Field(None, description="Detalles del calendario laboral asociado")
 
     model_config = ConfigDict(from_attributes=True)
 

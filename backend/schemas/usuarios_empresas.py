@@ -15,7 +15,7 @@ class UsuarioEmpresaBase(BaseModel):
     Propiedades comunes compartidas para la validación de un turno teórico
     basado en el modelo relacional mapeado por sqlacodegen.
     """
-    activo: Optional[bool] = Field(True, description="Indica si la relación usuario-empresa está activa o no")
+    activo: Optional[bool] = Field(None, description="Indica si la relación usuario-empresa está activa o no")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,7 +24,7 @@ class UsuarioEmpresaCreate(UsuarioEmpresaBase):
     Esquema utilizado para recibir los datos desde el cliente al configurar un nuevo turno.
     """
     usuario_id: UUID = Field(..., description="ID único UUID del usuario asociado")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa asociada")
+    empresa_id: Optional[UUID] = Field(None, description="ID de empresa; NULL para membresía global de superadministrador")
     rol_id: UUID = Field(..., description="ID único UUID del rol asociado")
 
     model_config = ConfigDict(from_attributes=True)
@@ -35,7 +35,7 @@ class UsuarioEmpresaUpdate(BaseModel):
     """
     rol_id: Optional[UUID] = Field(None, description="ID único UUID del rol asociado")
 
-    activo: Optional[bool] = Field(True, description="Indica si la relación usuario-empresa está activa o no")
+    activo: Optional[bool] = Field(None, description="Indica si la relación usuario-empresa está activa o no")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,7 +45,7 @@ class UsuarioEmpresaSimpleResponse(UsuarioEmpresaBase):
     """
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) de la relación usuario-empresa")
     usuario_id: UUID = Field(..., description="ID único UUID del usuario asociado")
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa asociada")
+    empresa_id: Optional[UUID] = Field(None, description="ID de empresa; NULL para membresía global de superadministrador")
     rol_id: UUID = Field(..., description="ID único UUID del rol asociado")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de la creación del cuadrante (now)")

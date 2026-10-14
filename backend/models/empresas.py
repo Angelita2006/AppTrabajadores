@@ -50,7 +50,7 @@ class Empresas(Base):
     dispositivos_fichaje: Mapped[list['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='empresa', doc='Dispositivos de fichaje asociados a la empresa.') # type: ignore
     resumenes_jornada: Mapped[list['ResumenesJornada']] = relationship('ResumenesJornada', back_populates='empresa', doc='Resúmenes de jornada asociados a la empresa.') # type: ignore
     usuarios_empresas: Mapped[list['UsuariosEmpresas']] = relationship('UsuariosEmpresas', back_populates='empresa', doc='Relaciones con usuarios.') # type: ignore
-    gestorias_como_gestora: Mapped[list['GestoriasEmpresas']] = relationship('GestoriasEmpresas', foreign_keys='GestoriasEmpresas.gestoria_empresa_id', back_populates='gestoria', doc='Relaciones con otras empresas como gestora.') # type: ignore
+    gestorias_como_gestora: Mapped[list['GestoriasEmpresas']] = relationship('GestoriasEmpresas', foreign_keys='GestoriasEmpresas.empresa_gestora_id', back_populates='empresa_gestora', doc='Relaciones con otras empresas como gestora.') # type: ignore
     gestorias_como_cliente: Mapped[list['GestoriasEmpresas']] = relationship('GestoriasEmpresas', foreign_keys='GestoriasEmpresas.empresa_cliente_id', back_populates='empresa_cliente', doc='Relaciones con otras empresas como cliente.') # type: ignore
     auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='empresa', doc='Auditoría de accesos asociada a la empresa.') # type: ignore
     contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='empresa', doc='Contratos asociados a la empresa.') # type: ignore

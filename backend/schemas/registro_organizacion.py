@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from schemas.empresas import EmpresaSimpleResponse
 from schemas.usuarios import UsuarioSimpleResponse
 
-class RegistroOrganizacionCompletaDTO(BaseModel):
+class RegistroOrganizacionCompleta(BaseModel):
     # Datos de la licencia
     codigo_licencia: str = Field(..., max_length=12, description="Código de la licencia")
 

@@ -147,8 +147,11 @@ def get_db_with_advanced_security(
     y configura las variables SET LOCAL en PostgreSQL de forma transparente.
     """
     db = SessionLocal()
+    # The tenant context is installed with SET LOCAL and ends at commit. Keep already
+    # loaded ORM values available when FastAPI serializes a response after the commit.
+    db.expire_on_commit = False
     try:
-        # 1. Consultar membresías y roles del usuario en el sistema
+        # Consultar membresías y roles del usuario en el sistema
         membresias = (
             db.query(UsuariosEmpresas)
             .outerjoin(Empresas, UsuariosEmpresas.empresa_id == Empresas.id)
@@ -169,27 +172,46 @@ def get_db_with_advanced_security(
             db.execute(text("SET LOCAL app.is_superadmin = 'true'"))
 
         else:
-            # Reutilizamos la función auxiliar DRY para validar la empresa actual
+            # Validar la empresa actual
             empresa = _obtener_y_validar_empresa(request, db)
 
             db.execute(text("SET LOCAL app.is_superadmin = 'false'"))
 
-            is_admin_gestoria = any(m for m in membresias if m.rol.tipo == TipoRolEnum.ADMIN_GESTORIA and m.empresa_id is not None and m.empresa_id == empresa.id)
+            gestorias_admin = {
+                m.empresa_id
+                for m in membresias
+                if m.rol.tipo == TipoRolEnum.ADMIN_GESTORIA and m.empresa_id is not None
+            }
+            is_admin_gestoria = empresa.id in gestorias_admin
+            es_cliente_gestoria = False
+            if not is_admin_gestoria and gestorias_admin:
+                es_cliente_gestoria = (
+                    db.query(GestoriasEmpresas.id)
+                    .filter(
+                        GestoriasEmpresas.empresa_gestora_id.in_(gestorias_admin),
+                        GestoriasEmpresas.empresa_cliente_id == empresa.id,
+                        GestoriasEmpresas.activo.is_(True),
+                    )
+                    .first()
+                    is not None
+                )
             is_inspector = any(m for m in membresias if m.rol.tipo == TipoRolEnum.AUDITOR_ITSS and m.empresa_id is not None and m.empresa_id == empresa.id)
             
             # -------------------------------------------------------------
             # CASO 2: ADMIN DE GESTORÍA (Acceso a sus empresas clientes)
             # -------------------------------------------------------------
-            if is_admin_gestoria:
+            if is_admin_gestoria or es_cliente_gestoria:
+                ids_gestorias = gestorias_admin if es_cliente_gestoria else {empresa.id}
                 clientes = (
                     db.query(GestoriasEmpresas.empresa_cliente_id)
                     .filter(
-                        GestoriasEmpresas.empresa_gestora_id == empresa.id,
+                        GestoriasEmpresas.empresa_gestora_id.in_(ids_gestorias),
                         GestoriasEmpresas.activo.is_(True)
                     )
                     .all()
                 )
                 allowed_ids = {c.empresa_cliente_id for c in clientes}
+                allowed_ids.update(ids_gestorias)
                 allowed_ids.add(empresa.id)
 
                 ids_formatted = ",".join([f"'{eid}'" for eid in allowed_ids])
@@ -261,16 +283,33 @@ def verificar_permisos_requeridos(permisos_requeridos: list[str]):
                 UsuariosEmpresas.usuario_id == usuario_actual.id,
                 UsuariosEmpresas.empresa_id == empresa.id,
                 UsuariosEmpresas.activo.is_(True),
-                Roles.activo.is_(True)
             )
             .first()
         )
 
         if not membresia:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="El usuario no cuenta con una relación activa para esta empresa."
+            membresia_gestoria = (
+                db.query(UsuariosEmpresas)
+                .join(Roles, UsuariosEmpresas.rol_id == Roles.id)
+                .join(
+                    GestoriasEmpresas,
+                    GestoriasEmpresas.empresa_gestora_id == UsuariosEmpresas.empresa_id,
+                )
+                .filter(
+                    UsuariosEmpresas.usuario_id == usuario_actual.id,
+                    UsuariosEmpresas.activo.is_(True),
+                    Roles.tipo == TipoRolEnum.ADMIN_GESTORIA,
+                    GestoriasEmpresas.empresa_cliente_id == empresa.id,
+                    GestoriasEmpresas.activo.is_(True),
+                )
+                .first()
             )
+            if not membresia_gestoria:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="El usuario no cuenta con una relación activa para esta empresa.",
+                )
+            membresia = membresia_gestoria
 
         rol_id = membresia.rol_id
 

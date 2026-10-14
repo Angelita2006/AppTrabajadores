@@ -1,25 +1,43 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.orm import Session, joinedload
+
 from backend.core.jornada import calcular_resumen_jornada
+from core.auditoria import registrar_auditoria
+from core.database import get_db
+from core.enums import (
+    AccionAuditoriaEnum,
+    AccionPermisoEnum,
+    EstadoCorreccionEnum,
+    EstadoFichajeEnum,
+    MetodoFichajeEnum,
+    OrigenFichajeEnum,
+    TipoCorreccionEnum,
+    TipoPermisoEnum,
+)
+from core.security import (
+    get_db_with_advanced_security,
+    obtener_usuario_actual,
+    verificar_permisos_requeridos,
+)
 from core.utils import calcular_hash_fichaje, procesar_y_guardar_firma
 from models.centros_trabajo import CentrosTrabajo
-from models.correcciones_fichaje import CorreccionesFichaje
 from models.contratos import Contratos
-from core.database import get_db
-from core.security import get_db_with_advanced_security, obtener_usuario_actual, verificar_permisos_requeridos
-from core.enums import AccionPermisoEnum, EstadoCorreccionEnum, EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoCorreccionEnum, TipoPermisoEnum
+from models.correcciones_fichaje import CorreccionesFichaje
 from models.empresas import Empresas
+from models.fichajes import Fichajes
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
-from models.fichajes import Fichajes
-from schemas.correcciones_fichaje import CorreccionFichajeCreate, CorreccionFichajeResponse, CorreccionFichajeUpdate
-from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
+from schemas.correcciones_fichaje import (
+    CorreccionFichajeCreate,
+    CorreccionFichajeResponse,
+    CorreccionFichajeUpdate,
+)
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de correcciones de fichaje bajo el prefijo "/api/correcciones".
 router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
@@ -27,17 +45,22 @@ router = APIRouter(prefix="/api/correcciones", tags=["Correcciones de Fichaje"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=CorreccionFichajeResponse, status_code=status.HTTP_201_CREATED, summary="Crear corrección de fichaje")
-@limiter.limit("20/minute")  
+@router.post(
+    "",
+    response_model=CorreccionFichajeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear corrección de fichaje",
+)
+@limiter.limit("20/minute")
 def crear_correccion_fichaje(
     request: Request,
-    payload: CorreccionFichajeCreate, 
+    payload: CorreccionFichajeCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.CORRECCIONES_FICHAJE])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/correcciones**
-    
+
     Crea una nueva corrección de fichaje en estado 'pendiente' por defecto.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -48,7 +71,7 @@ def crear_correccion_fichaje(
     if not empresa:
         print(f"Empresa ({payload.empresa_id}) no encontrada.")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Empresa no encontrada."
         )
 
@@ -56,7 +79,7 @@ def crear_correccion_fichaje(
     if not trabajador:
         print(f"Trabajador ({payload.trabajador_id}) no encontrado.")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador no encontrado."
         )
 
@@ -72,7 +95,7 @@ def crear_correccion_fichaje(
         if not fichaje:
             print(f"Fichaje afectado ({payload.fichaje_afectado_id}) no encontrado.")
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Fichaje afectado no encontrado."
             )
 
@@ -106,7 +129,7 @@ def crear_correccion_fichaje(
     try:
         db.add(nueva_correccion_fichaje)
         db.commit()
-        
+
         correccion_creada = (
             db.query(CorreccionesFichaje).options(
             joinedload(CorreccionesFichaje.empresa),
@@ -116,7 +139,7 @@ def crear_correccion_fichaje(
             .filter(CorreccionesFichaje.id == nueva_correccion_fichaje.id)
             .first()
         )
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -126,7 +149,7 @@ def crear_correccion_fichaje(
             detalle={"recurso": "correcciones_fichaje", "accion": "crear"},
             trabajador_id=payload.trabajador_id
         )
-        
+
         return correccion_creada
     except Exception as e:
         db.rollback()
@@ -137,15 +160,24 @@ def crear_correccion_fichaje(
         )
 
 
-@router.put("/{id_correccion}/resolver", response_model=CorreccionFichajeResponse, summary="Resolver corrección de fichaje")
-@limiter.limit("20/minute") 
+@router.put(
+    "/{id_correccion}/resolver",
+    response_model=CorreccionFichajeResponse,
+    summary="Resolver corrección de fichaje",
+)
+@limiter.limit("20/minute")
 def resolver_correccion_fichaje(
     request: Request,
-    id_correccion: UUID, 
+    id_correccion: UUID,
     payload: CorreccionFichajeUpdate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CORRECCIONES_FICHAJE])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
+    """
+    **PUT /{id_correccion}/resolver**
+
+    Resolver corrección de fichaje.
+    """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de resolución de la corrección de fichaje ({id_correccion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
@@ -159,18 +191,18 @@ def resolver_correccion_fichaje(
         .filter(CorreccionesFichaje.id == id_correccion)
         .first()
     )
-    
+
     if not correccion_fichaje:
         print(f"Corrección de fichaje ({id_correccion}) no encontrada.")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Corrección de fichaje no encontrada."
         )
 
     if correccion_fichaje.estado != EstadoCorreccionEnum.PENDIENTE:
         print(f"Acción bloqueada: Esta corrección de fichaje ({id_correccion}) ya fue resuelta previamente.")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Acción bloqueada: Esta corrección de fichaje ya fue resuelta previamente."
         )
 
@@ -207,15 +239,15 @@ def resolver_correccion_fichaje(
             if not fichaje_original:
                 print(f"Fichaje original ({correccion_fichaje.fichaje_afectado_id}) no encontrado.")
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fichaje original no encontrado.")
-            
+
             if correccion_fichaje.tipo_correccion in [TipoCorreccionEnum.MODIFICACION, TipoCorreccionEnum.ALTA_MANUAL]:
                 v_nuevo = correccion_fichaje.valor_nuevo or {}
-                fecha_str = v_nuevo.get("fecha_descuadre")   
-                hora_str = v_nuevo.get("hora_propuesta")    
+                fecha_str = v_nuevo.get("fecha_descuadre")
+                hora_str = v_nuevo.get("hora_propuesta")
 
                 if not fecha_str or not hora_str:
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, 
+                        status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Datos de tiempo insuficientes en la solicitud."
                     )
 
@@ -234,7 +266,7 @@ def resolver_correccion_fichaje(
                 centro_id = None
                 if fichaje_original and fichaje_original.centro_trabajo_id:
                     centro_id = fichaje_original.centro_trabajo_id
-                
+
                 if not centro_id:
                     contrato = db.query(Contratos).filter(Contratos.trabajador_id == correccion_fichaje.trabajador_id).first()
                     if contrato and contrato.centro_trabajo_id:
@@ -243,7 +275,7 @@ def resolver_correccion_fichaje(
                 if not centro_id:
                     print("No se pudo procesar: El trabajador no posee un contrato con centro de trabajo asignado.")
                     raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, 
+                        status_code=status.HTTP_400_BAD_REQUEST,
                         detail="No se pudo procesar: El trabajador no posee un contrato con centro de trabajo asignado."
                     )
 
@@ -258,17 +290,17 @@ def resolver_correccion_fichaje(
                 nuevo_fichaje = Fichajes(
                     empresa_id=correccion_fichaje.empresa_id,
                     trabajador_id=correccion_fichaje.trabajador_id,
-                    centro_trabajo_id=centro_id,  
+                    centro_trabajo_id=centro_id,
                     tipo_evento=correccion_fichaje.tipo_evento,
                     fecha_hora=fecha_hora_propuesta,
                     fecha_hora_dispositivo=fecha_hora_propuesta,
-                    metodo_fichaje=MetodoFichajeEnum.WEB,  
+                    metodo_fichaje=MetodoFichajeEnum.WEB,
                     origen=OrigenFichajeEnum.CORRECCION_RRHH,
                     estado=EstadoFichajeEnum.VALIDO,
                     hash_integridad=sha256_calculado,
-                    latitud=latitud,      
-                    longitud=longitud,    
-                    fichaje_sustituido_id=correccion_fichaje.fichaje_afectado_id, 
+                    latitud=latitud,
+                    longitud=longitud,
+                    fichaje_sustituido_id=correccion_fichaje.fichaje_afectado_id,
                     firma_digital=correccion_fichaje.firma_solicitante,
                     observaciones=f"Fichaje corrector mediante incidencia: {correccion_fichaje.motivo}"
                 )
@@ -295,7 +327,7 @@ def resolver_correccion_fichaje(
             .filter(CorreccionesFichaje.id == id_correccion)
             .first()
         )
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -305,7 +337,7 @@ def resolver_correccion_fichaje(
             detalle={"recurso": "correcciones_fichaje", "accion": "resolver"},
             trabajador_id=correccion_fichaje.trabajador_id
         )
-        
+
         return incidencia_actualizada
     except Exception as e:
         db.rollback()
@@ -315,17 +347,21 @@ def resolver_correccion_fichaje(
             detail=f"No se ha podido resolver la corrección de fichajes."
         )
 
-@router.delete("/{id_correccion}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar corrección de fichaje")
-@limiter.limit("20/minute") 
+@router.delete(
+    "/{id_correccion}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar corrección de fichaje",
+)
+@limiter.limit("20/minute")
 def eliminar_correccion_fichaje(
     request: Request,
-    id_correccion: UUID, 
+    id_correccion: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.ELIMINAR+"-"+TipoPermisoEnum.CORRECCIONES_FICHAJE])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **DELETE /api/correcciones/{id_correccion}**
-    
+
     Elimina una corrección de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -336,7 +372,7 @@ def eliminar_correccion_fichaje(
     if not correccion_fichaje:
         print(f"Corrección de fichaje ({id_correccion}) no encontrada.")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Corrección de fichaje no encontrada."
         )
 
@@ -364,17 +400,21 @@ def eliminar_correccion_fichaje(
         )
 
 
-@router.get("/empresa/{id_empresa}", response_model=List[CorreccionFichajeResponse], summary="Obtener correcciones de fichajes por empresa")
-@limiter.limit("60/minute") 
+@router.get(
+    "/empresa/{id_empresa}",
+    response_model=List[CorreccionFichajeResponse],
+    summary="Obtener correcciones de fichajes por empresa",
+)
+@limiter.limit("60/minute")
 def obtener_correcciones_fichajes_empresa(
     request: Request,
-    id_empresa: UUID, 
+    id_empresa: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CORRECCIONES_FICHAJE])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/correcciones/empresa/{id_empresa}**
-    
+
     Obtener correcciones de fichajes de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -389,7 +429,7 @@ def obtener_correcciones_fichajes_empresa(
         .filter(CorreccionesFichaje.empresa_id == id_empresa)
         .all()
     )
-    
+
     registrar_auditoria(
         db=db,
         request=request,
@@ -399,20 +439,24 @@ def obtener_correcciones_fichajes_empresa(
         detalle={"recurso": "correcciones_fichaje", "accion": "consultar_empresa"},
         trabajador_id=None
     )
-    
+
     return resultados
 
-@router.get("/trabajador/{id_trabajador}", response_model=List[CorreccionFichajeResponse], summary="Obtener correcciones por trabajador")
-@limiter.limit("60/minute")  
+@router.get(
+    "/trabajador/{id_trabajador}",
+    response_model=List[CorreccionFichajeResponse],
+    summary="Obtener correcciones por trabajador",
+)
+@limiter.limit("60/minute")
 def obtener_correcciones_fichajes_trabajador(
     request: Request,
-    id_trabajador: UUID, 
+    id_trabajador: UUID,
     db: Session = Depends(get_db),
     usuario_actual: Usuarios = Depends(obtener_usuario_actual)
 ):
     """
     **GET /api/correcciones/trabajador/{id_trabajador}**
-    
+
     Obtiene las correcciones de fichajes de un trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -423,7 +467,7 @@ def obtener_correcciones_fichajes_trabajador(
     if not trabajador:
         print(f"Trabajador ({id_trabajador}) no encontrado.")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador no encontrado."
         )
 
@@ -436,7 +480,7 @@ def obtener_correcciones_fichajes_trabajador(
         .filter(CorreccionesFichaje.trabajador_id == id_trabajador)
         .all()
     )
-    
+
     registrar_auditoria(
         db=db,
         request=request,
@@ -446,5 +490,5 @@ def obtener_correcciones_fichajes_trabajador(
         detalle={"recurso": "correcciones_fichaje", "accion": "consultar_trabajador"},
         trabajador_id=id_trabajador
     )
-    
+
     return resultados

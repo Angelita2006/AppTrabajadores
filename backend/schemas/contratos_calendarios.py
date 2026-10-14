@@ -35,7 +35,7 @@ class ContratoCalendarioUpdate(BaseModel):
     Esquema para la actualización parcial de un centro de trabajo.
     Todos los campos son opcionales para permitir actualizaciones 'patch'.
     """
-    activa: Optional[bool] = Field(True, description="Indica si la relación contrato-calendario está activa o no")
+    activa: Optional[bool] = Field(None, description="Indica si la relación contrato-calendario está activa o no")
 
     model_config = ConfigDict(from_attributes=True)
 

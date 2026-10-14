@@ -23,9 +23,7 @@ class GestoriaEmpresaCreate(GestoriaEmpresaBase):
     """
     Esquema unificado para crear relaciones entre empresa gestora y cliente.
     """
-    empresa_gestora_id: UUID = Field(..., description="ID único UUID de la empresa gestora")
     empresa_cliente_id: UUID = Field(..., description="ID único UUID de la empresa cliente")
-    usuario_creador_id: UUID = Field(..., description="ID único UUID del usuario creador de la autorización")
 
     @model_validator(mode='after')
     def validar_rango_fechas_update(self) -> 'GestoriaEmpresaCreate':
@@ -45,6 +43,7 @@ class GestoriaEmpresaUpdate(BaseModel):
     """
     fecha_inicio: Optional[datetime.date] = Field(None, description="Fecha de inicio de la autorización")
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha y hora de fin de la autorización")
+    activo: Optional[bool] = Field(None, description="Activa o desactiva la autorización")
     
     @model_validator(mode='after')
     def validar_rango_fechas_update(self) -> 'GestoriaEmpresaUpdate':
@@ -66,7 +65,7 @@ class GestoriaEmpresaSimpleResponse(GestoriaEmpresaBase):
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) de la relación gestoría-empresa cliente")
     empresa_gestora_id: UUID = Field(..., description="ID único UUID de la empresa gestora")
     empresa_cliente_id: UUID = Field(..., description="ID único UUID de la empresa cliente")
-    usuario_creador_id: UUID = Field(..., description="ID único UUID del usuario creador de la autorización")
+    usuario_creador_id: Optional[UUID] = Field(None, description="ID del usuario creador de la autorización, si sigue existiendo")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")

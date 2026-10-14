@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.orm import Session, joinedload
+
 from core.enums import AccionPermisoEnum, TipoPermisoEnum
 from core.security import get_db_with_advanced_security, verificar_permisos_requeridos
+from models.auditoria_accesos import AuditoriaAccesos
 from models.empresas import Empresas
-from schemas.auditoria_accesos import AuditoriaAccesoResponse
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
-from models.auditoria_accesos import AuditoriaAccesos
+from schemas.auditoria_accesos import AuditoriaAccesoResponse
 
 # APIRouter agrupa todos los endpoints relacionados con la auditoría de accesos bajo el prefijo "/api/auditoria-accesos".
 router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos"])
@@ -18,16 +20,20 @@ router = APIRouter(prefix="/api/auditoria-accesos", tags=["Auditoría de Accesos
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.get("/empresa/{id_empresa}", response_model=List[AuditoriaAccesoResponse], summary="Obtener auditoría por empresa")
+@router.get(
+    "/empresa/{id_empresa}",
+    response_model=List[AuditoriaAccesoResponse],
+    summary="Obtener auditoría por empresa",
+)
 def obtener_auditoria_empresa(
     request: Request,
-    id_empresa: UUID, 
+    id_empresa: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/auditoria-accesos/empresa/{id_empresa}**
-    
+
     Obtiene el historial de accesos de auditoría de la empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -48,16 +54,20 @@ def obtener_auditoria_empresa(
 
     return accesos_auditoria
 
-@router.get("/usuario/{id_usuario}", response_model=List[AuditoriaAccesoResponse], summary="Obtener auditoría por usuario")
+@router.get(
+    "/usuario/{id_usuario}",
+    response_model=List[AuditoriaAccesoResponse],
+    summary="Obtener auditoría por usuario",
+)
 def obtener_auditoria_usuario(
     request: Request,
-    id_usuario: UUID, 
+    id_usuario: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/auditoria-accesos/trabajador/{id_trabajador}**
-    
+
     Obtiene el historial de accesos de auditoría del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -79,16 +89,20 @@ def obtener_auditoria_usuario(
     return accesos_auditoria
 
 
-@router.get("/trabajador/{id_trabajador}", response_model=List[AuditoriaAccesoResponse], summary="Obtener auditoría por trabajador")
+@router.get(
+    "/trabajador/{id_trabajador}",
+    response_model=List[AuditoriaAccesoResponse],
+    summary="Obtener auditoría por trabajador",
+)
 def obtener_auditoria_por_trabajador(
     request: Request,
-    id_trabajador: UUID, 
+    id_trabajador: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/auditoria-accesos/trabajador/{id_trabajador}**
-    
+
     Obtiene el historial de accesos de auditoría del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"

@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from sqlalchemy import DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, Uuid, text
+from sqlalchemy import DateTime, ForeignKeyConstraint, PrimaryKeyConstraint, UniqueConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -10,6 +10,7 @@ class RolesPermisos(Base):
         PrimaryKeyConstraint('id', name='roles_permisos_pkey'), # Identificador único de la relación rol-permiso
         ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='RESTRICT', name='roles_permisos_rol_id_fkey'), # Identificador del rol al que pertenece la relación rol-permiso
         ForeignKeyConstraint(['permiso_id'], ['permisos.id'], ondelete='RESTRICT', name='roles_permisos_permiso_id_fkey'), # Identificador del permiso al que pertenece la relación rol-permiso
+        UniqueConstraint('rol_id', 'permiso_id', name='roles_permisos_rol_permiso_key'),
         {'comment': 'Relación entre roles y permisos; un rol puede tener múltiples permisos y un permiso puede pertenecer a múltiples roles.'},
     )
 

@@ -1,84 +1,106 @@
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+import os
+import shutil
+from datetime import date, datetime
 from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from core.archivos import CARPETA_LOGOS
-from core.database import get_db
-from core.security import get_password_hash, obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum
-from models.licencias import Licencias
-from models.empresas import Empresas
-from models.usuarios import Usuarios
-from models.roles import Roles
-from schemas.empresas import EmpresaCreate, EmpresaResponse, EmpresaUpdate
-from schemas.registro_organizacion import RegistroOrganizacionCompletaDTO, RespuestaRegistroCompletoDTO
-from schemas.trabajadores import TrabajadorResponse
-import shutil
-import os
-from fastapi import UploadFile, File
-from models.trabajadores import Trabajadores
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from backend.core.archivos import CARPETA_LOGOS_EMPRESAS
+from backend.models.gestorias_empresas import GestoriasEmpresas
+from backend.models.usuarios_empresas import UsuariosEmpresas
 from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum
+from core.database import get_db
+from core.enums import (
+    AccionAuditoriaEnum,
+    AccionPermisoEnum,
+    EstadoSuscripcionEnum,
+    TipoPermisoEnum,
+    TipoRolEnum,
+)
+from core.security import (
+    get_db_with_advanced_security,
+    get_password_hash,
+    verificar_permisos_requeridos,
+)
+from models.empresas import Empresas
+from models.licencias import Licencias
+from models.roles import Roles
+from models.usuarios import Usuarios
+from schemas.empresas import EmpresaSimpleResponse, EmpresaUpdate
+from schemas.registro_organizacion import (
+    RegistroOrganizacionCompleta,
+    RespuestaRegistroCompletoDTO,
+)
+from schemas.trabajadores import TrabajadorResponse
 
 # APIRouter agrupa todos los endpoints relacionados con la gestión de empresas bajo el prefijo "/api/empresas".
 router = APIRouter(prefix="/api/empresas", tags=["Empresas"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
-# Esto previene ataques de fuerza bruta o saturación de peticiones en rutas críticas.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=EmpresaResponse, status_code=status.HTTP_201_CREATED, summary="Crear empresa")
-@limiter.limit("10/minute")  
+@router.post(
+    "",
+    response_model=EmpresaSimpleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear empresa",
+)
+@limiter.limit("10/minute")
 def crear_empresa(
     request: Request,
-    obj_in: EmpresaCreate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA]))
+    payload: RegistroOrganizacionCompleta,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/empresas**
-    
-    Registra una nueva empresa en el sistema (restringido a administradores de gestoría).
+
+    Crea una nueva empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de empresa desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de crear de empresa desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    licencia = db.query(Licencias).filter(Licencias.codigo == payload.codigo_licencia.strip().upper()).first()
+    if not licencia:
+        print(f"El código de licencia ({payload.codigo_licencia}) introducido no existe.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código de licencia introducido no existe."
+        )
+
+    if licencia.empresa_id is not None:
+        print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado por otra empresa.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este código de licencia ya ha sido utilizado por otra empresa."
+        )
+
+    empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif).first()
+    if empresa_existente:
+        print(f"Ya existe una empresa registrada con ese cif ({payload.cif}).")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ya existe una empresa registrada con ese cif."
+        )
 
     try:
-        # 1. Verificar si la licencia existe y está libre
-        licencia = db.query(Licencias).filter(Licencias.codigo == obj_in.codigo_licencia.strip().upper()).first()
-        if not licencia:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El código de licencia introducido no existe."
-            ) 
-        
-        if licencia.usada:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Este código de licencia ya ha sido utilizado por otra empresa."
-            )
-
-        empresa_existente = db.query(Empresas).filter(Empresas.cif == obj_in.cif).first()
-        if empresa_existente:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ya existe una empresa registrada con el CIF ({obj_in.cif})."
-            )
-
         nueva_empresa = Empresas(
-            razon_social=obj_in.razon_social,
-            cif=obj_in.cif,
-            zona_horaria=obj_in.zona_horaria,
-            configuracion=obj_in.configuracion,
-            nombre_comercial=obj_in.nombre_comercial,
-            codigo_cnae=obj_in.codigo_cnae,
-            convenio_colectivo=obj_in.convenio_colectivo,
-            direccion_fiscal=obj_in.direccion_fiscal
+            razon_social=payload.razon_social,
+            cif=payload.cif,
+            zona_horaria=payload.zona_horaria,
+            configuracion=payload.configuracion,
+            nombre_comercial=payload.nombre_comercial,
+            codigo_cnae=payload.codigo_cnae,
+            convenio_colectivo=payload.convenio_colectivo,
+            direccion=payload.direccion
         )
-        
+
         db.add(nueva_empresa)
         db.commit()
         db.refresh(nueva_empresa)
@@ -86,250 +108,204 @@ def crear_empresa(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=nueva_empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "empresas", "accion": "crear", "entidad_id": str(nueva_empresa.id), "detalles": f"Se creó la empresa {nueva_empresa.razon_social}"}
+            detalle={"recurso": "empresas", "accion": "crear"},
+            trabajador_id=None
         )
 
         return nueva_empresa
-
-    except HTTPException as http_error:
-        raise http_error
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido crear la empresa: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido crear la empresa: {str(error)}"
+            detail=f"No se ha podido crear la empresa."
         )
 
-@router.post("/registro-completo", response_model=RespuestaRegistroCompletoDTO, status_code=status.HTTP_201_CREATED, summary="Registro atómico de organización, trabajador y usuario admin")
-@limiter.limit("10/minute") 
+@router.post(
+    "/registro-completo",
+    response_model=RespuestaRegistroCompletoDTO,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro de organización y usuario admin",
+)
+@limiter.limit("10/minute")
 def registrar_organizacion_completa(
     request: Request,
-    payload: RegistroOrganizacionCompletaDTO,
+    payload: RegistroOrganizacionCompleta,
     db: Session = Depends(get_db)
 ):
     """
     **POST /api/empresas/registro-completo**
-    
-    Realiza una transacción atómica para dar de alta una nueva empresa, 
-    su primer trabajador (administrador) y la cuenta de usuario vinculada. 
-    Si algo falla, se revierte toda la operación (Rollback).
+
+    Crea una nueva empresa y su usuario administrador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de organización completa desde la IP: {cliente_ip}")
+    print(f"Petición de registro de organización completa desde la IP ({cliente_ip}).")
+
+    # Validaciones estructurales básicas
+    licencia = (
+        db.query(Licencias)
+        .filter(Licencias.codigo == payload.codigo_licencia.strip().upper())
+        .with_for_update()
+        .first()
+    )
+    if not licencia:
+        print(f"El código de licencia ({payload.codigo_licencia}) no existe.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El código de licencia introducido no existe.")
+    if licencia.empresa_id is not None:
+        print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este código de licencia ya ha sido utilizado.")
+    if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
+    if licencia.fecha_expiracion < date.today():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
+
+    empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif.strip().upper()).first()
+    if empresa_existente:
+        print(f"Ya existe una empresa registrada con ese cif ({payload.cif})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya existe una empresa registrada con este cif.")
+
+    email_limpio = payload.email_admin.strip().lower()
+    usuario_existente = db.query(Usuarios).filter(Usuarios.email == email_limpio).first()
+    if usuario_existente and getattr(usuario_existente, "activo", True):
+        print(f"Ya existe un usuario activo registrado con ese correo electrónico ({email_limpio}).")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ya existe un usuario activo registrado con este correo electrónico."
+        )
 
     try:
-        # 1. Validar si la licencia existe y está disponible
-        licencia = db.query(Licencias).filter(Licencias.codigo == payload.codigo_licencia.strip().upper()).first()
-        if not licencia:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El código de licencia introducido no existe.")
-        if licencia.usada:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este código de licencia ya ha sido utilizado.")
-
-        # 2. Verificar que el CIF no esté registrado previamente
-        empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif.strip().upper()).first()
-        if empresa_existente:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya existe una empresa registrada con este CIF.")
-
-        email_limpio = payload.email_admin.strip().lower()
-
-        # 3. Verificar el estado del usuario por su email antes de operar
-        usuario_existente = db.query(Usuarios).filter(Usuarios.email == email_limpio).first()
-        if usuario_existente:
-            if getattr(usuario_existente, "activo", True):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, 
-                    detail="Ya existe un usuario activo registrado con este correo electrónico."
-                )
-
-        # 4. Crear la Empresa (Soportando tipo Gestoría o Empresa normal)
+        # Crear la Empresa (Soportando tipo Gestoría o Empresa normal)
         nueva_empresa = Empresas(
-            razon_social=payload.razon_social.strip(),
-            nombre_comercial=payload.nombre_comercial.strip() if payload.nombre_comercial else None,
+            razon_social=payload.razon_social,
+            nombre_comercial=payload.nombre_comercial,
             cif=payload.cif.strip().upper(),
-            direccion_fiscal=payload.direccion_fiscal.strip(),
-            codigo_cnae=payload.codigo_cnae.strip() if payload.codigo_cnae else None,
-            convenio_colectivo=payload.convenio_colectivo.strip() if payload.convenio_colectivo else None,
+            direccion=str(payload.direccion).strip(),
+            codigo_cnae=payload.codigo_cnae if payload.codigo_cnae else None,
+            convenio_colectivo=payload.convenio_colectivo if payload.convenio_colectivo else None,
             logo_url=payload.logo_url,
-            zona_horaria="Europe/Madrid",
-            es_gestoria=getattr(payload, "es_gestoria", False),
+            zona_horaria=payload.zona_horaria or "Europe/Madrid",
+            es_gestoria=payload.es_gestoria,
             configuracion={}
         )
         db.add(nueva_empresa)
-        db.flush() 
+        db.flush()
 
-        # 5. Marcar la licencia como usada y asignarla a la empresa (Relación 1:1)
-        licencia.usada = True
-        licencia.empresa_id = nueva_empresa.id
+        empresa_creada = db.query(Empresas).filter(Empresas.cif == nueva_empresa.cif).first()
+        if not empresa_creada:
+            print(f"No se ha podido crear la empresa con ese cif ({nueva_empresa.cif}).")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se ha podido crear la empresa con ese cif.")
 
-        rol_para_admin = db.query(Roles).filter(Roles.nombre == "Admin_empresa").first()
+        # Marcar la licencia como usada y asignarla a la empresa
+        setattr(licencia, "empresa_id", nueva_empresa.id)
 
-        # 6. Crear el Trabajador asociado (Primer expediente)
-        nuevo_trabajador = Trabajadores(
-            empresa_id=nueva_empresa.id,
-            dni_nif_nie=payload.dni_nif_nie_admin.strip().upper(),
-            nombre=payload.nombre_admin.strip(),
-            apellidos=payload.apellidos_admin.strip(),
-            email=email_limpio,
-            telefono=payload.telefono_admin.strip() if payload.telefono_admin else None,
-            numero_seguridad_social=payload.nss_admin.strip() if payload.nss_admin else None,
-            fecha_nacimiento=payload.fecha_nacimiento_admin,
-            rol_id=rol_para_admin.id if rol_para_admin else None
+        rol_para_admin = (
+            db.query(Roles).filter(Roles.tipo == TipoRolEnum.ADMIN_GESTORIA).first() if payload.es_gestoria
+            else db.query(Roles).filter(Roles.tipo == TipoRolEnum.ADMIN_EMPRESA).first()
         )
-        db.add(nuevo_trabajador)
-        db.flush() 
 
-        # 7. Gestionar el Usuario (Reutilizar si estaba inactivo o crear uno nuevo)
-        rol_usuario = TipoUsuarioEnum.ADMIN_GESTORIA if getattr(payload, "es_gestoria", False) else TipoUsuarioEnum.ADMIN_EMPRESA
+        if not rol_para_admin:
+            print("No se ha encontrado un rol para el admin.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se ha encontrado un rol para el admin.")
 
         if usuario_existente:
-            usuario_existente.nombre = f"{payload.nombre_admin.strip()} {payload.apellidos_admin.strip()}"
-            usuario_existente.password_hash = get_password_hash(payload.password_raw)
-            usuario_existente.tipo_usuario = rol_usuario
+            usuario_existente.nombre = f"{payload.nombre_admin.strip()}"
+            usuario_existente.password_hash = get_password_hash(payload.password)
             usuario_existente.empresa_id = nueva_empresa.id
-            usuario_existente.trabajador_id = nuevo_trabajador.id
             usuario_existente.activo = True
             nuevo_usuario = usuario_existente
+
+            nueva_relacion_usuario_empresa = UsuariosEmpresas(
+                usuario_id = usuario_existente.id,
+                empresa_id = empresa_creada.id,
+                rol_id = rol_para_admin.id,
+                activo = True
+            )
         else:
             nuevo_usuario = Usuarios(
-                nombre=f"{payload.nombre_admin.strip()} {payload.apellidos_admin.strip()}",
+                nombre=f"{payload.nombre_admin.strip()}",
                 email=email_limpio,
-                password_hash=get_password_hash(payload.password_raw),
-                tipo_usuario=rol_usuario,
+                password_hash=get_password_hash(payload.password),
                 empresa_id=nueva_empresa.id,
-                trabajador_id=nuevo_trabajador.id,
                 activo=True
             )
             db.add(nuevo_usuario)
 
-        # 8. Consolidar transacción completa
+            nueva_relacion_usuario_empresa = UsuariosEmpresas(
+                usuario_id = nuevo_usuario.id,
+                empresa_id = empresa_creada.id,
+                rol_id = rol_para_admin.id,
+                activo = True
+            )
+
         db.commit()
-        
+
         db.refresh(nueva_empresa)
-        db.refresh(nuevo_trabajador)
+        db.refresh(nueva_relacion_usuario_empresa)
         db.refresh(nuevo_usuario)
 
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=nuevo_usuario,
+            usuario_id=nuevo_usuario.id,
             empresa_id=nueva_empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "empresas", "accion": "registro_completo", "entidad_id": str(nueva_empresa.id), "detalles": f"Se registró la organización completa para {nueva_empresa.razon_social}"}
+            detalle={"recurso": "empresas", "accion": "registro_completo"},
+            trabajador_id=None
         )
 
         return {
             "empresa": nueva_empresa,
-            "trabajador": nuevo_trabajador,
-            "usuario": nuevo_usuario
+            "usuario": nuevo_usuario,
+            "usuarios-empresas": nueva_relacion_usuario_empresa
         }
 
-    except HTTPException as he:
+    except Exception as e:
         db.rollback()
-        raise he
-    except Exception as error:
-        db.rollback()
-        print(f"Error crítico en registro completo: {str(error)}")
+        print(f"No se ha podido realizar el registro completo de la organización: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido procesar el alta de la organización. Se ha revertido la operación."
+            detail=f"No se ha podido realizar el registro completo de la organización. Se ha revertido la operación."
         )
 
-@router.put("/{id_empresa}/razon-social", response_model=EmpresaResponse, summary="Cambiar razón social de empresa")
-@limiter.limit("20/minute")  
-def cambiar_razon_social_empresa(
+@router.put(
+    "/{id_empresa}",
+    response_model=EmpresaSimpleResponse,
+    summary="Modificar empresa",
+)
+@limiter.limit("20/minute")
+def modificar_empresa(
     request: Request,
-    id_empresa: UUID, 
-    nueva_razon_social: str, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
-):
-    """
-    **PUT /api/empresas/{id_empresa}/razon-social**
-    
-    Modifica la razón social de una empresa existente.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de cambio de razón social para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
-
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para modificar la razón social de esta empresa."
-        )
-
-    empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
-    
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado ninguna empresa con el ID ({id_empresa})."
-        )
-    
-    setattr(empresa, "razon_social", nueva_razon_social)
-    setattr(empresa, "updated_at", datetime.now())
-    
-    try:
-        db.commit()
-        db.refresh(empresa)
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario=usuario_actual,
-            empresa_id=id_empresa,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "empresas", "accion": "cambiar_razon_social", "entidad_id": str(id_empresa), "detalles": f"Se cambió la razón social de la empresa {id_empresa}"}
-        )
-
-        return empresa
-    except Exception as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido actualizar la razón social de la empresa: {str(error)}"
-        )
-
-
-@router.put("/{id_empresa}", response_model=EmpresaResponse, summary="Actualizar datos de empresa")
-@limiter.limit("20/minute") 
-def actualizar_datos_empresa(
-    request: Request,
-    id_empresa: UUID, 
-    payload: EmpresaUpdate, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    id_empresa: UUID,
+    payload: EmpresaUpdate,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/empresas/{id_empresa}**
-    
-    Actualiza los datos generales de una empresa en el sistema.
+
+    Modifica los datos de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de actualización de datos para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación de la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para actualizar los datos de esta empresa."
-        )
-
+    # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
-    
     if not empresa:
+        print(f"Empresa ({id_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado ninguna empresa con el ID ({id_empresa})."
+            detail=f"Empresa no encontrada."
         )
-    
+
     datos_actualizacion = payload.model_dump(exclude_unset=True)
     for key, value in datos_actualizacion.items():
         setattr(empresa, key, value)
 
     setattr(empresa, "updated_at", datetime.now())
-    
+
     try:
         db.commit()
         db.refresh(empresa)
@@ -337,57 +313,59 @@ def actualizar_datos_empresa(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=id_empresa,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "empresas", "accion": "actualizar", "entidad_id": str(id_empresa), "detalles": f"Se actualizaron los datos de la empresa {id_empresa}"}
+            detalle={"recurso": "empresas", "accion": "modificar"},
+            trabajador_id=None
         )
 
         return empresa
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se han podido modificar los datos de la empresa: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se han podido actualizar los datos de la empresa: {str(error)}"
+            detail=f"No se han podido modificar los datos de la empresa."
         )
 
-@router.put("/{id_empresa}/logo", response_model=EmpresaResponse, summary="Actualizar logo de empresa")
-@limiter.limit("20/minute") 
-async def actualizar_logo_empresa(
+@router.put(
+    "/{id_empresa}/logo",
+    response_model=EmpresaSimpleResponse,
+    summary="Modificar logo de empresa",
+)
+@limiter.limit("20/minute")
+async def modificar_logo_empresa(
     request: Request,
     id_empresa: UUID,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CALENDARIOS_LABORALES])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/empresas/{id_empresa}/logo**
-    
-    Sube y actualiza el logotipo oficial de una empresa.
+
+    Modifica el logotipo oficial de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de actualización de logo para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de modificación de logo para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    if usuario_actual.empresa_id and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No autorizado para modificar el logo de esta empresa."
-        )
-
+    # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
+        print(f"Empresa ({id_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+            detail=f"Empresa no encontrada."
         )
 
     assert file.filename is not None
 
     TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"]
-    
+
     if file.content_type not in TIPOS_PERMITIDOS:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="El archivo seleccionado no es una imagen válida (solo se permiten formatos JPEG, PNG, WEBP o ICO)."
         )
 
@@ -396,12 +374,12 @@ async def actualizar_logo_empresa(
         extension = "png"
 
     nombre_archivo = f"logo_{id_empresa}.{extension}"
-    ruta_destino = os.path.join(CARPETA_LOGOS, nombre_archivo)
+    ruta_destino = os.path.join(CARPETA_LOGOS_EMPRESAS, nombre_archivo)
 
     with open(ruta_destino, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    ruta_relativa = f"/api/archivos/logos/{nombre_archivo}"
+    ruta_relativa = f"/api/archivos/logos_empresas/{nombre_archivo}"
 
     empresa.logo_url = ruta_relativa
     empresa.updated_at = datetime.now()
@@ -413,173 +391,292 @@ async def actualizar_logo_empresa(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
+            usuario_id=usuario_actual.id,
             empresa_id=id_empresa,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "empresas", "accion": "actualizar_logo", "entidad_id": str(id_empresa), "detalles": f"Se actualizó el logo de la empresa {id_empresa}"}
+            detalle={"recurso": "empresas", "accion": "modificar_logo"},
+            trabajador_id=None
         )
 
         return empresa
-    except Exception as error:
+    except Exception as e:
         db.rollback()
+        print(f"No se ha podido modificar el logo de la empresa: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido guardar el logo de la empresa: {str(error)}"
+            detail=f"No se ha podido modificar el logo de la empresa."
         )
 
-@router.get("", response_model=List[EmpresaResponse], summary="Obtener lista de empresas")
-@limiter.limit("60/minute")  
-def obtener_empresas(
+@router.get(
+    "",
+    response_model=List[EmpresaSimpleResponse],
+    summary="Obtener empresas disponibles para el usuario actual",
+)
+@limiter.limit("60/minute")
+def obtener_empresas_disponibles(
     request: Request,
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/empresas**
-    
-    Devuelve el catálogo de organizaciones aplicando aislamiento multi-tenant.
+
+    Obtiene las empresas disponibles para el usuario actual.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de empresas desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta de las empresas disponibles para el usuario actual desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    query = db.query(Empresas)
-    
-    if usuario_actual.tipo_usuario != "Administrador":
-        if not usuario_actual.empresa_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acceso denegado. No estás vinculado a ninguna empresa."
+    # Validaciones estructurales básicas
+    membresias = (
+        db.query(UsuariosEmpresas)
+        .join(Roles, UsuariosEmpresas.rol_id == Roles.id)
+        .filter(
+            UsuariosEmpresas.usuario_id == usuario_actual.id,
+            UsuariosEmpresas.activo.is_(True),
+            Roles.activo.is_(True),
+        )
+        .all()
+    )
+
+    es_superadmin = any(
+        m.rol.tipo == TipoRolEnum.SUPERADMINISTRADOR
+        and m.empresa_id is None
+        for m in membresias
+    )
+
+    if es_superadmin:
+        empresas = (
+            db.query(Empresas)
+            .filter(Empresas.activa.is_(True))
+            .order_by(Empresas.nombre_comercial.asc())
+            .all()
+        )
+    else:
+        empresa_ids = {
+            m.empresa_id
+            for m in membresias
+            if m.empresa_id is not None
+            and m.rol.tipo != TipoRolEnum.AUDITOR_ITSS
+        }
+
+        gestorias_ids = {
+            m.empresa_id
+            for m in membresias
+            if m.empresa_id is not None
+            and m.rol.tipo == TipoRolEnum.ADMIN_GESTORIA
+        }
+
+        if gestorias_ids:
+            clientes_ids = (
+                db.query(GestoriasEmpresas.empresa_cliente_id)
+                .filter(
+                    GestoriasEmpresas.empresa_gestora_id.in_(gestorias_ids),
+                    GestoriasEmpresas.activo.is_(True),
+                    or_(
+                        GestoriasEmpresas.fecha_fin.is_(None),
+                        GestoriasEmpresas.fecha_fin >= datetime.now().date(),
+                    ),
+                )
+                .all()
             )
-        query = query.filter(Empresas.id == usuario_actual.empresa_id)
+            empresa_ids.update(cliente_id for (cliente_id,) in clientes_ids)
 
-    resultados = query.order_by(Empresas.nombre_comercial.asc()).all()
+        empresa_ids.update(
+            m.empresa_id
+            for m in membresias
+            if m.empresa_id is not None
+            and m.rol.tipo == TipoRolEnum.AUDITOR_ITSS
+        )
+
+        if not empresa_ids:
+            return []
+
+        empresas = (
+            db.query(Empresas)
+            .filter(
+                Empresas.id.in_(empresa_ids),
+                Empresas.activa.is_(True),
+            )
+            .order_by(Empresas.nombre_comercial.asc())
+            .all()
+        )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=usuario_actual.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_lista", "detalles": "Se consultó el listado de empresas"}
+        detalle={"recurso": "empresas", "accion": "consultar_disponibles"},
+        trabajador_id=None
     )
 
-    return resultados
+    return empresas
 
 
-@router.get("/{id_empresa}", response_model=EmpresaResponse, summary="Obtener empresa por ID")
-@limiter.limit("60/minute")  
-def obtener_empresa(
+@router.get(
+    "/actual",
+    response_model=List[EmpresaSimpleResponse],
+    summary="Obtener empresa actual para el usuario",
+)
+@limiter.limit("60/minute")
+def obtener_empresa_actual(
     request: Request,
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/empresas/actual**
+
+    Obtiene la empresa actual del usuario, si aplica.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de la empresa actual del usuario desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    empresa_id = request.headers.get("Empresa-ID")
+    empresa = db.query(Empresas).filter(Empresas.id == empresa_id).first()
+
+    if not empresa:
+        print(f"Empresa ({empresa_id}) no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa no encontrada.",
+        )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=usuario_actual.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "empresas", "accion": "consultar_actual"},
+        trabajador_id=None
+    )
+
+    return empresa
+
+@router.get(
+    "/{id_empresa}",
+    response_model=EmpresaSimpleResponse,
+    summary="Obtener empresa por id",
+)
+@limiter.limit("60/minute")
+def obtener_empresa_id(
+    request: Request,
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/empresas/{id_empresa}**
-    
+
     Obtiene los detalles completos de una empresa a partir de su ID único universal.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de detalle de la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
 
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes autorización para consultar los datos de esta empresa."
-        )
-
+    # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
+        print(f"Empresa ({id_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+            detail=f"Empresa no encontrada."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_por_id", "entidad_id": str(id_empresa), "detalles": f"Se consultó la empresa {id_empresa}"}
+        detalle={"recurso": "empresas", "accion": "consultar_id"},
+        trabajador_id=None
     )
 
     return empresa
 
 
-@router.get("/cif/{cif_empresa}", response_model=EmpresaResponse, summary="Obtener empresa por CIF")
-@limiter.limit("60/minute") 
-def obtener_empresa_por_cif(
+@router.get(
+    "/cif/{cif_empresa}",
+    response_model=EmpresaSimpleResponse,
+    summary="Obtener empresa por cif",
+)
+@limiter.limit("60/minute")
+def obtener_empresa_cif(
     request: Request,
-    cif_empresa: str, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    cif_empresa: str,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/empresas/cif/{cif_empresa}**
-    
-    Busca y devuelve los datos de una empresa filtrando directamente por su código CIF.
+
+   Obtiene una empresa por su cif.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de empresa por CIF {cif_empresa} desde la IP: {cliente_ip}")
+    print(f"Petición de consulta de empresa por cif ({cif_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.cif == cif_empresa).first()
     if not empresa:
+        print(f"Empresa con ese cif ({cif_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con CIF ({cif_empresa}) no encontrada."
+            detail=f"Empresa con ese cif no encontrada."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=empresa.id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_por_cif", "detalles": f"Se consultó la empresa por CIF {cif_empresa}"}
+        detalle={"recurso": "empresas", "accion": "consultar_cif"},
+        trabajador_id=None
     )
 
     return empresa
 
 
-@router.get("/{id_empresa}/trabajadores", response_model=List[TrabajadorResponse], summary="Obtener trabajadores de empresa")
-@limiter.limit("60/minute") 
+@router.get(
+    "/{id_empresa}/trabajadores",
+    response_model=List[TrabajadorResponse],
+    summary="Obtener trabajadores de empresa",
+)
+@limiter.limit("60/minute")
 def obtener_trabajadores_empresa(
     request: Request,
-    id_empresa: UUID, 
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.EMPRESAS])),
+    db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/empresas/{id_empresa}/trabajadores**
-    
-    Devuelve la lista de trabajadores vinculados a una empresa específica.
+
+    Obtiene los trabajadores vinculados a una empresa específica.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de trabajadores para la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta de trabajadores para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
 
-    es_admin_gestoria = usuario_actual.tipo_usuario == TipoUsuarioEnum.ADMIN_GESTORIA
-    if not es_admin_gestoria and usuario_actual.empresa_id != id_empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes autorización para consultar los trabajadores de esta empresa."
-        )
-
+    # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
+        print(f"Empresa ({id_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Empresa con ID ({id_empresa}) no encontrada."
+            detail=f"Empresa no encontrada."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_trabajadores", "entidad_id": str(id_empresa), "detalles": f"Se consultaron los trabajadores de la empresa {id_empresa}"}
+        detalle={"recurso": "empresas", "accion": "consultar_trabajadores"},
+        trabajador_id=None
     )
 
     return sorted(empresa.trabajadores, key=lambda t: t.nombre)

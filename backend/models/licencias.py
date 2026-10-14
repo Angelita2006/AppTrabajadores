@@ -12,12 +12,13 @@ class Licencias(Base):
         PrimaryKeyConstraint('id', name='licencias_pkey'), # Identificador único de la licencia
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='CASCADE', name='licencias_empresa_id_fkey'), # Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado
         UniqueConstraint('empresa_id', name='licencias_empresa_id_key'), # Cada empresa puede tener asignada una sola licencia comercial
+        UniqueConstraint('codigo', name='licencias_codigo_key'),
         CheckConstraint('fecha_expiracion IS NULL OR fecha_inicio IS NULL OR fecha_expiracion >= fecha_inicio', name='licencias_rango_vigencia_check'), # La fecha de expiración debe ser mayor o igual que la fecha de inicio de la vigencia
         {'comment': 'Suscripciones y licencias SaaS de las empresas (Trial de 14 días, Básico, Pro, Enterprise con facturación mensual o anual).'}
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único de la licencia.')
-    empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado.')
+    empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado.')
 
     codigo: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))"), comment='Código único para canjear la licencia comercial.')
 

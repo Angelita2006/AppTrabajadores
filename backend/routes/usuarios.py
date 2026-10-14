@@ -1,43 +1,92 @@
 from datetime import datetime, timedelta, timezone
 from operator import concat
-import random
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status, Request
-from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from core.security import oauth2_scheme, get_password_hash, verify_password, crear_token_acceso, obtener_usuario_actual, verificar_rol_requerido
-from core.enums import TipoUsuarioEnum, AccionAuditoriaEnum
-from core.auditoria import registrar_auditoria
-from core.utils import enviar_correo_cambio_contraseña, enviar_correo_cambio_email, enviar_correo_recuperacion
-from models.empresas import Empresas
-from models.roles import Roles
-from schemas.auth import ConfirmarPasswordRequest, EmailCambioRequest, EmailRecuperacionRequest
-from schemas.usuarios_roles import UsuarioRolCreate, UsuarioRolResponse
-from schemas.usuarios import LoginRequest, UsuarioRegisterCreate, UsuarioResponse
-from models.usuarios import Usuarios
-from models.trabajadores import Trabajadores
-from core.database import get_db
-from fastapi.security import OAuth2PasswordRequestForm
+import random
 import secrets
 
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Security,
+    status,
+)
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sqlalchemy.orm import joinedload, Session
 
-# Configuración del enrutador para la gestión de usuarios
+from core.auditoria import registrar_auditoria
+from core.database import get_db
+from core.enums import (
+    AccionAuditoriaEnum,
+    AccionPermisoEnum,
+    TipoPermisoEnum,
+    TipoRolEnum,
+)
+from core.security import (
+    crear_token_acceso,
+    get_db_with_advanced_security,
+    get_password_hash,
+    oauth2_scheme,
+    obtener_usuario_actual,
+    verificar_permisos_requeridos,
+    verify_password,
+)
+from core.utils import (
+    enviar_correo_cambio_contraseña,
+    enviar_correo_cambio_email,
+    enviar_correo_recuperacion_contraseña,
+)
+from models.empresas import Empresas
+from models.roles import Roles
+from models.trabajadores import Trabajadores
+from models.usuarios import Usuarios
+from models.usuarios_empresas import UsuariosEmpresas
+from models.usuarios_empresas import UsuariosEmpresas
+from schemas.auth import (
+    ConfirmarPasswordRecuperacionRequest,
+    EmailCambioRequest,
+    LoginRequest,
+)
+from schemas.usuarios import UsuarioSimpleResponse
+
+# APIRouter agrupa todos los endpoints relacionados con la gestión de usuarios bajo el prefijo "/api/usuarios".
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
-
-# Configuración del limitador de tasa de peticiones por IP
+# Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED, summary="Registro inicial de usuario")
+
+class RegistroUsuarioRequest(BaseModel):
+    email: EmailStr
+    empresa_cif: str = Field(..., min_length=1)
+    dni_nif_nie: str = Field(..., min_length=9, max_length=9)
+    password: str = Field(..., min_length=6)
+
+@router.post(
+    "/registro",
+    response_model=UsuarioSimpleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro inicial de usuario",
+)
 @limiter.limit("5/minute")
-def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Session = Depends(get_db)):
+def registrar_usuario(
+    request: Request,
+    obj_in: RegistroUsuarioRequest,
+    db: Session = Depends(get_db),
+):
     """
     **POST /api/usuarios/registro**
-    
-    Busca al trabajador existente mediante la empresa y el NIF, 
+
+    Busca al trabajador existente mediante la empresa y el NIF,
     y crea credenciales de usuario vinculadas con contraseña hasheada.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de creación de registrar usuario desde la IP ({cliente_ip}).")
     email_limpio = str(obj_in.email).strip().lower()
     email_existente = db.query(Usuarios).filter(
         Usuarios.email == email_limpio,
@@ -81,16 +130,16 @@ def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Sessi
         nombre=concat(concat(trabajador.nombre, " "), trabajador.apellidos),
         email=email_limpio,
         password_hash=get_password_hash(obj_in.password),
-        tipo_usuario=TipoUsuarioEnum.TRABAJADOR
+        tipo_usuario=TipoRolEnum.TRABAJADOR
     )
 
     db.add(nuevo_usuario)
     db.flush()
 
     if trabajador.rol_id:
-        nuevo_usuario_rol = UsuariosRoles(
+        nuevo_usuario_rol = UsuariosEmpresas(
             usuario_id=nuevo_usuario.id,
-            rol_id=trabajador.rol_id,    
+            rol_id=trabajador.rol_id,
             empresa_id=empresa.id
         )
         db.add(nuevo_usuario_rol)
@@ -98,45 +147,59 @@ def registrar_usuario(request: Request, obj_in: UsuarioRegisterCreate, db: Sessi
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=nuevo_usuario,
+        usuario_id=nuevo_usuario.id,
         empresa_id=empresa.id,
         accion=AccionAuditoriaEnum.CREACION,
-        detalle={"recurso": "usuarios", "accion": "registro", "entidad_id": str(nuevo_usuario.id), "detalles": f"Registro inicial del usuario {nuevo_usuario.email}"}
+        detalle={'recurso': 'usuarios', 'accion': 'registro', 'entidad_id': str(nuevo_usuario.id), 'detalles': f'Registro inicial del usuario {nuevo_usuario.email}'},
+        trabajador_id=None,
     )
 
     db.commit()
 
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == nuevo_usuario.id).first()
-    
+    usuario = (
+        db.query(Usuarios)
+        .options(
+            joinedload(Usuarios.empresa),
+            joinedload(Usuarios.trabajador),
+            joinedload(Usuarios.usuarios_empresas),
+        )
+        .filter(Usuarios.id == nuevo_usuario.id)
+        .first()
+    )
+
     db.refresh(usuario)
     return usuario
-    
 
 
-
-@router.post("/login", summary="Inicio de sesión en la plataforma")
+@router.post(
+    "/login",
+    summary="Inicio de sesión en la plataforma",
+)
 @limiter.limit("5/minute")
-def login_plataforma(request: Request, credenciales: LoginRequest, db: Session = Depends(get_db)):
+def login_plataforma(
+    request: Request,
+    credenciales: LoginRequest,
+    db: Session = Depends(get_db),
+):
     """
     **POST /api/usuarios/login**
-    
-    Autentica a un usuario validando su correo electrónico y contraseña, 
+
+    Autentica a un usuario validando su correo electrónico y contraseña,
     actualiza su último acceso y genera un token JWT de sesión.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Intento de login desde la IP: {cliente_ip}")
+    print(f"Intento de login desde la IP ({cliente_ip})")
 
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)).filter(
-            Usuarios.email == str(credenciales.email).strip().lower(),
-            Usuarios.activo.is_(True),
-        ).first()
+    usuario = (
+        db.query(Usuarios)
+        .options(
+            joinedload(Usuarios.empresa),
+            joinedload(Usuarios.trabajador),
+            joinedload(Usuarios.usuarios_empresas),
+        )
+        .filter(Usuarios.email == str(credenciales.email).strip().lower(), Usuarios.activo.is_(True))
+        .first()
+    )
 
     if not usuario:
         raise HTTPException(
@@ -151,14 +214,15 @@ def login_plataforma(request: Request, credenciales: LoginRequest, db: Session =
         )
 
     setattr(usuario, "ultimo_acceso", datetime.now())
-    
+
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario,
+        usuario_id=usuario.id,
         empresa_id=usuario.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "usuarios", "accion": "login", "entidad_id": str(usuario.id), "detalles": f"Inicio de sesión exitoso de {usuario.email}"}
+        detalle={'recurso': 'usuarios', 'accion': 'login', 'entidad_id': str(usuario.id), 'detalles': f'Inicio de sesión exitoso de {usuario.email}'},
+        trabajador_id=None,
     )
     db.commit()
     db.refresh(usuario)
@@ -172,40 +236,48 @@ def login_plataforma(request: Request, credenciales: LoginRequest, db: Session =
     }
 
 
-@router.post("/login-form", summary="Inicio de sesión compatible con Swagger UI")
+@router.post(
+    "/login-form",
+    summary="Inicio de sesión compatible con Swagger UI",
+)
 @limiter.limit("5/minute")
-def login_para_swagger(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login_para_swagger(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     """
     **POST /api/usuarios/login-form**
-    
+
     Endpoint auxiliar optimizado para autenticación OAuth2 estándar (Swagger UI).
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de login OAuth2 desde IP: {cliente_ip}")
+    print(f"Petición de login OAuth2 desde la IP ({cliente_ip})")
 
     user = db.query(Usuarios).filter(
         Usuarios.email == form_data.username,
         Usuarios.activo == True,
     ).first()
-    
+
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Credenciales incorrectas o usuario no encontrado."
         )
-    
+
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=user,
+        usuario_id=user.id,
         empresa_id=user.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "usuarios", "accion": "login_swagger", "entidad_id": str(user.id), "detalles": f"Inicio de sesión vía Swagger de {user.email}"}
+        detalle={'recurso': 'usuarios', 'accion': 'login_swagger', 'entidad_id': str(user.id), 'detalles': f'Inicio de sesión vía Swagger de {user.email}'},
+        trabajador_id=None,
     )
     db.commit()
 
     access_token = crear_token_acceso(data={"sub": user.email, "empresa_id": str(user.empresa_id)})
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer"
@@ -216,204 +288,173 @@ def login_para_swagger(request: Request, form_data: OAuth2PasswordRequestForm = 
 # RUTAS ESTÁTICAS (DEBEN IR ANTES DE LAS DINÁMICAS)
 # ==========================================
 
-@router.get("/me", response_model=UsuarioResponse, summary="Obtener perfil del usuario autenticado")
+@router.get(
+    "/me",
+    response_model=UsuarioSimpleResponse,
+    summary="Obtener perfil del usuario autenticado",
+)
 @limiter.limit("30/minute")
 def obtener_mi_usuario(
     request: Request,
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-) -> UsuarioResponse:
-    """
-    **GET /api/usuarios/me**
-    
-    Devuelve los datos completos del usuario que está realizando la petición usando el token de sesión.
-    """
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == usuario_actual.id).first()
-
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se encontró la información del usuario autenticado."
-        )
-
-    return usuario
-
-
-# ==========================================
-# RUTAS DINÁMICAS Y CON PARÁMETROS DE RUTA
-# ==========================================
-
-@router.get("/{id_usuario}", response_model=UsuarioResponse, summary="Obtener usuario por ID")
-@limiter.limit("30/minute") 
-def obtener_usuario_por_id(
-    request: Request,
-    id_usuario: UUID, 
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **GET /api/usuarios/{id_usuario}**
-    
+
     Busca los detalles de una cuenta mediante su identificador único UUID de forma protegida.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición desde IP: {cliente_ip}")
-    print(f"El usuario con ID {usuario_actual.id} (Rol: {usuario_actual.tipo_usuario}) ha consultado el perfil {id_usuario}")
+    print(f"Petición desde la IP ({cliente_ip})")
+    print(f"El usuario ({usuario_actual.id}) ha consultado el perfil ({id_usuario})")
 
-    es_admin = usuario_actual.tipo_usuario in [TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA]
+    es_admin = (
+        db.query(UsuariosEmpresas.id)
+        .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+        .filter(
+            UsuariosEmpresas.usuario_id == usuario_actual.id,
+            UsuariosEmpresas.activo.is_(True),
+            Roles.tipo.in_([TipoRolEnum.ADMIN_GESTORIA, TipoRolEnum.ADMIN_EMPRESA]),
+        )
+        .first()
+        is not None
+    )
     if usuario_actual.id != id_usuario and not es_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes autorización para ver los datos de otro usuario."
         )
 
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == id_usuario).first()
+    usuario = (
+        db.query(Usuarios)
+        .options(
+            joinedload(Usuarios.empresa),
+            joinedload(Usuarios.trabajador),
+            joinedload(Usuarios.usuarios_empresas),
+        )
+        .filter(Usuarios.id == id_usuario)
+        .first()
+    )
 
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cuenta de usuario con ID {id_usuario} no encontrada."
+            detail=f"Cuenta de usuario no encontrada."
         )
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
+        usuario_id=usuario_actual.id,
         empresa_id=usuario.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "usuarios", "accion": "obtener_por_id", "entidad_id": str(id_usuario), "detalles": f"Consulta de perfil de usuario {id_usuario}"}
+        detalle={'recurso': 'usuarios', 'accion': 'obtener_por_id', 'entidad_id': str(id_usuario), 'detalles': f'Consulta de perfil de usuario {id_usuario}'},
+        trabajador_id=None,
     )
     db.commit()
 
     return usuario
 
 
-@router.get("/trabajador/{id_trabajador}", response_model=UsuarioResponse, summary="Obtener usuario por ID de trabajador")
+@router.put(
+    "/{id_usuario}/estado",
+    response_model=UsuarioSimpleResponse,
+    summary="Modificar estado de usuario",
+    description="Activa o desactiva una cuenta de usuario.",
+)
 @limiter.limit("30/minute")
-def obtener_usuario_por_id_trabajador(
+def modificar_estado_usuario(
     request: Request,
-    id_trabajador: UUID, 
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
-) -> UsuarioResponse:
-    """
-    **GET /api/usuarios/trabajador/{id_trabajador}**
-    
-    Devuelve la cuenta de usuario asociada a un expediente de trabajador bajo autenticación.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición desde IP: {cliente_ip}")
-
-    if usuario_actual.tipo_usuario == TipoUsuarioEnum.TRABAJADOR and usuario_actual.trabajador_id != id_trabajador:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para acceder al expediente de otro trabajador."
-        )
-
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.trabajador_id == id_trabajador).first()
-
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró una cuenta de usuario asociada al expediente de trabajador con ID {id_trabajador}."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario=usuario_actual,
-        empresa_id=usuario.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "usuarios", "accion": "obtener_por_trabajador", "entidad_id": str(usuario.id), "detalles": f"Consulta de usuario por trabajador {id_trabajador}"}
-    )
-    db.commit()
-
-    return usuario
-
-
-@router.put("/{id_usuario}/estado", response_model=UsuarioResponse, summary="Modificar estado de cuenta de usuario")
-@limiter.limit("10/minute")
-def cambiar_estado_usuario(
-    request: Request,
-    id_usuario: UUID, 
-    activo: bool, 
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(verificar_rol_requerido([TipoUsuarioEnum.ADMIN_GESTORIA, TipoUsuarioEnum.ADMIN_EMPRESA, TipoUsuarioEnum.RRHH]))
+    id_usuario: UUID,
+    activo: bool,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **PUT /api/usuarios/{id_usuario}/estado?activo=false**
-    
-    Permite activar o desactivar una cuenta bloqueando su capacidad de login.
+
+    Activa o desactiva una cuenta de usuario.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición desde IP: {cliente_ip}")
-    print(f"El administrador {usuario_actual.email} está modificando el estado del usuario {id_usuario} a: {activo}")
+    print(f"Petición de modificación del estado del usuario ({id_usuario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    # Validaciones estructurales básicas
 
-    usuario = db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_roles)
-    ).filter(Usuarios.id == id_usuario).first()
+    usuario = (
+        db.query(Usuarios)
+        .options(
+            joinedload(Usuarios.empresa),
+            joinedload(Usuarios.trabajador),
+            joinedload(Usuarios.usuarios_empresas),
+        )
+        .filter(Usuarios.id == id_usuario)
+        .first()
+    )
 
     if not usuario:
+        print(f"Cuenta de usuario ({id_usuario}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cuenta de usuario con ID {id_usuario} no encontrada."
+            detail="Cuenta de usuario no encontrada.",
         )
 
-    setattr(usuario, "activo", activo)
-    setattr(usuario, "updated_at", datetime.now())
+    try:
+        setattr(usuario, "activo", activo)
+        setattr(usuario, "updated_at", datetime.now())
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=usuario.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                'recurso': 'usuarios',
+                'accion': 'cambiar_estado',
+                'entidad_id': str(id_usuario),
+                'detalles': f'Se cambió el estado del usuario {id_usuario} a activo={activo}',
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+        db.refresh(usuario)
+        return usuario
+    except Exception as e:
+        db.rollback()
+        print(f"Error al ejecutar modificar_estado_usuario: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido modificar el estado del usuario",
+        )
 
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario=usuario_actual,
-        empresa_id=usuario.empresa_id,
-        accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "usuarios", "accion": "cambiar_estado", "entidad_id": str(id_usuario), "detalles": f"Cambio de estado del usuario {id_usuario} a activo={activo}"}
-    )
-    db.commit()
-    db.refresh(usuario)
-    return usuario
 
-
-@router.put("/solicitar-cambio-email", status_code=status.HTTP_200_OK, summary="Solicitar cambio de correo electrónico con verificación")
+@router.put(
+    "/solicitar-cambio-email",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar cambio de correo electrónico con verificación",
+)
 @limiter.limit("5/minute")
 def solicitar_cambio_email(
     request: Request,
     nuevo_email: str,
     background_tasks: BackgroundTasks,
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
-    Valida la unicidad del nuevo correo, genera un token seguro de verificación 
+    Valida la unicidad del nuevo correo, genera un token seguro de verificación
     y envía un enlace al nuevo correo electrónico para confirmar el cambio.
     """
+    # Validaciones estructurales básicas
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación de solicitar cambio email desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
     email_limpio = str(nuevo_email).strip().lower()
-    
+
     email_existente = db.query(Usuarios).filter(
         Usuarios.email == email_limpio,
         Usuarios.id != usuario_actual.id,Usuarios.activo == True
     ).first()
-    
+
     if email_existente:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -427,42 +468,45 @@ def solicitar_cambio_email(
     setattr(usuario_actual, "token_cambio_email", token_verificacion)
     setattr(usuario_actual, "token_cambio_email_expira_at", expiracion)
     setattr(usuario_actual, "updated_at", datetime.now(timezone.utc))
-    
+
     background_tasks.add_task(enviar_correo_cambio_email, email_limpio, token_verificacion)
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario=usuario_actual,
-        empresa_id=usuario_actual.empresa_id,
+        usuario_id=usuario_actual.id,
+        empresa_id=request.headers.get('Empresa-ID'),
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={
-            "recurso": "usuarios", 
-            "accion": "solicitar_cambio_email", 
-            "entidad_id": str(usuario_actual.id), 
-            "detalles": f"Solicitud de cambio de email a {email_limpio}"
-        }
+        detalle={'recurso': 'usuarios', 'accion': 'solicitar_cambio_email', 'entidad_id': str(usuario_actual.id), 'detalles': f'Solicitud de cambio de email a {email_limpio}'},
+        trabajador_id=None,
     )
-    
+
     db.commit()
     db.refresh(usuario_actual)
-    
+
     return {
         "status": "success",
         "message": "Se ha enviado un enlace de confirmación a tu nuevo correo electrónico."
     }
 
 
-@router.post("/confirmar-cambio-email", status_code=status.HTTP_200_OK, summary="Confirmar cambio de correo electrónico mediante enlace")
+@router.post(
+    "/confirmar-cambio-email",
+    status_code=status.HTTP_200_OK,
+    summary="Confirmar cambio de correo electrónico mediante enlace",
+)
+@limiter.limit("20/minute")
 def confirmar_cambio_email(
     request: Request,
     token: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    Endpoint que procesa el clic en el enlace del correo. Valida el token, 
+    Endpoint que procesa el clic en el enlace del correo. Valida el token,
     actualiza el email antiguo por el nuevo en el usuario y en su trabajador asociado, y limpia los campos temporales.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación al confirmar el cambio de email desde la IP ({cliente_ip}).")
     usuario = db.query(Usuarios).filter(
         Usuarios.token_cambio_email == token
     ).first()
@@ -500,7 +544,7 @@ def confirmar_cambio_email(
         db.add(usuario)
 
         trabajador = db.query(Trabajadores).filter(Trabajadores.id == usuario.trabajador_id).first()
-        
+
         if trabajador:
             trabajador.email = nuevo_email
             trabajador.updated_at = datetime.now(timezone.utc)
@@ -511,18 +555,15 @@ def confirmar_cambio_email(
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario,
+            usuario_id=usuario.id,
             empresa_id=usuario.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                "recurso": "usuarios", 
-                "accion": "confirmar_cambio_email", 
-                "entidad_id": str(usuario.id), 
-                "detalles": f"Email cambiado exitosamente a {nuevo_email} (usuario y trabajador asociado)"
-            }
+            detalle={'recurso': 'usuarios', 'accion': 'confirmar_cambio_email', 'entidad_id': str(usuario.id), 'detalles': f'Email cambiado exitosamente a {nuevo_email} (usuario y trabajador asociado)'},
+            trabajador_id=None,
         )
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar confirmar_cambio_email: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se ha podido completar el cambio de correo electrónico. "+e.__str__()
@@ -534,21 +575,28 @@ def confirmar_cambio_email(
     }
 
 
-@router.put("/solicitar-cambio-password", status_code=status.HTTP_200_OK, summary="Solicitar código para cambio de contraseña")
+@router.put(
+    "/solicitar-cambio-password",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar código para cambio de contraseña",
+)
 @limiter.limit("5/minute")
 def solicitar_cambio_password(
     request: Request,
-    payload: EmailCambioRequest, 
+    payload: EmailCambioRequest,
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **POST /api/usuarios/solicitar-cambio-password**
-    
-    Valida la contraseña actual del usuario autenticado, genera un código aleatorio 
+
+    Valida la contraseña actual del usuario autenticado, genera un código aleatorio
     de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
     """
+    # Validaciones estructurales básicas
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación de solicitar cambio password desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
     if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -563,17 +611,19 @@ def solicitar_cambio_password(
 
         db.add(usuario_actual)
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=usuario_actual.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=request.headers.get('Empresa-ID'),
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "usuarios", "accion": "solicitar_cambio_password", "entidad_id": str(usuario_actual.id)}
+            detalle={'recurso': 'usuarios', 'accion': 'solicitar_cambio_password', 'entidad_id': str(usuario_actual.id)},
+            trabajador_id=None,
         )
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar solicitar_cambio_password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se ha podido procesar la solicitud de cambio de contraseña."
@@ -587,20 +637,26 @@ def solicitar_cambio_password(
     }
 
 
-@router.post("/confirmar-cambio-password", status_code=status.HTTP_200_OK, summary="Confirmar nueva contraseña con código")
+@router.post(
+    "/confirmar-cambio-password",
+    status_code=status.HTTP_200_OK,
+    summary="Confirmar nueva contraseña con código",
+)
 @limiter.limit("5/minute")
 def confirmar_cambio_password(
     request: Request,
-    payload: ConfirmarPasswordRequest, 
+    payload: ConfirmarPasswordRecuperacionRequest,
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-    usuario_actual: Usuarios = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **POST /api/usuarios/confirmar-cambio-password**
-    
+
     Valida el código de 6 dígitos recibido por correo y actualiza la contraseña definitivamente.
     """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación al confirmar el cambio de contraseña desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
     if not usuario_actual.codigo_recuperacion or payload.codigo_verificacion != usuario_actual.codigo_recuperacion:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -626,22 +682,23 @@ def confirmar_cambio_password(
         usuario_actual.password_hash = get_password_hash(payload.nueva_password)
         usuario_actual.codigo_recuperacion = None
         usuario_actual.codigo_expira_at = None
-        
+
         if hasattr(usuario_actual, 'updated_at'):
             usuario_actual.updated_at = datetime.now(timezone.utc)
-            
+
         db.add(usuario_actual)
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
-            usuario=usuario_actual,
-            empresa_id=usuario_actual.empresa_id,
+            usuario_id=usuario_actual.id,
+            empresa_id=request.headers.get('Empresa-ID'),
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "usuarios", "accion": "confirmar_cambio_password", "entidad_id": str(usuario_actual.id)}
+            detalle={'recurso': 'usuarios', 'accion': 'confirmar_cambio_password', 'entidad_id': str(usuario_actual.id)},
+            trabajador_id=None,
         )
-        
+
         return {
             "status": "success",
             "message": "Tu contraseña ha sido actualizada correctamente."
@@ -649,7 +706,7 @@ def confirmar_cambio_password(
 
     except Exception as e:
         db.rollback()
+        print(f"Error al ejecutar confirmar_cambio_password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido actualizar la contraseña: {str(e)}"
-        )
+            detail='No se ha podido actualizar la contraseña'        )

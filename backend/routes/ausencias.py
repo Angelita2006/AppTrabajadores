@@ -1,19 +1,25 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session, joinedload
 from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from models.ausencias import Ausencias
+from sqlalchemy.orm import Session, joinedload
+
+from core.auditoria import registrar_auditoria
+from core.enums import (
+    AccionAuditoriaEnum,
+    AccionPermisoEnum,
+    EstadoAusenciaEnum,
+    TipoPermisoEnum,
+)
 from core.security import get_db_with_advanced_security, verificar_permisos_requeridos
-from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
+from models.ausencias import Ausencias
 from models.empresas import Empresas
-from core.enums import EstadoAusenciaEnum
-from schemas.ausencias import AusenciaCreate, AusenciaResponse, AusenciaUpdate
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
-from core.auditoria import registrar_auditoria
+from schemas.ausencias import AusenciaCreate, AusenciaResponse, AusenciaUpdate
 
 # APIRouter agrupa todos los endpoints relacionados con el control de ausencias y bajas bajo el prefijo "/api/ausencias".
 router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"])
@@ -21,17 +27,22 @@ router = APIRouter(prefix="/api/ausencias", tags=["Control de Ausencias y Bajas"
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("", response_model=AusenciaResponse, status_code=status.HTTP_201_CREATED, summary="Crear ausencia")
-@limiter.limit("20/minute") 
+@router.post(
+    "",
+    response_model=AusenciaResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear ausencia",
+)
+@limiter.limit("20/minute")
 def crear_ausencia(
     request: Request,
-    payload: AusenciaCreate, 
+    payload: AusenciaCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR+"-"+TipoPermisoEnum.AUSENCIAS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **POST /api/ausencias**
-    
+
     Crea una nueva ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -62,7 +73,7 @@ def crear_ausencia(
     try:
         db.add(nueva_ausencia)
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -72,14 +83,14 @@ def crear_ausencia(
             detalle={"recurso": "ausencias", "accion": "crear"},
             trabajador_id=trabajador.id
         )
-        
+
         ausencia_creada = (
             db.query(Ausencias)
             .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
             .filter(Ausencias.id == nueva_ausencia.id)
             .first()
         )
-        
+
         print(f"Ausencia creada con éxito ({nueva_ausencia.id}).")
         return ausencia_creada
     except Exception as e:
@@ -90,18 +101,22 @@ def crear_ausencia(
             detail=f"No se ha podido crear la ausencia."
         )
 
-@router.put("/{id_ausencia}", response_model=AusenciaResponse, summary="Modificar ausencia")
-@limiter.limit("20/minute")  
+@router.put(
+    "/{id_ausencia}",
+    response_model=AusenciaResponse,
+    summary="Modificar ausencia",
+)
+@limiter.limit("20/minute")
 def modificar_ausencia(
     request: Request,
-    id_ausencia: UUID, 
+    id_ausencia: UUID,
     payload: AusenciaUpdate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/ausencias/{id_ausencia}**
-    
+
     Modificar una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -118,7 +133,7 @@ def modificar_ausencia(
         print(f"Intento de modificar una ausencia no aprobada ({id_ausencia}, Estado actual: {ausencia.estado}).")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta solicitud no ha sido aprobada previamente.")
 
-    # Inyección de los parámetros de resolución 
+    # Inyección de los parámetros de resolución
     setattr(ausencia, "fecha_inicio", payload.fecha_inicio)
     setattr(ausencia, "fecha_fin", payload.fecha_fin)
     setattr(ausencia, "justificante_url", payload.justificante_url)
@@ -127,7 +142,7 @@ def modificar_ausencia(
     setattr(ausencia, "updated_at", datetime.datetime.now())
 
     db.commit()
-    
+
     registrar_auditoria(
         db=db,
         request=request,
@@ -137,29 +152,33 @@ def modificar_ausencia(
         detalle={"recurso": "ausencias", "accion": "modificar"},
         trabajador_id=ausencia.trabajador_id
     )
-    
+
     ausencia_modificada = (
         db.query(Ausencias)
         .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.id == id_ausencia)
         .first()
     )
-    
+
     print(f"Ausencia ({id_ausencia}) modificada exitosamente.")
     return ausencia_modificada
 
-@router.put("/{id_ausencia}/resolver", response_model=AusenciaResponse, summary="Resolver ausencia")
-@limiter.limit("20/minute")  
+@router.put(
+    "/{id_ausencia}/resolver",
+    response_model=AusenciaResponse,
+    summary="Resolver ausencia",
+)
+@limiter.limit("20/minute")
 def resolver_ausencia(
     request: Request,
-    id_ausencia: UUID, 
+    id_ausencia: UUID,
     payload: AusenciaUpdate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/ausencias/{id_ausencia}/resolver**
-    
+
     Tramita la resolución (aprobación/rechazo) de una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -185,7 +204,7 @@ def resolver_ausencia(
         print("Intento inválido de cambiar el estado a pendiente durante la resolución.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede devolver una solicitud al estado pendiente.")
 
-    # Inyección de los parámetros de resolución 
+    # Inyección de los parámetros de resolución
     setattr(ausencia, "estado", payload.estado)
     setattr(ausencia, "usuario_validador_id", payload.usuario_validador_id)
     setattr(ausencia, "observaciones_admin", payload.observaciones_admin)
@@ -193,7 +212,7 @@ def resolver_ausencia(
     setattr(ausencia, "updated_at", datetime.datetime.now())
 
     db.commit()
-    
+
     registrar_auditoria(
         db=db,
         request=request,
@@ -203,29 +222,33 @@ def resolver_ausencia(
         detalle={"recurso": "ausencias", "accion": "resolver"},
         trabajador_id=ausencia.trabajador_id
     )
-    
+
     ausencia_resuelta = (
         db.query(Ausencias)
         .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.id == id_ausencia)
         .first()
     )
-    
+
     print(f"Ausencia ({id_ausencia}) resuelta exitosamente con estado '{payload.estado}'.")
     return ausencia_resuelta
 
-@router.put("/{id_ausencia}/cancelar", response_model=AusenciaResponse, summary="Cancelar ausencia")
-@limiter.limit("20/minute")  
+@router.put(
+    "/{id_ausencia}/cancelar",
+    response_model=AusenciaResponse,
+    summary="Cancelar ausencia",
+)
+@limiter.limit("20/minute")
 def cancelar_ausencia(
     request: Request,
-    id_ausencia: UUID, 
+    id_ausencia: UUID,
     payload: AusenciaUpdate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **PUT /api/ausencias/{id_ausencia}/cancelar**
-    
+
     Tramita la cancelación de una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -242,12 +265,12 @@ def cancelar_ausencia(
         print(f"Intento de cancelar una ausencia no aprobada ({id_ausencia}, Estado actual: {ausencia.estado}).")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta solicitud no ha sido aprobada previamente.")
 
-    # Inyección de los parámetros de cancelación 
+    # Inyección de los parámetros de cancelación
     setattr(ausencia, "estado", EstadoAusenciaEnum.CANCELADA)
     setattr(ausencia, "updated_at", datetime.datetime.now())
 
     db.commit()
-    
+
     registrar_auditoria(
         db=db,
         request=request,
@@ -257,27 +280,69 @@ def cancelar_ausencia(
         detalle={"recurso": "ausencias", "accion": "cancelar"},
         trabajador_id=ausencia.trabajador_id
     )
-    
+
     ausencia_cancelada = (
         db.query(Ausencias)
         .options(joinedload(Ausencias.empresa), joinedload(Ausencias.trabajador), joinedload(Ausencias.usuario_validador))
         .filter(Ausencias.id == id_ausencia)
         .first()
     )
-    
+
     print(f"Ausencia ({id_ausencia}) cancelada exitosamente.")
     return ausencia_cancelada
 
-@router.get("/empresa/{id_empresa}", response_model=List[AusenciaResponse], summary="Obtener ausencias por empresa")
+@router.get(
+    "/{id_ausencia}",
+    response_model=List[AusenciaResponse],
+    summary="Obtener ausencia por id",
+)
+def obtener_ausencia_id(
+    request: Request,
+    id_ausencia: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUSENCIAS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/ausencias/{id_ausencia}**
+
+    Obtiene la ausencia por id.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de ausencia por id ({id_ausencia}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    empresa_id = request.headers.get("Empresa-ID")
+    ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
+    if not ausencia:
+        print(f"Ausencia ({id_ausencia}) no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Ausencia no encontrada.")
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "ausencias", "accion": "consultar_id"},
+        trabajador_id=None
+    )
+
+    return ausencia
+
+@router.get(
+    "/empresa/{id_empresa}",
+    response_model=List[AusenciaResponse],
+    summary="Obtener ausencias por empresa",
+)
 def obtener_ausencias_empresa(
     request: Request,
-    id_empresa: UUID, 
+    id_empresa: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUSENCIAS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/ausencias/empresa/{id_empresa}**
-    
+
     Obtiene las ausencias de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -308,16 +373,20 @@ def obtener_ausencias_empresa(
 
     return ausencias
 
-@router.get("/trabajador/{id_trabajador}", response_model=List[AusenciaResponse], summary="Obtener ausencias por trabajador")
+@router.get(
+    "/trabajador/{id_trabajador}",
+    response_model=List[AusenciaResponse],
+    summary="Obtener ausencias por trabajador",
+)
 def obtener_ausencias_trabajador(
     request: Request,
-    id_trabajador: UUID, 
+    id_trabajador: UUID,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUSENCIAS])),
     db: Session = Depends(get_db_with_advanced_security)
 ):
     """
     **GET /api/ausencias/trabajador/{id_trabajador}**
-    
+
     Obtiene las ausencias de un trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"

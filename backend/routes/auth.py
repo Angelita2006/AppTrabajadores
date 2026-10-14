@@ -1,17 +1,22 @@
 import datetime
 import random
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from datetime import timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from backend.core.utils import enviar_correo_recuperacion_contraseña, enviar_sms_recuperacion_contraseña
-from schemas.auth import ConfirmarPasswordRecuperacionRequest, PasswordRecuperacionRequest
-from core.database import get_db
-from core.security import get_password_hash
-from models.usuarios import Usuarios
-from core.enums import AccionAuditoriaEnum
+from sqlalchemy.orm import Session
+
 from core.auditoria import registrar_auditoria
-from datetime import timedelta, timezone
+from core.database import get_db
+from core.enums import AccionAuditoriaEnum
+from core.security import get_password_hash
+from core.utils import enviar_correo_recuperacion_contraseña, enviar_sms_recuperacion_contraseña
+from models.usuarios import Usuarios
+from schemas.auth import (
+    ConfirmarPasswordRecuperacionRequest,
+    PasswordRecuperacionRequest,
+)
 
 # APIRouter agrupa todos los endpoints relacionados con la autenticación bajo el prefijo "/api/auth".
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
@@ -19,16 +24,20 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post("/recuperar-password", status_code=status.HTTP_200_OK, summary="Solicitar recuperación de contraseña")
-@limiter.limit("5/minute")  
+@router.post(
+    "/recuperar-password",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar recuperación de contraseña",
+)
+@limiter.limit("5/minute")
 def solicitar_recuperacion_password(
     request: Request,
-    payload: PasswordRecuperacionRequest, 
+    payload: PasswordRecuperacionRequest,
     db: Session = Depends(get_db),
 ):
     """
     **POST /api/auth/recuperar-password**
-    
+
     Valida el correo, genera un código aleatorio de 6 dígitos y lo envía por correo o por teléfono.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -84,7 +93,7 @@ def solicitar_recuperacion_password(
 
         db.add(usuario)
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -94,7 +103,7 @@ def solicitar_recuperacion_password(
             detalle={"recurso": "usuario", "accion": "solicitar_recuperacion_password"},
             trabajador_id=None
         )
-        
+
         print(f"Código de recuperación generado para el usuario ({usuario.id}).")
 
         # Envío del código generado
@@ -112,16 +121,20 @@ def solicitar_recuperacion_password(
             detail="No se ha podido procesar la solicitud de recuperación de contraseña."
         )
 
-@router.post("/confirmar-password", status_code=status.HTTP_200_OK, summary="Confirmar nueva contraseña")
-@limiter.limit("5/minute")  
+@router.post(
+    "/confirmar-password",
+    status_code=status.HTTP_200_OK,
+    summary="Confirmar nueva contraseña",
+)
+@limiter.limit("5/minute")
 def confirmar_password(
     request: Request,
-    payload: ConfirmarPasswordRecuperacionRequest, 
+    payload: ConfirmarPasswordRecuperacionRequest,
     db: Session = Depends(get_db),
 ):
     """
     **POST /api/auth/confirmar-password**
-    
+
     Valida el código de recuperación enviado y actualiza la contraseña.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -184,18 +197,18 @@ def confirmar_password(
     # Hashear la nueva contraseña y actualizar el registro del usuario
     try:
         usuario.password_hash = get_password_hash(payload.nueva_password)
-        
+
         # Limpiamos los campos de recuperación consumidos
         usuario.codigo_recuperacion = None
         usuario.codigo_expira_at = None
-            
+
         # Actualizamos la fecha de modificación
         if hasattr(usuario, 'updated_at'):
             usuario.updated_at = datetime.datetime.now(timezone.utc)
-            
-        db.add(usuario) 
+
+        db.add(usuario)
         db.commit()
-        
+
         registrar_auditoria(
             db=db,
             request=request,
@@ -205,7 +218,7 @@ def confirmar_password(
             detalle={"recurso": "usuario", "accion": "confirmar_recuperacion_password"},
             trabajador_id=None
         )
-        
+
         print(f"Contraseña actualizada exitosamente para el usuario ({usuario.id}).")
         return {"detail": "Tu contraseña ha sido actualizada correctamente."}
     except Exception as e:
