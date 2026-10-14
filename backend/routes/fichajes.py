@@ -1,4 +1,4 @@
-from datetime import date, datetime
+﻿from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID
 import hashlib
@@ -14,11 +14,7 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
-    EstadoFichajeEnum,
-    MetodoFichajeEnum,
-    OrigenFichajeEnum,
     TipoPermisoEnum,
-    TipoRolEnum,
 )
 from core.jornada import calcular_resumen_jornada
 from core.security import (
@@ -59,92 +55,90 @@ def filtro_fichajes_vigentes():
     response_model=FichajeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar fichaje",
+    description="Crea un nuevo fichaje para un trabajador, validando su ubicación GPS, festivos, ausencias, integridad de los datos y procesando una firma digital.",
 )
 @limiter.limit("30/minute")
 def crear_fichaje(
     request: Request,
-    obj_in: FichajeCreate,
+    payload: FichajeCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.FICHAJES])),
     db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **POST /api/fichajes**
 
-    Registra un nuevo fichaje para un trabajador, validando su ubicación GPS, festivos,
-    integridad de los datos mediante hash SHA-256 y opcionalmente procesando una firma digital.
+    Crea un nuevo fichaje para un trabajador, validando su ubicación GPS, festivos, ausencias,
+    integridad de los datos y procesando una firma digital.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de fichaje desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de registro de fichaje desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     trabajador = (
-        db.query(Trabajadores)
-        .options(
-            joinedload(Trabajadores.empresa),
-        )
-        .filter(Trabajadores.id == obj_in.trabajador_id, Trabajadores.activo.is_(True))
+        db.query(Trabajadores).options(
+        joinedload(Trabajadores.empresa))
+        .filter(Trabajadores.id == payload.trabajador_id, Trabajadores.activo.is_(True))
         .first()
     )
     if not trabajador:
+        print(f"Trabajador ({payload.trabajador_id}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado el trabajador. Verifique los datos."
+            detail=f"Trabajador no encontrado."
         )
 
-    empresa = db.query(Empresas).filter(Empresas.id == obj_in.empresa_id).first()
+    empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
     if not empresa:
+        print(f"Empresa ({payload.empresa_id}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado la empresa. Verifique los datos."
+            detail=f"Empresa no encontrada."
         )
 
-    if request.headers.get("Empresa-ID") != str(obj_in.empresa_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado. No tienes permisos para registrar fichajes en esta empresa."
-        )
+    fecha_a_validar = payload.fecha_hora_dispositivo if payload.fecha_hora_dispositivo else datetime.now()
 
-    fecha_a_validar = obj_in.fecha_hora_dispositivo if obj_in.fecha_hora_dispositivo else datetime.now()
-
-    # Obtener la ausencia vigente en el día si existe
-    ausencia_vigente = db.query(Ausencias).filter(
-        Ausencias.trabajador_id == obj_in.trabajador_id,
+    ausencia_vigente = (
+        db.query(Ausencias).filter(
+        Ausencias.trabajador_id == payload.trabajador_id,
         Ausencias.fecha_inicio <= fecha_a_validar.date(),
-        Ausencias.fecha_fin >= fecha_a_validar.date()
-    ).first()
-
+        Ausencias.fecha_fin >= fecha_a_validar.date())
+        .first()
+    )
     if ausencia_vigente:
+        print(f"El trabajador ({payload.trabajador_id}) tiene una ausencia activa para la fecha ({fecha_a_validar.date()}).")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Ausencia: Consta una ausencia o periodo vacacional asignado para este día. No es posible registrar fichajes."
         )
 
-    validacion_dia = validar_dia_laboral_o_marcar_extra(db, obj_in.trabajador_id, fecha_a_validar)
+    validacion_dia = validar_dia_laboral_o_marcar_extra(db, payload.trabajador_id, fecha_a_validar)
 
-    forzar_extra_enviado = getattr(obj_in, "forzar_hora_extra", False)
+    forzar_extra_enviado = getattr(payload, "forzar_hora_extra", False)
 
     if validacion_dia.startswith("Festivo"):
         if not forzar_extra_enviado:
+            print(f"Atención: El día seleccionado es festivo o no laborable ({validacion_dia}). Debe marcar la opción de forzar horas extra para continuar.")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Atención: El día seleccionado es festivo o no laborable ({validacion_dia}). Debe marcar la opción de forzar horas extra para continuar."
             )
 
     centro_trabajo = (
-        db.query(CentrosTrabajo)
-        .options(
-            joinedload(CentrosTrabajo.empresa),
-        )
-        .filter(CentrosTrabajo.id == obj_in.centro_trabajo_id, CentrosTrabajo.activo.is_(True))
+        db.query(CentrosTrabajo).options(
+        joinedload(CentrosTrabajo.empresa))
+        .filter(CentrosTrabajo.id == payload.centro_trabajo_id, CentrosTrabajo.activo.is_(True))
         .first()
     )
     if not centro_trabajo:
+        print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="El centro de trabajo especificado no existe en el sistema."
+            detail="Centro de trabajo no encontrado."
         )
 
     if centro_trabajo.latitud is not None and centro_trabajo.longitud is not None:
-        if obj_in.latitud is None or obj_in.longitud is None:
+        if payload.latitud is None or payload.longitud is None:
+            print("Se requiere obligatoriamente la ubicación GPS del dispositivo para validar el fichaje en este centro de trabajo.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Se requiere obligatoriamente la ubicación GPS del dispositivo para validar el fichaje en este centro de trabajo."
@@ -153,17 +147,18 @@ def crear_fichaje(
         distancia = calcular_distancia_metros(
             float(centro_trabajo.latitud),
             float(centro_trabajo.longitud),
-            float(obj_in.latitud),
-            float(obj_in.longitud)
+            float(payload.latitud),
+            float(payload.longitud)
         )
 
         if distancia > 500:
+            print(f"Ubicación fuera de rango. Te encuentras a {round(distancia, 2)} metros del centro de trabajo (el límite máximo permitido es de 500 metros).")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ubicación fuera de rango. Te encuentras a {round(distancia, 2)} metros del centro de trabajo (el límite máximo permitido es de 500 metros)."
             )
 
-    ip_a_procesar = getattr(obj_in, "ip_address", None)
+    ip_a_procesar = getattr(payload, "ip_address", None)
     if not ip_a_procesar and request.client:
         ip_a_procesar = request.client.host
 
@@ -174,44 +169,44 @@ def crear_fichaje(
         except ValueError:
             pass
 
-    datos_crudos = f"{obj_in.trabajador_id}-{obj_in.empresa_id}-{obj_in.tipo_evento.value}-{fecha_a_validar.isoformat()}"
+    datos_crudos = f"{payload.trabajador_id}-{payload.empresa_id}-{payload.tipo_evento.value}-{fecha_a_validar.isoformat()}"
     sha256_calculado = hashlib.sha256(datos_crudos.encode('utf-8')).hexdigest()
 
-    observaciones_finales = obj_in.observaciones
-    if validacion_dia.startswith("Festivo") and getattr(obj_in, "forzar_hora_extra", False):
+    observaciones_finales = payload.observaciones
+    if validacion_dia.startswith("Festivo") and getattr(payload, "forzar_hora_extra", False):
         prefijo_extra = f"[HORA EXTRA - {validacion_dia}]"
-        observaciones_finales = f"{prefijo_extra} {obj_in.observaciones}" if obj_in.observaciones else prefijo_extra
+        observaciones_finales = f"{prefijo_extra} {payload.observaciones}" if payload.observaciones else prefijo_extra
 
     ruta_relativa_firma = None
-    data_firma = getattr(obj_in, "firma_digital", None)
+    data_firma = getattr(payload, "firma_digital", None)
 
     if data_firma and isinstance(data_firma, str):
         try:
             ruta_relativa_firma = procesar_y_guardar_firma(data_firma)
         except Exception as e:
-            print(f"Error al ejecutar crear_fichaje: {e}")
+            print(f"No se pudo procesar la firma digital adjunta: {str(e)}.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='No se pudo procesar la imagen de la firma digital adjunta'
+                detail='No se pudo procesar la firma digital adjunta.'
             )
 
     nuevo_fichaje = Fichajes(
-        empresa_id=obj_in.empresa_id,
-        trabajador_id=obj_in.trabajador_id,
-        centro_trabajo_id=obj_in.centro_trabajo_id,
-        tipo_evento=obj_in.tipo_evento,
+        empresa_id=payload.empresa_id,
+        trabajador_id=payload.trabajador_id,
+        centro_trabajo_id=payload.centro_trabajo_id,
+        tipo_evento=payload.tipo_evento,
         fecha_hora=fecha_a_validar,
-        metodo_fichaje=MetodoFichajeEnum(obj_in.metodo_fichaje) if isinstance(obj_in.metodo_fichaje, str) else obj_in.metodo_fichaje,
-        origen=OrigenFichajeEnum(obj_in.origen) if hasattr(obj_in, 'origen') and obj_in.origen else OrigenFichajeEnum.TRABAJADOR,
-        estado=EstadoFichajeEnum(obj_in.estado) if hasattr(obj_in, 'estado') and obj_in.estado else EstadoFichajeEnum.VALIDO,
+        metodo_fichaje=payload.metodo_fichaje,
+        origen=payload.origen,
+        estado=payload.estado,
         hash_integridad=sha256_calculado,
-        latitud=obj_in.latitud,
-        longitud=obj_in.longitud,
+        latitud=payload.latitud,
+        longitud=payload.longitud,
         ip_address=ip_int,
         observaciones=observaciones_finales,
-        fecha_hora_dispositivo=obj_in.fecha_hora_dispositivo or fecha_a_validar,
-        dispositivo_id=getattr(obj_in, "dispositivo_id", None),
-        motivo_pausa_id=obj_in.motivo_pausa_id,
+        fecha_hora_dispositivo=payload.fecha_hora_dispositivo or fecha_a_validar,
+        dispositivo_id=payload.dispositivo_id,
+        motivo_pausa_id=payload.motivo_pausa_id,
         firma_digital=ruta_relativa_firma
     )
 
@@ -219,31 +214,31 @@ def crear_fichaje(
         db.add(nuevo_fichaje)
         calcular_resumen_jornada(
             db,
-            obj_in.empresa_id,
-            obj_in.trabajador_id,
+            payload.empresa_id,
+            payload.trabajador_id,
             fecha_a_validar.date(),
         )
 
-        # Registro de auditoría para la creación del fichaje
         registrar_auditoria(
             db=db,
             request=request,
             usuario_id=usuario_actual.id,
-            empresa_id=obj_in.empresa_id,
+            empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={'recurso': 'fichajes', 'accion': 'crear_fichaje', 'entidad_id': str(nuevo_fichaje.id), 'detalles': f'Se ha registrado un nuevo fichaje para el trabajador {obj_in.trabajador_id}'},
-            trabajador_id=None,
+            detalle={
+                'recurso': 'fichajes',
+                'accion': 'crear',
+            },
+            trabajador_id=payload.trabajador_id,
         )
 
         db.commit()
 
         fichaje_creado = (
-            db.query(Fichajes)
-            .options(
-                joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.centro_trabajo),
-                joinedload(Fichajes.empresa),
-            )
+            db.query(Fichajes).options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo),
+            joinedload(Fichajes.empresa))
             .filter(Fichajes.id == nuevo_fichaje.id)
             .first()
         )
@@ -251,10 +246,10 @@ def crear_fichaje(
         return fichaje_creado
     except Exception as e:
         db.rollback()
-        print(f"Error al ejecutar crear_fichaje: {e}")
+        print(f"No se ha podido crear el fichaje: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se ha podido guardar el fichaje en la base de datos'
+            detail='No se ha podido crear el fichaje.'
         )
 
 
@@ -262,6 +257,7 @@ def crear_fichaje(
     "/trabajador/{id_trabajador}/empresa/{id_empresa}",
     response_model=List[FichajeResponse],
     summary="Obtener fichajes de trabajador por empresa",
+    description="Obtiene los de un trabajador dentro de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_fichajes_trabajador_empresa(
@@ -274,31 +270,32 @@ def obtener_fichajes_trabajador_empresa(
     """
     **GET /api/fichajes/trabajador/{id_trabajador}/empresa/{id_empresa}**
 
-    Devuelve la lista completa de fichajes asociados a un trabajador específico dentro de una empresa.
+    Obtiene los de un trabajador dentro de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes del trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de listado de fichajes del trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El trabajador no fue encontrado."
+            detail=f"Trabajador no encontrado."
         )
 
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
     if not empresa:
+        print(f"Empresa ({id_empresa}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"La empresa no fue encontrada."
+            detail=f"Empresa no encontrada."
         )
 
     resultados = (
-        db.query(Fichajes)
-        .options(
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo),
-        )
+        db.query(Fichajes).options(
+        joinedload(Fichajes.trabajador),
+        joinedload(Fichajes.centro_trabajo))
         .filter(Fichajes.trabajador_id == id_trabajador, Fichajes.empresa_id == id_empresa, filtro_fichajes_vigentes())
         .all()
     )
@@ -309,8 +306,11 @@ def obtener_fichajes_trabajador_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'fichajes', 'accion': 'consultar_por_trabajador_empresa', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultaron los fichajes del trabajador {id_trabajador} en la empresa {id_empresa}'},
-        trabajador_id=None,
+        detalle={
+            'recurso': 'fichajes',
+            'accion': 'consultar_trabajador_empresa',
+        },
+        trabajador_id=id_trabajador,
     )
     db.commit()
     return resultados
@@ -319,6 +319,7 @@ def obtener_fichajes_trabajador_empresa(
     "/trabajador/{id_trabajador}/turno",
     response_model=List[FichajeResponse],
     summary="Obtener fichajes del turno actual",
+    description="Obtiene los fichajes del turno del usuario actual.",
 )
 @limiter.limit("60/minute")
 def obtener_fichajes_turno_actual(
@@ -329,38 +330,34 @@ def obtener_fichajes_turno_actual(
 ):
     """**GET /trabajador/{id_trabajador}/turno**
 
-    Gestiona la operaci?n `obtener_fichajes_turno_actual`.
+    Obtiene los fichajes del turno del usuario actual.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de fichajes por turno para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de fichajes por turno para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trabajador no localizado."
+            detail="Trabajador no encontrado."
         )
 
     hoy = date.today()
 
-    # 1. Buscar TODAS las asignaciones de turno que están vigentes a día de hoy para el trabajador
     asignaciones_vigentes = (
         db.query(AsignacionesTurno)
         .filter(
             AsignacionesTurno.trabajador_id == id_trabajador,
             AsignacionesTurno.fecha_inicio <= hoy,
-            or_(
-                AsignacionesTurno.fecha_fin.is_(None),
-                AsignacionesTurno.fecha_fin >= hoy
-            )
-        )
+            or_(AsignacionesTurno.fecha_fin.is_(None), AsignacionesTurno.fecha_fin >= hoy))
         .all()
     )
 
     if not asignaciones_vigentes:
         return []
 
-    # 2. Construir los rangos de fechas (fecha_inicio a fecha_fin) de las asignaciones activas
     condiciones_rangos_fechas = []
     for asig in asignaciones_vigentes:
         condicion_asig = [func.date(Fichajes.fecha_hora_dispositivo) >= asig.fecha_inicio]
@@ -368,13 +365,10 @@ def obtener_fichajes_turno_actual(
             condicion_asig.append(func.date(Fichajes.fecha_hora_dispositivo) <= asig.fecha_fin)
         condiciones_rangos_fechas.append(and_(*condicion_asig))
 
-    # 3. Consultar fichajes que caigan dentro de CUALQUIERA de las asignaciones vigentes
     fichajes_turno = (
-        db.query(Fichajes)
-        .options(
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo),
-        )
+        db.query(Fichajes).options(
+        joinedload(Fichajes.trabajador),
+        joinedload(Fichajes.centro_trabajo))
         .filter(Fichajes.trabajador_id == id_trabajador, filtro_fichajes_vigentes(), or_(*condiciones_rangos_fechas))
         .order_by(Fichajes.fecha_hora_dispositivo.asc())
         .all()
@@ -386,18 +380,21 @@ def obtener_fichajes_turno_actual(
         usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'fichajes', 'accion': 'consultar_fichajes_turno', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultaron los fichajes del turno actual para el trabajador {id_trabajador}'},
-        trabajador_id=None,
+        detalle={
+            'recurso': 'fichajes',
+            'accion': 'consultar_turno_actual',
+        },
+        trabajador_id=id_trabajador,
     )
     db.commit()
 
     return fichajes_turno
 
-
 @router.get(
     "/trabajador/{id_trabajador}/ultimo",
     response_model=Optional[FichajeResponse],
     summary="Obtener último fichaje del trabajador",
+    description="Obtiene el último fichaje del trabajador.",
 )
 @limiter.limit("60/minute")
 def obtener_ultimo_fichaje_trabajador(
@@ -409,52 +406,59 @@ def obtener_ultimo_fichaje_trabajador(
     """
     **GET /api/fichajes/trabajador/{trabajador_id}/ultimo**
 
-    Devuelve estrictamente el último evento de fichaje registrado por el trabajador (ordenado de forma descendente).
+    Obtiene el último fichaje del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición del último fichaje para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición del último fichaje para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
     if not trabajador:
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trabajador no encontrado."
         )
 
     ultimo_fichaje = (
-        db.query(Fichajes)
-        .options(
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo),
-        )
+        db.query(Fichajes).options(
+        joinedload(Fichajes.trabajador),
+        joinedload(Fichajes.centro_trabajo))
         .filter(Fichajes.trabajador_id == id_trabajador)
         .order_by(Fichajes.created_at.desc())
         .first()
     )
-
+    if not ultimo_fichaje:
+        print(f"Último fichaje no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Último fichaje no encontrado."
+        )
+    
     registrar_auditoria(
         db=db,
         request=request,
         usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'fichajes', 'accion': 'consultar_ultimo_fichaje', 'entidad_id': str(id_trabajador), 'detalles': f'Se consultó el último fichaje del trabajador {id_trabajador}'},
-        trabajador_id=None,
+        detalle={
+            'recurso': 'fichajes',
+            'accion': 'consultar_trabajador_ultimo',
+        },
+        trabajador_id=id_trabajador,
     )
     db.commit()
-
-    if not ultimo_fichaje:
-        return None
 
     return ultimo_fichaje
 
 @router.get(
     "/empresa/{empresa_id}",
     status_code=status.HTTP_200_OK,
-    summary="Listar fichajes de empresa entre fechas",
+    summary="Obtener fichajes de empresa entre fechas",
+    description="Obtener los fichajes de una empresa entre fechas específicas.",
 )
 @limiter.limit("60/minute")
-def listar_fichajes_empresa_entre_fechas(
+def obtener_fichajes_empresa_entre_fechas(
     request: Request,
     empresa_id: UUID,
     fecha_inicio: date,
@@ -465,19 +469,17 @@ def listar_fichajes_empresa_entre_fechas(
     """
     **GET /api/fichajes/empresa/{empresa_id}**
 
-    Lista detallada de todos los fichajes de una empresa para una fecha específica,
-    adaptada y formateada para el consumo directo del frontend. Protegida por roles administrativos.
+    Obtener los fichajes de una empresa entre fechas específicas.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes por empresa y fecha desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta de fichajes por empresa entre fechas desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     try:
         resultados = (
-            db.query(Fichajes)
-            .options(
-                joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.centro_trabajo),
-            )
+            db.query(Fichajes).options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo))
             .filter(Fichajes.empresa_id == empresa_id, func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin)
             .all()
         )
@@ -486,11 +488,9 @@ def listar_fichajes_empresa_entre_fechas(
         correcciones_aprobadas = {}
         if fichaje_ids:
             correcciones = (
-                db.query(CorreccionesFichaje)
-                .options(
-                    joinedload(CorreccionesFichaje.solicitado_por_usuario),
-                    joinedload(CorreccionesFichaje.aprobado_por_usuario),
-                )
+                db.query(CorreccionesFichaje).options(
+                joinedload(CorreccionesFichaje.usuario_solicitador),
+                joinedload(CorreccionesFichaje.usuario_aprobador))
                 .filter(CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids), CorreccionesFichaje.estado == 'Aprobada')
                 .all()
             )
@@ -501,8 +501,6 @@ def listar_fichajes_empresa_entre_fechas(
 
         payload_respuesta = []
         for fichaje in resultados:
-            codigo_evento = fichaje.tipo_evento.value
-
             if fichaje.fecha_hora_dispositivo:
                 fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
             else:
@@ -517,17 +515,15 @@ def listar_fichajes_empresa_entre_fechas(
             if correccion:
                 correccion_serializada = {
                     "id": str(correccion.id),
-                    "tipo_correccion": correccion.tipo_correccion.value,
+                    "tipo_correccion": correccion.tipo_correccion,
                     "motivo": correccion.motivo,
                     "fecha_solicitud": correccion.fecha_solicitud.isoformat(),
                     "fecha_resolucion": correccion.fecha_resolucion.isoformat() if correccion.fecha_resolucion else None,
                     "valor_nuevo": correccion.valor_nuevo,
                     "firma_solicitante": correccion.firma_solicitante,
                     "firma_resolutor": correccion.firma_resolutor,
-                    "solicitante": getattr(correccion.solicitado_por_usuario, "nombre", None),
-                    "resolutor": getattr(correccion.aprobado_por_usuario, "nombre", None),
-                    "solicitante_tipo": getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) if getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) else None,
-                    "resolutor_tipo": getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) if getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) else None,
+                    "solicitante": correccion.usuario_solicitador,
+                    "resolutor": correccion.usuario_aprobador,
                 }
 
             payload_respuesta.append({
@@ -535,12 +531,11 @@ def listar_fichajes_empresa_entre_fechas(
                 "trabajador_id": str(fichaje.trabajador_id),
                 "trabajador": trabajador_serializado,
                 "correccion_aprobada": correccion_serializada,
-                "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
                 "fecha_hora": fecha_hora_str,
-                "tipo_evento": fichaje.tipo_evento.value,
-                "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
+                "tipo_evento": fichaje.tipo_evento,
+                "metodo_fichaje": fichaje.metodo_fichaje,
                 "observaciones": fichaje.observaciones,
-                "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado),
+                "estado": fichaje.estado,
                 "firma_digital": fichaje.firma_digital
             })
 
@@ -550,7 +545,10 @@ def listar_fichajes_empresa_entre_fechas(
             usuario_id=usuario_actual.id,
             empresa_id=empresa_id,
             accion=AccionAuditoriaEnum.CONSULTA,
-            detalle={'recurso': 'fichajes', 'accion': 'listar_fichajes_empresa_por_fecha', 'entidad_id': str(empresa_id), 'detalles': f'Se listaron los fichajes de la empresa {empresa_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}'},
+            detalle={
+                'recurso': 'fichajes',
+                'accion': 'consultar_empresa_entre_fechas',
+            },
             trabajador_id=None,
         )
         db.commit()
@@ -559,21 +557,22 @@ def listar_fichajes_empresa_entre_fechas(
 
     except Exception as e:
         db.rollback()
-        print(f"Error al ejecutar listar_fichajes_empresa_entre_fechas: {e}")
+        print(f"No se han podido obtener los fichajes de la empresa entre esas fechas: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se han podido obtener los fichajes de la empresa'
+            detail='No se han podido obtener los fichajes de la empresa entre esas fechas.'
         )
 
 @router.get(
     "/trabajador/{trabajador_id}",
     status_code=status.HTTP_200_OK,
-    summary="Listar fichajes de trabajador entre fechas",
+    summary="Obtener fichajes de trabajador entre fechas",
+    description="Obtiene los fichajes de un trabajador entre fechas específicas.",
 )
 @limiter.limit("60/minute")
-def listar_fichajes_trabajador_entre_fechas(
+def obtener_fichajes_trabajador_entre_fechas(
     request: Request,
-    trabajador_id: UUID,
+    id_trabajador: UUID,
     fecha_inicio: date,
     fecha_fin: date,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FICHAJES])),
@@ -582,20 +581,18 @@ def listar_fichajes_trabajador_entre_fechas(
     """
     **GET /api/fichajes/trabajador/{trabajador_id}**
 
-    Lista detallada de todos los fichajes de un trabajador para un período entre fechas específico,
-    adaptada y formateada para el consumo directo del frontend. Protegida por roles administrativos.
+    Obtiene los fichajes de un trabajador entre fechas específicas.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de fichajes por trabajador entre fechas desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de consulta de fichajes por trabajador entre fechas desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     try:
         resultados = (
-            db.query(Fichajes)
-            .options(
-                joinedload(Fichajes.trabajador),
-                joinedload(Fichajes.centro_trabajo),
-            )
-            .filter(Fichajes.trabajador_id == trabajador_id, func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin)
+            db.query(Fichajes).options(
+            joinedload(Fichajes.trabajador),
+            joinedload(Fichajes.centro_trabajo))
+            .filter(Fichajes.trabajador_id == id_trabajador, func.date(Fichajes.fecha_hora_dispositivo) >= fecha_inicio, func.date(Fichajes.fecha_hora_dispositivo) <= fecha_fin)
             .all()
         )
 
@@ -603,11 +600,9 @@ def listar_fichajes_trabajador_entre_fechas(
         correcciones_aprobadas = {}
         if fichaje_ids:
             correcciones = (
-                db.query(CorreccionesFichaje)
-                .options(
-                    joinedload(CorreccionesFichaje.solicitado_por_usuario),
-                    joinedload(CorreccionesFichaje.aprobado_por_usuario),
-                )
+                db.query(CorreccionesFichaje).options(
+                joinedload(CorreccionesFichaje.solicitado_por_usuario),
+                joinedload(CorreccionesFichaje.aprobado_por_usuario))
                 .filter(CorreccionesFichaje.fichaje_afectado_id.in_(fichaje_ids), CorreccionesFichaje.estado == 'Aprobada')
                 .all()
             )
@@ -618,8 +613,6 @@ def listar_fichajes_trabajador_entre_fechas(
 
         payload_respuesta = []
         for fichaje in resultados:
-            codigo_evento = fichaje.tipo_evento.value
-
             if fichaje.fecha_hora_dispositivo:
                 fecha_hora_str = fichaje.fecha_hora_dispositivo.strftime("%Y-%m-%d %H:%M:%S")
             else:
@@ -634,17 +627,15 @@ def listar_fichajes_trabajador_entre_fechas(
             if correccion:
                 correccion_serializada = {
                     "id": str(correccion.id),
-                    "tipo_correccion": correccion.tipo_correccion.value,
+                    "tipo_correccion": correccion.tipo_correccion,
                     "motivo": correccion.motivo,
                     "fecha_solicitud": correccion.fecha_solicitud.isoformat(),
                     "fecha_resolucion": correccion.fecha_resolucion.isoformat() if correccion.fecha_resolucion else None,
                     "valor_nuevo": correccion.valor_nuevo,
                     "firma_solicitante": correccion.firma_solicitante,
                     "firma_resolutor": correccion.firma_resolutor,
-                    "solicitante": getattr(correccion.solicitado_por_usuario, "nombre", None),
-                    "resolutor": getattr(correccion.aprobado_por_usuario, "nombre", None),
-                    "solicitante_tipo": getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) if getattr(correccion.solicitado_por_usuario, "tipo_usuario", None) else None,
-                    "resolutor_tipo": getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) if getattr(correccion.aprobado_por_usuario, "tipo_usuario", None) else None,
+                    "solicitante": correccion.usuario_solicitador,
+                    "resolutor": correccion.usuario_aprobador,
                 }
 
             payload_respuesta.append({
@@ -652,12 +643,11 @@ def listar_fichajes_trabajador_entre_fechas(
                 "trabajador_id": str(fichaje.trabajador_id),
                 "trabajador": trabajador_serializado,
                 "correccion_aprobada": correccion_serializada,
-                "codigo_evento_resuelto": codigo_evento.upper() if codigo_evento else "",
                 "fecha_hora": fecha_hora_str,
-                "tipo_evento": fichaje.tipo_evento.value,
-                "metodo_fichaje": str(fichaje.metodo_fichaje.value) if hasattr(fichaje.metodo_fichaje, "value") else str(fichaje.metodo_fichaje),
+                "tipo_evento": fichaje.tipo_evento,
+                "metodo_fichaje": fichaje.metodo_fichaje,
                 "observaciones": fichaje.observaciones,
-                "estado": fichaje.estado.value if hasattr(fichaje.estado, "value") else str(fichaje.estado),
+                "estado": fichaje.estado,
                 "firma_digital": fichaje.firma_digital
             })
 
@@ -667,8 +657,11 @@ def listar_fichajes_trabajador_entre_fechas(
             usuario_id=usuario_actual.id,
             empresa_id=request.headers.get('Empresa-ID'),
             accion=AccionAuditoriaEnum.CONSULTA,
-            detalle={'recurso': 'fichajes', 'accion': 'listar_fichajes_trabajador_entre_fechas', 'entidad_id': str(empresa_id), 'detalles': f'Se listaron los fichajes del trabajador {trabajador_id} para el período entre las fechas {fecha_inicio} - {fecha_fin}'},
-            trabajador_id=None,
+            detalle={
+                'recurso': 'fichajes',
+                'accion': 'consultar_trabajador_entre_fechas',
+            },
+            trabajador_id=id_trabajador,
         )
         db.commit()
 
@@ -676,17 +669,18 @@ def listar_fichajes_trabajador_entre_fechas(
 
     except Exception as e:
         db.rollback()
-        print(f"Error al ejecutar listar_fichajes_trabajador_entre_fechas: {e}")
+        print(f"No se han podido obtener los fichajes del trabajador entre esas fechas: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se han podido obtener los fichajes de la empresa'
+            detail='No se han podido obtener los fichajes del trabajador entre esas fechas.'
         )
 
 
 @router.get(
     "/{id_fichaje}",
     response_model=FichajeResponse,
-    summary="Obtener fichaje por ID",
+    summary="Obtener fichaje por id",
+    description="Obtiene el fichaje por su id.",
 )
 @limiter.limit("60/minute")
 def obtener_fichaje(
@@ -698,31 +692,25 @@ def obtener_fichaje(
     """
     **GET /api/fichajes/{id_fichaje}**
 
-    Obtiene los detalles completos de un fichaje a partir de su ID único universal.
+    Obtiene el fichaje por su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de detalle del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de detalle del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     fichaje = (
-        db.query(Fichajes)
-        .options(
-            joinedload(Fichajes.trabajador),
-            joinedload(Fichajes.centro_trabajo),
-        )
+        db.query(Fichajes).options(
+        joinedload(Fichajes.trabajador),
+        joinedload(Fichajes.centro_trabajo))
         .filter(Fichajes.id == id_fichaje)
         .first()
     )
 
     if not fichaje:
+        print(f"Fichaje ({id_fichaje}) no encontrado.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El fichaje no existe."
-        )
-
-    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para visualizar este registro de fichaje."
+            detail=f"Fichaje no encontrado."
         )
 
     registrar_auditoria(
@@ -731,113 +719,12 @@ def obtener_fichaje(
         usuario_id=usuario_actual.id,
         empresa_id=fichaje.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'fichajes', 'accion': 'consultar_fichaje_por_id', 'entidad_id': str(id_fichaje), 'detalles': f'Se consultaron los detalles del fichaje {id_fichaje}'},
-        trabajador_id=None,
+        detalle={
+            'recurso': 'fichajes',
+            'accion': 'consultar_id',
+        },
+        trabajador_id=fichaje.trabajador_id,
     )
     db.commit()
 
     return fichaje
-
-
-@router.patch(
-    "/{id_fichaje}/validar",
-    response_model=FichajeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Validar fichaje",
-)
-@limiter.limit("30/minute")
-def validar_fichaje(
-    request: Request,
-    id_fichaje: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.FICHAJES])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **PATCH /api/fichajes/{id_fichaje}/validar**
-
-    Cambia el estado de un fichaje a Válido y recalcula su hash de seguridad.
-    Exclusivo para administradores de empresa o gestoría.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
-    # Validaciones estructurales básicas
-
-    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
-    if not fichaje:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró el registro de fichaje solicitado."
-        )
-
-    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permisos para validar fichajes correspondientes a otra empresa."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=fichaje.empresa_id,
-        accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={'recurso': 'fichajes', 'accion': 'intento_validacion_fichaje', 'entidad_id': str(id_fichaje), 'detalles': f'Intento de validación directa del fichaje inmutable {id_fichaje}'},
-        trabajador_id=None,
-    )
-    db.commit()
-
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="Los fichajes son inmutables. La validación debe realizarse mediante una corrección aprobada.",
-    )
-
-
-@router.delete(
-    "/{id_fichaje}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar fichaje",
-)
-@limiter.limit("20/minute")
-def eliminar_fichaje(
-    request: Request,
-    id_fichaje: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.ELIMINAR + "-" + TipoPermisoEnum.FICHAJES])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **DELETE /api/fichajes/{id_fichaje}**
-
-    Elimina un registro de fichaje existente. Requiere privilegios administrativos
-    de gestoría o empresa.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de eliminación del fichaje ({id_fichaje}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
-
-    fichaje = db.query(Fichajes).filter(Fichajes.id == id_fichaje).first()
-    if not fichaje:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="El registro de fichaje que intentas eliminar no ha sido encontrado."
-        )
-
-    if request.headers.get("Empresa-ID") != str(fichaje.empresa_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes autorización para eliminar registros de fichaje de otra empresa."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=fichaje.empresa_id,
-        accion=AccionAuditoriaEnum.ELIMINACION,
-        detalle={'recurso': 'fichajes', 'accion': 'intento_eliminacion_fichaje', 'entidad_id': str(id_fichaje), 'detalles': f'Intento de eliminación directa del fichaje inmutable {id_fichaje}'},
-        trabajador_id=None,
-    )
-    db.commit()
-
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="Los fichajes son inmutables. Solicita una corrección o anulación mediante el flujo de incidencias.",
-    )

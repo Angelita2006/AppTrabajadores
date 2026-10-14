@@ -49,6 +49,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=EmpresaSimpleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear empresa",
+    description="Crea una nueva empresa.",
 )
 @limiter.limit("10/minute")
 def crear_empresa(
@@ -63,7 +64,7 @@ def crear_empresa(
     Crea una nueva empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de crear de empresa desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de crear de empresa desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     licencia = db.query(Licencias).filter(Licencias.codigo == payload.codigo_licencia.strip().upper()).first()
@@ -111,7 +112,10 @@ def crear_empresa(
             usuario_id=usuario_actual.id,
             empresa_id=nueva_empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "empresas", "accion": "crear"},
+            detalle={
+                'recurso': "empresas",
+                'accion': "crear",
+            },
             trabajador_id=None
         )
 
@@ -129,6 +133,7 @@ def crear_empresa(
     response_model=RespuestaRegistroCompletoDTO,
     status_code=status.HTTP_201_CREATED,
     summary="Registro de organización y usuario admin",
+    description="Crea una nueva empresa y su usuario administrador.",
 )
 @limiter.limit("10/minute")
 def registrar_organizacion_completa(
@@ -158,8 +163,10 @@ def registrar_organizacion_completa(
         print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este código de licencia ya ha sido utilizado.")
     if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
+        print("La licencia no está activa.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
     if licencia.fecha_expiracion < date.today():
+        print("La licencia está vencida.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
 
     empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif.strip().upper()).first()
@@ -211,10 +218,10 @@ def registrar_organizacion_completa(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se ha encontrado un rol para el admin.")
 
         if usuario_existente:
-            usuario_existente.nombre = f"{payload.nombre_admin.strip()}"
-            usuario_existente.password_hash = get_password_hash(payload.password)
-            usuario_existente.empresa_id = nueva_empresa.id
-            usuario_existente.activo = True
+            setattr(usuario_existente, 'nombre', f"{payload.nombre_admin.strip()}")
+            setattr(usuario_existente, 'password_hash', get_password_hash(payload.password))
+            setattr(usuario_existente, 'empresa_id', nueva_empresa.id)
+            setattr(usuario_existente, 'activo', True)
             nuevo_usuario = usuario_existente
 
             nueva_relacion_usuario_empresa = UsuariosEmpresas(
@@ -252,7 +259,10 @@ def registrar_organizacion_completa(
             usuario_id=nuevo_usuario.id,
             empresa_id=nueva_empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "empresas", "accion": "registro_completo"},
+            detalle={
+                'recurso': "empresas",
+                'accion': "registro_completo",
+            },
             trabajador_id=None
         )
 
@@ -274,6 +284,7 @@ def registrar_organizacion_completa(
     "/{id_empresa}",
     response_model=EmpresaSimpleResponse,
     summary="Modificar empresa",
+    description="Modifica los datos de una empresa.",
 )
 @limiter.limit("20/minute")
 def modificar_empresa(
@@ -289,7 +300,7 @@ def modificar_empresa(
     Modifica los datos de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación de la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -316,7 +327,10 @@ def modificar_empresa(
             usuario_id=usuario_actual.id,
             empresa_id=id_empresa,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "empresas", "accion": "modificar"},
+            detalle={
+                'recurso': "empresas",
+                'accion': "modificar",
+            },
             trabajador_id=None
         )
 
@@ -333,6 +347,7 @@ def modificar_empresa(
     "/{id_empresa}/logo",
     response_model=EmpresaSimpleResponse,
     summary="Modificar logo de empresa",
+    description="Modifica el logotipo oficial de una empresa.",
 )
 @limiter.limit("20/minute")
 async def modificar_logo_empresa(
@@ -348,7 +363,7 @@ async def modificar_logo_empresa(
     Modifica el logotipo oficial de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de logo para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación de logo para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -364,6 +379,7 @@ async def modificar_logo_empresa(
     TIPOS_PERMITIDOS = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"]
 
     if file.content_type not in TIPOS_PERMITIDOS:
+        print("El archivo seleccionado no es una imagen válida (solo se permiten formatos JPEG, PNG, WEBP o ICO).")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El archivo seleccionado no es una imagen válida (solo se permiten formatos JPEG, PNG, WEBP o ICO)."
@@ -381,8 +397,8 @@ async def modificar_logo_empresa(
 
     ruta_relativa = f"/api/archivos/logos_empresas/{nombre_archivo}"
 
-    empresa.logo_url = ruta_relativa
-    empresa.updated_at = datetime.now()
+    setattr(empresa, 'logo_url', ruta_relativa)
+    setattr(empresa, 'updated_at', datetime.now())
 
     try:
         db.commit()
@@ -394,7 +410,10 @@ async def modificar_logo_empresa(
             usuario_id=usuario_actual.id,
             empresa_id=id_empresa,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "empresas", "accion": "modificar_logo"},
+            detalle={
+                'recurso': "empresas",
+                'accion': "modificar_logo",
+            },
             trabajador_id=None
         )
 
@@ -411,6 +430,7 @@ async def modificar_logo_empresa(
     "",
     response_model=List[EmpresaSimpleResponse],
     summary="Obtener empresas disponibles para el usuario actual",
+    description="Obtiene las empresas disponibles para el usuario actual.",
 )
 @limiter.limit("60/minute")
 def obtener_empresas_disponibles(
@@ -424,7 +444,7 @@ def obtener_empresas_disponibles(
     Obtiene las empresas disponibles para el usuario actual.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de las empresas disponibles para el usuario actual desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de las empresas disponibles para el usuario actual desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     membresias = (
@@ -507,7 +527,10 @@ def obtener_empresas_disponibles(
         usuario_id=usuario_actual.id,
         empresa_id=usuario_actual.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_disponibles"},
+        detalle={
+            'recurso': "empresas",
+            'accion': "consultar_disponibles",
+        },
         trabajador_id=None
     )
 
@@ -518,6 +541,7 @@ def obtener_empresas_disponibles(
     "/actual",
     response_model=List[EmpresaSimpleResponse],
     summary="Obtener empresa actual para el usuario",
+    description="Obtiene la empresa actual del usuario, si aplica.",
 )
 @limiter.limit("60/minute")
 def obtener_empresa_actual(
@@ -531,7 +555,7 @@ def obtener_empresa_actual(
     Obtiene la empresa actual del usuario, si aplica.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de la empresa actual del usuario desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de la empresa actual del usuario desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa_id = request.headers.get("Empresa-ID")
@@ -550,7 +574,10 @@ def obtener_empresa_actual(
         usuario_id=usuario_actual.id,
         empresa_id=usuario_actual.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_actual"},
+        detalle={
+            'recurso': "empresas",
+            'accion': "consultar_actual",
+        },
         trabajador_id=None
     )
 
@@ -560,6 +587,7 @@ def obtener_empresa_actual(
     "/{id_empresa}",
     response_model=EmpresaSimpleResponse,
     summary="Obtener empresa por id",
+    description="Obtiene los detalles completos de una empresa a partir de su ID único universal.",
 )
 @limiter.limit("60/minute")
 def obtener_empresa_id(
@@ -574,7 +602,7 @@ def obtener_empresa_id(
     Obtiene los detalles completos de una empresa a partir de su ID único universal.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de detalle de la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}")
+    print(f"Petición de detalle de la empresa {id_empresa} desde la IP: {cliente_ip} por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -591,7 +619,10 @@ def obtener_empresa_id(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_id"},
+        detalle={
+            'recurso': "empresas",
+            'accion': "consultar_id",
+        },
         trabajador_id=None
     )
 
@@ -602,6 +633,7 @@ def obtener_empresa_id(
     "/cif/{cif_empresa}",
     response_model=EmpresaSimpleResponse,
     summary="Obtener empresa por cif",
+    description="Obtiene una empresa por su cif.",
 )
 @limiter.limit("60/minute")
 def obtener_empresa_cif(
@@ -616,7 +648,7 @@ def obtener_empresa_cif(
    Obtiene una empresa por su cif.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de empresa por cif ({cif_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de empresa por cif ({cif_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.cif == cif_empresa).first()
@@ -633,7 +665,10 @@ def obtener_empresa_cif(
         usuario_id=usuario_actual.id,
         empresa_id=empresa.id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_cif"},
+        detalle={
+            'recurso': "empresas",
+            'accion': "consultar_cif",
+        },
         trabajador_id=None
     )
 
@@ -644,6 +679,7 @@ def obtener_empresa_cif(
     "/{id_empresa}/trabajadores",
     response_model=List[TrabajadorResponse],
     summary="Obtener trabajadores de empresa",
+    description="Obtiene los trabajadores vinculados a una empresa específica.",
 )
 @limiter.limit("60/minute")
 def obtener_trabajadores_empresa(
@@ -658,7 +694,7 @@ def obtener_trabajadores_empresa(
     Obtiene los trabajadores vinculados a una empresa específica.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de trabajadores para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de trabajadores para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -675,7 +711,10 @@ def obtener_trabajadores_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "empresas", "accion": "consultar_trabajadores"},
+        detalle={
+            'recurso': "empresas",
+            'accion': "consultar_trabajadores",
+        },
         trabajador_id=None
     )
 

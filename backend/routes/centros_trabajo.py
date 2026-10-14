@@ -31,6 +31,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=CentroTrabajoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear centro de trabajo",
+    description="Registra una nueva sede física vinculada a una empresa cliente (tenant) validando los datos con Pydantic.",
 )
 @limiter.limit("20/minute")
 async def crear_centro_trabajo(
@@ -45,7 +46,7 @@ async def crear_centro_trabajo(
     Registra una nueva sede física vinculada a una empresa cliente (tenant) validando los datos con Pydantic.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de centro de trabajo desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de centro de trabajo desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -88,7 +89,10 @@ async def crear_centro_trabajo(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "centros_trabajo", "accion": "crear"},
+            detalle={
+                'recurso': "centros_trabajo",
+                'accion': "crear",
+            },
             trabajador_id=None
         )
 
@@ -105,6 +109,7 @@ async def crear_centro_trabajo(
     "/{id_centro}",
     response_model=CentroTrabajoResponse,
     summary="Modificar centro de trabajo",
+    description="Permite editar los datos del centro de trabajo y recalcula las coordenadas si es necesario.",
 )
 @limiter.limit("20/minute")
 async def modificar_centro_trabajo(
@@ -120,7 +125,7 @@ async def modificar_centro_trabajo(
     Permite editar los datos del centro de trabajo y recalcula las coordenadas si es necesario.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
@@ -167,7 +172,10 @@ async def modificar_centro_trabajo(
             usuario_id=usuario_actual.id,
             empresa_id=centro.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "centros_trabajo", "accion": "modificar"},
+            detalle={
+                'recurso': "centros_trabajo",
+                'accion': "modificar",
+            },
             trabajador_id=None
         )
 
@@ -184,6 +192,7 @@ async def modificar_centro_trabajo(
     "/{id_centro}/desactivar",
     status_code=status.HTTP_200_OK,
     summary="Desactivar centro de trabajo",
+    description="Desactivar un centro de trabajo.",
 )
 @limiter.limit("20/minute")
 def desactivar_centro_trabajo(
@@ -198,7 +207,7 @@ def desactivar_centro_trabajo(
     Desactivar un centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de desactivación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
@@ -209,8 +218,8 @@ def desactivar_centro_trabajo(
             detail=f"Centro de trabajo no encontrado."
         )
 
-    centro.activo = False
-    centro.updated_at = datetime.now()
+    setattr(centro, 'activo', False)
+    setattr(centro, 'updated_at', datetime.now())
 
     try:
         db.commit()
@@ -220,7 +229,10 @@ def desactivar_centro_trabajo(
             usuario_id=usuario_actual.id,
             empresa_id=centro.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "centros_trabajo", "accion": "desactivar"},
+            detalle={
+                'recurso': "centros_trabajo",
+                'accion': "desactivar",
+            },
             trabajador_id=None
         )
 
@@ -238,6 +250,7 @@ def desactivar_centro_trabajo(
     "/empresa/{id_empresa}",
     response_model=List[CentroTrabajoResponse],
     summary="Obtener centros de trabajo por empresa",
+    description="Obtiene los centros de trabajo de la empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_centros_trabajo_empresa(
@@ -252,7 +265,7 @@ def obtener_centros_trabajo_empresa(
     Obtiene los centros de trabajo de la empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de centros de trabajo para la empresa ({id_empresa}) desde la IP ){cliente_ip} por: {usuario_actual.email}.")
+    print(f"Petición de consulta de centros de trabajo para la empresa ({id_empresa}) desde la IP ){cliente_ip} por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     centros = (
@@ -268,7 +281,10 @@ def obtener_centros_trabajo_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "centros_trabajo", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "centros_trabajo",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -278,6 +294,7 @@ def obtener_centros_trabajo_empresa(
     "/{id_centro}",
     response_model=CentroTrabajoResponse,
     summary="Obtener centro de trabajo por id",
+    description="Obtiene los datos de un centro de trabajo por su id.",
 )
 @limiter.limit("60/minute")
 def obtener_centro_trabajo_id(
@@ -292,8 +309,9 @@ def obtener_centro_trabajo_id(
     Obtiene los datos de un centro de trabajo por su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     centro = (
         db.query(CentrosTrabajo)
         .options(joinedload(CentrosTrabajo.empresa))
@@ -314,7 +332,10 @@ def obtener_centro_trabajo_id(
         usuario_id=usuario_actual.id,
         empresa_id=centro.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "centros_trabajo", "accion": "consultar_id"},
+        detalle={
+            'recurso': "centros_trabajo",
+            'accion': "consultar_id",
+        },
         trabajador_id=None
     )
 

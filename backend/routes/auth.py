@@ -28,6 +28,7 @@ limiter = Limiter(key_func=get_remote_address)
     "/recuperar-password",
     status_code=status.HTTP_200_OK,
     summary="Solicitar recuperación de contraseña",
+    description="Valida el correo, genera un código aleatorio de 6 dígitos y lo envía por correo o por teléfono.",
 )
 @limiter.limit("5/minute")
 def solicitar_recuperacion_password(
@@ -88,8 +89,8 @@ def solicitar_recuperacion_password(
 
     # Guardar el código y su expiración (15 minutos con zona horaria UTC)
     try:
-        usuario.codigo_recuperacion = codigo_aleatorio
-        usuario.codigo_expira_at = datetime.datetime.now(timezone.utc) + timedelta(minutes=15)
+        setattr(usuario, 'codigo_recuperacion', codigo_aleatorio)
+        setattr(usuario, 'codigo_expira_at', datetime.datetime.now(timezone.utc) + timedelta(minutes=15))
 
         db.add(usuario)
         db.commit()
@@ -100,8 +101,11 @@ def solicitar_recuperacion_password(
             usuario_id=usuario.id,
             empresa_id=None,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "usuario", "accion": "solicitar_recuperacion_password"},
-            trabajador_id=None
+            detalle={
+                'recurso': "usuario",
+                'accion': "solicitar_recuperacion_password",
+            },
+            trabajador_id=usuario.trabajador_id
         )
 
         print(f"Código de recuperación generado para el usuario ({usuario.id}).")
@@ -125,6 +129,7 @@ def solicitar_recuperacion_password(
     "/confirmar-password",
     status_code=status.HTTP_200_OK,
     summary="Confirmar nueva contraseña",
+    description="Valida el código de recuperación enviado y actualiza la contraseña.",
 )
 @limiter.limit("5/minute")
 def confirmar_password(
@@ -138,7 +143,7 @@ def confirmar_password(
     Valida el código de recuperación enviado y actualiza la contraseña.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}")
+    print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}.")
 
     # Validaciones estructurales básicas
     usuario = None
@@ -186,8 +191,8 @@ def confirmar_password(
 
     if usuario.codigo_expira_at and datetime.datetime.now(timezone.utc) > usuario.codigo_expira_at:
         print(f"El código de recuperación ha expirado para el usuario ({usuario.id}).")
-        usuario.codigo_recuperacion = None
-        usuario.codigo_expira_at = None
+        setattr(usuario, 'codigo_recuperacion', None)
+        setattr(usuario, 'codigo_expira_at', None)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -196,15 +201,15 @@ def confirmar_password(
 
     # Hashear la nueva contraseña y actualizar el registro del usuario
     try:
-        usuario.password_hash = get_password_hash(payload.nueva_password)
+        setattr(usuario, 'password_hash', get_password_hash(payload.nueva_password))
 
         # Limpiamos los campos de recuperación consumidos
-        usuario.codigo_recuperacion = None
-        usuario.codigo_expira_at = None
+        setattr(usuario, 'codigo_recuperacion', None)
+        setattr(usuario, 'codigo_expira_at', None)
 
         # Actualizamos la fecha de modificación
         if hasattr(usuario, 'updated_at'):
-            usuario.updated_at = datetime.datetime.now(timezone.utc)
+            setattr(usuario, 'updated_at', datetime.datetime.now(timezone.utc))
 
         db.add(usuario)
         db.commit()
@@ -215,8 +220,11 @@ def confirmar_password(
             usuario_id=usuario.id,
             empresa_id=None,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "usuario", "accion": "confirmar_recuperacion_password"},
-            trabajador_id=None
+            detalle={
+                'recurso': "usuario",
+                'accion': "confirmar_recuperacion_password",
+            },
+            trabajador_id=usuario.trabajador_id
         )
 
         print(f"Contraseña actualizada exitosamente para el usuario ({usuario.id}).")

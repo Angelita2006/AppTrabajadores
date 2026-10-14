@@ -34,6 +34,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=DepartamentoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear departamento",
+    description="Crea un nuevo departamento dentro de una empresa.",
 )
 @limiter.limit("20/minute")
 def crear_departamento(
@@ -47,11 +48,12 @@ def crear_departamento(
     Crea un nuevo departamento dentro de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de departamento desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de departamento desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
     if not empresa:
+        print(f"Empresa ({payload.empresa_id}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Empresa con ID ({payload.empresa_id}) no encontrada."
@@ -93,7 +95,10 @@ def crear_departamento(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "departamentos", "accion": "crear"},
+            detalle={
+                'recurso': "departamentos",
+                'accion': "crear",
+            },
             trabajador_id=None
         )
 
@@ -110,6 +115,7 @@ def crear_departamento(
     "/{id_departamento}",
     response_model=DepartamentoResponse,
     summary="Modificar departamento",
+    description="Modifica los datos de un departamento.",
 )
 @limiter.limit("20/minute")
 def modificar_departamento(
@@ -124,7 +130,7 @@ def modificar_departamento(
     Modifica los datos de un departamento.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     departamento = (
@@ -145,7 +151,7 @@ def modificar_departamento(
     update_data = payload.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(departamento, key, value)
-    departamento.updated_at = datetime.now()
+    setattr(departamento, 'updated_at', datetime.now())
 
     try:
         db.commit()
@@ -164,7 +170,10 @@ def modificar_departamento(
             usuario_id=usuario_actual.id,
             empresa_id=departamento.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "departamentos", "accion": "modificar"},
+            detalle={
+                'recurso': "departamentos",
+                'accion': "modificar",
+            },
             trabajador_id=None
         )
 
@@ -181,6 +190,7 @@ def modificar_departamento(
     "/{id_departamento}/desactivar",
     status_code=status.HTTP_200_OK,
     summary="Desactivar departamento",
+    description="Desactivar un departamento.",
 )
 @limiter.limit("20/minute")
 def desactivar_departamento(
@@ -195,8 +205,9 @@ def desactivar_departamento(
     Desactivar un departamento.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de desactivación del departamento ({id_departamento}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     departamento = db.query(Departamentos).filter(Departamentos.id == id_departamento).first()
     if not departamento:
         print(f"Departamento ({id_departamento}) no encontrado.")
@@ -205,8 +216,8 @@ def desactivar_departamento(
             detail=f"Departamento no encontrado."
         )
 
-    departamento.activo = False
-    departamento.updated_at = datetime.now()
+    setattr(departamento, 'activo', False)
+    setattr(departamento, 'updated_at', datetime.now())
 
     try:
         db.commit()
@@ -217,7 +228,10 @@ def desactivar_departamento(
             usuario_id=usuario_actual.id,
             empresa_id=departamento.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "departamentos", "accion": "desactivar"},
+            detalle={
+                'recurso': "departamentos",
+                'accion': "desactivar",
+            },
             trabajador_id=None
         )
 
@@ -235,6 +249,7 @@ def desactivar_departamento(
     "/empresa/{id_empresa}",
     response_model=List[DepartamentoResponse],
     summary="Obtener departamentos por empresa",
+    description="Obtiene los departamentos de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_departamentos_empresa(
@@ -249,8 +264,9 @@ def obtener_departamentos_empresa(
     Obtiene los departamentos de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de departamentos para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de departamentos para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     resultados = (
         db.query(Departamentos).options(
         joinedload(Departamentos.empresa),
@@ -265,7 +281,10 @@ def obtener_departamentos_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "departamentos", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "departamentos",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -276,6 +295,7 @@ def obtener_departamentos_empresa(
     "/{id_departamento}",
     response_model=DepartamentoResponse,
     summary="Obtener departamento por id",
+    description="Obtiene un departamento mediante su id.",
 )
 @limiter.limit("60/minute")
 def obtener_departamento_id(
@@ -290,8 +310,9 @@ def obtener_departamento_id(
     Obtiene un departamento mediante su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de detalle del departamento ({id_departamento}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de detalle del departamento ({id_departamento}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     departamento = (
         db.query(Departamentos).options(
         joinedload(Departamentos.empresa),
@@ -313,7 +334,10 @@ def obtener_departamento_id(
         usuario_id=usuario_actual.id,
         empresa_id=departamento.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "departamentos", "accion": "consultar"},
+        detalle={
+            'recurso': "departamentos",
+            'accion': "consultar",
+        },
         trabajador_id=None
     )
 

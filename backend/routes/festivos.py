@@ -43,6 +43,7 @@ def crear_festivo(
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de creación de día festivo desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     calendario = (
         db.query(CalendariosLaborales).options(
         joinedload(CalendariosLaborales.empresa))
@@ -98,7 +99,10 @@ def crear_festivo(
             usuario_id=usuario_actual.id,
             empresa_id=calendario.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={'recurso': 'festivos', 'accion': 'crear'},
+            detalle={
+                'recurso': 'festivos',
+                'accion': 'crear',
+            },
             trabajador_id=None,
         )
 
@@ -196,7 +200,10 @@ def modificar_festivo(
             usuario_id=usuario_actual.id,
             empresa_id=calendario.empresa_id if calendario else None,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={'recurso': 'festivos', 'accion': 'modificar'},
+            detalle={
+                'recurso': 'festivos',
+                'accion': 'modificar',
+            },
             trabajador_id=None,
         )
 
@@ -228,7 +235,7 @@ def desactivar_festivo(
     Desactiva un día festivo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del festivo ({id_festivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de desactivación del festivo ({id_festivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
    
     # Validaciones estructurales básicas
     festivo = (
@@ -247,8 +254,8 @@ def desactivar_festivo(
         )
 
     try:
-        festivo.activo = False
-        festivo.updated_at = datetime.now()
+        setattr(festivo, 'activo', False)
+        setattr(festivo, 'updated_at', datetime.now())
         db.commit()
 
         registrar_auditoria(
@@ -257,7 +264,10 @@ def desactivar_festivo(
             usuario_id=usuario_actual.id,
             empresa_id=festivo.calendario.empresa_id if festivo.calendario else None,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={'recurso': 'festivos', 'accion': 'desactivar'},
+            detalle={
+                'recurso': 'festivos',
+                'accion': 'desactivar',
+            },
             trabajador_id=None,
         )
 
@@ -292,6 +302,7 @@ def obtener_festivos_calendario(
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de consulta de festivos para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     calendario = (
         db.query(CalendariosLaborales).options(
         joinedload(CalendariosLaborales.empresa))
@@ -309,7 +320,7 @@ def obtener_festivos_calendario(
     resultados = (
         db.query(Festivos).options(
         joinedload(Festivos.calendario)
-    .joinedload(CalendariosLaborales.empresa))
+        .joinedload(CalendariosLaborales.empresa))
         .filter(Festivos.calendario_id == id_calendario, Festivos.activo.is_(True))
         .order_by(Festivos.fecha.asc())
         .all()
@@ -321,7 +332,10 @@ def obtener_festivos_calendario(
         usuario_id=usuario_actual.id,
         empresa_id=calendario.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'festivos', 'accion': 'consultar_calendario'},
+        detalle={
+            'recurso': 'festivos',
+            'accion': 'consultar_calendario',
+        },
         trabajador_id=None,
     )
 

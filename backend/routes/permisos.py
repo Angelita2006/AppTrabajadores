@@ -22,9 +22,10 @@ limiter = Limiter(key_func=get_remote_address)
     '',
     response_model=List[PermisoSimpleResponse],
     summary='Obtener todos los permisos',
+    description="Obtiene todos los permisos del sistema disponibles.",
 )
 @limiter.limit("60/minute")
-def obtener_todos_los_permisos(
+def obtener__permisos(
     request: Request,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.PERMISOS])),
     db: Session = Depends(get_db_with_advanced_security),
@@ -32,12 +33,14 @@ def obtener_todos_los_permisos(
     """
     **GET /api/permisos**
 
-    Obtiene la lista completa de permisos del sistema disponibles.
+    Obtiene todos los permisos del sistema disponibles.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de permisos desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de listado de permisos desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     if not usuario_actual.activo:
+        print("La cuenta de usuario se encuentra inactiva.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta de usuario se encuentra inactiva.")
 
     resultados = db.query(Permisos).all()
@@ -48,7 +51,10 @@ def obtener_todos_los_permisos(
         usuario_id=usuario_actual.id,
         empresa_id=request.headers.get('Empresa-ID'),
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={'recurso': 'permisos', 'accion': 'obtener_todos', 'entidad_id': None, 'detalles': 'Se consultó la lista completa de permisos del sistema'},
+        detalle={
+            'recurso': 'permisos',
+            'accion': 'obtener_todos',
+        },
         trabajador_id=None,
     )
     db.commit()
@@ -59,35 +65,39 @@ def obtener_todos_los_permisos(
     '',
     response_model=PermisoSimpleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary='Crear permiso de seguridad',
+    summary='Crear permiso',
+    description="Crea un nuevo permiso.",
 )
 @limiter.limit("10/minute")
-def crear_permiso_seguridad(
+def crear_permiso(
     request: Request,
-    obj_in: PermisoCreate,
+    payload: PermisoCreate,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.PERMISOS])),
     db: Session = Depends(get_db_with_advanced_security),
 ):
     """
     **POST /api/permisos**
 
-    Registra un nuevo permiso de seguridad en el sistema validando privilegios administrativos.
+    Crea un nuevo permiso.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de permiso desde la IP ({cliente_ip}) por el administrador: {usuario_actual.email}")
+    print(f"Petición de creación de permiso desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     if not usuario_actual.activo:
+        print("La cuenta de usuario se encuentra inactiva.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta de usuario se encuentra inactiva.")
 
     try:
-        permiso_existente = db.query(Permisos).filter(Permisos.codigo == obj_in.codigo).first()
+        permiso_existente = db.query(Permisos).filter(Permisos.tipo == payload.tipo, Permisos.accion == payload.accion).first()
         if permiso_existente:
+            print(f"Ya existe un permiso registrado con el tipo '{payload.tipo}' y la acción ({payload.accion}).")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ya existe un permiso registrado con el código '{obj_in.codigo}'."
+                detail=f"Ya existe un permiso registrado con esa combinación de tipo y acción."
             )
 
-        nuevo_permiso = Permisos(codigo=obj_in.codigo, descripcion=obj_in.descripcion)
+        nuevo_permiso = Permisos(tipo=payload.tipo, accion=payload.accion, descripcion=payload.descripcion)
         db.add(nuevo_permiso)
 
         registrar_auditoria(
@@ -96,19 +106,21 @@ def crear_permiso_seguridad(
             usuario_id=usuario_actual.id,
             empresa_id=request.headers.get('Empresa-ID'),
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={'recurso': 'permisos', 'accion': 'crear_permiso', 'entidad_id': str(nuevo_permiso.id) if hasattr(nuevo_permiso, 'id') else None, 'detalles': f"Se ha registrado un nuevo permiso con código '{obj_in.codigo}'"},
+            detalle={
+                'recurso': 'permisos',
+                'accion': 'crear',
+            },
             trabajador_id=None,
         )
 
         db.commit()
         db.refresh(nuevo_permiso)
+
         return nuevo_permiso
-    except HTTPException as http_error:
-        raise http_error
     except Exception as e:
         db.rollback()
-        print(f"Error al ejecutar crear_permiso_seguridad: {e}")
+        print(f"No se ha podido crear el permiso: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail='No se ha podido guardar el permiso'
+            detail='No se ha podido crear el permiso.'
         )

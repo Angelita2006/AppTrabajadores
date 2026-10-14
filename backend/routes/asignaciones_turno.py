@@ -33,6 +33,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=AsignacionTurnoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Asignar turno a contrato",
+    description="Vincula un turno a un contrato.",
 )
 @limiter.limit("20/minute")
 def asignar_turno_contrato(
@@ -86,7 +87,10 @@ def asignar_turno_contrato(
             usuario_id=usuario_actual.id,
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "asignaciones_turno", "accion": "crear"},
+            detalle={
+                'recurso': "asignaciones_turno",
+                'accion': "crear",
+            },
             trabajador_id=contrato.trabajador_id
         )
 
@@ -112,6 +116,7 @@ def asignar_turno_contrato(
     response_model=List[AsignacionTurnoResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Asignar masivamente turnos",
+    description="Vincula múltiples turnos a un contrato.",
 )
 @limiter.limit("20/minute")
 def asignar_turnos_masivamente(
@@ -176,7 +181,10 @@ def asignar_turnos_masivamente(
             usuario_id=usuario_actual.id,
             empresa_id=trabajador.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "asignaciones_turno", "accion": "crear_masivamente"},
+            detalle={
+                'recurso': "asignaciones_turno",
+                'accion': "crear_masivamente",
+            },
             trabajador_id=trabajador.id
         )
 
@@ -201,6 +209,7 @@ def asignar_turnos_masivamente(
     "/{id_asignacion}/modificar",
     response_model=AsignacionTurnoResponse,
     summary="Modificar asignación de turno",
+    description="Modifica los datos sobre una asignación de turno de un conrato.",
 )
 @limiter.limit("20/minute")
 def modificar_asignacion_turno(
@@ -216,7 +225,7 @@ def modificar_asignacion_turno(
     Modifica los datos sobre una asignación de turno de un conrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación para la asignación de turno ({id_asignacion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación para la asignación de turno ({id_asignacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     asignacion = db.query(AsignacionesTurno).filter(AsignacionesTurno.id == id_asignacion).first()
@@ -249,7 +258,10 @@ def modificar_asignacion_turno(
         usuario_id=usuario_actual.id,
         empresa_id=asignacion.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "asignaciones_turno", "accion": "modificar"},
+        detalle={
+            'recurso': "asignaciones_turno",
+            'accion': "modificar",
+        },
         trabajador_id=asignacion.trabajador_id
     )
 
@@ -267,6 +279,7 @@ def modificar_asignacion_turno(
     "/{id_asignacion}/finalizar",
     response_model=AsignacionTurnoResponse,
     summary="Finalizar vigencia de asignación de turno",
+    description="Establece la fecha de vencimiento de una asignación de turno para permitir rotaciones horarias.",
 )
 @limiter.limit("20/minute")
 def finalizar_vigencia_turno(
@@ -282,7 +295,7 @@ def finalizar_vigencia_turno(
     Establece la fecha de vencimiento de una asignación de turno para permitir rotaciones horarias.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de finalización de vigencia para la asignación de turno ({id_asignacion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de finalización de vigencia para la asignación de turno ({id_asignacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     asignacion = db.query(AsignacionesTurno).filter(AsignacionesTurno.id == id_asignacion).first()
@@ -307,7 +320,10 @@ def finalizar_vigencia_turno(
         usuario_id=usuario_actual.id,
         empresa_id=asignacion.empresa_id,
         accion=AccionAuditoriaEnum.BAJA_LOGICA,
-        detalle={"recurso": "asignaciones_turno", "accion": "finalizar"},
+        detalle={
+            'recurso': "asignaciones_turno",
+            'accion': "finalizar",
+        },
         trabajador_id=asignacion.trabajador_id
     )
 
@@ -326,6 +342,7 @@ def finalizar_vigencia_turno(
     "/{id_asignacion}",
     status_code=status.HTTP_200_OK,
     summary="Eliminar asignación de turno",
+    description="Elimina una asignación de turno de un contrato.",
 )
 def eliminar_asignacion_turno(
     request: Request,
@@ -357,7 +374,10 @@ def eliminar_asignacion_turno(
         usuario_id=usuario_actual.id,
         empresa_id=asignacion.empresa_id,
         accion=AccionAuditoriaEnum.ELIMINACION,
-        detalle={"recurso": "asignaciones_turno", "accion": "eliminar"},
+        detalle={
+            'recurso': "asignaciones_turno",
+            'accion': "eliminar",
+        },
         trabajador_id=asignacion.trabajador_id
     )
 
@@ -369,6 +389,7 @@ def eliminar_asignacion_turno(
     "/contrato/{id_contrato}",
     status_code=status.HTTP_200_OK,
     summary="Eliminar asignaciones del contrato",
+    description="Elimina todas las asignaciones de turno vinculadas al contrato.",
 )
 def eliminar_asignaciones_contrato(
     request: Request,
@@ -382,7 +403,7 @@ def eliminar_asignaciones_contrato(
     Elimina todas las asignaciones de turno vinculadas al contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición para eliminar las asignaciones de turno del contrato ({id_contrato}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición para eliminar las asignaciones de turno del contrato ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
@@ -411,7 +432,10 @@ def eliminar_asignaciones_contrato(
             usuario_id=usuario_actual.id,
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "asignaciones_turno", "accion": "eliminar_contrato"},
+            detalle={
+                'recurso': "asignaciones_turno",
+                'accion': "eliminar_contrato",
+            },
             trabajador_id=contrato.trabajador_id
         )
 
@@ -429,6 +453,7 @@ def eliminar_asignaciones_contrato(
     "/{id_asignacion}",
     response_model=List[AsignacionTurnoResponse],
     summary="Obtener asignación por id",
+    description="Obtiene las asignaciones de turnos por contrato.",
 )
 def obtener_asignacion_id(
     request: Request,
@@ -442,7 +467,7 @@ def obtener_asignacion_id(
     Obtiene las asignaciones de turnos por contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de la asignacion de turno ({id_asignacion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de la asignacion de turno ({id_asignacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     asignacion = db.query(AsignacionesTurno).options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno)).filter(AsignacionesTurno.id == id_asignacion).first()
@@ -461,7 +486,10 @@ def obtener_asignacion_id(
         usuario_id=usuario_actual.id,
         empresa_id=asignacion.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "asignaciones_turno", "accion": "consultar_id"},
+        detalle={
+            'recurso': "asignaciones_turno",
+            'accion': "consultar_id",
+        },
         trabajador_id=contrato.trabajador_id
     )
 
@@ -471,6 +499,7 @@ def obtener_asignacion_id(
     "/contrato/{id_contrato}",
     response_model=List[AsignacionTurnoResponse],
     summary="Obtener asignaciones por contrato",
+    description="Obtiene las asignaciones de turnos por contrato.",
 )
 def obtener_asignaciones_contrato(
     request: Request,
@@ -484,7 +513,7 @@ def obtener_asignaciones_contrato(
     Obtiene las asignaciones de turnos por contrato.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de asignaciones de turno para el contrato ({id_contrato}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de asignaciones de turno para el contrato ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
@@ -498,7 +527,10 @@ def obtener_asignaciones_contrato(
         usuario_id=usuario_actual.id,
         empresa_id=contrato.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "asignaciones_turno", "accion": "consultar_contrato"},
+        detalle={
+            'recurso': "asignaciones_turno",
+            'accion': "consultar_contrato",
+        },
         trabajador_id=contrato.trabajador_id
     )
 

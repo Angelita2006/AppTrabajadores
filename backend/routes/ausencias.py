@@ -32,6 +32,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=AusenciaResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear ausencia",
+    description="Crea una nueva ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.",
 )
 @limiter.limit("20/minute")
 def crear_ausencia(
@@ -46,7 +47,7 @@ def crear_ausencia(
     Crea una nueva ausencia (vacaciones, baja, etc.) en estado 'pendiente' por defecto.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de registro de ausencia para el trabajador ({payload.trabajador_id}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de registro de ausencia para el trabajador ({payload.trabajador_id}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -80,7 +81,10 @@ def crear_ausencia(
             usuario_id=usuario_actual.id,
             empresa_id=empresa.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "ausencias", "accion": "crear"},
+            detalle={
+                'recurso': "ausencias",
+                'accion': "crear",
+            },
             trabajador_id=trabajador.id
         )
 
@@ -105,6 +109,7 @@ def crear_ausencia(
     "/{id_ausencia}",
     response_model=AusenciaResponse,
     summary="Modificar ausencia",
+    description="Modificar una ausencia.",
 )
 @limiter.limit("20/minute")
 def modificar_ausencia(
@@ -120,7 +125,7 @@ def modificar_ausencia(
     Modificar una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación para la ausencia ({id_ausencia}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación para la ausencia ({id_ausencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
@@ -149,7 +154,10 @@ def modificar_ausencia(
         usuario_id=usuario_actual.id,
         empresa_id=ausencia.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "ausencias", "accion": "modificar"},
+        detalle={
+            'recurso': "ausencias",
+            'accion': "modificar",
+        },
         trabajador_id=ausencia.trabajador_id
     )
 
@@ -167,6 +175,7 @@ def modificar_ausencia(
     "/{id_ausencia}/resolver",
     response_model=AusenciaResponse,
     summary="Resolver ausencia",
+    description="Tramita la resolución (aprobación/rechazo) de una ausencia.",
 )
 @limiter.limit("20/minute")
 def resolver_ausencia(
@@ -182,7 +191,7 @@ def resolver_ausencia(
     Tramita la resolución (aprobación/rechazo) de una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de resolución para la ausencia ({id_ausencia}) con estado '{payload.estado}' desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de resolución para la ausencia ({id_ausencia}) con estado '{payload.estado}' desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
@@ -219,7 +228,10 @@ def resolver_ausencia(
         usuario_id=usuario_actual.id,
         empresa_id=ausencia.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "ausencias", "accion": "resolver"},
+        detalle={
+            'recurso': "ausencias",
+            'accion': "resolver",
+        },
         trabajador_id=ausencia.trabajador_id
     )
 
@@ -237,6 +249,7 @@ def resolver_ausencia(
     "/{id_ausencia}/cancelar",
     response_model=AusenciaResponse,
     summary="Cancelar ausencia",
+    description="Tramita la cancelación de una ausencia.",
 )
 @limiter.limit("20/minute")
 def cancelar_ausencia(
@@ -252,7 +265,7 @@ def cancelar_ausencia(
     Tramita la cancelación de una ausencia.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de cancelación para la ausencia ({id_ausencia}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de cancelación para la ausencia ({id_ausencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     ausencia = db.query(Ausencias).filter(Ausencias.id == id_ausencia).first()
@@ -277,7 +290,10 @@ def cancelar_ausencia(
         usuario_id=usuario_actual.id,
         empresa_id=ausencia.empresa_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={"recurso": "ausencias", "accion": "cancelar"},
+        detalle={
+            'recurso': "ausencias",
+            'accion': "cancelar",
+        },
         trabajador_id=ausencia.trabajador_id
     )
 
@@ -295,6 +311,7 @@ def cancelar_ausencia(
     "/{id_ausencia}",
     response_model=List[AusenciaResponse],
     summary="Obtener ausencia por id",
+    description="Obtiene la ausencia por id.",
 )
 def obtener_ausencia_id(
     request: Request,
@@ -308,7 +325,7 @@ def obtener_ausencia_id(
     Obtiene la ausencia por id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de ausencia por id ({id_ausencia}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de ausencia por id ({id_ausencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa_id = request.headers.get("Empresa-ID")
@@ -323,8 +340,11 @@ def obtener_ausencia_id(
         usuario_id=usuario_actual.id,
         empresa_id=empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "ausencias", "accion": "consultar_id"},
-        trabajador_id=None
+        detalle={
+            'recurso': "ausencias",
+            'accion': "consultar_id",
+        },
+        trabajador_id=ausencia.trabajador_id
     )
 
     return ausencia
@@ -333,6 +353,7 @@ def obtener_ausencia_id(
     "/empresa/{id_empresa}",
     response_model=List[AusenciaResponse],
     summary="Obtener ausencias por empresa",
+    description="Obtiene las ausencias de una empresa.",
 )
 def obtener_ausencias_empresa(
     request: Request,
@@ -346,7 +367,7 @@ def obtener_ausencias_empresa(
     Obtiene las ausencias de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de ausencias para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de ausencias para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -360,7 +381,10 @@ def obtener_ausencias_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "ausencias", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "ausencias",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -377,6 +401,7 @@ def obtener_ausencias_empresa(
     "/trabajador/{id_trabajador}",
     response_model=List[AusenciaResponse],
     summary="Obtener ausencias por trabajador",
+    description="Obtiene las ausencias de un trabajador.",
 )
 def obtener_ausencias_trabajador(
     request: Request,
@@ -390,7 +415,7 @@ def obtener_ausencias_trabajador(
     Obtiene las ausencias de un trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de ausencias para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de ausencias para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
@@ -404,7 +429,10 @@ def obtener_ausencias_trabajador(
         usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "ausencias", "accion": "consultar_trabajador"},
+        detalle={
+            'recurso': "ausencias",
+            'accion': "consultar_trabajador",
+        },
         trabajador_id=id_trabajador
     )
 

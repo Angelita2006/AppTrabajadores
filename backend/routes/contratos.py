@@ -34,6 +34,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=ContratoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear contrato laboral",
+    description="Crear un nuevo contrato laboral.",
 )
 @limiter.limit("20/minute")
 def crear_contrato_laboral(
@@ -48,7 +49,7 @@ def crear_contrato_laboral(
     Crear un nuevo contrato laboral.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de contrato laboral desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de contrato laboral desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -137,7 +138,10 @@ def crear_contrato_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "contratos", "accion": "crear"},
+            detalle={
+                'recurso': "contratos",
+                'accion': "crear",
+            },
             trabajador_id=payload.trabajador_id
         )
 
@@ -154,6 +158,7 @@ def crear_contrato_laboral(
     "/{id_contrato}",
     response_model=ContratoResponse,
     summary="Modificar contrato laboral",
+    description="Modifica los datos de un contrato laboral existente.",
 )
 @limiter.limit("20/minute")
 def modificar_contrato_laboral(
@@ -169,7 +174,7 @@ def modificar_contrato_laboral(
     Modifica los datos de un contrato laboral existente.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
@@ -211,7 +216,10 @@ def modificar_contrato_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "contratos", "accion": "modificar"},
+            detalle={
+                'recurso': "contratos",
+                'accion': "modificar",
+            },
             trabajador_id=contrato.trabajador_id
         )
 
@@ -229,6 +237,7 @@ def modificar_contrato_laboral(
     "/{id_contrato}/finalizar",
     response_model=ContratoResponse,
     summary="Finalizar contrato laboral",
+    description="Establece la fecha de finalización el contrato laboral.",
 )
 @limiter.limit("20/minute")
 def finalizar_contrato_laboral(
@@ -244,7 +253,7 @@ def finalizar_contrato_laboral(
     Establece la fecha de finalización el contrato laboral.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de finalización del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de finalización del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
@@ -287,7 +296,10 @@ def finalizar_contrato_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "contratos", "accion": "finalizar"},
+            detalle={
+                'recurso': "contratos",
+                'accion': "finalizar",
+            },
             trabajador_id=contrato.trabajador_id
         )
 
@@ -304,6 +316,7 @@ def finalizar_contrato_laboral(
     "/{id_contrato}",
     response_model=ContratoResponse,
     summary="Eliminar contrato laboral",
+    description="Elimina el contrato laboral.",
 )
 @limiter.limit("20/minute")
 def eliminar_contrato_laboral(
@@ -318,7 +331,7 @@ def eliminar_contrato_laboral(
     Elimina el contrato laboral.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de eliminación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de eliminación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
@@ -339,7 +352,10 @@ def eliminar_contrato_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "contratos", "accion": "eliminar"},
+            detalle={
+                'recurso': "contratos",
+                'accion': "eliminar",
+            },
             trabajador_id=contrato.trabajador_id
         )
 
@@ -357,6 +373,7 @@ def eliminar_contrato_laboral(
     "/trabajador/{id_trabajador}",
     response_model=List[ContratoResponse],
     summary="Obtener contratos laborales por trabajador",
+    description="Obtiene los contratos laborales del trabajador.",
 )
 @limiter.limit("60/minute")
 def obtener_contratos_laborales_trabajador(
@@ -371,7 +388,7 @@ def obtener_contratos_laborales_trabajador(
     Obtiene los contratos laborales del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de contratos para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de contratos para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
@@ -400,7 +417,10 @@ def obtener_contratos_laborales_trabajador(
         usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "contratos", "accion": "consultar_trabajador"},
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_trabajador",
+        },
         trabajador_id=id_trabajador
     )
 
@@ -410,6 +430,7 @@ def obtener_contratos_laborales_trabajador(
     "/empresa/{id_empresa}",
     response_model=List[ContratoResponse],
     summary="Obtener contratos laborales por empresa",
+    description="Obtiene los contratos laborales de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_contratos_laborales_empresa(
@@ -424,8 +445,9 @@ def obtener_contratos_laborales_empresa(
     Obtiene los contratos laborales de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de contratos laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de contratos laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     contratos = (
         db.query(Contratos).options(
         joinedload(Contratos.empresa),
@@ -444,7 +466,10 @@ def obtener_contratos_laborales_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "contratos", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -455,6 +480,7 @@ def obtener_contratos_laborales_empresa(
     "/trabajador/{id_trabajador}/empresa/{id_empresa}/activo",
     response_model=ContratoResponse,
     summary="Obtener contrato laboral activo de un trabajador",
+    description="Obtiene el contrato laboral activo de un trabajador.",
 )
 @limiter.limit("60/minute")
 def obtener_contrato_laboral_activo_trabajador_empresa(
@@ -470,7 +496,7 @@ def obtener_contrato_laboral_activo_trabajador_empresa(
     Obtiene el contrato laboral activo de un trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de contrato laboral activo para el trabajador ({id_trabajador}) en la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de contrato laboral activo para el trabajador ({id_trabajador}) en la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     hoy = date.today()
@@ -506,7 +532,10 @@ def obtener_contrato_laboral_activo_trabajador_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "contratos", "accion": "consultar_activo"},
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_activo",
+        },
         trabajador_id=id_trabajador
     )
 

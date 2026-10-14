@@ -47,7 +47,7 @@ async def importar_calendario_pdf(
     Procesa un archivo PDF mediante IA para extraer e importar automáticamente los días festivos de un calendario laboral.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de importación de PDF para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de importación de PDF para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == id_calendario).first()
@@ -56,6 +56,7 @@ async def importar_calendario_pdf(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario laboral no encontrado.")
 
     if not file.filename or not file.filename.lower().endswith('.pdf'):
+        print("El archivo debe ser un formato PDF válido.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo debe ser un formato PDF válido.")
 
     try:
@@ -77,8 +78,8 @@ async def importar_calendario_pdf(
             ).first()
 
             if festivo_existente:
-                festivo_existente.descripcion = f["descripcion"] if f.get("descripcion") is not None else ""
-                festivo_existente.tipo = f["tipo"]
+                setattr(festivo_existente, 'descripcion', f["descripcion"] if f.get("descripcion") is not None else "")
+                setattr(festivo_existente, 'tipo', f["tipo"])
                 festivos_finales_retorno.append(festivo_existente)
             else:
                 # Si no existe, crear el registro desde cero de forma segura
@@ -104,7 +105,10 @@ async def importar_calendario_pdf(
                 usuario_id=usuario_actual.id,
                 empresa_id=calendario.empresa_id,
                 accion=AccionAuditoriaEnum.CREACION,
-                detalle={"recurso": "calendarios_laborales", "accion": "importar_pdf"},
+                detalle={
+                    'recurso': "calendarios_laborales",
+                    'accion': "importar_pdf",
+                },
                 trabajador_id=None
             )
 
@@ -126,13 +130,14 @@ async def importar_calendario_pdf(
     except Exception as e:
         db.rollback()  # Revierte cualquier cambio si ocurre un error imprevisto
         print(f"Error detallado en la persistencia del PDF para el calendario {id_calendario}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error al procesar y guardar el PDF.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error al procesar y guardar el PDF.")
 
 @router.post(
     "",
     response_model=CalendarioLaboralResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear calendario laboral",
+    description="Crea un nuevo calendario laboral anual asociándolo a una empresa o centro de trabajo.",
 )
 @limiter.limit("20/minute")
 def crear_calendario_laboral(
@@ -147,7 +152,7 @@ def crear_calendario_laboral(
     Crea un nuevo calendario laboral anual asociándolo a una empresa o centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de calendario laboral desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de calendario laboral desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -188,7 +193,10 @@ def crear_calendario_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "calendarios_laborales", "accion": "crear"},
+            detalle={
+                'recurso': "calendarios_laborales",
+                'accion': "crear",
+            },
             trabajador_id=None
         )
 
@@ -213,6 +221,7 @@ def crear_calendario_laboral(
     "/{id_calendario}",
     response_model=CalendarioLaboralResponse,
     summary="Modificar calendario laboral",
+    description="Modifica los datos de un calendario existente.",
 )
 @limiter.limit("20/minute")
 def modificar_calendario_laboral(
@@ -228,7 +237,7 @@ def modificar_calendario_laboral(
     Modifica los datos de un calendario existente.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de actualización del calendario laboral ({id_calendario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de actualización del calendario laboral ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == id_calendario).first()
@@ -241,9 +250,9 @@ def modificar_calendario_laboral(
 
     try:
         if payload.nombre is not None:
-            calendario.nombre = payload.nombre
+            setattr(calendario, 'nombre', payload.nombre)
         if payload.activo is not None:
-            calendario.activo = payload.activo
+            setattr(calendario, 'activo', payload.activo)
 
         db.add(calendario)
         db.commit()
@@ -254,7 +263,10 @@ def modificar_calendario_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=calendario.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "calendarios_laborales", "accion": "modificar"},
+            detalle={
+                'recurso': "calendarios_laborales",
+                'accion': "modificar",
+            },
             trabajador_id=None
         )
 
@@ -278,6 +290,7 @@ def modificar_calendario_laboral(
     "/{id_calendario}/desactivar",
     status_code=status.HTTP_200_OK,
     summary="Desactivar calendario laboral",
+    description="Desactiva un calendario.",
 )
 @limiter.limit("20/minute")
 def desactivar_calendario_laboral(
@@ -292,7 +305,7 @@ def desactivar_calendario_laboral(
     Desactiva un calendario.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del calendario laboral ({id_calendario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de desactivación del calendario laboral ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     calendario = db.query(CalendariosLaborales).filter(CalendariosLaborales.id == id_calendario).first()
@@ -303,8 +316,8 @@ def desactivar_calendario_laboral(
             detail=f"Calendario laboral no encontrado."
         )
 
-    calendario.activo = False
-    calendario.updated_at = datetime.now()
+    setattr(calendario, 'activo', False)
+    setattr(calendario, 'updated_at', datetime.now())
 
     try:
         db.commit()
@@ -315,7 +328,10 @@ def desactivar_calendario_laboral(
             usuario_id=usuario_actual.id,
             empresa_id=calendario.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "calendarios_laborales", "accion": "desactivar"},
+            detalle={
+                'recurso': "calendarios_laborales",
+                'accion': "desactivar",
+            },
             trabajador_id=None
         )
 
@@ -333,6 +349,7 @@ def desactivar_calendario_laboral(
     "/empresa/{id_empresa}/con-festivos",
     response_model=List[CalendarioConFestivosResponse],
     summary="Obtener calendarios laborales con festivos por empresa",
+    description="Obtiene todos los calendarios laborales de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_calendarios_laborales_festivos_empresa(
@@ -347,7 +364,7 @@ def obtener_calendarios_laborales_festivos_empresa(
     Obtiene todos los calendarios laborales de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de calendarios laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de calendarios laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -364,7 +381,10 @@ def obtener_calendarios_laborales_festivos_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "calendarios_laborales", "accion": "consultar_con_festivos_empresa"},
+        detalle={
+            'recurso': "calendarios_laborales",
+            'accion': "consultar_con_festivos_empresa",
+        },
         trabajador_id=None
     )
 
@@ -413,6 +433,7 @@ def obtener_calendarios_laborales_festivos_empresa(
     "/empresa/{id_empresa}",
     response_model=List[CalendarioLaboralResponse],
     summary="Obtener calendarios lalborales por empresa",
+    description="Obtiene los calendarios laborales de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_calendarios_laborales_empresa(
@@ -427,7 +448,7 @@ def obtener_calendarios_laborales_empresa(
     Obtiene los calendarios laborales de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de calendarios para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de calendarios para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -441,7 +462,10 @@ def obtener_calendarios_laborales_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "calendarios_laborales", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "calendarios_laborales",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -458,6 +482,7 @@ def obtener_calendarios_laborales_empresa(
     "/centro/{id_centro}",
     response_model=List[CalendarioLaboralResponse],
     summary="Obtener calendarios laborales por centro de trabajo",
+    description="Recupera los calendarios asociados específicamente a una sede física concreta.",
 )
 @limiter.limit("60/minute")
 def obtener_calendarios_laborales_centro(
@@ -486,7 +511,10 @@ def obtener_calendarios_laborales_centro(
         usuario_id=usuario_actual.id,
         empresa_id=centro.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "calendarios_laborales", "accion": "consultar_centro"},
+        detalle={
+            'recurso': "calendarios_laborales",
+            'accion': "consultar_centro",
+        },
         trabajador_id=None
     )
 
@@ -503,6 +531,7 @@ def obtener_calendarios_laborales_centro(
     "/{id_calendario}",
     response_model=CalendarioConFestivosResponse,
     summary="Obtener calendario laboral por id",
+    description="Obtiene un calendario laboral con sus festivos por su id.",
 )
 @limiter.limit("60/minute")
 def obtener_calendario_laboral_id(
@@ -517,8 +546,9 @@ def obtener_calendario_laboral_id(
     Obtiene un calendario laboral con sus festivos por su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del calendario ({id_calendario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta del calendario ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     calendario = (
         db.query(CalendariosLaborales)
         .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
@@ -538,7 +568,10 @@ def obtener_calendario_laboral_id(
         usuario_id=usuario_actual.id,
         empresa_id=calendario.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "calendarios_laborales", "accion": "consultar_id"},
+        detalle={
+            'recurso': "calendarios_laborales",
+            'accion': "consultar_id",
+        },
         trabajador_id=None
     )
 

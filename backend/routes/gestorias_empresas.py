@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+﻿from datetime import date, datetime, timezone
 from typing import List
 from uuid import UUID
 
@@ -33,26 +33,20 @@ router = APIRouter(prefix="/api/gestorias-empresas", tags=["Gestorías y empresa
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-def _empresa_contexto(request: Request) -> UUID:
-    valor = request.headers.get("Empresa-ID")
-    try:
-        return UUID(valor) if valor else None
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="La cabecera Empresa-ID no contiene un UUID válido.") from exc
-
-
 def _relacion_gestoria(db: Session, id_relacion: UUID) -> GestoriasEmpresas:
     relacion = (
-        db.query(GestoriasEmpresas)
-        .options(
-            joinedload(GestoriasEmpresas.empresa_gestora),
-            joinedload(GestoriasEmpresas.empresa_cliente),
-        )
+        db.query(GestoriasEmpresas).options(
+        joinedload(GestoriasEmpresas.empresa_gestora),
+        joinedload(GestoriasEmpresas.empresa_cliente))
         .filter(GestoriasEmpresas.id == id_relacion)
         .first()
     )
     if not relacion:
-        raise HTTPException(status_code=404, detail="No se encontró la autorización entre gestoría y empresa.")
+        print(f"Relación ({id_relacion}) no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la autorización entre gestoría y empresa."
+        )
     return relacion
 
 
@@ -60,24 +54,22 @@ def _es_superadmin_global(db: Session, usuario_id: UUID) -> bool:
     return (
         db.query(UsuariosEmpresas.id)
         .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
-        .filter(
-            UsuariosEmpresas.usuario_id == usuario_id,
+        .filter(UsuariosEmpresas.usuario_id == usuario_id,
             UsuariosEmpresas.empresa_id.is_(None),
             UsuariosEmpresas.activo.is_(True),
-            Roles.tipo == TipoRolEnum.SUPERADMINISTRADOR,
-        )
+            Roles.tipo == TipoRolEnum.SUPERADMINISTRADOR)
         .first()
         is not None
     )
-
 
 @router.get(
     "",
     response_model=List[GestoriaEmpresaSimpleResponse],
     summary="Listar autorizaciones de gestoría",
+    description="Lista las autorizaciones visibles para la empresa activa.",
 )
 @limiter.limit("60/minute")
-def listar_autorizaciones_gestoria(
+def obtener_autorizaciones_gestorias(
     request: Request,
     usuario_actual: Usuarios = Depends(
         verificar_permisos_requeridos([
@@ -91,24 +83,28 @@ def listar_autorizaciones_gestoria(
     Lista las autorizaciones visibles para la empresa activa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de listado de autorizaciones de gestoría desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
-    empresa_id = _empresa_contexto(request)
+    print(f"Petición de listado de autorizaciones de gestoría desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    
+    # Validaciones estructurales básicas
+    empresa_id = request.headers.get("Empresa-ID")
     if empresa_id is None:
         if not _es_superadmin_global(db, usuario_actual.id):
-            raise HTTPException(status_code=400, detail="Debe seleccionar una empresa activa.")
+            print("Debe seleccionar una empresa activa.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debe seleccionar una empresa activa.")
         return db.query(GestoriasEmpresas).order_by(GestoriasEmpresas.created_at.desc()).all()
     consulta = db.query(GestoriasEmpresas).filter(
         (GestoriasEmpresas.empresa_gestora_id == empresa_id)
         | (GestoriasEmpresas.empresa_cliente_id == empresa_id)
     )
     relaciones = consulta.order_by(GestoriasEmpresas.created_at.desc()).all()
+    
     return relaciones
-
 
 @router.get(
     "/{id_relacion}",
     response_model=GestoriaEmpresaSimpleResponse,
     summary="Obtener autorización de gestoría",
+    description="Obtiene una autorización relacionada con la empresa activa.",
 )
 @limiter.limit("60/minute")
 def obtener_autorizacion_gestoria(
@@ -126,19 +122,26 @@ def obtener_autorizacion_gestoria(
     Obtiene una autorización relacionada con la empresa activa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de autorización de gestoría con identificador ({id_relacion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de autorización de gestoría con identificador ({id_relacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    
+    # Validaciones estructurales básicas
     relacion = _relacion_gestoria(db, id_relacion)
-    empresa_id = _empresa_contexto(request)
+    empresa_id = request.headers.get("Empresa-ID")
     if empresa_id not in (relacion.empresa_gestora_id, relacion.empresa_cliente_id) and not _es_superadmin_global(db, usuario_actual.id):
-        raise HTTPException(status_code=404, detail="No se encontró la autorización solicitada.")
+        print("No se encontró la autorización solicitada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se encontró la autorización solicitada."
+        )
+    
     return relacion
-
 
 @router.post(
     "",
     response_model=GestoriaEmpresaSimpleResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Autorizar a una gestoría sobre una empresa cliente",
+    description="Registra la autorización de la gestoría seleccionada sobre una empresa cliente.",
 )
 @limiter.limit("20/minute")
 def crear_autorizacion_gestoria(
@@ -156,20 +159,42 @@ def crear_autorizacion_gestoria(
     Registra la autorización de la gestoría seleccionada sobre una empresa cliente.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de autorización de gestoría desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
-    gestoria_id = _empresa_contexto(request)
+    print(f"Petición de creación de autorización de gestoría desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    
+    # Validaciones estructurales básicas
+    gestoria_id = request.headers.get("Empresa-ID")
     gestoria = db.query(Empresas).filter(Empresas.id == gestoria_id).first()
     cliente = db.query(Empresas).filter(Empresas.id == payload.empresa_cliente_id).first()
     if not gestoria or not gestoria.es_gestoria:
-        raise HTTPException(status_code=403, detail="La empresa activa no está registrada como gestoría.")
+        print("La empresa activa no está registrada como gestoría.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="La empresa activa no está registrada como gestoría."
+        )
     if not cliente:
-        raise HTTPException(status_code=404, detail="No se encontró la empresa cliente.")
+        print(f"Empresa cliente ({payload.empresa_cliente_id}) no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la empresa cliente."
+        )
     if cliente.es_gestoria or cliente.id == gestoria.id:
-        raise HTTPException(status_code=400, detail="La empresa indicada no puede ser cliente de esta autorización.")
+        print("La empresa indicada no puede ser cliente de esta autorización.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="La empresa indicada no puede ser cliente de esta autorización."
+        )
     if not cliente.activa:
-        raise HTTPException(status_code=409, detail="No se puede autorizar una empresa inactiva.")
+        print("No se puede autorizar una empresa inactiva.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="No se puede autorizar una empresa inactiva."
+        )
     if payload.fecha_inicio < date.today():
-        raise HTTPException(status_code=422, detail="La fecha de inicio no puede estar en el pasado.")
+        print("La fecha de inicio no puede estar en el pasado.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+            detail="La fecha de inicio no puede estar en el pasado."
+        )
 
     relacion = GestoriasEmpresas(
         empresa_gestora_id=gestoria.id,
@@ -188,20 +213,29 @@ def crear_autorizacion_gestoria(
             usuario_id=usuario_actual.id,
             empresa_id=gestoria.id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={'recurso': 'gestorias_empresas', 'entidad_id': str(relacion.id)},
+            detalle={
+                'recurso': 'gestorias_empresas',
+                'accion': 'crear',
+            },
             trabajador_id=None,
         )
         db.commit()
+        
         return relacion
-    except IntegrityError as exc:
+    except IntegrityError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Ya existe una autorización activa entre estas empresas.") from exc
+        print(f"Ya existe una autorización activa entre estas empresas: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, 
+            detail="Ya existe una autorización activa entre estas empresas."
+        )
 
 
 @router.patch(
     "/{id_relacion}",
     response_model=GestoriaEmpresaSimpleResponse,
     summary="Modificar autorización de gestoría",
+    description="Modifica una autorización de la gestoría activa con la empresa.",
 )
 @limiter.limit("20/minute")
 def modificar_autorizacion_gestoria(
@@ -217,36 +251,56 @@ def modificar_autorizacion_gestoria(
 ):
     """**PATCH /api/gestorias-empresas/{id_relacion}**
 
-    Actualiza la vigencia o el estado de una autorización de la gestoría activa.
+    Modifica una autorización de la gestoría activa con la empresa.
     """
-    # Validaciones estructurales básicas
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de autorización de gestoría con identificador ({id_relacion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación de autorización de gestoría con identificador ({id_relacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
     relacion = _relacion_gestoria(db, id_relacion)
-    if relacion.empresa_gestora_id != _empresa_contexto(request):
-        raise HTTPException(status_code=404, detail="No se encontró la autorización solicitada.")
+    if relacion.empresa_gestora_id != request.headers.get("Empresa-ID"):
+        print("No se encontró la autorización solicitada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se encontró la autorización solicitada."
+        )
+    
     cambios = payload.model_dump(exclude_unset=True)
     if not cambios:
-        raise HTTPException(status_code=400, detail="Debe indicar al menos un campo para actualizar.")
+        print("Debe indicar al menos un campo para actualizar.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Debe indicar al menos un campo para actualizar."
+        )
+    
     fecha_inicio = cambios.get("fecha_inicio", relacion.fecha_inicio)
     fecha_fin = cambios.get("fecha_fin", relacion.fecha_fin)
     if fecha_fin is not None and fecha_fin < fecha_inicio:
-        raise HTTPException(status_code=422, detail="La fecha de fin no puede ser anterior a la fecha de inicio.")
+        print("La fecha de fin no puede ser anterior a la fecha de inicio.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+            detail="La fecha de fin no puede ser anterior a la fecha de inicio."
+        )
+    
     for campo, valor in cambios.items():
         setattr(relacion, campo, valor)
-    relacion.updated_at = datetime.now(timezone.utc)
+    setattr(relacion, "updated_at", datetime.now(timezone.utc))
+
     registrar_auditoria(
         db=db,
         request=request,
         usuario_id=usuario_actual.id,
         empresa_id=relacion.empresa_gestora_id,
         accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={'recurso': 'gestorias_empresas', 'entidad_id': str(id_relacion), 'campos': list(cambios)},
+        detalle={
+            'recurso': 'gestorias_empresas',
+            'accion': 'modificar',
+        },
         trabajador_id=None,
     )
     db.commit()
+    
     return relacion
-
 
 @router.delete(
     "/{id_relacion}",
@@ -268,19 +322,25 @@ def revocar_autorizacion_gestoria(
     """
     **DELETE /api/gestorias-empresas/{id_relacion}**
 
-    Da de baja una autorización de gestoría sin eliminar su historial.
+    Revoca una autorización de gestoría sin eliminar su historial.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de baja lógica de autorización de gestoría ({id_relacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}")
+    print(f"Petición de revocación de autorización de gestoría ({id_relacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    
     # Validaciones estructurales básicas
     relacion = _relacion_gestoria(db, id_relacion)
-    if relacion.empresa_gestora_id != _empresa_contexto(request):
-        raise HTTPException(status_code=404, detail="No se encontró la autorización solicitada.")
+    if relacion.empresa_gestora_id != request.headers.get("Empresa-ID"):
+        print("No se encontró la autorización solicitada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="No se encontró la autorización solicitada."
+        )
 
     try:
         if relacion.activo:
-            relacion.activo = False
-            relacion.updated_at = datetime.now(timezone.utc)
+            setattr(relacion, "activo", False)
+            setattr(relacion, "updated_at", datetime.now(timezone.utc))
+            
             registrar_auditoria(
                 db=db,
                 request=request,
@@ -289,9 +349,7 @@ def revocar_autorizacion_gestoria(
                 accion=AccionAuditoriaEnum.BAJA_LOGICA,
                 detalle={
                     'recurso': 'gestorias_empresas',
-                    'accion': 'revocar_autorizacion',
-                    'entidad_id': str(id_relacion),
-                    'detalles': f'Se dio de baja lógica la autorización de gestoría {id_relacion}',
+                    'accion': 'revocar',
                 },
                 trabajador_id=None,
             )
@@ -299,8 +357,8 @@ def revocar_autorizacion_gestoria(
         return relacion
     except Exception as e:
         db.rollback()
-        print(f"Error al ejecutar revocar_autorizacion_gestoria: {e}")
+        print(f"No se ha podido revocar la autorización de gestoría: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se ha podido revocar la autorización de gestoría",
+            detail="No se ha podido revocar la autorización de gestoría.",
         )

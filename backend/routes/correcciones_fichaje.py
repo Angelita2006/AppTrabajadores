@@ -50,6 +50,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=CorreccionFichajeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear corrección de fichaje",
+    description="Crea una nueva corrección de fichaje en estado 'pendiente' por defecto.",
 )
 @limiter.limit("20/minute")
 def crear_correccion_fichaje(
@@ -64,7 +65,7 @@ def crear_correccion_fichaje(
     Crea una nueva corrección de fichaje en estado 'pendiente' por defecto.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de corrección de fichaje desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de corrección de fichaje desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -146,7 +147,10 @@ def crear_correccion_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "correcciones_fichaje", "accion": "crear"},
+            detalle={
+                'recurso': "correcciones_fichaje",
+                'accion': "crear",
+            },
             trabajador_id=payload.trabajador_id
         )
 
@@ -164,6 +168,7 @@ def crear_correccion_fichaje(
     "/{id_correccion}/resolver",
     response_model=CorreccionFichajeResponse,
     summary="Resolver corrección de fichaje",
+    description="Resolver corrección de fichaje.",
 )
 @limiter.limit("20/minute")
 def resolver_correccion_fichaje(
@@ -246,6 +251,7 @@ def resolver_correccion_fichaje(
                 hora_str = v_nuevo.get("hora_propuesta")
 
                 if not fecha_str or not hora_str:
+                    print("Datos de tiempo insuficientes en la solicitud.")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Datos de tiempo insuficientes en la solicitud."
@@ -334,7 +340,10 @@ def resolver_correccion_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=correccion_fichaje.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "correcciones_fichaje", "accion": "resolver"},
+            detalle={
+                'recurso': "correcciones_fichaje",
+                'accion': "resolver",
+            },
             trabajador_id=correccion_fichaje.trabajador_id
         )
 
@@ -351,6 +360,7 @@ def resolver_correccion_fichaje(
     "/{id_correccion}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar corrección de fichaje",
+    description="Elimina una corrección de fichaje.",
 )
 @limiter.limit("20/minute")
 def eliminar_correccion_fichaje(
@@ -365,7 +375,7 @@ def eliminar_correccion_fichaje(
     Elimina una corrección de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de eliminación de la corrección de fichaje ({id_correccion}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de eliminación de la corrección de fichaje ({id_correccion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     correccion_fichaje = db.query(CorreccionesFichaje).filter(CorreccionesFichaje.id == id_correccion).first()
@@ -386,7 +396,10 @@ def eliminar_correccion_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=correccion_fichaje.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "correcciones_fichaje", "accion": "eliminar"},
+            detalle={
+                'recurso': "correcciones_fichaje",
+                'accion': "eliminar",
+            },
             trabajador_id=correccion_fichaje.trabajador_id
         )
 
@@ -404,6 +417,7 @@ def eliminar_correccion_fichaje(
     "/empresa/{id_empresa}",
     response_model=List[CorreccionFichajeResponse],
     summary="Obtener correcciones de fichajes por empresa",
+    description="Obtener correcciones de fichajes de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_correcciones_fichajes_empresa(
@@ -418,8 +432,9 @@ def obtener_correcciones_fichajes_empresa(
     Obtener correcciones de fichajes de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de correcciones de fichajes para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de correcciones de fichajes para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     resultados = (
         db.query(CorreccionesFichaje).options(
         joinedload(CorreccionesFichaje.empresa),
@@ -436,7 +451,10 @@ def obtener_correcciones_fichajes_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "correcciones_fichaje", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "correcciones_fichaje",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -446,6 +464,7 @@ def obtener_correcciones_fichajes_empresa(
     "/trabajador/{id_trabajador}",
     response_model=List[CorreccionFichajeResponse],
     summary="Obtener correcciones por trabajador",
+    description="Obtiene las correcciones de fichajes de un trabajador.",
 )
 @limiter.limit("60/minute")
 def obtener_correcciones_fichajes_trabajador(
@@ -460,7 +479,7 @@ def obtener_correcciones_fichajes_trabajador(
     Obtiene las correcciones de fichajes de un trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de correcciones de fichajes para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de correcciones de fichajes para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
@@ -487,7 +506,10 @@ def obtener_correcciones_fichajes_trabajador(
         usuario_id=usuario_actual.id,
         empresa_id=trabajador.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "correcciones_fichaje", "accion": "consultar_trabajador"},
+        detalle={
+            'recurso': "correcciones_fichaje",
+            'accion': "consultar_trabajador",
+        },
         trabajador_id=id_trabajador
     )
 

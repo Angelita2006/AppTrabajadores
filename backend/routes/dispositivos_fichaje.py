@@ -34,6 +34,7 @@ limiter = Limiter(key_func=get_remote_address)
     response_model=DispositivoFichajeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear dispositivo de fichaje",
+    description="Crea un nuevo dispositivo de fichaje dentro de una empresa y centro de trabajo.",
 )
 @limiter.limit("20/minute")
 def crear_dispositivo_fichaje(
@@ -48,7 +49,7 @@ def crear_dispositivo_fichaje(
     Crea un nuevo dispositivo de fichaje dentro de una empresa y centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de dispositivo de fichaje desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de creación de dispositivo de fichaje desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == payload.empresa_id).first()
@@ -96,7 +97,10 @@ def crear_dispositivo_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=payload.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
-            detalle={"recurso": "dispositivos_fichaje", "accion": "crear"},
+            detalle={
+                'recurso': "dispositivos_fichaje",
+                'accion': "crear",
+            },
             trabajador_id=None
         )
 
@@ -113,6 +117,7 @@ def crear_dispositivo_fichaje(
     "/{id_dispositivo}",
     response_model=DispositivoFichajeResponse,
     summary="Modificar dispositivo de fichaje",
+    description="Modifica los datos de un dispositivo de fichaje.",
 )
 @limiter.limit("20/minute")
 def modificar_dispositivo_fichaje(
@@ -128,8 +133,9 @@ def modificar_dispositivo_fichaje(
     Modifica los datos de un dispositivo de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     dispositivo = (
         db.query(DispositivosFichaje).options(
         joinedload(DispositivosFichaje.empresa),
@@ -166,7 +172,10 @@ def modificar_dispositivo_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=dispositivo.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "dispositivos_fichaje", "accion": "modificar"},
+            detalle={
+                'recurso': "dispositivos_fichaje",
+                'accion': "modificar",
+            },
             trabajador_id=None
         )
 
@@ -183,6 +192,7 @@ def modificar_dispositivo_fichaje(
     "/{id_dispositivo}/estado",
     response_model=DispositivoFichajeResponse,
     summary="Modificar estado de dispositivo de fichaje",
+    description="Permite activar o desactivar un dispositivo de fichaje.",
 )
 @limiter.limit("20/minute")
 def modificar_estado_dispositivo_fichaje(
@@ -198,7 +208,7 @@ def modificar_estado_dispositivo_fichaje(
     Permite activar o desactivar un dispositivo de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de estado para el dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de modificación de estado para el dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     dispositivo = db.query(DispositivosFichaje).options(
@@ -233,7 +243,10 @@ def modificar_estado_dispositivo_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=dispositivo.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={"recurso": "dispositivos_fichaje", "accion": "modificar_estado"},
+            detalle={
+                'recurso': "dispositivos_fichaje",
+                'accion': "modificar_estado",
+            },
             trabajador_id=None
         )
 
@@ -250,6 +263,7 @@ def modificar_estado_dispositivo_fichaje(
     "/{id_dispositivo}/desactivar",
     status_code=status.HTTP_200_OK,
     summary="Desactivar dispositivo de fichaje",
+    description="Desactiva un dispositivo de fichaje.",
 )
 @limiter.limit("20/minute")
 def desactivar_dispositivo_fichaje(
@@ -264,7 +278,7 @@ def desactivar_dispositivo_fichaje(
     Desactiva un dispositivo de fichaje.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de desactivación del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     dispositivo = (
@@ -294,7 +308,10 @@ def desactivar_dispositivo_fichaje(
             usuario_id=usuario_actual.id,
             empresa_id=dispositivo.empresa_id,
             accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={"recurso": "dispositivos_fichaje", "accion": "desactivar"},
+            detalle={
+                'recurso': "dispositivos_fichaje",
+                'accion': "desactivar",
+            },
             trabajador_id=None
         )
 
@@ -312,6 +329,7 @@ def desactivar_dispositivo_fichaje(
     "/empresa/{id_empresa}",
     response_model=List[DispositivoFichajeResponse],
     summary="Obtener dispositivos de fichaje por empresa",
+    description="Obtiene los dispositivos de fichaje de una empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_dispositivos_fichaje_empresa(
@@ -326,8 +344,9 @@ def obtener_dispositivos_fichaje_empresa(
     Obtiene los dispositivos de fichaje de una empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de dispositivos de fichaje para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de dispositivos de fichaje para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
+    # Validaciones estructurales básicas
     resultados = (
         db.query(DispositivosFichaje).options(
         joinedload(DispositivosFichaje.empresa),
@@ -342,7 +361,10 @@ def obtener_dispositivos_fichaje_empresa(
         usuario_id=usuario_actual.id,
         empresa_id=id_empresa,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar_empresa"},
+        detalle={
+            'recurso': "dispositivos_fichaje",
+            'accion': "consultar_empresa",
+        },
         trabajador_id=None
     )
 
@@ -352,6 +374,7 @@ def obtener_dispositivos_fichaje_empresa(
     "/centro/{id_centro}",
     response_model=List[DispositivoFichajeResponse],
     summary="Obtener dispositivos de fichaje por centro de trabajo",
+    description="Obtiene los dispositivos de fichaje de un centro de trabajo.",
 )
 @limiter.limit("60/minute")
 def obtener_dispositivos_fichaje_centro(
@@ -366,7 +389,7 @@ def obtener_dispositivos_fichaje_centro(
     Obtiene los dispositivos de fichaje de un centro de trabajo.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de dispositivos de fichaje para el centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de dispositivos de fichaje para el centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
@@ -391,7 +414,10 @@ def obtener_dispositivos_fichaje_centro(
         usuario_id=usuario_actual.id,
         empresa_id=centro.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar_centro"},
+        detalle={
+            'recurso': "dispositivos_fichaje",
+            'accion': "consultar_centro",
+        },
         trabajador_id=None
     )
 
@@ -401,6 +427,7 @@ def obtener_dispositivos_fichaje_centro(
     "/{id_dispositivo}",
     response_model=DispositivoFichajeResponse,
     summary="Obtener dispositivo por id",
+    description="Obtiene el dispositivo de fichaje por su id.",
 )
 @limiter.limit("60/minute")
 def obtener_dispositivo_fichaje_id(
@@ -415,7 +442,7 @@ def obtener_dispositivo_fichaje_id(
     Obtiene el dispositivo de fichaje por su id.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta del dispositivo de fichaje ({id_dispositivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     dispositivo = (
@@ -439,7 +466,10 @@ def obtener_dispositivo_fichaje_id(
         usuario_id=usuario_actual.id,
         empresa_id=dispositivo.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={"recurso": "dispositivos_fichaje", "accion": "consultar"},
+        detalle={
+            'recurso': "dispositivos_fichaje",
+            'accion': "consultar",
+        },
         trabajador_id=None
     )
 

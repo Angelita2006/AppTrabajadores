@@ -24,6 +24,7 @@ limiter = Limiter(key_func=get_remote_address)
     "/empresa/{id_empresa}",
     response_model=List[AuditoriaAccesoResponse],
     summary="Obtener auditoría por empresa",
+    description="Obtiene el historial de accesos de auditoría de la empresa.",
 )
 def obtener_auditoria_empresa(
     request: Request,
@@ -37,7 +38,7 @@ def obtener_auditoria_empresa(
     Obtiene el historial de accesos de auditoría de la empresa.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de accesos de auditoría para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de accesos de auditoría para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     empresa = db.query(Empresas).filter(Empresas.id == id_empresa).first()
@@ -58,6 +59,7 @@ def obtener_auditoria_empresa(
     "/usuario/{id_usuario}",
     response_model=List[AuditoriaAccesoResponse],
     summary="Obtener auditoría por usuario",
+    description="Obtiene el historial de accesos de auditoría del trabajador.",
 )
 def obtener_auditoria_usuario(
     request: Request,
@@ -71,7 +73,7 @@ def obtener_auditoria_usuario(
     Obtiene el historial de accesos de auditoría del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de accesos de auditoría para el usuario ({id_usuario}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de accesos de auditoría para el usuario ({id_usuario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     usuario = db.query(Usuarios).filter(Usuarios.id == id_usuario).first()
@@ -93,6 +95,7 @@ def obtener_auditoria_usuario(
     "/trabajador/{id_trabajador}",
     response_model=List[AuditoriaAccesoResponse],
     summary="Obtener auditoría por trabajador",
+    description="Obtiene el historial de accesos de auditoría del trabajador.",
 )
 def obtener_auditoria_por_trabajador(
     request: Request,
@@ -106,7 +109,7 @@ def obtener_auditoria_por_trabajador(
     Obtiene el historial de accesos de auditoría del trabajador.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de accesos de auditoría para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por: {usuario_actual.email}.")
+    print(f"Petición de consulta de accesos de auditoría para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()

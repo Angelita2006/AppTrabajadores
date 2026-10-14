@@ -37,6 +37,7 @@ def _relacion_query(db: Session):
 def _obtener_relacion_o_404(db: Session, id_relacion: UUID) -> ContratosCalendarios:
     relacion = _relacion_query(db).filter(ContratosCalendarios.id == id_relacion).first()
     if not relacion:
+        print(f"Relaci?n ({id_relacion}) no encontrada.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No se encontró la asociación contrato-calendario.",
@@ -49,12 +50,14 @@ def _validar_vigencia_calendario(
     calendario: CalendariosLaborales,
 ) -> None:
     if contrato.empresa_id != calendario.empresa_id:
+        print("El contrato y el calendario deben pertenecer a la misma empresa.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El contrato y el calendario deben pertenecer a la misma empresa.",
         )
 
     if contrato.centro_trabajo_id != calendario.centro_trabajo_id:
+        print("El calendario debe corresponder al centro de trabajo del contrato.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El calendario debe corresponder al centro de trabajo del contrato.",
@@ -63,6 +66,7 @@ def _validar_vigencia_calendario(
     anio_inicio = contrato.fecha_inicio.year
     anio_fin = contrato.fecha_fin.year if contrato.fecha_fin else None
     if calendario.anio < anio_inicio or (anio_fin is not None and calendario.anio > anio_fin):
+        print("El año del calendario debe estar dentro de la vigencia del contrato.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El año del calendario debe estar dentro de la vigencia del contrato.",
@@ -74,6 +78,7 @@ def _validar_vigencia_calendario(
     response_model=ContratoCalendarioResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Asociar un calendario laboral a un contrato",
+    description="Asocia un calendario laboral anual a un contrato.",
 )
 @limiter.limit("20/minute")
 def crear_contrato_calendario(
@@ -91,12 +96,14 @@ def crear_contrato_calendario(
 
     Asocia un calendario laboral anual a un contrato.
     """
+    # Validaciones estructurales básicas
     contrato = (
         db.query(Contratos)
         .filter(Contratos.id == payload.contrato_id, Contratos.activo.is_(True))
         .first()
     )
     if not contrato:
+        print(f"Contrato laboral ({payload.contrato_id}) no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato activo no encontrado.")
 
     calendario = (
@@ -108,6 +115,7 @@ def crear_contrato_calendario(
         .first()
     )
     if not calendario:
+        print(f"Calendario laboral ({payload.calendario_laboral_id}) no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario activo no encontrado.")
 
     _validar_vigencia_calendario(contrato, calendario)
@@ -121,6 +129,7 @@ def crear_contrato_calendario(
         .first()
     )
     if existente:
+        print("Ya existe una asociación entre este contrato y calendario.")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe una asociación entre este contrato y calendario.",
@@ -141,9 +150,8 @@ def crear_contrato_calendario(
             empresa_id=contrato.empresa_id,
             accion=AccionAuditoriaEnum.CREACION,
             detalle={
-                "recurso": "contratos_calendarios",
-                "accion": "asociar",
-                "entidad_id": str(relacion.id),
+                'recurso': "contratos_calendarios",
+                'accion': "asociar",
             },
             trabajador_id=contrato.trabajador_id,
         )
@@ -162,6 +170,7 @@ def crear_contrato_calendario(
     "/contrato/{id_contrato}",
     response_model=List[ContratoCalendarioResponse],
     summary="Listar calendarios asociados a un contrato",
+    description="Lista los calendarios activos asociados al contrato.",
 )
 @limiter.limit("60/minute")
 def obtener_calendarios_contrato(
@@ -179,8 +188,10 @@ def obtener_calendarios_contrato(
 
     Lista los calendarios activos asociados al contrato.
     """
+    # Validaciones estructurales básicas
     contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
     if not contrato:
+        print(f"Contrato laboral ({id_contrato}) no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato no encontrado.")
 
     return (
@@ -202,6 +213,7 @@ def obtener_calendarios_contrato(
     "/empresa/{id_empresa}",
     response_model=List[ContratoCalendarioResponse],
     summary="Listar asociaciones de contratos y calendarios de una empresa",
+    description="Lista las asociaciones activas de contratos y calendarios de la empresa.",
 )
 @limiter.limit("60/minute")
 def obtener_relaciones_empresa(
@@ -219,6 +231,7 @@ def obtener_relaciones_empresa(
 
     Lista las asociaciones activas de contratos y calendarios de la empresa.
     """
+    # Validaciones estructurales básicas
     return (
         _relacion_query(db)
         .join(Contratos, ContratosCalendarios.contrato_id == Contratos.id)
@@ -235,6 +248,7 @@ def obtener_relaciones_empresa(
     "/{id_relacion}",
     response_model=ContratoCalendarioResponse,
     summary="Obtener una asociación contrato-calendario",
+    description="Obtiene una asociación entre contrato y calendario por su identificador.",
 )
 @limiter.limit("60/minute")
 def obtener_contrato_calendario(
@@ -252,6 +266,7 @@ def obtener_contrato_calendario(
 
     Obtiene una asociación entre contrato y calendario por su identificador.
     """
+    # Validaciones estructurales básicas
     return _obtener_relacion_o_404(db, id_relacion)
 
 
@@ -259,6 +274,7 @@ def obtener_contrato_calendario(
     "/{id_relacion}",
     response_model=ContratoCalendarioResponse,
     summary="Actualizar el estado de una asociación contrato-calendario",
+    description="Actualiza el estado de una asociación entre contrato y calendario.",
 )
 @limiter.limit("20/minute")
 def modificar_contrato_calendario(
@@ -277,8 +293,10 @@ def modificar_contrato_calendario(
 
     Actualiza el estado de una asociación entre contrato y calendario.
     """
+    # Validaciones estructurales básicas
     relacion = _obtener_relacion_o_404(db, id_relacion)
     if payload.activa is None:
+        print("Debes indicar el nuevo valor de activa.")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Debes indicar el nuevo valor de activa.",
@@ -292,14 +310,15 @@ def modificar_contrato_calendario(
             .first()
         )
         if not contrato or not calendario or not contrato.activo or not calendario.activo:
+            print("No se puede activar la asociación porque el contrato o calendario está inactivo.")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="No se puede activar la asociación porque el contrato o calendario está inactivo.",
             )
         _validar_vigencia_calendario(contrato, calendario)
 
-    relacion.activa = payload.activa
-    relacion.updated_at = datetime.now(timezone.utc)
+    setattr(relacion, 'activa', payload.activa)
+    setattr(relacion, 'updated_at', datetime.now(timezone.utc))
     try:
         registrar_auditoria(
             db=db,
@@ -308,10 +327,8 @@ def modificar_contrato_calendario(
             empresa_id=relacion.contrato.empresa_id,
             accion=AccionAuditoriaEnum.MODIFICACION,
             detalle={
-                "recurso": "contratos_calendarios",
-                "accion": "modificar_estado",
-                "entidad_id": str(relacion.id),
-                "activa": relacion.activa,
+                'recurso': "contratos_calendarios",
+                'accion': "modificar_estado",
             },
             trabajador_id=relacion.contrato.trabajador_id,
         )
@@ -330,6 +347,7 @@ def modificar_contrato_calendario(
     "/{id_relacion}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Desactivar una asociación contrato-calendario",
+    description="Desactiva la asociación sin borrar su registro.",
 )
 @limiter.limit("20/minute")
 def desactivar_contrato_calendario(
@@ -347,12 +365,13 @@ def desactivar_contrato_calendario(
 
     Desactiva la asociación sin borrar su registro.
     """
+    # Validaciones estructurales básicas
     relacion = _obtener_relacion_o_404(db, id_relacion)
     if not relacion.activa:
         return None
 
-    relacion.activa = False
-    relacion.updated_at = datetime.now(timezone.utc)
+    setattr(relacion, 'activa', False)
+    setattr(relacion, 'updated_at', datetime.now(timezone.utc))
     try:
         registrar_auditoria(
             db=db,
@@ -361,9 +380,8 @@ def desactivar_contrato_calendario(
             empresa_id=relacion.contrato.empresa_id,
             accion=AccionAuditoriaEnum.BAJA_LOGICA,
             detalle={
-                "recurso": "contratos_calendarios",
-                "accion": "desactivar",
-                "entidad_id": str(relacion.id),
+                'recurso': "contratos_calendarios",
+                'accion': "desactivar",
             },
             trabajador_id=relacion.contrato.trabajador_id,
         )
