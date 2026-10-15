@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from operator import concat
 from uuid import UUID
 import random
 import secrets
@@ -13,7 +12,6 @@ from fastapi import (
     status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import joinedload, Session
@@ -24,13 +22,13 @@ from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
     TipoPermisoEnum,
-    TipoRolEnum,
 )
 from core.security import (
     crear_token_acceso,
     get_db_with_advanced_security,
     get_password_hash,
     oauth2_scheme,
+    obtener_usuario_actual,
     verificar_permisos_requeridos,
     verify_password,
 )
@@ -38,15 +36,10 @@ from core.utils import (
     enviar_correo_cambio_contraseña,
     enviar_correo_cambio_email,
 )
-from models.empresas import Empresas
-from models.roles import Roles
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
-from models.usuarios_empresas import UsuariosEmpresas
-from models.usuarios_empresas import UsuariosEmpresas
 from schemas.auth import (
     ConfirmarPasswordRecuperacionRequest,
-    EmailCambioRequest,
     LoginRequest,
     PasswordCambioRequest,
 )
@@ -290,7 +283,7 @@ def obtener_mi_usuario(
     Busca los detalles de una cuenta mediante su identificador único UUID de forma protegida.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del usuario autenticado desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    print(f"Petición de consulta del usuario autenticado ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     usuario = (
@@ -545,6 +538,7 @@ def confirmar_cambio_email(
             detail="No se ha podido completar el cambio de correo electrónico."
         )
 
+    print(f"¡Correo electrónico confirmado y actualizado con éxito en tu cuenta ({usuario.email}) y perfil de trabajador!")
     return {"detail": "¡Correo electrónico confirmado y actualizado con éxito en tu cuenta y perfil de trabajador!"}
 
 @router.put(
@@ -568,7 +562,7 @@ def solicitar_cambio_password(
     de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de solicitar cambio password desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    print(f"Petición de modificación de solicitar cambio password ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
@@ -610,6 +604,7 @@ def solicitar_cambio_password(
 
     enviar_correo_cambio_contraseña(usuario_actual.email, codigo_aleatorio)
 
+    print(f"Se ha enviado un código de verificación ({codigo_aleatorio}) a tu correo electrónico para confirmar el cambio.")
     return {"detail": "Se ha enviado un código de verificación a tu correo electrónico para confirmar el cambio."}
 
 @router.post(
@@ -623,8 +618,8 @@ def confirmar_cambio_password(
     request: Request,
     payload: ConfirmarPasswordRecuperacionRequest,
     token: str = Depends(oauth2_scheme),
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.USUARIOS])),
-    db: Session = Depends(get_db_with_advanced_security),
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
 ):
     """
     **POST /api/usuarios/confirmar-cambio-password**
@@ -632,7 +627,7 @@ def confirmar_cambio_password(
     Valida el código de 6 dígitos recibido por correo y actualiza la contraseña definitivamente.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación al confirmar el cambio de contraseña desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    print(f"Petición de modificación al confirmar el cambio de contraseña ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
     
     # Validaciones estructurales básicas
     if not usuario_actual.codigo_recuperacion or payload.codigo_verificacion != usuario_actual.codigo_recuperacion:
@@ -663,9 +658,7 @@ def confirmar_cambio_password(
         setattr(usuario_actual, 'password_hash', get_password_hash(payload.nueva_password))
         setattr(usuario_actual, 'codigo_recuperacion', None)
         setattr(usuario_actual, 'codigo_expira_at', None)
-
-        if hasattr(usuario_actual, 'updated_at'):
-            setattr(usuario_actual, 'updated_at', datetime.now(timezone.utc))
+        setattr(usuario_actual, 'updated_at', datetime.now(timezone.utc))
 
         db.add(usuario_actual)
         db.commit()
@@ -683,6 +676,7 @@ def confirmar_cambio_password(
             trabajador_id=usuario_actual.trabajador_id,
         )
 
+        print(f"La contraseña ({usuario_actual.email}) ha sido modificada correctamente.")
         return {"detail": "Tu contraseña ha sido modificada correctamente."}
     except Exception as e:
         db.rollback()
