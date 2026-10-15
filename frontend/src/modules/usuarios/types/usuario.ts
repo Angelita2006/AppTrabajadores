@@ -6,6 +6,7 @@ import { Trabajador } from "../../trabajadores/types/trabajador";
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
 export const TIPOS_USUARIO = {
+  SUPERADMINISTRADOR: "Superadministrador",
   ADMIN_GESTORIA: "Admin_gestoría",
   ADMIN_EMPRESA: "Admin_empresa",
   RRHH: "Rrhh",

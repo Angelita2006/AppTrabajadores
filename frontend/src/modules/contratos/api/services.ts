@@ -46,9 +46,9 @@ export const crearContrato = async (payload: {
  * @returns {Promise<Contrato[]>} Promesa con el listado global de contratos.
  * @throws {Error} Lanza un error si ocurre un fallo al realizar la consulta al servidor.
  */
-export const obtenerTodosLosContratos = async (): Promise<Contrato[]> => {
+export const obtenerTodosLosContratos = async (empresaId: string): Promise<Contrato[]> => {
   try {
-    const response = await api.get<Contrato[]>("/api/contratos");
+    const response = await api.get<Contrato[]>(`/api/contratos/empresa/${empresaId}`);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -217,7 +217,7 @@ export const rescindirContratoActivoTrabajador = async (
       fechaFinPersonalizada || new Date().toISOString().split("T")[0];
 
     const response = await api.put<Contrato>(
-      `/api/contratos/${contratoActivo.id}/dar-baja`,
+      `/api/contratos/${contratoActivo.id}/finalizar`,
       null,
       {
         params: { fecha_fin: fechaCese },
@@ -249,9 +249,11 @@ export const eliminarTodosLosContratosTrabajador = async (
   idTrabajador: string,
 ): Promise<void> => {
   try {
-    await api.delete(
-      `/api/contratos/empresa/${idEmpresa}/trabajador/${idTrabajador}`,
+    const respuesta = await api.get<Contrato[]>(
+      `/api/contratos/trabajador/${idTrabajador}`,
     );
+    const deEmpresa = respuesta.data.filter((contrato) => contrato.empresa_id === idEmpresa);
+    await Promise.all(deEmpresa.map((contrato) => api.delete(`/api/contratos/${contrato.id}`)));
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

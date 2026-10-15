@@ -27,6 +27,9 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
   }
 };
 
+/** Lista exclusivamente las empresas que el backend concede a esta cuenta. */
+export const obtenerEmpresasDisponibles = obtenerEmpresas;
+
 /**
  * Recupera la información detallada de una empresa específica mediante su ID único.
  * URI: GET /api/empresas/{id_empresa}
@@ -143,13 +146,8 @@ export const cambiarRazonSocialEmpresa = async (
 ): Promise<Empresa> => {
   try {
     const respuesta = await api.put<Empresa>(
-      `/api/empresas/${idEmpresa}/razon-social`,
-      null,
-      {
-        params: {
-          nueva_razon_social: nuevaRazonSocial,
-        },
-      },
+      `/api/empresas/${idEmpresa}`,
+      { razon_social: nuevaRazonSocial },
     );
     return respuesta.data;
   } catch (error: any) {

@@ -1,5 +1,5 @@
 import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional
 from uuid import UUID
 
@@ -28,6 +28,13 @@ class UsuarioCreate(UsuarioBase):
     """
     password: str = Field(..., description="Contraseña única de acceso")
 
+    @field_validator("password")
+    @classmethod
+    def validar_longitud_password_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("La contrasena no puede superar 72 bytes.")
+        return value
+
     model_config = ConfigDict(from_attributes=True)
 
 class UsuarioUpdate(BaseModel):
@@ -44,6 +51,13 @@ class UsuarioUpdate(BaseModel):
 
     password: Optional[str] = Field(None, description="Contraseña única de acceso")
     
+    @field_validator("password")
+    @classmethod
+    def validar_longitud_password_bcrypt(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and len(value.encode("utf-8")) > 72:
+            raise ValueError("La contrasena no puede superar 72 bytes.")
+        return value
+
     model_config = ConfigDict(from_attributes=True)
 
 class UsuarioSimpleResponse(UsuarioBase):
@@ -57,16 +71,8 @@ class UsuarioSimpleResponse(UsuarioBase):
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación (now)")
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
 
-    codigo_recuperacion: Optional[str] = Field(None, description='Código de recuperación para restablecimiento de contraseña')
-    codigo_expira_at: Optional[datetime.datetime] = Field(None, description='Fecha de expiración del código de recuperación')
 
-    email_pendiente_verificacion: Optional[str] = Field(None, description='Dirección de correo electrónico pendiente de verificación')
-    token_cambio_email: Optional[str] = Field(None, description='Token para cambiar la dirección de correo electrónico')
-    token_cambio_email_expira_at: Optional[str] = Field(None, description='Fecha de expiracion del token para cambiar el correo electrónico')
 
-    telefono_pendiente_verificacion: Optional[str] = Field(None, description='Número de teléfono pendiente de verificación')
-    token_cambio_telefono: Optional[str] = Field(None, description='Token para cambiar el número de teléfono')
-    token_cambio_telefono_expira_at: Optional[str] = Field(None, description='Fecha de expiración del token para cambiar el número de teléfono')
 
     model_config = ConfigDict(from_attributes=True)
 

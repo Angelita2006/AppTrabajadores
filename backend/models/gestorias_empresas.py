@@ -3,6 +3,7 @@ import uuid
 from typing import Optional
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKeyConstraint, Index, PrimaryKeyConstraint, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 from core.database import Base
 
 class GestoriasEmpresas(Base):
@@ -28,6 +29,8 @@ class GestoriasEmpresas(Base):
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('CURRENT_DATE'), comment='Fecha de inicio de la autorización.')
     fecha_fin: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment='Fecha de finalización de la autorización.')
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('true'), comment="Indica si la relacion entre la gestoría y la empresa cliente está activa o no.")
+    permisos_delegados: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"), comment='Permisos actualmente delegados por el cliente a la gestoría.')
+    permisos_maximos: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"), comment='Techo de permisos de delegación configurado por el superadministrador.')
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la autorización.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización de la autorización.')

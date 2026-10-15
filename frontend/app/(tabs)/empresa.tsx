@@ -49,7 +49,13 @@ type TabConfig =
   | "dispositivos";
 
 export default function EmpresasScreen() {
-  const { usuarioActual, empresaActual, setEmpresaActual } = useSesion();
+  const {
+    usuarioActual,
+    empresaActual,
+    empresas: empresasDeSesion,
+    setEmpresaActual,
+    tienePermiso,
+  } = useSesion();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
 
   const [cargando, setCargando] = useState(true);
@@ -87,7 +93,9 @@ export default function EmpresasScreen() {
   const esGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
   const esRRHH = usuarioActual?.tipo_usuario === "Rrhh";
-  const esAutorizado = esGestoria || esAdminEmpresa || esRRHH;
+  const puedeConsultarEmpresa = tienePermiso("EMPRESAS", "consultar");
+  const puedeModificarEmpresa = tienePermiso("EMPRESAS", "modificar");
+  const esAutorizado = puedeConsultarEmpresa;
 
   // Estados para la gestión de la entidad y su logo corporativo
   const [logoUrlInput, setLogoUrlInput] = useState("");
@@ -105,7 +113,7 @@ export default function EmpresasScreen() {
     if (esAutorizado) {
       cargarCatalogoEmpresas();
     }
-  }, [esAutorizado]);
+  }, [esAutorizado, empresasDeSesion]);
 
   useEffect(() => {
     if (empresaActual) {
@@ -161,15 +169,9 @@ export default function EmpresasScreen() {
   const cargarCatalogoEmpresas = async () => {
     try {
       setCargando(true);
-      const todasLasEmpresas = await obtenerEmpresas();
-      let empresasPermitidas = esGestoria
-        ? todasLasEmpresas
-        : todasLasEmpresas.filter(
-            (e: Empresa) => e.id === usuarioActual?.empresa_id,
-          );
-
+      const empresasPermitidas = empresasDeSesion;
       setEmpresas(empresasPermitidas);
-      if (empresasPermitidas.length > 0 && !empresaActual && setEmpresaActual) {
+      if (empresasPermitidas.length > 0 && !empresaActual) {
         setEmpresaActual(empresasPermitidas[0]);
       }
     } catch (error: any) {
@@ -183,7 +185,7 @@ export default function EmpresasScreen() {
   };
 
   const handleGuardarDatosEmpresa = async () => {
-    if (!empresaActual) return;
+    if (!empresaActual || !puedeModificarEmpresa) return;
     try {
       setGuardando(true);
       await guardarDatosEmpresa(
@@ -213,6 +215,7 @@ export default function EmpresasScreen() {
   };
 
   const handleCambiarLogo = async (empresa: Empresa) => {
+    if (!puedeModificarEmpresa) return;
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -337,11 +340,7 @@ export default function EmpresasScreen() {
               const estaSeleccionada = empresaActual?.id === item.id;
               return (
                 <Pressable
-                  onPress={
-                    esGestoria && empresas.length > 1
-                      ? () => setEmpresaActual?.(item)
-                      : undefined
-                  }
+                  onPress={empresas.length > 1 ? () => setEmpresaActual(item) : undefined}
                   style={[
                     styles.tarjetaInteractiva,
                     estaSeleccionada && styles.tarjetaSeleccionada,
@@ -358,7 +357,7 @@ export default function EmpresasScreen() {
                         }}
                       >
                         <Pressable
-                          onPress={() => handleCambiarLogo(item)}
+                          onPress={puedeModificarEmpresa ? () => handleCambiarLogo(item) : undefined}
                           style={{
                             width: 36,
                             height: 36,
@@ -414,7 +413,6 @@ export default function EmpresasScreen() {
                 { key: "departamentos", label: "Departamentos" },
                 { key: "calendario", label: "Calendario Laboral" },
                 { key: "dispositivos", label: "Dispositivos" },
-                { key: "tipoeventos", label: "Tipos de Fichaje" },
               ].map((tab) => (
                 <Pressable
                   key={tab.key}

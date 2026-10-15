@@ -66,6 +66,12 @@ export const obtenerTrabajador = async (
   }
 };
 
+/** Recupera el expediente laboral asociado al usuario autenticado. */
+export const obtenerMiTrabajador = async (): Promise<Trabajador> => {
+  const respuesta = await api.get<Trabajador>("/api/trabajadores/me");
+  return respuesta.data;
+};
+
 /**
  * Registra un nuevo empleado en la base de datos de la plataforma.
  * URI: POST /api/trabajadores
@@ -244,7 +250,7 @@ export const tramitarBajaTotalTrabajador = async (
   trabajadorId: string,
 ): Promise<void> => {
   try {
-    await api.post(`/api/trabajadores/${trabajadorId}/baja-total`);
+    await api.post(`/api/trabajadores/${trabajadorId}/baja`);
   } catch (error: any) {
     const apiMessage =
       error?.response?.data?.detail || error?.response?.data?.message;

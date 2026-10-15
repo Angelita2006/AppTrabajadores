@@ -3,42 +3,56 @@ from models.roles import Roles
 from models.permisos import Permisos
 from models.roles_permisos import RolesPermisos
 from models.politicas_retencion import PoliticasRetencion
-from core.enums import AccionPermisoEnum, AccionRetencionEnum, TipoPermisoEnum
+from core.enums import (
+    ACCIONES_PERMISOS_ACTIVAS,
+    AccionPermisoEnum,
+    AccionRetencionEnum,
+    AlcancePermisoEnum,
+    TipoPermisoEnum,
+    TipoRolEnum,
+)
 
 ROLES_SISTEMA_INICIALES = [
     {
-        "id": "6kdl163e-55m4-7860-8824-cfy23aj47834",
+        "id": "6d1d163e-55a4-7860-8824-cf023a047834",
         "nombre": "Superadministrador",
+        "tipo": TipoRolEnum.SUPERADMINISTRADOR,
         "descripcion": "Control total global de la plataforma SaaS, gestión de pasarela de pagos y administración maestra."
     },
     {
         "id": "5aca163e-53f3-4210-9924-cff25ab38444",
         "nombre": "Trabajador",
+        "tipo": TipoRolEnum.TRABAJADOR,
         "descripcion": "Realización de fichajes y consulta de cuadrante personal."
     },
     {
         "id": "66cba6e5-bd7a-4bfc-8f32-d1643bb75c92",
         "nombre": "Rrhh",
+        "tipo": TipoRolEnum.RRHH,
         "descripcion": "Gestión de turnos, calendarios, incidencias y personal."
     },
     {
         "id": "6ce13799-4042-40a4-9165-ece37dcc75f6",
         "nombre": "Auditor_itss",
+        "tipo": TipoRolEnum.AUDITOR_ITSS,
         "descripcion": "Acceso de inspección de trabajo a registros de jornada."
     },
     {
         "id": "92c1919b-742a-492a-8421-97cea9d8b2bd",
         "nombre": "Representante_legal",
+        "tipo": TipoRolEnum.REPRESENTANTE_LEGAL,
         "descripcion": "Acceso a informes de cumplimiento y auditoría legal."
     },
     {
         "id": "b470ce6f-6a3a-4c73-a0c2-4bd2db48218f",
         "nombre": "Admin_empresa",
+        "tipo": TipoRolEnum.ADMIN_EMPRESA,
         "descripcion": "Gestión total de los parámetros y centros de la empresa."
     },
     {
         "id": "f8e554c6-cb9a-45dd-8c49-f4b6a38cfac8",
         "nombre": "Admin_gestoría",
+        "tipo": TipoRolEnum.ADMIN_GESTORIA,
         "descripcion": "Control global multiempresa y supervisión de asesoría."
     }
 ]
@@ -50,14 +64,28 @@ def inicializar_roles_sistema(db: Session):
     """
     for rol_data in ROLES_SISTEMA_INICIALES:
         rol_existente = db.query(Roles).filter(Roles.id == rol_data["id"]).first()
+        if rol_existente is None:
+            rol_existente = (
+                db.query(Roles)
+                .filter(
+                    Roles.empresa_id.is_(None),
+                    Roles.nombre == rol_data["nombre"],
+                )
+                .first()
+            )
         if not rol_existente:
             nuevo_rol = Roles(
                 id=rol_data["id"],
                 empresa_id=None,
                 nombre=rol_data["nombre"],
+                tipo=rol_data["tipo"],
                 descripcion=rol_data["descripcion"]
             )
             db.add(nuevo_rol)
+        else:
+            setattr(rol_existente, "tipo", rol_data["tipo"])
+            setattr(rol_existente, "nombre", rol_data["nombre"])
+            setattr(rol_existente, "descripcion", rol_data["descripcion"])
     db.commit()
 
 def inicializar_permisos_sistema(db: Session) -> None:
@@ -66,10 +94,12 @@ def inicializar_permisos_sistema(db: Session) -> None:
     asegurando que tengan empresa_id = NULL.
     Excluye combinaciones que atenten contra la lógica de negocio legal o de inmutabilidad.
     """
-    permisos_existentes = set(db.query(Permisos.tipo, Permisos.accion).all())
+    permisos_existentes = set(
+        db.query(Permisos.tipo, Permisos.accion, Permisos.alcance).all()
+    )
     
     for tipo in TipoPermisoEnum:
-        for accion in AccionPermisoEnum:
+        for accion in ACCIONES_PERMISOS_ACTIVAS:
             # REGLAS DE NEGOCIO LEGALES Y DE SEGURIDAD (Filtros de exclusión):
             
             # 1. Los fichajes son estrictamente inmutables (append-only). Nadie puede "modificar" ni "eliminar" un fichaje directamente.
@@ -80,15 +110,20 @@ def inicializar_permisos_sistema(db: Session) -> None:
             if tipo == TipoPermisoEnum.AUDITORIA_ACCESOS and accion not in (AccionPermisoEnum.CONSULTAR, AccionPermisoEnum.EXPORTAR):
                 continue
 
-            if (tipo, accion) in permisos_existentes:
-                continue
-                
-            descripcion = f"Permite {accion.value} sobre {tipo.value.replace('_', ' ')}."
-            db.add(Permisos(
-                tipo=tipo,
-                accion=accion,
-                descripcion=descripcion
-            ))
+            for alcance in AlcancePermisoEnum:
+                if (tipo, accion, alcance) in permisos_existentes:
+                    continue
+
+                descripcion = (
+                    f"Permite {accion.value} sobre {tipo.value.replace('_', ' ')} "
+                    f"en el ámbito {alcance.value}."
+                )
+                db.add(Permisos(
+                    tipo=tipo,
+                    accion=accion,
+                    alcance=alcance,
+                    descripcion=descripcion,
+                ))
 
     db.commit()
 
@@ -98,72 +133,147 @@ def inicializar_relaciones_roles_permisos(db: Session) -> None:
     respetando los principios de privilegio (Least Privilege) y normativa laboral.
     """
     # Mapeo de IDs de roles definidos arriba
-    id_superadmin = "6kdl163e-55m4-7860-8824-cfy23aj47834"
-    id_trabajador = "5aca163e-53f3-4210-9924-cff25ab38444"
-    id_rrhh = "66cba6e5-bd7a-4bfc-8f32-d1643bb75c92"
-    id_auditor = "6ce13799-4042-40a4-9165-ece37dcc75f6"
-    id_rep_legal = "92c1919b-742a-492a-8421-97cea9d8b2bd"
-    id_admin_empresa = "b470ce6f-6a3a-4c73-a0c2-4bd2db48218f"
-    id_admin_gestoria = "f8e554c6-cb9a-45dd-8c49-f4b6a38cfac8"
+    ids_roles = {
+        rol_data["tipo"]: db.query(Roles.id)
+        .filter(
+            Roles.empresa_id.is_(None),
+            Roles.nombre == rol_data["nombre"],
+        )
+        .scalar()
+        for rol_data in ROLES_SISTEMA_INICIALES
+    }
+    id_superadmin = ids_roles[TipoRolEnum.SUPERADMINISTRADOR]
+    id_trabajador = ids_roles[TipoRolEnum.TRABAJADOR]
+    id_rrhh = ids_roles[TipoRolEnum.RRHH]
+    id_auditor = ids_roles[TipoRolEnum.AUDITOR_ITSS]
+    id_rep_legal = ids_roles[TipoRolEnum.REPRESENTANTE_LEGAL]
+    id_admin_empresa = ids_roles[TipoRolEnum.ADMIN_EMPRESA]
+    id_admin_gestoria = ids_roles[TipoRolEnum.ADMIN_GESTORIA]
 
-    # Obtener todos los permisos actuales de la BD
-    todos_los_permisos = db.query(Permisos).all()
+    permisos = {
+        (permiso.accion, permiso.tipo, permiso.alcance): permiso
+        for permiso in db.query(Permisos).all()
+    }
+    own_types = {
+        TipoPermisoEnum.USUARIOS,
+        TipoPermisoEnum.USUARIOS_EMPRESAS,
+        TipoPermisoEnum.TRABAJADORES,
+        TipoPermisoEnum.FICHAJES,
+        TipoPermisoEnum.CORRECCIONES_FICHAJE,
+        TipoPermisoEnum.AUSENCIAS,
+        TipoPermisoEnum.RESUMENES_JORNADA,
+        TipoPermisoEnum.ASIGNACIONES_TURNO,
+        TipoPermisoEnum.TURNOS,
+        TipoPermisoEnum.CONTRATOS,
+        TipoPermisoEnum.CONTRATOS_CALENDARIOS,
+        TipoPermisoEnum.CALENDARIOS_LABORALES,
+    }
+    company_catalogs = {
+        TipoPermisoEnum.DEPARTAMENTOS,
+        TipoPermisoEnum.DISPOSITIVOS_FICHAJE,
+        TipoPermisoEnum.EMPRESAS,
+        TipoPermisoEnum.FESTIVOS,
+        TipoPermisoEnum.CALENDARIOS_LABORALES,
+        TipoPermisoEnum.MOTIVOS_PAUSA,
+        TipoPermisoEnum.POLITICAS_RETENCION,
+        TipoPermisoEnum.TURNOS,
+    }
 
-    for rol_id in [id_superadmin, id_admin_gestoria]:
-        # Superadministrador y Admin de Gestoría tienen acceso a TODOS los permisos válidos creados
-        for permiso in todos_los_permisos:
-            existe = db.query(RolesPermisos).filter_by(rol_id=rol_id, permiso_id=permiso.id).first()
-            if not existe:
-                db.add(RolesPermisos(rol_id=rol_id, permiso_id=permiso.id))
+    matriz: dict[str, set[tuple[AccionPermisoEnum, TipoPermisoEnum, AlcancePermisoEnum]]] = {
+        id_superadmin: set(permisos.keys()),
+        id_trabajador: set(),
+        id_rrhh: set(),
+        id_auditor: set(),
+        id_rep_legal: set(),
+        id_admin_empresa: set(),
+        id_admin_gestoria: set(),
+    }
 
-    # Matriz específica para el TRABAJADOR (Solo fichar, consultar sus datos, solicitar correcciones/ausencias)
-    permisos_trabajador = [
-        (AccionPermisoEnum.FICHAR, TipoPermisoEnum.FICHAJES),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.FICHAJES),
-        (AccionPermisoEnum.CREAR, TipoPermisoEnum.CORRECCIONES_FICHAJE), # Solicitar corrección de fichaje
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.CORRECCIONES_FICHAJE),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.TURNOS),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.CALENDARIOS_LABORALES),
-        (AccionPermisoEnum.CREAR, TipoPermisoEnum.AUSENCIAS), # Solicitar vacaciones/ausencia
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.AUSENCIAS),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.CONTRATOS),
-    ]
-    for accion, tipo in permisos_trabajador:
-        perm = db.query(Permisos).filter_by(accion=accion, tipo=tipo).first()
-        if perm:
-            existe = db.query(RolesPermisos).filter_by(rol_id=id_trabajador, permiso_id=perm.id).first()
-            if not existe:
-                db.add(RolesPermisos(rol_id=id_trabajador, permiso_id=perm.id))
+    for tipo in own_types:
+        acciones = {
+            AccionPermisoEnum.CONSULTAR,
+            AccionPermisoEnum.CREAR,
+            AccionPermisoEnum.MODIFICAR,
+        }
+        if tipo in {TipoPermisoEnum.FICHAJES, TipoPermisoEnum.CONTRATOS_CALENDARIOS,
+                    TipoPermisoEnum.ASIGNACIONES_TURNO, TipoPermisoEnum.TURNOS,
+                    TipoPermisoEnum.CALENDARIOS_LABORALES, TipoPermisoEnum.USUARIOS_EMPRESAS}:
+            acciones = {AccionPermisoEnum.CONSULTAR}
+        if tipo == TipoPermisoEnum.USUARIOS:
+            acciones = {AccionPermisoEnum.CONSULTAR, AccionPermisoEnum.MODIFICAR}
+        matriz[id_trabajador].update(
+            (accion, tipo, AlcancePermisoEnum.PROPIO) for accion in acciones
+        )
+    matriz[id_trabajador].update(
+        (AccionPermisoEnum.CONSULTAR, tipo, AlcancePermisoEnum.EMPRESA)
+        for tipo in company_catalogs
+    )
+    matriz[id_trabajador].update({
+        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.PERMISOS, AlcancePermisoEnum.EMPRESA),
+        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.ROLES, AlcancePermisoEnum.EMPRESA),
+    })
 
-    # Matriz para Auditor ITSS e Inspector (Solo lectura y exportación para cumplir con la obligación legal de mostrar registros)
-    permisos_auditoria = [
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.FICHAJES),
-        (AccionPermisoEnum.EXPORTAR, TipoPermisoEnum.FICHAJES),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.TRABAJADORES),
-        (AccionPermisoEnum.EXPORTAR, TipoPermisoEnum.TRABAJADORES),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.CONTRATOS),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.AUDITORIA_ACCESOS),
-        (AccionPermisoEnum.EXPORTAR, TipoPermisoEnum.AUDITORIA_ACCESOS),
-        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.RESUMENES_JORNADA),
-        (AccionPermisoEnum.EXPORTAR, TipoPermisoEnum.RESUMENES_JORNADA),
-    ]
-    for rol_id in [id_auditor, id_rep_legal]:
-        for accion, tipo in permisos_auditoria:
-            perm = db.query(Permisos).filter_by(accion=accion, tipo=tipo).first()
-            if perm:
-                existe = db.query(RolesPermisos).filter_by(rol_id=rol_id, permiso_id=perm.id).first()
-                if not existe:
-                    db.add(RolesPermisos(rol_id=rol_id, permiso_id=perm.id))
+    operaciones_rrhh = {
+        TipoPermisoEnum.ASIGNACIONES_TURNO, TipoPermisoEnum.AUSENCIAS,
+        TipoPermisoEnum.CALENDARIOS_LABORALES, TipoPermisoEnum.CENTROS_TRABAJO,
+        TipoPermisoEnum.CONTRATOS, TipoPermisoEnum.CONTRATOS_CALENDARIOS,
+        TipoPermisoEnum.CORRECCIONES_FICHAJE, TipoPermisoEnum.DEPARTAMENTOS,
+        TipoPermisoEnum.DISPOSITIVOS_FICHAJE, TipoPermisoEnum.FESTIVOS,
+        TipoPermisoEnum.FICHAJES, TipoPermisoEnum.MOTIVOS_PAUSA,
+        TipoPermisoEnum.RESUMENES_JORNADA, TipoPermisoEnum.TRABAJADORES,
+        TipoPermisoEnum.TURNOS,
+    }
+    matriz[id_rrhh].update(matriz[id_trabajador])
+    for tipo in operaciones_rrhh:
+        matriz[id_rrhh].update(
+            (accion, tipo, AlcancePermisoEnum.EMPRESA)
+            for accion in ACCIONES_PERMISOS_ACTIVAS
+        )
+    matriz[id_rrhh].update({
+        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.USUARIOS, AlcancePermisoEnum.EMPRESA),
+        (AccionPermisoEnum.CREAR, TipoPermisoEnum.USUARIOS, AlcancePermisoEnum.EMPRESA),
+        (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.USUARIOS_EMPRESAS, AlcancePermisoEnum.EMPRESA),
+        (AccionPermisoEnum.CREAR, TipoPermisoEnum.USUARIOS_EMPRESAS, AlcancePermisoEnum.EMPRESA),
+    })
 
-    # RRHH y Admin de Empresa (Gestión operativa completa de la empresa)
-    # Tienen casi todo excepto superadministración de licencias globales de plataforma
-    for rol_id in [id_rrhh, id_admin_empresa]:
-        for permiso in todos_los_permisos:
-            # Opcional: restringir que RRHH no gestione licencias de pago si se desea
-            if permiso.tipo == TipoPermisoEnum.LICENCIAS and rol_id == id_rrhh:
-                continue
-            existe = db.query(RolesPermisos).filter_by(rol_id=rol_id, permiso_id=permiso.id).first()
-            if not existe:
+    # Administradores de empresa y gestoría gestionan su propio tenant.
+    empresa_admin_types = set(TipoPermisoEnum) - {
+        TipoPermisoEnum.LICENCIAS,
+        TipoPermisoEnum.PERMISOS,
+    }
+    for rol_id in (id_admin_empresa, id_admin_gestoria):
+        matriz[rol_id].update(
+            (accion, tipo, AlcancePermisoEnum.EMPRESA)
+            for tipo in empresa_admin_types
+            for accion in ACCIONES_PERMISOS_ACTIVAS
+        )
+        matriz[rol_id].update(matriz[id_trabajador])
+    # Los responsables consultan su suscripción, pero no emiten ni revocan licencias.
+    for rol_id in (id_admin_empresa, id_admin_gestoria):
+        matriz[rol_id].add(
+            (AccionPermisoEnum.CONSULTAR, TipoPermisoEnum.LICENCIAS, AlcancePermisoEnum.EMPRESA)
+        )
+
+    recursos_auditables = set(TipoPermisoEnum) - {
+        TipoPermisoEnum.USUARIOS,
+        TipoPermisoEnum.USUARIOS_EMPRESAS,
+        TipoPermisoEnum.ROLES,
+        TipoPermisoEnum.ROLES_PERMISOS,
+        TipoPermisoEnum.PERMISOS,
+    }
+    for tipo in recursos_auditables:
+        matriz[id_auditor].add((AccionPermisoEnum.CONSULTAR, tipo, AlcancePermisoEnum.EMPRESA))
+        matriz[id_auditor].add((AccionPermisoEnum.EXPORTAR, tipo, AlcancePermisoEnum.EMPRESA))
+        matriz[id_rep_legal].add((AccionPermisoEnum.CONSULTAR, tipo, AlcancePermisoEnum.EMPRESA))
+
+    # Sincroniza únicamente roles del sistema: cambios de la matriz también revocan grants obsoletos.
+    for rol_id, permisos_objetivo in matriz.items():
+        db.query(RolesPermisos).filter(RolesPermisos.rol_id == rol_id).delete(
+            synchronize_session=False
+        )
+        for clave in permisos_objetivo:
+            permiso = permisos.get(clave)
+            if permiso:
                 db.add(RolesPermisos(rol_id=rol_id, permiso_id=permiso.id))
 
     db.commit()

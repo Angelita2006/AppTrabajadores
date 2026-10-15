@@ -212,6 +212,63 @@ def crear_turno(
 
 
 @router.put(
+    "/{id_turno}/desactivar",
+    status_code=status.HTTP_200_OK,
+    summary="Desactivar turno",
+    description="Desactiva un turno.",
+)
+@limiter.limit("20/minute")
+def desactivar_turno(
+    request: Request,
+    id_turno: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.TURNOS])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """
+    **PUT /api/turnos/{id_turno}/desactivar**
+
+    Desactiva un turno.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación de baja lógica del turno ({id_turno}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    
+    # Validaciones estructurales básicas
+    turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
+    if not turno:
+        print(f"Turno ({id_turno}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Turno no encontrado.",
+        )
+
+    setattr(turno, 'activo', False)
+    setattr(turno, 'updated_at', datetime.now())
+
+    try:
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=turno.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                'recurso': 'turnos',
+                'accion': 'desactivar',
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+
+        print(f"Turno {id_turno} desactivado correctamente y enviado a la papelera.")
+        return {"detail": f"Turno desactivado correctamente y enviado a la papelera."}
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido desactivar el turno: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail='No se ha podido desactivar el turno.',
+        )
+@router.put(
     "/{id_turno}/editar",
     response_model=TurnoResponse,
     summary="Modificar turno",
@@ -279,60 +336,3 @@ def editar_turno(
             detail='No se ha podido modificar el turno.'
         )
 
-@router.put(
-    "/{id_turno}/desactivar",
-    status_code=status.HTTP_200_OK,
-    summary="Desactivar turno",
-    description="Desactiva un turno.",
-)
-@limiter.limit("20/minute")
-def desactivar_turno(
-    request: Request,
-    id_turno: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.TURNOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **PUT /api/turnos/{id_turno}/desactivar**
-
-    Desactiva un turno.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de baja lógica del turno ({id_turno}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
-    # Validaciones estructurales básicas
-    turno = db.query(Turnos).filter(Turnos.id == id_turno).first()
-    if not turno:
-        print(f"Turno ({id_turno}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Turno no encontrado.",
-        )
-
-    setattr(turno, 'activo', False)
-    setattr(turno, 'updated_at', datetime.now())
-
-    try:
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=turno.empresa_id,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': 'turnos',
-                'accion': 'desactivar',
-            },
-            trabajador_id=None,
-        )
-        db.commit()
-
-        print(f"Turno {id_turno} desactivado correctamente y enviado a la papelera.")
-        return {"detail": f"Turno desactivado correctamente y enviado a la papelera."}
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido desactivar el turno: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se ha podido desactivar el turno.',
-        )

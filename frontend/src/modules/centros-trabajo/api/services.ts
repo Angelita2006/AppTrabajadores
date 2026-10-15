@@ -41,11 +41,11 @@ export const crearCentroTrabajo = async (
  * @returns {Promise<CentroTrabajo[]>} Promesa con el listado global de centros de trabajo.
  * @throws {Error} Lanza un error si ocurre un fallo al realizar la consulta al servidor.
  */
-export const obtenerTodosLosCentrosTrabajo = async (): Promise<
+export const obtenerTodosLosCentrosTrabajo = async (idEmpresa: string): Promise<
   CentroTrabajo[]
 > => {
   try {
-    const response = await api.get<CentroTrabajo[]>("/api/centros-trabajo");
+    const response = await api.get<CentroTrabajo[]>(`/api/centros-trabajo/empresa/${idEmpresa}`);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -125,7 +125,7 @@ export const actualizarCentroTrabajo = async (
 ): Promise<CentroTrabajo> => {
   try {
     const response = await api.put<CentroTrabajo>(
-      `/api/centros-trabajo/${idCentro}/editar`,
+      `/api/centros-trabajo/${idCentro}`,
       payload,
     );
     return response.data;
@@ -153,13 +153,15 @@ export const cambiarEstadoCentroTrabajo = async (
   activo: boolean,
 ): Promise<CentroTrabajo> => {
   try {
-    const response = await api.put<CentroTrabajo>(
-      `/api/centros-trabajo/${idCentro}/estado`,
-      null,
-      {
-        params: { activo },
-      },
-    );
+    if (activo) {
+      const response = await api.put<CentroTrabajo>(
+        `/api/centros-trabajo/${idCentro}`,
+        { activo: true },
+      );
+      return response.data;
+    }
+    await api.put(`/api/centros-trabajo/${idCentro}/desactivar`);
+    const response = await api.get<CentroTrabajo>(`/api/centros-trabajo/${idCentro}`);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;

@@ -21,6 +21,66 @@ router = APIRouter(prefix="/api/festivos", tags=["Festivos"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
+@router.get(
+    '/calendario/{id_calendario}',
+    response_model=List[FestivoSimpleResponse],
+    summary='Obtener festivos por calendario laboral',
+    description='Obtiene los festivos de un calendario laboral.',
+)
+@limiter.limit("60/minute")
+def obtener_festivos_calendario(
+    request: Request,
+    id_calendario: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FESTIVOS])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """
+    **GET /api/festivos/calendario/{id_calendario}**
+
+    Obtiene los festivos de un calendario laboral.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de festivos para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    calendario = (
+        db.query(CalendariosLaborales).options(
+        joinedload(CalendariosLaborales.empresa))
+        .filter(CalendariosLaborales.id == id_calendario)
+        .first()
+    )
+
+    if not calendario:
+        print(f"Calendario laboral ({id_calendario}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Calendario laboral no encontrado.",
+        )
+
+    resultados = (
+        db.query(Festivos).options(
+        joinedload(Festivos.calendario)
+        .joinedload(CalendariosLaborales.empresa))
+        .filter(Festivos.calendario_id == id_calendario, Festivos.activo.is_(True))
+        .order_by(Festivos.fecha.asc())
+        .all()
+    )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=calendario.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': 'festivos',
+            'accion': 'consultar_calendario',
+        },
+        trabajador_id=None,
+    )
+    db.commit()
+
+    return resultados
 @router.post(
     '',
     response_model=FestivoSimpleResponse,
@@ -105,6 +165,7 @@ def crear_festivo(
             },
             trabajador_id=None,
         )
+        db.commit()
 
         return festivo_creado
     except Exception as e:
@@ -114,6 +175,72 @@ def crear_festivo(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='No se ha podido guardar el día festivo.')
 
+
+@router.put(
+    '/{id_festivo}/desactivar',
+    status_code=status.HTTP_200_OK,
+    summary='Desactiva un día festivo',
+    description='Desactiva un día festivo.',
+)
+@limiter.limit("30/minute")
+def desactivar_festivo(
+    request: Request,
+    id_festivo: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.FESTIVOS])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """
+    **PUT /api/festivos/{id_festivo}/desactivar**
+
+    Desactiva un día festivo.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de desactivación del festivo ({id_festivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+   
+    # Validaciones estructurales básicas
+    festivo = (
+        db.query(Festivos).options(
+        joinedload(Festivos.calendario)
+        .joinedload(CalendariosLaborales.empresa))
+        .filter(Festivos.id == id_festivo)
+        .first()
+    )
+
+    if not festivo:
+        print(f"Festivo ({id_festivo}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Festivo no encontrado."
+        )
+
+    try:
+        setattr(festivo, 'activo', False)
+        setattr(festivo, 'updated_at', datetime.now())
+        db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=festivo.calendario.empresa_id if festivo.calendario else None,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={
+                'recurso': 'festivos',
+                'accion': 'desactivar',
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+
+        print(f"Día festivo ({id_festivo}) desactivado correctamente y enviado a la papelera.")
+        return {"detail": f"Día festivo desactivado correctamente y enviado a la papelera."}
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido desactivar el día festivo: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail='No se ha podido desactivar el día festivo.',
+        )
 
 @router.put(
     '/{id_festivo}',
@@ -206,6 +333,7 @@ def modificar_festivo(
             },
             trabajador_id=None,
         )
+        db.commit()
 
         return festivo_actualizado
     except Exception as e:
@@ -216,127 +344,3 @@ def modificar_festivo(
             detail='No se ha podido actualizar el día festivo',
         )
 
-@router.put(
-    '/{id_festivo}/desactivar',
-    status_code=status.HTTP_200_OK,
-    summary='Desactiva un día festivo',
-    description='Desactiva un día festivo.',
-)
-@limiter.limit("30/minute")
-def desactivar_festivo(
-    request: Request,
-    id_festivo: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.FESTIVOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **PUT /api/festivos/{id_festivo}/desactivar**
-
-    Desactiva un día festivo.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del festivo ({id_festivo}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-   
-    # Validaciones estructurales básicas
-    festivo = (
-        db.query(Festivos).options(
-        joinedload(Festivos.calendario)
-        .joinedload(CalendariosLaborales.empresa))
-        .filter(Festivos.id == id_festivo)
-        .first()
-    )
-
-    if not festivo:
-        print(f"Festivo ({id_festivo}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Festivo no encontrado."
-        )
-
-    try:
-        setattr(festivo, 'activo', False)
-        setattr(festivo, 'updated_at', datetime.now())
-        db.commit()
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=festivo.calendario.empresa_id if festivo.calendario else None,
-            accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={
-                'recurso': 'festivos',
-                'accion': 'desactivar',
-            },
-            trabajador_id=None,
-        )
-
-        print(f"Día festivo ({id_festivo}) desactivado correctamente y enviado a la papelera.")
-        return {"detail": f"Día festivo desactivado correctamente y enviado a la papelera."}
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido desactivar el día festivo: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se ha podido desactivar el día festivo.',
-        )
-
-@router.get(
-    '/calendario/{id_calendario}',
-    response_model=List[FestivoSimpleResponse],
-    summary='Obtener festivos por calendario laboral',
-    description='Obtiene los festivos de un calendario laboral.',
-)
-@limiter.limit("60/minute")
-def obtener_festivos_calendario(
-    request: Request,
-    id_calendario: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.FESTIVOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **GET /api/festivos/calendario/{id_calendario}**
-
-    Obtiene los festivos de un calendario laboral.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de festivos para el calendario ({id_calendario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    calendario = (
-        db.query(CalendariosLaborales).options(
-        joinedload(CalendariosLaborales.empresa))
-        .filter(CalendariosLaborales.id == id_calendario)
-        .first()
-    )
-
-    if not calendario:
-        print(f"Calendario laboral ({id_calendario}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Calendario laboral no encontrado.",
-        )
-
-    resultados = (
-        db.query(Festivos).options(
-        joinedload(Festivos.calendario)
-        .joinedload(CalendariosLaborales.empresa))
-        .filter(Festivos.calendario_id == id_calendario, Festivos.activo.is_(True))
-        .order_by(Festivos.fecha.asc())
-        .all()
-    )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=calendario.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': 'festivos',
-            'accion': 'consultar_calendario',
-        },
-        trabajador_id=None,
-    )
-
-    return resultados

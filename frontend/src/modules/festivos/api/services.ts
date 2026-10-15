@@ -15,9 +15,9 @@ import { Festivo, FestivoCreate, FestivoUpdate } from "../types/festivo";
  * @returns {Promise<Festivo[]>} Promesa con el listado completo de días festivos.
  * @throws {Error} Lanza un error si ocurre un fallo al obtener todos los festivos.
  */
-export const obtenerTodosLosFestivos = async (): Promise<Festivo[]> => {
+export const obtenerTodosLosFestivos = async (idCalendario: string): Promise<Festivo[]> => {
   try {
-    const response = await api.get<Festivo[]>("/api/festivos");
+    const response = await api.get<Festivo[]>(`/api/festivos/calendario/${idCalendario}`);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -92,7 +92,7 @@ export const editarFestivo = async (
 ): Promise<Festivo> => {
   try {
     const response = await api.put<Festivo>(
-      `/api/festivos/${idFestivo}/editar`,
+      `/api/festivos/${idFestivo}`,
       null,
       {
         params: {

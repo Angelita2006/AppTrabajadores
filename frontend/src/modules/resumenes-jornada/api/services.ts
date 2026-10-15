@@ -15,9 +15,9 @@ import { ResumenJornada, ResumenJornadaCreate } from "../types/resumen-jornada";
  * @returns {Promise<ResumenJornada[]>} Promesa con el listado completo de resúmenes de jornada.
  * @throws {Error} Lanza un error si ocurre un fallo al recuperar los registros.
  */
-export const obtenerResumenesJornada = async (): Promise<ResumenJornada[]> => {
+export const obtenerResumenesJornada = async (idTrabajador: string): Promise<ResumenJornada[]> => {
   try {
-    const respuesta = await api.get<ResumenJornada[]>("/api/resumenes-jornada");
+    const respuesta = await api.get<ResumenJornada[]>(`/api/resumenes-jornada/trabajador/${idTrabajador}`);
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error.response?.data?.message;

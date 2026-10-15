@@ -19,11 +19,11 @@ import {
  * @returns {Promise<AusenciaResponse[]>} Promesa con el listado completo de ausencias.
  * @throws {Error} Lanza un error si ocurre un fallo de red o error en el servidor.
  */
-export const obtenerTodasLasAusencias = async (): Promise<
+export const obtenerTodasLasAusencias = async (idEmpresa: string): Promise<
   AusenciaResponse[]
 > => {
   try {
-    const respuesta = await api.get<AusenciaResponse[]>("/api/ausencias");
+    const respuesta = await api.get<AusenciaResponse[]>(`/api/ausencias/empresa/${idEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error.response?.data?.message;

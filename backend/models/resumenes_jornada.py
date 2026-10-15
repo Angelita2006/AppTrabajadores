@@ -37,5 +37,5 @@ class ResumenesJornada(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del resumen.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del resumen.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='resumenes_jornada', doc='Empresa a la que pertenece el resumen.') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='resumenes_jornada', doc='Trabajador al que corresponde el resumen.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='resumenes_jornada', doc='Empresa a la que pertenece el resumen.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', foreign_keys=[trabajador_id], back_populates='resumenes_jornada', doc='Trabajador al que corresponde el resumen.') # type: ignore

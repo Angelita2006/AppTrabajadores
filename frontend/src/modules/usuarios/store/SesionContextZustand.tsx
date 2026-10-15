@@ -2,6 +2,8 @@ import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ReactNode, useEffect } from "react";
 import { create } from "zustand";
+import { setAuthToken, setEmpresaContext } from "@/src/service/api/api";
+import { obtenerMisAccesos } from "../api/services";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
@@ -10,12 +12,9 @@ import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { obtenerContratosPorTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
 import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaje";
-import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
+import { obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
-import {
-    obtenerEmpresaTrabajador,
-    obtenerTrabajador,
-} from "../../trabajadores/api/services";
+import { obtenerMiTrabajador, obtenerTrabajador } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
 
@@ -38,6 +37,9 @@ interface SesionState {
   setUsuarioActual: (usuario: UsuarioSesion | null) => void;
   empresas: Empresa[];
   setEmpresas: (empresas: Empresa[]) => void;
+  accesos: import("../api/services").AccesoUsuario[];
+  setAccesos: (accesos: import("../api/services").AccesoUsuario[]) => void;
+  tienePermiso: (recurso: string, accion: string, alcance?: string) => boolean;
   empresaActual: Empresa | null;
   setEmpresaActual: (empresa: Empresa | null) => void;
   trabajadores: Trabajador[];
@@ -80,13 +82,48 @@ interface SesionState {
   cerrarSesionCompleta: () => Promise<void>;
 }
 
-export const useSesionStore = create<SesionState>((set) => ({
+export const useSesionStore = create<SesionState>((set, get) => ({
   usuarioActual: null,
   setUsuarioActual: (usuarioActual) => set({ usuarioActual }),
   empresas: [],
   setEmpresas: (empresas) => set({ empresas }),
+  accesos: [],
+  setAccesos: (accesos) => set({ accesos }),
+  tienePermiso: (recurso, accion, alcance) =>
+    get().accesos.some(
+      (acceso) =>
+        (acceso.empresa_id === get().empresaActual?.id || acceso.empresa_id === null) &&
+        acceso.permisos.some(
+          (permiso) =>
+            permiso.recurso === recurso &&
+            permiso.accion === accion &&
+            (!alcance || permiso.alcance === alcance),
+        ),
+    ),
   empresaActual: null,
-  setEmpresaActual: (empresaActual) => set({ empresaActual }),
+  setEmpresaActual: (empresaActual) => {
+    const empresaAnterior = get().empresaActual;
+    if (empresaAnterior?.id !== empresaActual?.id) {
+      set({
+        empresaActual,
+        trabajadores: [],
+        trabajadorActual: null,
+        contratos: [],
+        contratoActual: null,
+        turnos: [],
+        turnoActual: null,
+        centrosTrabajo: [],
+        centroTrabajoActual: null,
+        calendarios: [],
+        calendarioLaboralActual: null,
+        dispositivos: [],
+        dispositivoFichajeActual: null,
+      });
+    } else {
+      set({ empresaActual });
+    }
+    void setEmpresaContext(empresaActual?.id ?? null);
+  },
   trabajadores: [],
   setTrabajadores: (trabajadores) => set({ trabajadores }),
   trabajadorActual: null,
@@ -160,10 +197,13 @@ export const useSesionStore = create<SesionState>((set) => ({
         STORAGE_KEY_TOKEN,
         STORAGE_KEY_VERSION,
       ]);
+      await setEmpresaContext(null);
+      await setAuthToken(null);
 
       set({
         usuarioActual: null,
         empresas: [],
+        accesos: [],
         empresaActual: null,
         trabajadores: [],
         trabajadorActual: null,
@@ -314,6 +354,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       if (!usuarioActual) {
         if (isCancelled) return;
         setEmpresas([]);
+        useSesionStore.getState().setAccesos([]);
         setEmpresaActual(null);
         setTrabajadores([]);
         setTrabajadorActual(null);
@@ -335,46 +376,73 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       }
 
       try {
-        if (
-          usuarioActual.tipo_usuario === "Admin_empresa" &&
-          usuarioActual.empresa_id
-        ) {
-          const empresa = await obtenerEmpresa(usuarioActual.empresa_id);
-          if (isCancelled) return;
-          setEmpresas([empresa]);
-          setEmpresaActual(empresa);
-          return;
-        }
+        const empresaGuardada = useSesionStore.getState().empresaActual;
+        let accesos = await obtenerMisAccesos(empresaGuardada?.id);
+        if (isCancelled) return;
+        useSesionStore.getState().setAccesos(accesos);
 
-        if (usuarioActual.tipo_usuario === "Admin_gestoría") {
-          const todasLasEmpresas = await obtenerEmpresas();
-          if (isCancelled) return;
-          setEmpresas(todasLasEmpresas);
-          const empresaActualActual = useSesionStore.getState().empresaActual;
-          setEmpresaActual(
-            empresaActualActual ??
-              (todasLasEmpresas.length > 0 ? todasLasEmpresas[0] : null),
-          );
-          return;
-        }
+        const empresaContextoInicial = empresaGuardada?.id ??
+          accesos.find((acceso) => acceso.empresa_id)?.empresa_id ?? null;
+        await setEmpresaContext(empresaContextoInicial);
 
-        if (usuarioActual.trabajador_id) {
-          const token = await AsyncStorage.getItem(STORAGE_KEY_TOKEN);
-          if (isCancelled) return;
-          try {
-            const [empresasLista, empresaTrabajador] = await Promise.all([
-              obtenerEmpresas(),
-              obtenerEmpresaTrabajador(usuarioActual.trabajador_id, token!),
-            ]);
-            if (isCancelled) return;
-            setEmpresas(empresasLista);
-            if (empresaTrabajador) {
-              setEmpresaActual(empresaTrabajador);
-            }
-          } catch (err) {
-            console.error("Error al obtener la empresa del trabajador:", err);
+        let empresasDisponibles: Empresa[];
+        try {
+          empresasDisponibles = await obtenerEmpresas();
+        } catch (error) {
+          const empresaRespaldo = accesos.find(
+            (acceso) => acceso.empresa_id,
+          )?.empresa_id ?? null;
+          if (!empresaRespaldo || empresaRespaldo === empresaContextoInicial) {
+            throw error;
           }
-          return;
+          await setEmpresaContext(empresaRespaldo);
+          empresasDisponibles = await obtenerEmpresas();
+        }
+        if (isCancelled) return;
+        setEmpresas(empresasDisponibles);
+        const empresaSeleccionada = empresasDisponibles.find(
+          (empresa) => empresa.id === empresaGuardada?.id,
+        ) ?? empresasDisponibles.find(
+          (empresa) => empresa.id === empresaContextoInicial,
+        ) ?? empresasDisponibles[0] ?? null;
+        await setEmpresaContext(empresaSeleccionada?.id ?? null);
+        setEmpresaActual(empresaSeleccionada);
+        accesos = await obtenerMisAccesos(empresaSeleccionada?.id);
+        if (isCancelled) return;
+        useSesionStore.getState().setAccesos(accesos);
+
+        const accesoActivo = accesos.find(
+          (acceso) => acceso.empresa_id === empresaSeleccionada?.id,
+        ) ?? accesos.find((acceso) => acceso.rol.tipo.startsWith("Admin_gestor"))
+          ?? accesos.find((acceso) => acceso.empresa_id === null);
+        if (accesoActivo) {
+          const usuarioActualizado = {
+            ...usuarioActual,
+            tipo_usuario: accesoActivo.rol.tipo as TipoUsuarioEnum,
+            empresa_id: empresaSeleccionada?.id ?? null,
+          };
+          if (
+            usuarioActual.tipo_usuario !== usuarioActualizado.tipo_usuario ||
+            usuarioActual.empresa_id !== usuarioActualizado.empresa_id
+          ) {
+            setUsuarioActual(usuarioActualizado);
+          }
+          setRolActual(accesoActivo.rol.tipo as TipoUsuarioEnum);
+        }
+
+        try {
+          const trabajador = await obtenerMiTrabajador();
+          if (isCancelled) return;
+          setTrabajadorActual(trabajador);
+          if (usuarioActual.trabajador_id !== trabajador.id) {
+            const usuarioEnStore = useSesionStore.getState().usuarioActual;
+            setUsuarioActual({
+              ...(usuarioEnStore ?? usuarioActual),
+              trabajador_id: trabajador.id,
+            });
+          }
+        } catch {
+          if (!isCancelled) setTrabajadorActual(null);
         }
       } catch (error: any) {
         if (!isCancelled) {
@@ -390,7 +458,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [usuarioActual, cargandoSesionLocal]);
+  }, [usuarioActual, empresaActual?.id, cargandoSesionLocal]);
 
   // MOTOR 3: CARGA DE EXPEDIENTE LABORAL
   useEffect(() => {

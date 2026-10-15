@@ -28,7 +28,7 @@ class CalendariosLaborales(Base):
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del registro.')
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='calendarios_laborales', doc='Empresa a la que pertenece el calendario.') # type: ignore
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='calendarios_laborales', doc='Centro de trabajo al que pertenece el calendario.') # type: ignore
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='calendarios_laborales', doc='Centro de trabajo al que pertenece el calendario.') # type: ignore
     
     festivos: Mapped[list['Festivos']] = relationship('Festivos', back_populates='calendario', cascade='all, delete-orphan', doc='Días festivos incluidos en el calendario.') # type: ignore
-    contratos: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', back_populates='calendario', doc='Contratos asociados al calendario.') # type: ignore
+    contratos: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', back_populates='calendario_laboral', doc='Contratos asociados al calendario.') # type: ignore

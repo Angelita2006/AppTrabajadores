@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator, field_validator
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - AUTHENTICATION
@@ -49,11 +49,24 @@ class PasswordCambioRequest(BaseModel):
     antigua_password: str = Field(..., min_length=6, max_length=255, description="Contraseña actual del usuario")
     nueva_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña del usuario")
 
+    @field_validator("nueva_password")
+    @classmethod
+    def validar_limite_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password exceeds bcrypt 72-byte limit.")
+        return value
+
     model_config = ConfigDict(from_attributes=True)
 
 class PasswordRecuperacionRequest(BaseModel):
-    email: Optional[EmailStr]
-    telefono: Optional[str]
+    email: Optional[EmailStr] = None
+    telefono: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validar_medio_unico(self):
+        if bool(self.email) == bool(self.telefono):
+            raise ValueError("Proporciona solo un correo o un teléfono.")
+        return self
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,5 +78,12 @@ class ConfirmarPasswordRecuperacionRequest(BaseModel):
     telefono: Optional[str] = Field(None, description="Número de teléfono de la cuenta")
     codigo_verificacion: str = Field(..., min_length=6, max_length=10, description="Código de verificación de 6 dígitos recibido por correo")
     nueva_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña del usuario")
+
+    @field_validator("nueva_password")
+    @classmethod
+    def validar_limite_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password exceeds bcrypt 72-byte limit.")
+        return value
 
     model_config = ConfigDict(from_attributes=True)

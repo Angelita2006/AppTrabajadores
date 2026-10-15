@@ -1,4 +1,5 @@
 import api from "@/src/service/api/api";
+import { Contrato } from "../../contratos/types/contrato";
 import {
   AsignacionTurno,
   AsignacionTurnoCreate,
@@ -76,10 +77,17 @@ export const obtenerAsignacionesTurnoTrabajador = async (
     return [];
   }
   try {
-    const response = await api.get<AsignacionTurno[]>(
-      `/api/asignaciones-turno/trabajador/${idTrabajador}`,
+    const contratos = await api.get<Contrato[]>(
+      `/api/contratos/trabajador/${idTrabajador}`,
     );
-    return response.data;
+    const respuestas = await Promise.all(
+      contratos.data.map((contrato) =>
+        api.get<AsignacionTurno[]>(
+          `/api/asignaciones-turno/contrato/${contrato.id}`,
+        ),
+      ),
+    );
+    return respuestas.flatMap((respuesta) => respuesta.data);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -129,10 +137,15 @@ export const eliminarTodasAsignacionesTrabajador = async (
     return null;
   }
   try {
-    const response = await api.delete(
-      `/api/asignaciones-turno/trabajador/${idTrabajador}/eliminar-todas`,
+    const contratos = await api.get<Contrato[]>(
+      `/api/contratos/trabajador/${idTrabajador}`,
     );
-    return response.data;
+    const respuestas = await Promise.all(
+      contratos.data.map((contrato) =>
+        api.delete(`/api/asignaciones-turno/contrato/${contrato.id}`),
+      ),
+    );
+    return respuestas.map((respuesta) => respuesta.data);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

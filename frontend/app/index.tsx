@@ -1,12 +1,7 @@
-import {
-    actualizarEstadoTrabajador,
-    obtenerEmpresaTrabajador,
-} from "@/src/modules/trabajadores/api/services";
-import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { NotificationService } from "@/src/notifications/NotificationService";
-import { setAuthToken } from "@/src/service/api/api";
+import { setAuthToken, setEmpresaContext } from "@/src/service/api/api";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
@@ -28,7 +23,6 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from "react-native-reanimated";
-import { obtenerEmpresa } from "../src/modules/empresas/api/services";
 import { ThemedText } from "../src/shared/components/ThemedText";
 import { IconSymbol } from "../src/shared/ui/IconSymbol";
 
@@ -39,7 +33,6 @@ export default function RootIndexScreen() {
   const {
     usuarioActual,
     setUsuarioActual,
-    setEmpresaActual,
     cargandoSesionLocal,
   } = useSesion();
 
@@ -118,40 +111,9 @@ export default function RootIndexScreen() {
       }
 
       const { access_token, usuario } = respuestaLogin;
-      setAuthToken(access_token);
+      await setAuthToken(access_token);
+      await setEmpresaContext(null);
       setUsuarioActual(usuario);
-
-      if (usuario.tipo_usuario === "Admin_empresa" && usuario.empresa_id) {
-        try {
-          const empresa = await obtenerEmpresa(usuario.empresa_id);
-          setEmpresaActual(empresa);
-        } catch (error: any) {
-          mostrarError(
-            "No se pudieron cargar los datos de la empresa administradora: " +
-              obtenerMensajeAmigableError(error),
-          );
-        }
-      } else if (usuario.trabajador_id) {
-        try {
-          const empresaTrabajador = await obtenerEmpresaTrabajador(
-            usuario.trabajador_id,
-            access_token,
-          );
-          if (empresaTrabajador) {
-            setEmpresaActual(empresaTrabajador);
-          }
-        } catch (error: any) {
-          mostrarError(
-            "No se pudieron cargar empresas del trabajador: " +
-              obtenerMensajeAmigableError(error),
-          );
-        }
-      }
-      if (usuario.trabajador_id)
-        actualizarEstadoTrabajador(
-          usuario.trabajador_id,
-          ESTADOS_TRABAJADOR.ACTIVO,
-        );
     } catch (error: any) {
       mostrarError(
         "Ha fallado el proceso de autenticación: " +

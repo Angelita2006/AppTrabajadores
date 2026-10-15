@@ -4,7 +4,35 @@
 
 # @end expo-cli
 node_modules
-api/backend/.env
+# Variables locales, variantes por entorno y secretos.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Copias y exportaciones de base de datos.
+*.dump
+*.backup
+*.sql.gz
+
+# Archivos privados subidos a la aplicación.
+/var/uploads/
+static/firmas_fichajes/
+static/firmas_solicitudes_correcciones_fichajes/
+static/firmas_resoluciones_correcciones_fichajes/
+static/fotos_trabajadores/
+static/logos_empresas/
+static/justificantes_ausencias/
+static/contratos/
+backend/static/firmas_fichajes/
+backend/static/firmas_solicitudes_correcciones_fichajes/
+backend/static/firmas_resoluciones_correcciones_fichajes/
+backend/static/fotos_trabajadores/
+backend/static/logos_empresas/
+backend/static/justificantes_ausencias/
+backend/static/contratos/
 mobile/android
 GEMINI.md
 mobile/expo-env.d.ts

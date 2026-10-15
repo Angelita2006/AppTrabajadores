@@ -4,6 +4,20 @@ import {
     CorreccionFichajeResponse,
 } from "../types/correccion";
 
+const EVENTOS_BACKEND: Record<string, string> = {
+  ENTRADA: "Entrada",
+  SALIDA: "Salida",
+  INICIO_PAUSA: "Inicio_pausa",
+  FIN_PAUSA: "Fin_pausa",
+};
+
+function normalizarCorreccion(item: CorreccionFichajeResponse): CorreccionFichajeResponse {
+  const tipo_evento = Object.keys(EVENTOS_BACKEND).find(
+    (codigo) => EVENTOS_BACKEND[codigo] === item.tipo_evento,
+  ) ?? item.tipo_evento;
+  return { ...item, tipo_evento: tipo_evento as CorreccionFichajeResponse["tipo_evento"] };
+}
+
 /**
  * Registra una nueva solicitud de rectificación horaria en el sistema.
  * URI: POST /api/correcciones
@@ -19,10 +33,13 @@ export const crearCorreccion = async (
 ): Promise<CorreccionFichajeResponse> => {
   try {
     const response = await api.post<CorreccionFichajeResponse>(
-      "/api/correcciones",
-      payload,
+      "/api/correcciones-fichaje",
+      {
+        ...payload,
+        tipo_evento: EVENTOS_BACKEND[payload.tipo_evento] ?? payload.tipo_evento,
+      },
     );
-    return response.data;
+    return normalizarCorreccion(response.data);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -40,13 +57,13 @@ export const crearCorreccion = async (
  * @returns {Promise<CorreccionFichajeResponse[]>} Promesa con el listado de todas las correcciones registradas.
  * @throws {Error} Lanza un error si falla la consulta al servidor.
  */
-export const obtenerTodasLasCorrecciones = async (): Promise<
+export const obtenerTodasLasCorrecciones = async (idEmpresa: string): Promise<
   CorreccionFichajeResponse[]
 > => {
   try {
     const response =
-      await api.get<CorreccionFichajeResponse[]>("/api/correcciones");
-    return response.data;
+      await api.get<CorreccionFichajeResponse[]>(`/api/correcciones-fichaje/empresa/${idEmpresa}`);
+    return response.data.map(normalizarCorreccion);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -70,9 +87,9 @@ export const obtenerCorreccionesPorEmpresa = async (
 ): Promise<CorreccionFichajeResponse[]> => {
   try {
     const response = await api.get<CorreccionFichajeResponse[]>(
-      `/api/correcciones/empresa/${idEmpresa}`,
+      `/api/correcciones-fichaje/empresa/${idEmpresa}`,
     );
-    return response.data;
+    return response.data.map(normalizarCorreccion);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -97,9 +114,9 @@ export const obtenerCorreccionesPorTrabajador = async (
 ): Promise<CorreccionFichajeResponse[]> => {
   try {
     const response = await api.get<CorreccionFichajeResponse[]>(
-      `/api/correcciones/trabajador/${idTrabajador}`,
+      `/api/correcciones-fichaje/trabajador/${idTrabajador}`,
     );
-    return response.data;
+    return response.data.map(normalizarCorreccion);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -128,49 +145,16 @@ export const resolverCorreccion = async (
   firmaResolutor: string,
 ): Promise<any> => {
   try {
-    const response = await api.put<any>(
-      `/api/correcciones/${idCorreccion}/resolver`,
-      { firma_resolutor: firmaResolutor },
-      {
-        params: {
-          nuevo_estado: nuevoEstado,
-          resolutor_usuario_id: idUsuarioResolutor,
-        },
-      },
+    const response = await api.put<CorreccionFichajeResponse>(
+      `/api/correcciones-fichaje/${idCorreccion}/resolver`,
+      { estado: nuevoEstado, firma_resolutor: firmaResolutor },
     );
-    return response.data;
+    return normalizarCorreccion(response.data);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al resolver la solicitud de corrección ${idCorreccion}.`,
-    );
-  }
-};
-
-/**
- * Restaura una incidencia y su fichaje afectado de vuelta al estado pendiente original.
- * URI: PUT /api/correcciones/{idCorreccion}/restaurar-pendiente
- *
- * @async
- * @function restaurarCorreccionPendiente
- * @param {string} idCorreccion - Identificador UUID único de la solicitud de corrección.
- * @returns {Promise<any>} Promesa con la respuesta de la operación.
- * @throws {Error} Lanza un error si falla la restauración de la corrección.
- */
-export const restaurarCorreccionPendiente = async (
-  idCorreccion: string,
-): Promise<any> => {
-  try {
-    const response = await api.put<any>(
-      `/api/correcciones/${idCorreccion}/restaurar-pendiente`,
-    );
-    return response.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        `Error al restaurar la corrección ${idCorreccion} a estado pendiente.`,
     );
   }
 };
@@ -189,7 +173,7 @@ export const eliminarCorreccion = async (
   idCorreccion: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/correcciones/${idCorreccion}`);
+    await api.delete(`/api/correcciones-fichaje/${idCorreccion}`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

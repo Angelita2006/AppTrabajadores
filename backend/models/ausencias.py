@@ -39,6 +39,6 @@ class Ausencias(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del registro.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del registro.')
     
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='ausencias', doc='Empresa a la que pertenece la ausencia.') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='ausencias', doc='Trabajador que tiene la ausencia.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='ausencias', doc='Empresa a la que pertenece la ausencia.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', foreign_keys=[trabajador_id], back_populates='ausencias', doc='Trabajador que tiene la ausencia.') # type: ignore
     usuario_validador: Mapped[Optional['Usuarios']] = relationship('Usuarios', back_populates='ausencias_validadas', doc='Usuario que valida la solicitud de ausencia.') # type: ignore

@@ -25,7 +25,7 @@ class Departamentos(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del departamento.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del departamento.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='departamentos', doc='Empresa a la que pertenece el departamento.') # type: ignore
-    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='departamentos', doc='Centro de trabajo al que pertenece el departamento.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='departamentos', doc='Empresa a la que pertenece el departamento.') # type: ignore
+    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='departamentos', doc='Centro de trabajo al que pertenece el departamento.') # type: ignore
     
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='departamento', doc='Contratos asociados al departamento.') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', foreign_keys='Contratos.departamento_id', back_populates='departamento', doc='Contratos asociados al departamento.') # type: ignore

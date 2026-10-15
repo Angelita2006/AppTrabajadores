@@ -16,7 +16,7 @@ import { ESTADOS_TRABAJADOR, FichaTrabajadorProps } from "../types/trabajador";
 /**
  * Mapeo de los estados del trabajador a un texto legible para mostrar en pantalla.
  */
-const TEXTO_ESTADOS_TRABAJADOR: Record<number, string> = {
+const TEXTO_ESTADOS_TRABAJADOR: Record<string, string> = {
   [ESTADOS_TRABAJADOR.INACTIVO]: "Inactivo",
   [ESTADOS_TRABAJADOR.ACTIVO]: "Activo",
   [ESTADOS_TRABAJADOR.TRABAJANDO]: "Trabajando",
@@ -171,7 +171,7 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   // Obtener la representación textual del estado usando el const
   const textoEstado =
     TEXTO_ESTADOS_TRABAJADOR[
-      item.estado as keyof typeof TEXTO_ESTADOS_TRABAJADOR
+      item.estado
     ] ?? "Desconocido";
 
   return (

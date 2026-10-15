@@ -14,6 +14,7 @@ class UsuariosEmpresas(Base):
         ForeignKeyConstraint(['rol_id'], ['roles.id'], ondelete='RESTRICT', name='usuarios_empresas_rol_id_fkey'), # Identificador del rol de acceso de este usuario en esta empresa; un usuario puede tener un único rol por empresa
         UniqueConstraint('usuario_id', 'empresa_id', name='usuarios_empresas_usuario_id_empresa_id_key'), # Combinación única de usuario y empresa; un usuario puede tener un único rol por empresa
         Index('usuarios_empresas_empresa_activo_idx', 'empresa_id', 'activo'), # Índice para consultas de usuarios activos en una empresa
+        Index('usuarios_empresas_global_activo_usuario_key', 'usuario_id', unique=True, postgresql_where=text('empresa_id IS NULL AND activo IS TRUE')),
         {'comment': 'Membresías y acceso de usuarios a empresas; los roles se asignan por separado.'},
     )
 

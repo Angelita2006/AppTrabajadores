@@ -24,6 +24,9 @@ const api = axios.create({
 
 // Variable en memoria global para acceso instantáneo
 let memoryToken = "";
+let memoryEmpresaId = "";
+
+const EMPRESA_CONTEXT_KEY = "@fichapp_empresa_actual_id";
 
 if (Platform.OS === "web" && typeof window !== "undefined") {
   try {
@@ -77,6 +80,20 @@ export const loadAuthToken = async () => {
   }
 };
 
+/** Fija el tenant seleccionado. El backend vuelve a validar el acceso en cada petición. */
+export const setEmpresaContext = async (empresaId) => {
+  memoryEmpresaId = empresaId || "";
+  try {
+    if (memoryEmpresaId) {
+      await AsyncStorage.setItem(EMPRESA_CONTEXT_KEY, memoryEmpresaId);
+    } else {
+      await AsyncStorage.removeItem(EMPRESA_CONTEXT_KEY);
+    }
+  } catch (error) {
+    mostrarError("Error al guardar la empresa activa: " + error);
+  }
+};
+
 api.interceptors.request.use(
   async (config) => {
     try {
@@ -88,8 +105,19 @@ api.interceptors.request.use(
         }
       }
 
+      if (!memoryEmpresaId) {
+        memoryEmpresaId = (await AsyncStorage.getItem(EMPRESA_CONTEXT_KEY)) || "";
+      }
+
       if (memoryToken) {
         config.headers.set("Authorization", `Bearer ${memoryToken}`);
+      }
+      if (config.skipEmpresaContext) {
+        config.headers.delete("Empresa-ID");
+      } else if (memoryEmpresaId) {
+        config.headers.set("Empresa-ID", memoryEmpresaId);
+      } else {
+        config.headers.delete("Empresa-ID");
       }
     } catch (error) {
       mostrarError("Error al recuperar el token: " + error);

@@ -153,3 +153,19 @@ class AccionPermisoEnum(str, enum.Enum):
     ELIMINAR = "eliminar"
     IMPORTAR = "importar"
     EXPORTAR = "exportar"
+
+
+ACCIONES_PERMISOS_ACTIVAS = (
+    AccionPermisoEnum.CONSULTAR,
+    AccionPermisoEnum.CREAR,
+    AccionPermisoEnum.MODIFICAR,
+    AccionPermisoEnum.ELIMINAR,
+    AccionPermisoEnum.IMPORTAR,
+    AccionPermisoEnum.EXPORTAR,
+)
+
+class AlcancePermisoEnum(str, enum.Enum):
+    """Ámbito en el que puede ejercerse un permiso."""
+    PROPIO = "propio"
+    EMPRESA = "empresa"
+    GLOBAL = "global"

@@ -11,6 +11,7 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    AlcancePermisoEnum,
     TipoPermisoEnum,
 )
 from core.security import (
@@ -38,7 +39,7 @@ limiter = Limiter(key_func=get_remote_address)
 def obtener_resumenes_jornada_trabajador(
     request: Request,
     id_trabajador: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.RESUMENES_JORNADA])),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.RESUMENES_JORNADA + "-" + AlcancePermisoEnum.PROPIO])),
     db: Session = Depends(get_db_with_advanced_security),
 ):
     """
@@ -64,6 +65,12 @@ def obtener_resumenes_jornada_trabajador(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Trabajador no encontrado."
         )
+
+    if (
+        getattr(request.state, "alcance_efectivo", None) == AlcancePermisoEnum.PROPIO.value
+        and trabajador.usuario_id != usuario_actual.id
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
 
     resultados = (
         db.query(ResumenesJornada).options(

@@ -1,6 +1,21 @@
 import api from "../../../service/api/api";
 import { FichajeCreateParams, RegistroFichaje } from "../types/registrofichaje";
 
+const EVENTOS_BACKEND: Record<string, string> = {
+  ENTRADA: "Entrada",
+  SALIDA: "Salida",
+  INICIO_PAUSA: "Inicio_pausa",
+  FIN_PAUSA: "Fin_pausa",
+};
+
+function normalizarFichaje(fichaje: RegistroFichaje): RegistroFichaje {
+  const evento = String(fichaje.tipo_evento);
+  const tipo_evento = Object.keys(EVENTOS_BACKEND).find(
+    (codigo) => EVENTOS_BACKEND[codigo] === evento,
+  ) ?? evento;
+  return { ...fichaje, tipo_evento: tipo_evento as RegistroFichaje["tipo_evento"] };
+}
+
 /**
  * Servicio de Gestión de Fichajes y Marcajes Laborales.
  * Contiene todas las operaciones CRUD y lógicas de negocio para el registro inmutable, consultas históricas, turnos y control de presencia en la plataforma SaaS.
@@ -15,10 +30,13 @@ import { FichajeCreateParams, RegistroFichaje } from "../types/registrofichaje";
  * @returns {Promise<RegistroFichaje[]>} Promesa con el listado completo de fichajes.
  * @throws {Error} Lanza un error si ocurre un fallo al recuperar el historial de fichajes.
  */
-export const obtenerFichajes = async (): Promise<RegistroFichaje[]> => {
+export const obtenerFichajes = async (idEmpresa: string): Promise<RegistroFichaje[]> => {
   try {
-    const respuesta = await api.get<RegistroFichaje[]>("/api/fichajes");
-    return respuesta.data;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const respuesta = await api.get<RegistroFichaje[]>(`/api/fichajes/empresa/${idEmpresa}`, {
+      params: { fecha_inicio: "2000-01-01", fecha_fin: hoy },
+    });
+    return respuesta.data.map(normalizarFichaje);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -46,7 +64,7 @@ export const obtenerFichajesTrabajadorYEmpresa = async (
     const respuesta = await api.get<RegistroFichaje[]>(
       `/api/fichajes/trabajador/${idTrabajador}/empresa/${idEmpresa}`,
     );
-    return respuesta.data;
+    return respuesta.data.map(normalizarFichaje);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -72,7 +90,7 @@ export const obtenerFichajesTurnoActual = async (
     const respuesta = await api.get<RegistroFichaje[]>(
       `/api/fichajes/trabajador/${idTrabajador}/turno`,
     );
-    return respuesta.data;
+    return respuesta.data.map(normalizarFichaje);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -93,12 +111,12 @@ export const obtenerFichajesTurnoActual = async (
  */
 export const obtenerUltimoFichaje = async (
   idTrabajador: string,
-): Promise<RegistroFichaje> => {
+): Promise<RegistroFichaje | null> => {
   try {
-    const respuesta = await api.get<RegistroFichaje>(
+    const respuesta = await api.get<RegistroFichaje | null>(
       `/api/fichajes/trabajador/${idTrabajador}/ultimo`,
     );
-    return respuesta.data;
+    return respuesta.data ? normalizarFichaje(respuesta.data) : respuesta.data;
   } catch (error: any) {
     const errorDetail = error?.response?.data?.detail;
     let mensajeLegible =
@@ -140,7 +158,7 @@ export const obtenerFichajesEmpresaEntreFechas = async (
         params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
       },
     );
-    return respuesta.data;
+    return respuesta.data.map(normalizarFichaje);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.detail;
     let mensajeLegible =
@@ -181,7 +199,7 @@ export const obtenerFichajesTrabajadorEntreFechas = async (
         params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
       },
     );
-    return respuesta.data;
+    return respuesta.data.map(normalizarFichaje);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(
@@ -205,8 +223,12 @@ export const registrarFichaje = async (
   payload: FichajeCreateParams,
 ): Promise<RegistroFichaje> => {
   try {
-    const respuesta = await api.post<RegistroFichaje>("/api/fichajes", payload);
-    return respuesta.data;
+    const evento = EVENTOS_BACKEND[payload.tipo_evento] ?? payload.tipo_evento;
+    const respuesta = await api.post<RegistroFichaje>("/api/fichajes", {
+      ...payload,
+      tipo_evento: evento,
+    });
+    return normalizarFichaje(respuesta.data);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

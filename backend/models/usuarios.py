@@ -1,6 +1,6 @@
 import datetime
-from typing import Optional
 import uuid
+from typing import Optional
 from sqlalchemy import Boolean, DateTime, Index, PrimaryKeyConstraint, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
@@ -30,8 +30,9 @@ class Usuarios(Base):
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización del usuario.')
     ultimo_acceso: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True, comment='Fecha del último acceso del usuario.')
 
-    codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment='Código de recuperación para restablecimiento de contraseña.')
+    codigo_recuperacion: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, comment='Código de recuperación para restablecimiento de contraseña.')
     codigo_expira_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True, comment='Fecha de expiración del código de recuperación.')
+    intentos_recuperacion: Mapped[int] = mapped_column(default=0, server_default=text('0'), nullable=False)
 
     email_pendiente_verificacion: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment='Dirección de correo electrónico pendiente de verificación.')
     token_cambio_email = mapped_column(String(255), nullable=True, unique=True, comment='Token para cambiar la dirección de correo electrónico.')
@@ -42,10 +43,14 @@ class Usuarios(Base):
     token_cambio_telefono_expira_at = mapped_column(DateTime(timezone=True), nullable=True, comment='Fecha de expiración del token para cambiar el número de teléfono.')
 
     usuarios_empresas: Mapped[list['UsuariosEmpresas']] = relationship('UsuariosEmpresas', back_populates='usuario', doc='Relación con las empresas a las que tiene acceso el usuario.') # type: ignore
-    empresas_admin: Mapped[list['Empresas']] = relationship('Empresas', foreign_keys='[Empresas.usuario_admin_id]', back_populates='usuario_admin', doc='Empresas que administra el usuario.') # type: ignore
+    trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', foreign_keys='Trabajadores.usuario_id', uselist=False, back_populates='usuario', doc='Ficha de trabajador vinculada a esta cuenta.') # type: ignore
     auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='usuario', doc='Auditoría de accesos del usuario.') # type: ignore
-    usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='usuario', doc='Roles asignados al usuario.') # type: ignore
-    correcciones_fichaje_aprobado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.aprobado_por_usuario_id]', back_populates='aprobado_por_usuario', doc='Correcciones de fichaje aprobadas por el usuario.') # type: ignore
-    correcciones_fichaje_solicitado_por_usuario: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.solicitado_por_usuario_id]', back_populates='solicitado_por_usuario', doc='Correcciones de fichaje solicitadas por el usuario.') # type: ignore
-    ausencias_validadas: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='validado_por_usuario', doc='Ausencias validadas por el usuario.') # type: ignore
+    correcciones_fichaje_usuario_aprobador: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.usuario_aprobador_id]', back_populates='usuario_aprobador', doc='Correcciones de fichaje aprobadas por el usuario.') # type: ignore
+    correcciones_fichaje_usuario_solicitador: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.usuario_solicitador_id]', back_populates='usuario_solicitador', doc='Correcciones de fichaje solicitadas por el usuario.') # type: ignore
+    ausencias_validadas: Mapped[list['Ausencias']] = relationship('Ausencias', back_populates='usuario_validador', doc='Ausencias validadas por el usuario.') # type: ignore
     gestorias_empresas: Mapped[list['GestoriasEmpresas']] = relationship('GestoriasEmpresas', back_populates='usuario_creador', doc='Autorizaciones creadas por el usuario para que una gestoría pueda administrar una empresa cliente.') # type: ignore
+
+    @property
+    def trabajador_id(self) -> Optional[uuid.UUID]:
+        """Compatibilidad de lectura con auditorías que registran el trabajador asociado."""
+        return self.trabajador.id if self.trabajador is not None else None

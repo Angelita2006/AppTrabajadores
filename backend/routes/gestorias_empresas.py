@@ -12,17 +12,20 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    AlcancePermisoEnum,
     TipoPermisoEnum,
     TipoRolEnum,
 )
 from core.security import get_db_with_advanced_security, verificar_permisos_requeridos
 from models.empresas import Empresas
 from models.gestorias_empresas import GestoriasEmpresas
+from models.permisos import Permisos
 from models.roles import Roles
 from models.usuarios import Usuarios
 from models.usuarios_empresas import UsuariosEmpresas
 from schemas.gestorias_empresas import (
     GestoriaEmpresaCreate,
+    GestoriaEmpresaPermisosUpdate,
     GestoriaEmpresaSimpleResponse,
     GestoriaEmpresaUpdate,
 )
@@ -231,6 +234,164 @@ def crear_autorizacion_gestoria(
         )
 
 
+@router.put(
+    "/{id_relacion}/permisos",
+    response_model=GestoriaEmpresaSimpleResponse,
+    summary="Configurar permisos delegados a una gestoría",
+    description="Establece el máximo de permisos que una gestoría puede ejercer sobre una empresa cliente.",
+)
+@limiter.limit("20/minute")
+def configurar_permisos_delegados(
+    id_relacion: UUID,
+    payload: GestoriaEmpresaPermisosUpdate,
+    request: Request,
+    usuario_actual: Usuarios = Depends(
+        verificar_permisos_requeridos([
+            AccionPermisoEnum.MODIFICAR
+            + "-"
+            + TipoPermisoEnum.GESTORIAS_EMPRESAS
+            + "-"
+            + AlcancePermisoEnum.GLOBAL
+        ])
+    ),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**PUT /api/gestorias-empresas/{id_relacion}/permisos**
+
+    Configura los permisos máximos delegados en la empresa cliente.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(
+        f"Petición de configuración de permisos delegados ({id_relacion}) "
+        f"desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}."
+    )
+
+    # Validaciones estructurales básicas
+    if not _es_superadmin_global(db, usuario_actual.id):
+        print("Solo el superadministrador global puede configurar la delegación de permisos.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el superadministrador global puede configurar la delegación de permisos.",
+        )
+
+    relacion = _relacion_gestoria(db, id_relacion)
+    claves = list(dict.fromkeys(payload.permisos_delegados))
+    permisos_disponibles = {
+        f"{permiso.accion.value}-{permiso.tipo.value}-{permiso.alcance.value}": permiso
+        for permiso in db.query(Permisos).all()
+        if permiso.alcance != AlcancePermisoEnum.GLOBAL
+    }
+    desconocidos = set(claves) - permisos_disponibles.keys()
+    if desconocidos:
+        print("La lista contiene permisos inexistentes o globales.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La lista contiene permisos inexistentes o globales.",
+        )
+
+    try:
+        setattr(relacion, "permisos_maximos", claves)
+        setattr(
+            relacion,
+            "permisos_delegados",
+            [permiso for permiso in (relacion.permisos_delegados or []) if permiso in claves],
+        )
+        setattr(relacion, "updated_at", datetime.now(timezone.utc))
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=relacion.empresa_cliente_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                "recurso": "gestorias_empresas",
+                "accion": "configurar_limite_permisos_gestoria",
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+        db.refresh(relacion)
+        return relacion
+    except Exception as e:
+        db.rollback()
+        print(f"No se han podido configurar los permisos delegados: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se han podido configurar los permisos delegados.",
+        )
+
+
+@router.put(
+    "/{id_relacion}/permisos-delegados",
+    response_model=GestoriaEmpresaSimpleResponse,
+    summary="Conceder o revocar permisos de la gestoría",
+    description="Permite al cliente reducir la delegación dentro del límite fijado por la plataforma.",
+)
+@limiter.limit("20/minute")
+def actualizar_permisos_delegados_cliente(
+    id_relacion: UUID,
+    payload: GestoriaEmpresaPermisosUpdate,
+    request: Request,
+    usuario_actual: Usuarios = Depends(
+        verificar_permisos_requeridos([
+            AccionPermisoEnum.MODIFICAR
+            + "-"
+            + TipoPermisoEnum.GESTORIAS_EMPRESAS
+        ])
+    ),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**PUT /api/gestorias-empresas/{id_relacion}/permisos-delegados**
+
+    Ajusta los permisos delegados sin superar el límite fijado por la plataforma.
+    """
+    relacion = _relacion_gestoria(db, id_relacion)
+    es_superadmin = _es_superadmin_global(db, usuario_actual.id)
+    empresa_contexto = request.headers.get("Empresa-ID")
+    if not es_superadmin and empresa_contexto != str(relacion.empresa_cliente_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró la autorización de gestoría para la empresa activa.",
+        )
+    if not relacion.activo:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede cambiar una delegación de una autorización inactiva.",
+        )
+
+    claves = list(dict.fromkeys(payload.permisos_delegados))
+    maximos = set(relacion.permisos_maximos or [])
+    if not set(claves).issubset(maximos):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La delegación supera los permisos máximos fijados por el superadministrador.",
+        )
+
+    try:
+        setattr(relacion, "permisos_delegados", claves)
+        setattr(relacion, "updated_at", datetime.now(timezone.utc))
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=relacion.empresa_cliente_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                "recurso": "gestorias_empresas",
+                "accion": "actualizar_permisos_delegados_cliente",
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+        db.refresh(relacion)
+        return relacion
+    except Exception as e:
+        db.rollback()
+        print(f"No se han podido actualizar los permisos delegados: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se han podido actualizar los permisos delegados.",
+        )
 @router.patch(
     "/{id_relacion}",
     response_model=GestoriaEmpresaSimpleResponse,
@@ -362,3 +523,5 @@ def revocar_autorizacion_gestoria(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se ha podido revocar la autorización de gestoría.",
         )
+
+

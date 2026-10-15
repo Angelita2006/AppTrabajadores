@@ -7,79 +7,23 @@ import { ThemedText } from "../../src/shared/components/ThemedText";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function RootLayout() {
-  const { usuarioActual } = useSesion();
+  const { usuarioActual, tienePermiso } = useSesion();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
 
   const tieneSesion = usuarioActual !== null;
 
-  // Clasificación de roles
-  const esAdmin =
-    usuarioActual?.tipo_usuario === "Admin_empresa" ||
-    usuarioActual?.tipo_usuario === "Admin_gestoría";
-
-  const esRrhh = usuarioActual?.tipo_usuario === "Rrhh";
-  const esTrabajador = usuarioActual?.tipo_usuario === "Trabajador";
-  const esInspectorOVisualizador =
-    usuarioActual?.tipo_usuario === "Auditor_itss" ||
-    usuarioActual?.tipo_usuario === "Representante_legal";
-
-  // Definir las pantallas disponibles según el rol
   const pantallasDisponibles = [
-    {
-      name: "fichar",
-      title: "Fichar",
-      show: tieneSesion && (esTrabajador || esRrhh),
-      icon: "house.fill",
-    },
-    {
-      name: "perfil",
-      title: tieneSesion ? "Perfil" : "Login",
-      show: tieneSesion,
-      icon: "person",
-    },
-    {
-      name: "empresa",
-      title: "Empresa",
-      show: tieneSesion && (esAdmin || esRrhh),
-      icon: "briefcase.fill",
-    },
-    {
-      name: "horarios",
-      title: "Horarios",
-      show: tieneSesion && (esTrabajador || esRrhh),
-      icon: "schedule",
-    },
-    {
-      name: "fichajes",
-      title: "Registro",
-      show: tieneSesion && (esAdmin || esRrhh || esInspectorOVisualizador),
-      icon: "folder",
-    },
-    {
-      name: "incidencias",
-      title: "Incidencias",
-      show: tieneSesion && esTrabajador,
-      icon: "warning",
-    },
-    {
-      name: "gestion-incidencias",
-      title: "Gestión Incidencias",
-      show: tieneSesion && (esAdmin || esRrhh),
-      icon: "warning",
-    },
-    {
-      name: "ausencias",
-      title: "Ausencias",
-      show: tieneSesion && esTrabajador,
-      icon: "event",
-    },
-    {
-      name: "gestion-ausencias",
-      title: "Gestión Ausencias",
-      show: tieneSesion && (esAdmin || esRrhh),
-      icon: "event",
-    },
+    { name: "fichar", title: "Fichar", show: tieneSesion && tienePermiso("fichajes", "crear"), icon: "house.fill" },
+    { name: "perfil", title: "Perfil", show: tieneSesion, icon: "person" },
+    { name: "empresa", title: "Organizaciones", show: tieneSesion && tienePermiso("empresas", "consultar"), icon: "briefcase.fill" },
+    { name: "horarios", title: "Horarios", show: tieneSesion && tienePermiso("asignaciones_turno", "consultar"), icon: "schedule" },
+    { name: "fichajes", title: "Registro", show: tieneSesion && tienePermiso("fichajes", "consultar"), icon: "folder" },
+    { name: "incidencias", title: "Incidencias", show: tieneSesion && tienePermiso("correcciones_fichaje", "crear"), icon: "warning" },
+    { name: "gestion-incidencias", title: "Gesti?n Incidencias", show: tieneSesion && tienePermiso("correcciones_fichaje", "modificar"), icon: "warning" },
+    { name: "ausencias", title: "Ausencias", show: tieneSesion && tienePermiso("ausencias", "crear"), icon: "event" },
+    { name: "gestion-ausencias", title: "Gesti?n Ausencias", show: tieneSesion && tienePermiso("ausencias", "modificar"), icon: "event" },
+    { name: "licencias", title: "Licencias", show: tieneSesion && tienePermiso("licencias", "consultar"), icon: "key" },
   ].filter((p) => p.show);
 
   return (
@@ -103,6 +47,7 @@ export default function RootLayout() {
         <Stack.Screen name="fichar" options={{ title: "Fichar" }} />
         <Stack.Screen name="perfil" options={{ title: "Perfil" }} />
         <Stack.Screen name="empresa" options={{ title: "Empresa" }} />
+        <Stack.Screen name="licencias" options={{ title: "Licencias" }} />
         <Stack.Screen name="horarios" options={{ title: "Horarios" }} />
         <Stack.Screen
           name="fichajes"

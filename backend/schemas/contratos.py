@@ -91,7 +91,7 @@ class ContratoUpdate(BaseModel):
 
     activo: Optional[bool] = Field(True, description="Indica si el contrato está activo o no")
 
-    @field_validator('fecha_fin', 'departamento_id', mode='before')
+    @field_validator('fecha_inicio', 'fecha_fin', mode='before')
     @classmethod
     def limpiar_vacios(cls, v: Any) -> Any:
         """Convierte cadenas vacías en None para evitar errores de parseo UUID/Date."""

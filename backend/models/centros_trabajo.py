@@ -32,9 +32,9 @@ class CentrosTrabajo(Base):
 
     empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='centros_trabajo', doc='Empresa a la que pertenece el centro de trabajo.') # type: ignore
     
-    calendarios_laborales: Mapped[list['CalendariosLaborales']] = relationship('CalendariosLaborales', back_populates='centro_trabajo', doc='Calendarios laborales asociados al centro de trabajo.') # type: ignore
-    departamentos: Mapped[list['Departamentos']] = relationship('Departamentos', back_populates='centro_trabajo', doc='Departamentos asociados al centro de trabajo.') # type: ignore
-    dispositivos_fichaje: Mapped[list['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='centro_trabajo', doc='Dispositivos de fichaje asociados al centro de trabajo.') # type: ignore
-    contratos: Mapped[list['Contratos']] = relationship('Contratos', back_populates='centro_trabajo', doc='Contratos asociados al centro de trabajo.') # type: ignore
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='centro_trabajo', doc='Fichajes asociados al centro de trabajo.') # type: ignore
+    calendarios_laborales: Mapped[list['CalendariosLaborales']] = relationship('CalendariosLaborales', foreign_keys='CalendariosLaborales.centro_trabajo_id', back_populates='centro_trabajo', doc='Calendarios laborales asociados al centro de trabajo.') # type: ignore
+    departamentos: Mapped[list['Departamentos']] = relationship('Departamentos', foreign_keys='Departamentos.centro_trabajo_id', back_populates='centro_trabajo', doc='Departamentos asociados al centro de trabajo.') # type: ignore
+    dispositivos_fichaje: Mapped[list['DispositivosFichaje']] = relationship('DispositivosFichaje', foreign_keys='DispositivosFichaje.centro_trabajo_id', back_populates='centro_trabajo', doc='Dispositivos de fichaje asociados al centro de trabajo.') # type: ignore
+    contratos: Mapped[list['Contratos']] = relationship('Contratos', foreign_keys='Contratos.centro_trabajo_id', back_populates='centro_trabajo', doc='Contratos asociados al centro de trabajo.') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', foreign_keys='Fichajes.centro_trabajo_id', back_populates='centro_trabajo', doc='Fichajes asociados al centro de trabajo.') # type: ignore
 

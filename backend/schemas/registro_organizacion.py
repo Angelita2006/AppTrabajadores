@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from schemas.empresas import EmpresaSimpleResponse
 from schemas.usuarios import UsuarioSimpleResponse
 
@@ -9,7 +9,7 @@ class RegistroOrganizacionCompleta(BaseModel):
     codigo_licencia: str = Field(..., max_length=12, description="Código de la licencia")
 
     # Datos de la empresa
-    nombre_comercial: str = Field(..., description="Nombre comercial de la empresa")
+    nombre_comercial: str = Field(..., max_length=50, description="Nombre comercial de la empresa")
     razon_social: str = Field(..., max_length=50, description="Razón social o denominación legal")
     cif: str = Field(..., max_length=20, description="Código de Identificación Fiscal único")
     zona_horaria: str = Field("Europe/Madrid", max_length=50, description="Zona horaria por defecto para los centros de trabajo")
@@ -28,6 +28,13 @@ class RegistroOrganizacionCompleta(BaseModel):
     email_admin: EmailStr = Field(..., max_length=30, description="Correo electrónico único de acceso del administrador")
     telefono_admin: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso del administrador")
     password: str = Field(..., description="Contraseña única de acceso del administrador")
+
+    @field_validator("password")
+    @classmethod
+    def validar_limite_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password exceeds bcrypt 72-byte limit.")
+        return value
 
 class RespuestaRegistroCompletoDTO(BaseModel):
     empresa: EmpresaSimpleResponse

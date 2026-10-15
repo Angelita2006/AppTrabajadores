@@ -1,4 +1,5 @@
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import React, { useEffect, useState } from "react";
 import {
     Linking,

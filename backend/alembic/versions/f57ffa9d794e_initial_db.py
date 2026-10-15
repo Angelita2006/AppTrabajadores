@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.create_table('permisos',
     sa.Column('id', sa.Uuid(), server_default=sa.text('gen_random_uuid()'), nullable=False, comment='Identificador único del permiso.'),
     sa.Column('tipo', sa.Enum('asignaciones_turno', 'auditoria_accesos', 'ausencias', 'calendarios_laborales', 'centros_trabajo', 'contratos_calendarios', 'contratos', 'correcciones_fichaje', 'departamentos', 'dispositivos_fichaje', 'empresas', 'festivos', 'fichajes', 'gestorias_empresas', 'licencias', 'motivos_pausa', 'permisos', 'politicas_retencion', 'resumenes_jornada', 'roles_permisos', 'roles', 'trabajadores', 'turnos', 'usuarios_empresas', 'usuarios', name='tipo_permiso_enum'), server_default=sa.text("'usuarios'::tipo_permiso_enum"), nullable=False, comment='Recurso o área funcional a la que aplica el permiso.'),
-    sa.Column('accion', sa.Enum('consultar', 'crear', 'modificar', 'eliminar', 'aprobar', 'exportar', 'fichar', name='accion_permiso_enum'), server_default=sa.text("'consultar'::accion_permiso_enum"), nullable=False, comment='Operación autorizada sobre el recurso.'),
+    sa.Column('accion', sa.Enum('consultar', 'crear', 'modificar', 'eliminar', 'exportar', name='accion_permiso_enum'), server_default=sa.text("'consultar'::accion_permiso_enum"), nullable=False, comment='Operación autorizada sobre el recurso.'),
     sa.Column('descripcion', sa.String(length=255), nullable=True, comment='Descripción del permiso.'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Fecha de creación de la licencia.'),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Fecha de actualización de la licencia.'),

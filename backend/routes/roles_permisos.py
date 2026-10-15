@@ -41,7 +41,12 @@ def _es_superadmin_global(db: Session, usuario_id: UUID) -> bool:
         is not None
     )
 
-def _rol_gestionable(db: Session, rol_id: UUID, empresa_id: UUID, usuario_id: UUID) -> Roles:
+def _rol_gestionable(
+    db: Session,
+    rol_id: UUID,
+    empresa_id: UUID | None,
+    usuario_id: UUID,
+) -> Roles:
     rol = db.query(Roles).filter(Roles.id == rol_id).first()
     if not rol:
         print(f"Rol ({rol_id}) no encontrado.")
@@ -50,12 +55,20 @@ def _rol_gestionable(db: Session, rol_id: UUID, empresa_id: UUID, usuario_id: UU
             detail="Rol no encontrado."
         )
     
-    if rol.empresa_id is None:
-        if _es_superadmin_global(db, usuario_id):
-            return rol
+    if _es_superadmin_global(db, usuario_id):
+        return rol
+
+    if empresa_id is None:
         print("Los roles globales solo pueden modificarse desde el panel superadministrador.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Se requiere una empresa activa para gestionar roles de empresa."
+        )
+
+    if rol.empresa_id is None:
+        print("Los roles globales solo pueden modificarse desde el panel superadministrador.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Los roles globales solo pueden modificarse desde el panel superadministrador."
         )
     
@@ -67,6 +80,20 @@ def _rol_gestionable(db: Session, rol_id: UUID, empresa_id: UUID, usuario_id: UU
         )
     
     return rol
+
+
+def _empresa_contexto(request: Request) -> UUID | None:
+    valor = request.headers.get("Empresa-ID")
+    if not valor:
+        return None
+    try:
+        return UUID(valor)
+    except ValueError as e:
+        print(f"La cabecera Empresa-ID no contiene un UUID válido: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cabecera Empresa-ID no contiene un UUID válido."
+        )
 
 @router.get(
     "/rol/{id_rol}",
@@ -92,7 +119,7 @@ def obtener_permisos_rol(
     print(f"Petición de consulta de permisos del rol ({id_rol}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
     
     # Validaciones estructurales básicas
-    _rol_gestionable(db, id_rol, UUID(request.headers.get("Empresa-ID")), usuario_actual.id)
+    _rol_gestionable(db, id_rol, _empresa_contexto(request), usuario_actual.id)
     
     return db.query(RolesPermisos).filter(RolesPermisos.rol_id == id_rol).order_by(RolesPermisos.created_at).all()
 
@@ -121,7 +148,7 @@ def crear_permiso_rol(
     print(f"Petición de asignación de permiso a un rol desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
     
     # Validaciones estructurales básicas
-    rol = _rol_gestionable(db, payload.rol_id, UUID(request.headers.get("Empresa-ID")), usuario_actual.id)
+    rol = _rol_gestionable(db, payload.rol_id, _empresa_contexto(request), usuario_actual.id)
     permiso = db.query(Permisos).filter(Permisos.id == payload.permiso_id).first()
     if permiso is None:
         print(f"Permiso ({payload.permiso_id}) no encontrado.")
@@ -200,7 +227,7 @@ def retirar_permiso_rol(
             detail="No se encontró la asociación rol-permiso."
         )
     
-    rol = _rol_gestionable(db, relacion.rol_id, UUID(request.headers.get("Empresa-ID")), usuario_actual.id)
+    rol = _rol_gestionable(db, relacion.rol_id, _empresa_contexto(request), usuario_actual.id)
     
     registrar_auditoria(
         db=db,

@@ -2,7 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from core.enums import AccionPermisoEnum, TipoPermisoEnum
+from core.enums import AccionPermisoEnum, AlcancePermisoEnum, TipoPermisoEnum
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - PERMISOS
@@ -15,6 +15,7 @@ class PermisoBase(BaseModel):
     """
     tipo: TipoPermisoEnum = Field(..., description="Recurso o área funcional a la que aplica el permiso")
     accion: AccionPermisoEnum = Field(..., description="Operación autorizada sobre el recurso")
+    alcance: AlcancePermisoEnum = Field(AlcancePermisoEnum.EMPRESA, description="Ámbito del permiso")
     descripcion: str = Field(..., max_length=255, description="Descripción del permiso")
 
     model_config = ConfigDict(from_attributes=True)

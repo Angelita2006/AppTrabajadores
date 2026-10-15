@@ -7,6 +7,7 @@ import { UsuarioResponse } from "../../usuarios/types/usuario";
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
 export const TIPOS_USUARIO = {
+  SUPERADMINISTRADOR: "Superadministrador",
   ADMIN_GESTORIA: "Admin_gestoría",
   ADMIN_EMPRESA: "Admin_empresa",
   RRHH: "Rrhh",
@@ -29,6 +30,10 @@ export const TIPO_USUARIO_LABELS: Record<
   TipoUsuarioEnum,
   { label: string; descripcion: string }
 > = {
+  [TIPOS_USUARIO.SUPERADMINISTRADOR]: {
+    label: "Superadministrador",
+    descripcion: "Administración global de la plataforma.",
+  },
   [TIPOS_USUARIO.ADMIN_GESTORIA]: {
     label: "Administrador de Gestoría",
     descripcion: "Control global multiempresa y supervisión de asesoría.",
@@ -66,6 +71,9 @@ export interface UsuarioRol {
   usuario_id: string;
   /** Identificador único del rol (UUID). */
   rol_id: string;
+  activo?: boolean | null;
+  created_at?: string;
+  updated_at?: string;
   /** Identificador de la empresa (UUID) o null si el rol es global de gestoría. */
   empresa_id?: string | null;
 

@@ -2,6 +2,7 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
+from core.enums import TipoRolEnum
 from schemas.empresas import EmpresaSimpleResponse
 
 # ==========================================
@@ -23,6 +24,7 @@ class RolCreate(RolBase):
     Esquema utilizado para recibir los datos al registrar un nuevo rol en la plataforma.
     """
     empresa_id: Optional[UUID] = Field(..., description="ID único UUID de la empresa; NULL para rol de sistema; con valor es un rol personalizado de esa empresa")
+    tipo: TipoRolEnum = Field(TipoRolEnum.OTRO, description="Tipo del rol; los roles especiales solo los asigna el superadministrador")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +44,7 @@ class RolSimpleResponse(RolBase):
     """
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del rol")
     empresa_id: Optional[UUID] = Field(..., description="ID único UUID de la empresa; NULL para rol de sistema; con valor es un rol personalizado de esa empresa")
+    tipo: TipoRolEnum
 
     created_at: datetime.datetime = Field(..., description="Fecha y hora de inserción real calculada por el servidor (now)")
     updated_at: datetime.datetime = Field(..., description="Fecha y hora de la última modificación efectuada (now)")

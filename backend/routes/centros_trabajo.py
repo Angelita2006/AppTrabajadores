@@ -26,6 +26,102 @@ router = APIRouter(prefix="/api/centros-trabajo", tags=["Centros de Trabajo"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
+@router.get(
+    "/empresa/{id_empresa}",
+    response_model=List[CentroTrabajoResponse],
+    summary="Obtener centros de trabajo por empresa",
+    description="Obtiene los centros de trabajo de la empresa.",
+)
+@limiter.limit("60/minute")
+def obtener_centros_trabajo_empresa(
+    request: Request,
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/centros-trabajo/empresa/{id_empresa}**
+
+    Obtiene los centros de trabajo de la empresa.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de centros de trabajo para la empresa ({id_empresa}) desde la IP ){cliente_ip} por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    centros = (
+        db.query(CentrosTrabajo)
+        .options(joinedload(CentrosTrabajo.empresa))
+        .filter(CentrosTrabajo.empresa_id == id_empresa, CentrosTrabajo.activo.is_(True))
+        .all()
+    )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': "centros_trabajo",
+            'accion': "consultar_empresa",
+        },
+        trabajador_id=None
+    )
+    db.commit()
+
+    return centros
+
+@router.get(
+    "/{id_centro}",
+    response_model=CentroTrabajoResponse,
+    summary="Obtener centro de trabajo por id",
+    description="Obtiene los datos de un centro de trabajo por su id.",
+)
+@limiter.limit("60/minute")
+def obtener_centro_trabajo_id(
+    request: Request,
+    id_centro: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/centros-trabajo/{id_centro}**
+
+    Obtiene los datos de un centro de trabajo por su id.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    centro = (
+        db.query(CentrosTrabajo)
+        .options(joinedload(CentrosTrabajo.empresa))
+        .filter(CentrosTrabajo.id == id_centro)
+        .first()
+    )
+    if not centro:
+        print(f"Centro de trabajo ({id_centro}) no encontrado.")
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Centro de trabajo no encontrado."
+        )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=centro.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': "centros_trabajo",
+            'accion': "consultar_id",
+        },
+        trabajador_id=None
+    )
+    db.commit()
+
+    return centro
 @router.post(
     "",
     response_model=CentroTrabajoResponse,
@@ -95,6 +191,7 @@ async def crear_centro_trabajo(
             },
             trabajador_id=None
         )
+        db.commit()
 
         return centro_creado
     except Exception as e:
@@ -103,6 +200,65 @@ async def crear_centro_trabajo(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se ha podido crear el centro de trabajo."
+        )
+
+@router.put(
+    "/{id_centro}/desactivar",
+    status_code=status.HTTP_200_OK,
+    summary="Desactivar centro de trabajo",
+    description="Desactivar un centro de trabajo.",
+)
+@limiter.limit("20/minute")
+def desactivar_centro_trabajo(
+    request: Request,
+    id_centro: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **PUT /api/centros-trabajo/{id_centro}/desactivar**
+
+    Desactivar un centro de trabajo.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de desactivación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
+    if not centro:
+        print(f"Centro de trabajo ({id_centro}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Centro de trabajo no encontrado."
+        )
+
+    setattr(centro, 'activo', False)
+    setattr(centro, 'updated_at', datetime.now())
+
+    try:
+        db.commit()
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=centro.empresa_id,
+            accion=AccionAuditoriaEnum.ELIMINACION,
+            detalle={
+                'recurso': "centros_trabajo",
+                'accion': "desactivar",
+            },
+            trabajador_id=None
+        )
+        db.commit()
+
+        print(f"Centro de trabajo ({id_centro}) desactivado correctamente y enviado a la papelera.")
+        return {"detail": f"Centro de trabajo desactivado correctamente y enviado a la papelera."}
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido desactivar el centro de trabajo: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se ha podido desactivar el centro de trabajo: {str(e)}."
         )
 
 @router.put(
@@ -178,6 +334,7 @@ async def modificar_centro_trabajo(
             },
             trabajador_id=None
         )
+        db.commit()
 
         return centro_editado
     except Exception as e:
@@ -188,155 +345,3 @@ async def modificar_centro_trabajo(
             detail=f"No se ha podido actualizar el centro de trabajo."
         )
 
-@router.put(
-    "/{id_centro}/desactivar",
-    status_code=status.HTTP_200_OK,
-    summary="Desactivar centro de trabajo",
-    description="Desactivar un centro de trabajo.",
-)
-@limiter.limit("20/minute")
-def desactivar_centro_trabajo(
-    request: Request,
-    id_centro: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **PUT /api/centros-trabajo/{id_centro}/desactivar**
-
-    Desactivar un centro de trabajo.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de desactivación del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == id_centro).first()
-    if not centro:
-        print(f"Centro de trabajo ({id_centro}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo no encontrado."
-        )
-
-    setattr(centro, 'activo', False)
-    setattr(centro, 'updated_at', datetime.now())
-
-    try:
-        db.commit()
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=centro.empresa_id,
-            accion=AccionAuditoriaEnum.ELIMINACION,
-            detalle={
-                'recurso': "centros_trabajo",
-                'accion': "desactivar",
-            },
-            trabajador_id=None
-        )
-
-        print(f"Centro de trabajo ({id_centro}) desactivado correctamente y enviado a la papelera.")
-        return {"detail": f"Centro de trabajo desactivado correctamente y enviado a la papelera."}
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido desactivar el centro de trabajo: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido desactivar el centro de trabajo: {str(e)}."
-        )
-
-@router.get(
-    "/empresa/{id_empresa}",
-    response_model=List[CentroTrabajoResponse],
-    summary="Obtener centros de trabajo por empresa",
-    description="Obtiene los centros de trabajo de la empresa.",
-)
-@limiter.limit("60/minute")
-def obtener_centros_trabajo_empresa(
-    request: Request,
-    id_empresa: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/centros-trabajo/empresa/{id_empresa}**
-
-    Obtiene los centros de trabajo de la empresa.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de centros de trabajo para la empresa ({id_empresa}) desde la IP ){cliente_ip} por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    centros = (
-        db.query(CentrosTrabajo)
-        .options(joinedload(CentrosTrabajo.empresa))
-        .filter(CentrosTrabajo.empresa_id == id_empresa, CentrosTrabajo.activo.is_(True))
-        .all()
-    )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=id_empresa,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': "centros_trabajo",
-            'accion': "consultar_empresa",
-        },
-        trabajador_id=None
-    )
-
-    return centros
-
-@router.get(
-    "/{id_centro}",
-    response_model=CentroTrabajoResponse,
-    summary="Obtener centro de trabajo por id",
-    description="Obtiene los datos de un centro de trabajo por su id.",
-)
-@limiter.limit("60/minute")
-def obtener_centro_trabajo_id(
-    request: Request,
-    id_centro: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CENTROS_TRABAJO])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/centros-trabajo/{id_centro}**
-
-    Obtiene los datos de un centro de trabajo por su id.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del centro de trabajo ({id_centro}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    centro = (
-        db.query(CentrosTrabajo)
-        .options(joinedload(CentrosTrabajo.empresa))
-        .filter(CentrosTrabajo.id == id_centro)
-        .first()
-    )
-    if not centro:
-        print(f"Centro de trabajo ({id_centro}) no encontrado.")
-
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo no encontrado."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=centro.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': "centros_trabajo",
-            'accion': "consultar_id",
-        },
-        trabajador_id=None
-    )
-
-    return centro

@@ -58,12 +58,12 @@ class Fichajes(Base):
 
     hash_integridad: Mapped[str] = mapped_column(String(64), nullable=False, comment='SHA-256 calculado automáticamente sobre los campos clave del registro (ver trigger calcular_hash_fichaje), para evidenciar manipulación.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='fichajes', doc='Empresa a la que pertenece el fichaje.') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='fichajes', doc='Trabajador al que pertenece el fichaje.') # type: ignore
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='fichajes', doc='Centro de trabajo donde se registró el fichaje.') # type: ignore
-    dispositivo: Mapped[Optional['DispositivosFichaje']] = relationship('DispositivosFichaje', back_populates='fichajes', doc='Dispositivo desde el que se realizó el fichaje, si aplica.') # type: ignore
-    fichaje_sustituido: Mapped[Optional['Fichajes']] = relationship('Fichajes', remote_side=[id], back_populates='fichaje_sustituido_reverse', doc='Fichaje que se sustituye, si aplica.')
-    fichaje_sustituido_reverse: Mapped[list['Fichajes']] = relationship('Fichajes', remote_side=[fichaje_sustituido_id], back_populates='fichaje_sustituido', doc='Fichajes que sustituyen a este, si aplica.')
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='fichajes', doc='Empresa a la que pertenece el fichaje.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', foreign_keys=[trabajador_id], back_populates='fichajes', doc='Trabajador al que pertenece el fichaje.') # type: ignore
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='fichajes', doc='Centro de trabajo donde se registró el fichaje.') # type: ignore
+    dispositivo: Mapped[Optional['DispositivosFichaje']] = relationship('DispositivosFichaje', foreign_keys=[dispositivo_id], back_populates='fichajes', doc='Dispositivo desde el que se realizó el fichaje, si aplica.') # type: ignore
+    fichaje_sustituido: Mapped[Optional['Fichajes']] = relationship('Fichajes', foreign_keys=[fichaje_sustituido_id], remote_side=[id], back_populates='fichaje_sustituido_reverse', doc='Fichaje que se sustituye, si aplica.')
+    fichaje_sustituido_reverse: Mapped[list['Fichajes']] = relationship('Fichajes', foreign_keys=[fichaje_sustituido_id], back_populates='fichaje_sustituido', doc='Fichajes que sustituyen a este, si aplica.')
     motivo_pausa: Mapped[Optional['MotivosPausa']] = relationship('MotivosPausa', back_populates='fichajes', doc='Motivo de la pausa, si aplica.') # type: ignore
     
-    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', back_populates='fichaje_afectado', doc='Correcciones aplicadas al fichaje.') # type: ignore
+    correcciones_fichaje: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='CorreccionesFichaje.fichaje_afectado_id', back_populates='fichaje_afectado', doc='Correcciones aplicadas al fichaje.') # type: ignore

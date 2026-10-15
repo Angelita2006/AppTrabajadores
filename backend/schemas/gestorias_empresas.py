@@ -1,6 +1,6 @@
 import datetime
 from pydantic import BaseModel, Field, ConfigDict, model_validator
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from schemas.empresas import EmpresaSimpleResponse
 from schemas.usuarios import UsuarioSimpleResponse
@@ -66,6 +66,8 @@ class GestoriaEmpresaSimpleResponse(GestoriaEmpresaBase):
     empresa_gestora_id: UUID = Field(..., description="ID único UUID de la empresa gestora")
     empresa_cliente_id: UUID = Field(..., description="ID único UUID de la empresa cliente")
     usuario_creador_id: Optional[UUID] = Field(None, description="ID del usuario creador de la autorización, si sigue existiendo")
+    permisos_delegados: List[str] = Field(default_factory=list, description="Permisos actualmente delegados por el cliente")
+    permisos_maximos: List[str] = Field(default_factory=list, description="Límite superior de permisos fijado por el superadministrador")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")
@@ -81,3 +83,9 @@ class GestoriaEmpresaResponse(GestoriaEmpresaSimpleResponse):
     usuario_creador: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario que ha creado la autorización")
 
     model_config = ConfigDict(from_attributes=True)
+
+class GestoriaEmpresaPermisosUpdate(BaseModel):
+    """Lista explícita de permisos que el superadministrador delega en el vínculo."""
+    permisos_delegados: List[str] = Field(..., max_length=200)
+
+    model_config = ConfigDict(extra="forbid")

@@ -1,5 +1,6 @@
 import datetime
-import random
+import hashlib
+import secrets
 from datetime import timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -25,107 +26,6 @@ router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post(
-    "/recuperar-password",
-    status_code=status.HTTP_200_OK,
-    summary="Solicitar recuperación de contraseña",
-    description="Valida el correo, genera un código aleatorio de 6 dígitos y lo envía por correo o por teléfono.",
-)
-@limiter.limit("5/minute")
-def solicitar_recuperacion_password(
-    request: Request,
-    payload: PasswordRecuperacionRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    **POST /api/auth/recuperar-password**
-
-    Valida el correo, genera un código aleatorio de 6 dígitos y lo envía por correo o por teléfono.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de recuperación de contraseña para el correo ({payload.email}) desde la IP ({cliente_ip}).")
-
-    # Validaciones estructurales básicas
-    medio = None
-    usuario = None
-    if payload.email:
-        medio = "email"
-        usuario = db.query(Usuarios).filter(
-            Usuarios.email == payload.email.strip(),
-            Usuarios.activo.is_(True),
-        ).first()
-        if not usuario:
-            print(f"Intento de recuperación fallido: El correo ({payload.email}) no está registrado en el sistema.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No consta ninguna cuenta registrada con esa dirección de correo electrónico."
-            )
-    elif payload.telefono:
-        medio = "telefono"
-        usuario = db.query(Usuarios).filter(
-            Usuarios.telefono == payload.telefono.strip(),
-            Usuarios.activo.is_(True),
-        ).first()
-        if not usuario:
-            print(f"Intento de recuperación fallido: El teléfono ({payload.telefono}) no está registrado en el sistema.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No consta ninguna cuenta registrada con esa número de teléfono."
-            )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se ha proporcionado ningún medio de recuperación."
-        )
-
-    if not usuario:
-        print("No se ha podido encontrar un usuario para recuperar su contraseña.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se ha podido encontrar un usuario para recuperar su contraseña."
-        )
-
-    # Generación del código aleatorio real de 6 dígitos
-    codigo_aleatorio = f"{random.randint(0, 999999):06d}"
-
-    # Guardar el código y su expiración (15 minutos con zona horaria UTC)
-    try:
-        setattr(usuario, 'codigo_recuperacion', codigo_aleatorio)
-        setattr(usuario, 'codigo_expira_at', datetime.datetime.now(timezone.utc) + timedelta(minutes=15))
-
-        db.add(usuario)
-        db.commit()
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario.id,
-            empresa_id=None,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': "usuario",
-                'accion': "solicitar_recuperacion_password",
-            },
-            trabajador_id=usuario.trabajador_id
-        )
-
-        print(f"Código de recuperación generado para el usuario ({usuario.id}).")
-
-        # Envío del código generado
-        if medio == "email":
-            enviar_correo_recuperacion_contraseña(usuario.email, codigo_aleatorio)
-            return {"detail": f"Se ha enviado un código a tu dirección de correo electrónico."}
-        elif medio == "telefono":
-            enviar_sms_recuperacion_contraseña(usuario.telefono.__str__().replace("-", ""), codigo_aleatorio)
-            return {"detail": f"Se ha enviado un código a tu número de teléfono."}
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido guardar el código de recuperación: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se ha podido procesar la solicitud de recuperación de contraseña."
-        )
-
-@router.post(
     "/confirmar-password",
     status_code=status.HTTP_200_OK,
     summary="Confirmar nueva contraseña",
@@ -137,102 +37,114 @@ def confirmar_password(
     payload: ConfirmarPasswordRecuperacionRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    **POST /api/auth/confirmar-password**
-
-    Valida el código de recuperación enviado y actualiza la contraseña.
-    """
+    """Valida un código temporal y actualiza la contraseña de la cuenta."""
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de confirmación de nueva contraseña para el correo '{payload.email}' desde la IP: {cliente_ip}.")
+    print(f"Petición de confirmación de recuperación de contraseña desde la IP ({cliente_ip}).")
 
-    # Validaciones estructurales básicas
-    usuario = None
-    if payload.email:
-        usuario = db.query(Usuarios).filter(
-            Usuarios.email == payload.email.strip(),
-            Usuarios.activo.is_(True),
-        ).first()
-        if not usuario:
-            print(f"Intento de recuperación fallido: El correo ({payload.email}) no está registrado en el sistema.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No consta ninguna cuenta registrada con esa dirección de correo electrónico."
-            )
-    elif payload.telefono:
-        usuario = db.query(Usuarios).filter(
-            Usuarios.telefono == payload.telefono.strip(),
-            Usuarios.activo.is_(True),
-        ).first()
-        if not usuario:
-            print(f"Intento de recuperación fallido: El teléfono ({payload.telefono}) no está registrado en el sistema.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No consta ninguna cuenta registrada con esa número de teléfono."
-            )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se ha proporcionado ningún medio de recuperación."
-        )
+    identificador = payload.email.strip().lower() if payload.email else payload.telefono.strip() if payload.telefono else None
+    if not identificador:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
 
-    if not usuario:
-        print("No se ha podido encontrar un usuario para recuperar su contraseña.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se ha podido encontrar un usuario para recuperar su contraseña."
-        )
+    consulta = db.query(Usuarios).filter(Usuarios.activo.is_(True))
+    consulta = consulta.filter(Usuarios.email == identificador) if payload.email else consulta.filter(Usuarios.telefono == identificador)
+    usuario = consulta.with_for_update().first()
+    ahora = datetime.datetime.now(timezone.utc)
+    if not usuario or not usuario.codigo_recuperacion or not usuario.codigo_expira_at or ahora > usuario.codigo_expira_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
 
-    if not usuario.codigo_recuperacion or payload.codigo_verificacion != usuario.codigo_recuperacion:
-        print(f"Código de verificación inválido o ausente para el usuario ({usuario.id}).")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código de verificación introducido no está o es incorrecto."
-        )
+    codigo_proporcionado = hashlib.sha256(payload.codigo_verificacion.encode("utf-8")).hexdigest()
+    codigo_legacy = str(usuario.codigo_recuperacion)
+    codigo_valido = secrets.compare_digest(codigo_legacy, codigo_proporcionado)
+    if len(codigo_legacy) == 6 and codigo_legacy.isdigit():
+        codigo_valido = codigo_valido or secrets.compare_digest(codigo_legacy, payload.codigo_verificacion)
 
-    if usuario.codigo_expira_at and datetime.datetime.now(timezone.utc) > usuario.codigo_expira_at:
-        print(f"El código de recuperación ha expirado para el usuario ({usuario.id}).")
-        setattr(usuario, 'codigo_recuperacion', None)
-        setattr(usuario, 'codigo_expira_at', None)
+    if not codigo_valido:
+        usuario.intentos_recuperacion += 1
+        if usuario.intentos_recuperacion >= 5:
+            usuario.codigo_recuperacion = None
+            usuario.codigo_expira_at = None
+            usuario.intentos_recuperacion = 0
         db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código de verificación ha expirado. Solicita uno nuevo."
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
 
-    # Hashear la nueva contraseña y actualizar el registro del usuario
     try:
-        setattr(usuario, 'password_hash', get_password_hash(payload.nueva_password))
-
-        # Limpiamos los campos de recuperación consumidos
-        setattr(usuario, 'codigo_recuperacion', None)
-        setattr(usuario, 'codigo_expira_at', None)
-
-        # Actualizamos la fecha de modificación
-        if hasattr(usuario, 'updated_at'):
-            setattr(usuario, 'updated_at', datetime.datetime.now(timezone.utc))
-
-        db.add(usuario)
+        usuario.password_hash = get_password_hash(payload.nueva_password)
+        usuario.codigo_recuperacion = None
+        usuario.codigo_expira_at = None
+        usuario.intentos_recuperacion = 0
+        usuario.updated_at = ahora
         db.commit()
-
         registrar_auditoria(
             db=db,
             request=request,
             usuario_id=usuario.id,
             empresa_id=None,
             accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': "usuario",
-                'accion': "confirmar_recuperacion_password",
-            },
-            trabajador_id=usuario.trabajador_id
+            detalle={"recurso": "usuarios", "accion": "confirmar_recuperacion_password"},
+            trabajador_id=usuario.trabajador_id,
         )
-
-        print(f"Contraseña actualizada exitosamente para el usuario ({usuario.id}).")
+        db.commit()
         return {"detail": "Tu contraseña ha sido actualizada correctamente."}
     except Exception as e:
         db.rollback()
-        print(f"No se ha podido actualizar la contraseña del usuario ({usuario.id}): {str(e)}.")
+        print(f"No se ha podido actualizar la contraseña del usuario ({usuario.id}): {e}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"No se ha podido actualizar la contraseña."
+            detail="No se ha podido actualizar la contraseña.",
+        )
+
+@router.post(
+    "/recuperar-password",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar recuperación de contraseña",
+    description="Valida el correo, genera un código aleatorio de 6 dígitos y lo envía por correo o por teléfono.",
+)
+@limiter.limit("5/minute")
+def solicitar_recuperacion_password(
+    request: Request,
+    payload: PasswordRecuperacionRequest,
+    db: Session = Depends(get_db),
+):
+    """Env?a un código temporal sin revelar si el correo o teléfono tiene cuenta."""
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de recuperación de contraseña desde la IP ({cliente_ip}).")
+
+    medio = "email" if payload.email else "telefono" if payload.telefono else None
+    identificador = payload.email.strip().lower() if payload.email else payload.telefono.strip() if payload.telefono else None
+    if medio is None or identificador is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Indica un correo o teléfono válido.")
+
+    consulta = db.query(Usuarios).filter(Usuarios.activo.is_(True))
+    consulta = consulta.filter(Usuarios.email == identificador) if medio == "email" else consulta.filter(Usuarios.telefono == identificador)
+    usuario = consulta.first()
+    respuesta = {"detail": "Si los datos corresponden a una cuenta activa, recibirás instrucciones de recuperación."}
+    if usuario is None:
+        return respuesta
+
+    codigo = f"{secrets.randbelow(1_000_000):06d}"
+    try:
+        usuario.codigo_recuperacion = hashlib.sha256(codigo.encode("utf-8")).hexdigest()
+        usuario.codigo_expira_at = datetime.datetime.now(timezone.utc) + timedelta(minutes=15)
+        usuario.intentos_recuperacion = 0
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario.id,
+            empresa_id=None,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "usuarios", "accion": "solicitar_recuperacion_password"},
+            trabajador_id=usuario.trabajador_id,
+        )
+        db.commit()
+        if medio == "email":
+            enviar_correo_recuperacion_contraseña(usuario.email, codigo)
+        else:
+            enviar_sms_recuperacion_contraseña(identificador.replace("-", ""), codigo)
+        return respuesta
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido procesar la recuperación de contraseña para el usuario ({usuario.id}): {e}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido procesar la solicitud de recuperación de contraseña.",
         )

@@ -25,22 +25,21 @@ class CorreccionFichajeBase(BaseModel):
     motivo: str = Field(..., max_length=255, description="Justificación detallada de la solicitud de corrección")
 
     fecha_solicitud: datetime.datetime = Field(..., description="Fecha y hora en que se realizó la solicitud de corrección")
-    fecha_resolucion: Optional[datetime.datetime] = Field(..., description="Fecha y hora en que se realizó la resolución de la corrección")
-
-    firma_solicitante: str = Field(..., description="Firma del solicitante de la corrección")
-    firma_resolutor: Optional[str] = Field(..., description="Firma del resolutor de la corrección")
+    fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha y hora en que se realizó la resolución de la corrección")
 
     model_config = ConfigDict(from_attributes=True)
 
-class CorreccionFichajeCreate(CorreccionFichajeBase):
-    """
-    Esquema utilizado para recibir los datos al solicitar una nueva corrección.
-    """
-    empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
-    usuario_aprobador_id: UUID = Field(..., description="ID único UUID del usuario que ha aprobado la corrección de fichaje")
-    usuario_solicitador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que ha solicitado la corrección de fichaje")
-    fichaje_afectado_id: Optional[UUID] = Field(None, description="ID del fichaje original que se desea corregir o anular")
+class CorreccionFichajeCreate(BaseModel):
+    """Solicitud del trabajador; el usuario y estado se derivan de la sesi?n."""
+    empresa_id: UUID
+    trabajador_id: UUID
+    tipo_evento: TipoEventoFichajeEnum
+    tipo_correccion: TipoCorreccionEnum
+    valor_nuevo: Dict[str, Any] = Field(default_factory=dict)
+    valor_anterior: Optional[Dict[str, Any]] = None
+    motivo: str = Field(..., max_length=255)
+    fichaje_afectado_id: Optional[UUID] = None
+    firma_solicitante: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +59,7 @@ class CorreccionFichajeUpdate(BaseModel):
     fecha_solicitud: Optional[datetime.datetime] = Field(None, description="Fecha y hora en que se realizó la solicitud de corrección")
     fecha_resolucion: Optional[datetime.datetime] = Field(None, description="Fecha y hora en que se realizó la resolución de la corrección")
 
+    # Las firmas se aceptan en escritura, pero solo se exponen por el endpoint protegido de archivos.
     firma_solicitante: Optional[str] = Field(None, description="Firma del solicitante de la corrección")
     firma_resolutor: Optional[str] = Field(None, description="Firma del resolutor de la corrección")
 
@@ -72,8 +72,8 @@ class CorreccionFichajeSimpleResponse(CorreccionFichajeBase):
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) de la corrección de fichaje")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador afectado")
-    usuario_aprobador_id: UUID = Field(..., description="ID único UUID del usuario que ha aprobado la corrección de fichaje")
-    usuario_solicitador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que ha solicitado la corrección de fichaje")
+    usuario_aprobador_id: Optional[UUID] = Field(None, description="ID único UUID del usuario que ha aprobado la corrección de fichaje")
+    usuario_solicitador_id: UUID = Field(..., description="ID único UUID del usuario que ha solicitado la corrección de fichaje")
     fichaje_afectado_id: Optional[UUID] = Field(None, description="ID del fichaje original que se desea corregir o anular")
 
     model_config = ConfigDict(from_attributes=True)
@@ -84,7 +84,7 @@ class CorreccionFichajeResponse(CorreccionFichajeSimpleResponse):
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
     trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador afectado")
-    solicitado_por_usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario solicitante")
-    aprobado_por_usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario que aprobó la solicitud")
+    usuario_solicitador: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario solicitante")
+    usuario_aprobador: Optional[UsuarioSimpleResponse] = Field(None, description="Detalles del usuario que resolvió la solicitud")
 
     model_config = ConfigDict(from_attributes=True)

@@ -47,7 +47,7 @@ interface FichajeSimplificado {
   id: string;
   fecha: string;
   hora: string;
-  tipo_evento: string;
+  tipo_evento: TipoFichaje;
 }
 
 export default function GestionIncidenciasScreen() {
@@ -248,7 +248,7 @@ export default function GestionIncidenciasScreen() {
 
           const resultados = await Promise.all(fichajesProcesadosPromises);
           setFichajesDisponibles(
-            resultados.filter((f): f is FichajeSimplificado => f !== null),
+            resultados.filter((f): f is NonNullable<typeof f> => f !== null),
           );
         }
       } catch (error: any) {
@@ -326,7 +326,6 @@ export default function GestionIncidenciasScreen() {
         trabajador_id: trabajadorSeleccionadoId,
         tipo_correccion: tipoCorreccion,
         tipo_evento: tipoEventoSolicitado,
-        solicitado_por_usuario_id: usuarioActual.id,
         firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:

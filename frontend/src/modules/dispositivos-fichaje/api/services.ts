@@ -20,7 +20,7 @@ export const obtenerDispositivosEmpresa = async (
 ): Promise<Dispositivo[]> => {
   try {
     const response = await api.get<Dispositivo[]>(
-      `/api/dispositivos/empresa/${idEmpresa}`,
+      `/api/dispositivos-fichaje/empresa/${idEmpresa}`,
     );
     return response.data;
   } catch (error: any) {
@@ -46,7 +46,7 @@ export const obtenerDispositivosCentro = async (
 ): Promise<Dispositivo[]> => {
   try {
     const response = await api.get<Dispositivo[]>(
-      `/api/dispositivos/centro/${idCentro}`,
+      `/api/dispositivos-fichaje/centro/${idCentro}`,
     );
     return response.data;
   } catch (error: any) {
@@ -71,7 +71,7 @@ export const crearDispositivo = async (
   payload: DispositivoCreate,
 ): Promise<Dispositivo> => {
   try {
-    const response = await api.post<Dispositivo>("/api/dispositivos", payload);
+    const response = await api.post<Dispositivo>("/api/dispositivos-fichaje", payload);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -98,7 +98,7 @@ export const editarDispositivo = async (
 ): Promise<Dispositivo> => {
   try {
     const response = await api.put<Dispositivo>(
-      `/api/dispositivos/${idDispositivo}`,
+      `/api/dispositivos-fichaje/${idDispositivo}`,
       payload,
     );
     return response.data;
@@ -124,7 +124,7 @@ export const eliminarDispositivo = async (
   idDispositivo: string,
 ): Promise<void> => {
   try {
-    await api.put(`/api/dispositivos/${idDispositivo}/desactivar`);
+    await api.put(`/api/dispositivos-fichaje/${idDispositivo}/desactivar`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

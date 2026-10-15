@@ -30,6 +30,5 @@ class Roles(Base):
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='roles', doc='Empresa a la que pertenece el rol.') # type: ignore
 
     permiso: Mapped[list['Permisos']] = relationship('Permisos', secondary='roles_permisos', back_populates='rol', viewonly=True, overlaps='roles_permisos,rol', doc='Permisos asociados al rol.') # type: ignore
-    usuarios_roles: Mapped[list['UsuariosRoles']] = relationship('UsuariosRoles', back_populates='rol', doc='Usuarios asignados al rol.') # type: ignore
     usuarios_empresas: Mapped[list['UsuariosEmpresas']] = relationship('UsuariosEmpresas', back_populates='rol', doc='Usuarios asignados al rol.') # type: ignore
     roles_permisos: Mapped[list['RolesPermisos']] = relationship('RolesPermisos', back_populates='rol', overlaps='permiso', doc='Relación entre roles y permisos.') # type: ignore

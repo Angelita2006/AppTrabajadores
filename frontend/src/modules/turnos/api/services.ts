@@ -15,9 +15,9 @@ import { Turno, TurnoCreate, TurnoUpdate } from "../types/turno";
  * @returns {Promise<Turno[]>} Promesa con el catálogo completo de turnos.
  * @throws {Error} Lanza un error si ocurre un fallo al recuperar el catálogo.
  */
-export const obtenerTodosLosTurnos = async (): Promise<Turno[]> => {
+export const obtenerTodosLosTurnos = async (idEmpresa: string): Promise<Turno[]> => {
   try {
-    const respuesta = await api.get<Turno[]>("/api/turnos");
+    const respuesta = await api.get<Turno[]>(`/api/turnos/empresa/${idEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error.response?.data?.message;

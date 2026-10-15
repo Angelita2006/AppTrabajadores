@@ -56,6 +56,40 @@ def obtener_auditoria_empresa(
     return accesos_auditoria
 
 @router.get(
+    "/trabajador/{id_trabajador}",
+    response_model=List[AuditoriaAccesoResponse],
+    summary="Obtener auditoría por trabajador",
+    description="Obtiene el historial de accesos de auditoría del trabajador.",
+)
+def obtener_auditoria_por_trabajador(
+    request: Request,
+    id_trabajador: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/auditoria-accesos/trabajador/{id_trabajador}**
+
+    Obtiene el historial de accesos de auditoría del trabajador.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de accesos de auditoría para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Trabajador no encontrado.")
+
+    accesos_auditoria = (
+        db.query(AuditoriaAccesos)
+        .options(joinedload(AuditoriaAccesos.empresa), joinedload(AuditoriaAccesos.usuario), joinedload(AuditoriaAccesos.trabajador))
+        .filter(AuditoriaAccesos.trabajador_id == id_trabajador)
+        .all()
+    )
+
+    return accesos_auditoria
+@router.get(
     "/usuario/{id_usuario}",
     response_model=List[AuditoriaAccesoResponse],
     summary="Obtener auditoría por usuario",
@@ -91,37 +125,3 @@ def obtener_auditoria_usuario(
     return accesos_auditoria
 
 
-@router.get(
-    "/trabajador/{id_trabajador}",
-    response_model=List[AuditoriaAccesoResponse],
-    summary="Obtener auditoría por trabajador",
-    description="Obtiene el historial de accesos de auditoría del trabajador.",
-)
-def obtener_auditoria_por_trabajador(
-    request: Request,
-    id_trabajador: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.AUDITORIA_ACCESOS])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/auditoria-accesos/trabajador/{id_trabajador}**
-
-    Obtiene el historial de accesos de auditoría del trabajador.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de accesos de auditoría para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        print(f"Trabajador ({id_trabajador}) no encontrado.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Trabajador no encontrado.")
-
-    accesos_auditoria = (
-        db.query(AuditoriaAccesos)
-        .options(joinedload(AuditoriaAccesos.empresa), joinedload(AuditoriaAccesos.usuario), joinedload(AuditoriaAccesos.trabajador))
-        .filter(AuditoriaAccesos.trabajador_id == id_trabajador)
-        .all()
-    )
-
-    return accesos_auditoria

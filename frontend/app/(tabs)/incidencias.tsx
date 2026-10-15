@@ -6,11 +6,7 @@ import {
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
-import {
-    obtenerTipoEventoPorId,
-    obtenerTiposEventosEmpresa,
-} from "@/src/modules/tipos_eventos_fichaje/api/services";
-import { TipoEventoFichaje } from "@/src/modules/tipos_eventos_fichaje/types/tipos_evento_fichaje";
+import { TIPOS_FICHAJE, TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha } from "@/src/utils/formaters";
@@ -39,7 +35,7 @@ interface FichajeSimplificado {
   id: string;
   fecha: string;
   hora: string;
-  tipo_evento: string;
+  tipo_evento: TipoFichaje;
 }
 
 export default function IncidenciasScreen() {
@@ -51,9 +47,6 @@ export default function IncidenciasScreen() {
     FichajeSimplificado[]
   >([]);
 
-  const [tiposEventosEmpresa, setTiposEventosEmpresa] = useState<
-    TipoEventoFichaje[]
-  >([]);
   const [cargando, setCargando] = useState(true);
 
   // Estados locales del formulario
@@ -63,8 +56,8 @@ export default function IncidenciasScreen() {
   const [fechaAfectada, setFechaAfectada] = useState("");
   const [horaRealPropuesta, setHoraRealPropuesta] = useState("10:00");
 
-  const [tipoEventoIdSolicitado, setTipoEventoIdSolicitado] =
-    useState<string>("");
+  const [tipoEventoSolicitado, setTipoEventoSolicitado] =
+    useState<TipoFichaje>(TIPOS_FICHAJE.ENTRADA);
   const [comentario, setComentario] = useState("");
   const [horaAnterior, setHoraAnterior] = useState("");
   const [firmaSolicitante, setFirmaSolicitante] = useState<string | null>(null);
@@ -99,14 +92,6 @@ export default function IncidenciasScreen() {
     try {
       setCargando(true);
       if (!empresaActual?.id) return;
-
-      const eventosEmpresa = await obtenerTiposEventosEmpresa(empresaActual.id);
-      if (Array.isArray(eventosEmpresa)) {
-        setTiposEventosEmpresa(eventosEmpresa);
-        setTipoEventoIdSolicitado((prev) =>
-          !prev && eventosEmpresa.length > 0 ? eventosEmpresa[0].id : prev,
-        );
-      }
 
       if (esAdmin) {
         const datosGlobales = await obtenerCorreccionesPorEmpresa(
@@ -147,12 +132,7 @@ export default function IncidenciasScreen() {
           async (fichaje: RegistroFichaje) => {
             if (!fichaje || !fichaje.estado) return null;
             if (fichaje.estado.toString() !== "Válido") return null;
-            if (!fichaje.tipo_evento_id) return null;
-
-            const tipoEvento = await obtenerTipoEventoPorId(
-              fichaje.tipo_evento_id,
-            );
-            const codigoEvento = tipoEvento?.codigo?.toUpperCase() || "";
+            const codigoEvento = fichaje.tipo_evento;
 
             const fechaHoraStr = fichaje.fecha_hora || "";
             const [fecha, horaCompleta] = fechaHoraStr.includes("T")
@@ -174,7 +154,7 @@ export default function IncidenciasScreen() {
 
         const resultados = await Promise.all(fichajesProcesadosPromises);
         const fichajesValidos: FichajeSimplificado[] = resultados.filter(
-          (f): f is FichajeSimplificado => f !== null,
+          (f): f is NonNullable<typeof f> => f !== null,
         );
 
         setIncidencias(datosPersonales);
@@ -259,8 +239,7 @@ export default function IncidenciasScreen() {
         empresa_id: empresaActual.id,
         trabajador_id: idTrabajadorEfectivo,
         tipo_correccion: tipoCorreccion,
-        tipo_evento_id: tipoEventoIdSolicitado,
-        solicitado_por_usuario_id: usuarioActual.id,
+        tipo_evento: tipoEventoSolicitado,
         firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:
@@ -270,7 +249,7 @@ export default function IncidenciasScreen() {
             ? {
                 fecha_descuadre: fechaAfectada.trim(),
                 hora_propuesta: horaRealPropuesta.trim(),
-                tipo_evento_id: tipoEventoIdSolicitado,
+                tipo_evento: tipoEventoSolicitado,
               }
             : {},
         valor_anterior:
@@ -300,7 +279,7 @@ export default function IncidenciasScreen() {
     fichajeAfectadoId,
     fechaAfectada,
     horaRealPropuesta,
-    tipoEventoIdSolicitado,
+    tipoEventoSolicitado,
     horaAnterior,
     firmaSolicitante,
     usuarioActual,
@@ -486,24 +465,24 @@ export default function IncidenciasScreen() {
 
                   <ThemedText style={styles.label}>Tipo de Evento</ThemedText>
                   <View style={styles.selectorTipos}>
-                    {tiposEventosEmpresa.map((evento) => (
+                    {Object.values(TIPOS_FICHAJE).map((evento) => (
                       <Pressable
-                        key={evento.id}
+                        key={evento}
                         style={[
                           styles.opcionTipo,
-                          tipoEventoIdSolicitado === evento.id &&
+                          tipoEventoSolicitado === evento &&
                             styles.opcionTipoActiva,
                         ]}
-                        onPress={() => setTipoEventoIdSolicitado(evento.id)}
+                        onPress={() => setTipoEventoSolicitado(evento)}
                       >
                         <ThemedText
                           style={[
                             styles.textoOpcion,
-                            tipoEventoIdSolicitado === evento.id &&
+                            tipoEventoSolicitado === evento &&
                               styles.textoOpcionActiva,
                           ]}
                         >
-                          {evento.codigo.replace("_", " ").toUpperCase()}
+                          {evento.replace("_", " ")}
                         </ThemedText>
                       </Pressable>
                     ))}

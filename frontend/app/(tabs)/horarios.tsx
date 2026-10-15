@@ -204,7 +204,7 @@ export default function HorariosScreen() {
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
                 if (fechaFichajeStr !== fechaRealStr) return false;
 
-                const codigo = fichaje.tipo_evento?.codigo;
+                const codigo = fichaje.tipo_evento;
                 const esEntrada = codigo === "ENTRADA";
                 const esSalida = codigo === "SALIDA";
 
@@ -238,7 +238,7 @@ export default function HorariosScreen() {
                 const fechaFichajeStr = fichaje.fecha_hora.split("T")[0];
                 if (fechaFichajeStr !== fechaRealStr) return false;
 
-                const codigo = fichaje.tipo_evento?.codigo;
+                const codigo = fichaje.tipo_evento;
                 const esPausa =
                   codigo === "INICIO_PAUSA" || codigo === "FIN_PAUSA";
 
@@ -266,7 +266,7 @@ export default function HorariosScreen() {
             let marcaInicioPausa: number | null = null;
             pausasOrdenadas.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const codigo = fichaje.tipo_evento?.codigo;
+              const codigo = fichaje.tipo_evento;
 
               if (codigo === "INICIO_PAUSA") {
                 marcaInicioPausa = tMs;
@@ -283,7 +283,7 @@ export default function HorariosScreen() {
 
             marcajesDelDia.forEach((fichaje: RegistroFichaje) => {
               const tMs = new Date(fichaje.fecha_hora).getTime();
-              const codigo = fichaje.tipo_evento?.codigo;
+              const codigo = fichaje.tipo_evento;
               const esEntrada = codigo === "ENTRADA";
 
               if (esEntrada) {
@@ -403,7 +403,7 @@ export default function HorariosScreen() {
                           const horaLimpia = partes[1]
                             ? partes[1].substring(0, 5)
                             : "00:00";
-                          const codigo = fichaje.tipo_evento?.codigo;
+                          const codigo = fichaje.tipo_evento;
                           const esEntrada = codigo === "ENTRADA";
 
                           return (

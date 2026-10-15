@@ -89,15 +89,24 @@ def crear_permiso(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta de usuario se encuentra inactiva.")
 
     try:
-        permiso_existente = db.query(Permisos).filter(Permisos.tipo == payload.tipo, Permisos.accion == payload.accion).first()
+        permiso_existente = db.query(Permisos).filter(
+            Permisos.tipo == payload.tipo,
+            Permisos.accion == payload.accion,
+            Permisos.alcance == payload.alcance,
+        ).first()
         if permiso_existente:
-            print(f"Ya existe un permiso registrado con el tipo '{payload.tipo}' y la acción ({payload.accion}).")
+            print(f"Ya existe un permiso registrado con el tipo '{payload.tipo}', la acción ({payload.accion}) y el alcance ({payload.alcance}).")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Ya existe un permiso registrado con esa combinación de tipo y acción."
+                detail="Ya existe un permiso registrado con esa combinación de tipo, acción y alcance."
             )
 
-        nuevo_permiso = Permisos(tipo=payload.tipo, accion=payload.accion, descripcion=payload.descripcion)
+        nuevo_permiso = Permisos(
+            tipo=payload.tipo,
+            accion=payload.accion,
+            alcance=payload.alcance,
+            descripcion=payload.descripcion,
+        )
         db.add(nuevo_permiso)
 
         registrar_auditoria(

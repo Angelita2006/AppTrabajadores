@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from uuid import UUID
-import random
+import hashlib
 import secrets
 
 from fastapi import (
@@ -14,6 +15,7 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, Session
 
 from core.auditoria import registrar_auditoria
@@ -21,7 +23,9 @@ from core.database import get_db
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    AlcancePermisoEnum,
     TipoPermisoEnum,
+    TipoRolEnum,
 )
 from core.security import (
     crear_token_acceso,
@@ -38,6 +42,11 @@ from core.utils import (
 )
 from models.trabajadores import Trabajadores
 from models.usuarios import Usuarios
+from models.gestorias_empresas import GestoriasEmpresas
+from models.usuarios_empresas import UsuariosEmpresas
+from models.roles import Roles
+from models.roles_permisos import RolesPermisos
+from models.permisos import Permisos
 from schemas.auth import (
     ConfirmarPasswordRecuperacionRequest,
     LoginRequest,
@@ -51,218 +60,136 @@ router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
-@router.post(
-    "/registro",
-    response_model=UsuarioSimpleResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Registro inicial de usuario",
-    description="Busca al trabajador existente mediante la empresa y el NIF, y crea credenciales de usuario vinculadas con contraseña hasheada.",
+@router.get(
+    "/me/accesos",
+    summary="Consultar mis empresas, roles y permisos efectivos",
+    description="Devuelve únicamente las membresías y permisos asociados a la cuenta autenticada.",
 )
-@limiter.limit("5/minute")
-def crear_usuario(
+@limiter.limit("30/minute")
+def obtener_mis_accesos(
     request: Request,
-    payload: UsuarioCreate,
+    empresa_id: Optional[UUID] = None,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.CONSULTAR
+        + "-"
+        + TipoPermisoEnum.USUARIOS_EMPRESAS
+        + "-"
+        + AlcancePermisoEnum.PROPIO
+    ])),
     db: Session = Depends(get_db),
 ):
+    """**GET /api/usuarios/me/accesos**
+
+    Consulta las empresas, roles y permisos propios sin exponer los de otros usuarios.
     """
-    **POST /api/usuarios**
-
-    Crea un usuario nuevo.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de creación de usuario desde la IP ({cliente_ip}).")
-    
-    # Validaciones estructurales básicas
-    email_limpio = str(payload.email).strip().lower()
-    email_existente = db.query(Usuarios).filter(
-        Usuarios.email == email_limpio,
-        Usuarios.activo.is_(True),
-    ).first()
-    if email_existente:
-        print("El correo electrónico ya se encuentra registrado en el sistema.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya se encuentra registrado en el sistema."
+    membresias = (
+        db.query(UsuariosEmpresas)
+        .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+        .filter(
+            UsuariosEmpresas.usuario_id == usuario_actual.id,
+            UsuariosEmpresas.activo.is_(True),
         )
-
-    telefono_limpio = str(payload.telefono).strip().lower()
-    telefono_existente = db.query(Usuarios).filter(
-        Usuarios.telefono == telefono_limpio,
-        Usuarios.activo.is_(True),
-    ).first()
-    if telefono_existente:
-        print("El número de teléfono ya se encuentra registrado en el sistema.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El número de teléfono ya se encuentra registrado en el sistema."
-        )
-
-    usuario_existente = db.query(Usuarios).filter(Usuarios.email == payload.email).first()
-    if usuario_existente:
-        print("Este trabajador ya dispone de una cuenta de usuario registrada.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este trabajador ya dispone de una cuenta de usuario registrada."
-        )
-
-    nuevo_usuario = Usuarios(
-        nombre=payload.nombre,
-        email=email_limpio,
-        telefono=telefono_limpio,
-        password_hash=get_password_hash(payload.password),
+        .order_by(UsuariosEmpresas.created_at.asc())
+        .all()
     )
+    accesos = []
+    for membresia in membresias:
+        permisos = (
+            db.query(Permisos)
+            .join(RolesPermisos, RolesPermisos.permiso_id == Permisos.id)
+            .filter(RolesPermisos.rol_id == membresia.rol_id)
+            .order_by(Permisos.tipo, Permisos.accion, Permisos.alcance)
+            .all()
+        )
+        accesos.append({
+            "membresia_id": str(membresia.id),
+            "empresa_id": str(membresia.empresa_id) if membresia.empresa_id else None,
+            "rol": {
+                "id": str(membresia.rol.id),
+                "nombre": membresia.rol.nombre,
+                "tipo": membresia.rol.tipo.value,
+            },
+            "permisos": [
+                {
+                    "recurso": permiso.tipo.value,
+                    "accion": permiso.accion.value,
+                    "alcance": permiso.alcance.value,
+                }
+                for permiso in permisos
+            ],
+        })
 
-    db.add(nuevo_usuario)
-    db.flush()
+    # Proyecta solo los permisos que la gestoría tiene delegados para el cliente activo.
+    if empresa_id and not any(
+        acceso["empresa_id"] == str(empresa_id) for acceso in accesos
+    ):
+        delegacion = (
+            db.query(UsuariosEmpresas, GestoriasEmpresas)
+            .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+            .join(
+                GestoriasEmpresas,
+                GestoriasEmpresas.empresa_gestora_id == UsuariosEmpresas.empresa_id,
+            )
+            .filter(
+                UsuariosEmpresas.usuario_id == usuario_actual.id,
+                UsuariosEmpresas.activo.is_(True),
+                Roles.activo.is_(True),
+                Roles.tipo == TipoRolEnum.ADMIN_GESTORIA,
+                GestoriasEmpresas.empresa_cliente_id == empresa_id,
+                GestoriasEmpresas.activo.is_(True),
+                GestoriasEmpresas.fecha_inicio <= datetime.now().date(),
+                (GestoriasEmpresas.fecha_fin.is_(None)
+                 | (GestoriasEmpresas.fecha_fin >= datetime.now().date())),
+            )
+            .first()
+        )
+        if delegacion:
+            membresia_gestoria, relacion = delegacion
+            permisos_rol = (
+                db.query(Permisos)
+                .join(RolesPermisos, RolesPermisos.permiso_id == Permisos.id)
+                .filter(RolesPermisos.rol_id == membresia_gestoria.rol_id)
+                .order_by(Permisos.tipo, Permisos.accion, Permisos.alcance)
+                .all()
+            )
+            claves_delegadas = set(relacion.permisos_delegados or []) & set(
+                relacion.permisos_maximos or []
+            )
+            permisos_efectivos = [
+                permiso
+                for permiso in permisos_rol
+                if f"{permiso.accion.value}-{permiso.tipo.value}-{permiso.alcance.value}"
+                in claves_delegadas
+            ]
+            accesos.append({
+                "membresia_id": str(membresia_gestoria.id),
+                "empresa_id": str(empresa_id),
+                "rol": {
+                    "id": str(membresia_gestoria.rol.id),
+                    "nombre": membresia_gestoria.rol.nombre,
+                    "tipo": membresia_gestoria.rol.tipo.value,
+                },
+                "permisos": [
+                    {
+                        "recurso": permiso.tipo.value,
+                        "accion": permiso.accion.value,
+                        "alcance": permiso.alcance.value,
+                    }
+                    for permiso in permisos_efectivos
+                ],
+            })
 
     registrar_auditoria(
         db=db,
         request=request,
-        usuario_id=nuevo_usuario.id,
+        usuario_id=usuario_actual.id,
         empresa_id=None,
-        accion=AccionAuditoriaEnum.CREACION,
-        detalle={
-            'recurso': 'usuarios',
-            'accion': 'crear',
-        },
-        trabajador_id=None,
-    )
-
-    db.commit()
-
-    usuario = (
-        db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_empresas))
-        .filter(Usuarios.id == nuevo_usuario.id)
-        .first()
-    )
-
-    db.refresh(usuario)
-    return usuario
-
-@router.post(
-    "/login",
-    summary="Inicio de sesión en la plataforma",
-    description="Autentica a un usuario validando su correo electrónico y contraseña, actualiza su último acceso y genera un token JWT de sesión.",
-)
-@limiter.limit("5/minute")
-def login_plataforma(
-    request: Request,
-    credenciales: LoginRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    **POST /api/usuarios/login**
-
-    Autentica a un usuario validando su correo electrónico y contraseña,
-    actualiza su último acceso y genera un token JWT de sesión.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Intento de inicio de sesión desde la IP ({cliente_ip})")
-
-    # Validaciones estructurales básicas
-    usuario = (
-        db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_empresas))
-        .filter(Usuarios.email == str(credenciales.email).strip().lower(), Usuarios.activo.is_(True))
-        .first()
-    )
-
-    if not usuario:
-        print("No hay ningún usuario registrado con ese correo electrónico.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No hay ningún usuario registrado con ese correo electrónico."
-        )
-
-    if not verify_password(credenciales.password, str(usuario.password_hash)):
-        print("La contraseña introducida es incorrecta.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="La contraseña introducida es incorrecta."
-        )
-
-    setattr(usuario, "ultimo_acceso", datetime.now())
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario.id,
-        empresa_id=usuario.empresa_id,
         accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': 'usuarios',
-            'accion': 'login',
-        },
-        trabajador_id=None,
+        detalle={"recurso": "usuarios_empresas", "accion": "consultar_accesos_propios"},
+        trabajador_id=usuario_actual.trabajador_id,
     )
     db.commit()
-    db.refresh(usuario)
-
-    access_token = crear_token_acceso(data={"sub": str(usuario.id), "id": usuario.email})
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "usuario": usuario
-    }
-
-@router.post(
-    "/login-form",
-    summary="Inicio de sesión compatible con Swagger UI",
-    description="Endpoint auxiliar optimizado para autenticación OAuth2 estándar (Swagger UI).",
-)
-@limiter.limit("5/minute")
-def login_para_swagger(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-):
-    """
-    **POST /api/usuarios/login-form**
-
-    Endpoint auxiliar optimizado para autenticación OAuth2 estándar (Swagger UI).
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de login OAuth2 desde la IP ({cliente_ip}).")
-
-    # Validaciones estructurales básicas
-    user = db.query(Usuarios).filter(
-        Usuarios.email == form_data.username,
-        Usuarios.activo == True,
-    ).first()
-
-    if not user or not verify_password(form_data.password, user.password_hash):
-        print("Credenciales incorrectas o usuario no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Credenciales incorrectas o usuario no encontrado."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=user.id,
-        empresa_id=user.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': 'usuarios',
-            'accion': 'login_swagger',
-        },
-        trabajador_id=user.trabajador_id,
-    )
-    db.commit()
-
-    access_token = crear_token_acceso(data={"sub": user.email, "empresa_id": str(user.empresa_id)})
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    return accesos
 
 @router.get(
     "/me",
@@ -274,8 +201,8 @@ def login_para_swagger(
 def obtener_mi_usuario(
     request: Request,
     token: str = Depends(oauth2_scheme),
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.USUARIOS])),
-    db: Session = Depends(get_db_with_advanced_security),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.USUARIOS + "-" + AlcancePermisoEnum.PROPIO])),
+    db: Session = Depends(get_db),
 ):
     """
     **GET /api/usuarios/{id_usuario}**
@@ -283,12 +210,11 @@ def obtener_mi_usuario(
     Busca los detalles de una cuenta mediante su identificador único UUID de forma protegida.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del usuario autenticado ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    print(f"Petición de consulta del usuario autenticado ([token oculto]) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     usuario = (
         db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
         joinedload(Usuarios.trabajador),
         joinedload(Usuarios.usuarios_empresas))
         .filter(Usuarios.id == usuario_actual.id)
@@ -318,136 +244,6 @@ def obtener_mi_usuario(
 
     return usuario
 
-@router.put(
-    "/{id_usuario}/estado",
-    response_model=UsuarioSimpleResponse,
-    summary="Modificar estado de usuario",
-    description="Modifica el estado de un usuario.",
-)
-@limiter.limit("30/minute")
-def modificar_estado_usuario(
-    request: Request,
-    id_usuario: UUID,
-    payload: UsuarioUpdate,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **PUT /api/usuarios/{id_usuario}/estado?activo=false**
-
-    Modifica el estado de un usuario.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del estado del usuario ({id_usuario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
-    # Validaciones estructurales básicas
-    usuario = (
-        db.query(Usuarios).options(
-        joinedload(Usuarios.empresa),
-        joinedload(Usuarios.trabajador),
-        joinedload(Usuarios.usuarios_empresas))
-        .filter(Usuarios.id == id_usuario)
-        .first()
-    )
-
-    if not usuario:
-        print(f"Usuario ({id_usuario}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado.",
-        )
-
-    try:
-        setattr(usuario, "activo", payload.activo)
-        setattr(usuario, "updated_at", datetime.now())
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=None,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': 'usuarios',
-                'accion': 'modificar_estado',
-            },
-            trabajador_id=None,
-        )
-        db.commit()
-        db.refresh(usuario)
-
-        return usuario
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido modificar el estado del usuario: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se ha podido modificar el estado del usuario.",
-        )
-
-
-@router.put(
-    "/solicitar-cambio-email",
-    status_code=status.HTTP_200_OK,
-    summary="Solicitar cambio de correo electrónico con verificación",
-    description="Valida la unicidad del nuevo correo, genera un token seguro de verificación y envía un enlace al nuevo correo electrónico para confirmar el cambio.",
-)
-@limiter.limit("5/minute")
-def solicitar_cambio_email(
-    request: Request,
-    nuevo_email: str,
-    background_tasks: BackgroundTasks,
-    token: str = Depends(oauth2_scheme),
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    Valida la unicidad del nuevo correo, genera un token seguro de verificación
-    y envía un enlace al nuevo correo electrónico para confirmar el cambio.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de solicitar cambio email desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    email_limpio = str(nuevo_email).strip().lower()
-    email_existente = db.query(Usuarios).filter(
-        Usuarios.email == email_limpio,
-        Usuarios.id != usuario_actual.id,Usuarios.activo == True
-    ).first()
-    if email_existente:
-        print("El correo electrónico ya está en uso por otro usuario.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico ya está en uso por otro usuario."
-        )
-
-    token_verificacion = secrets.token_urlsafe(32)
-    expiracion = datetime.now(timezone.utc) + timedelta(hours=1)
-
-    setattr(usuario_actual, "email_pendiente_verificacion", email_limpio)
-    setattr(usuario_actual, "token_cambio_email", token_verificacion)
-    setattr(usuario_actual, "token_cambio_email_expira_at", expiracion)
-    setattr(usuario_actual, "updated_at", datetime.now(timezone.utc))
-
-    background_tasks.add_task(enviar_correo_cambio_email, email_limpio, token_verificacion)
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=request.headers.get('Empresa-ID'),
-        accion=AccionAuditoriaEnum.MODIFICACION,
-        detalle={
-            'recurso': 'usuarios',
-            'accion': 'solicitar_cambio_email',
-        },
-        trabajador_id=usuario_actual.trabajador_id,
-    )
-
-    db.commit()
-    db.refresh(usuario_actual)
-
-    return {"detail": "Se ha enviado un enlace de confirmación a tu nuevo correo electrónico."}
 
 @router.post(
     "/confirmar-cambio-email",
@@ -467,7 +263,7 @@ def confirmar_cambio_email(
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de modificación al confirmar el cambio de email desde la IP ({cliente_ip}).")
-    
+
     # Validaciones estructurales básicas
     usuario = db.query(Usuarios).filter(
         Usuarios.token_cambio_email == token
@@ -511,7 +307,6 @@ def confirmar_cambio_email(
         trabajador = db.query(Trabajadores).filter(Trabajadores.id == usuario.trabajador_id).first()
 
         if trabajador:
-            setattr(trabajador, 'email', nuevo_email)
             setattr(trabajador, 'updated_at', datetime.now(timezone.utc))
             db.add(trabajador)
 
@@ -521,7 +316,7 @@ def confirmar_cambio_email(
             db=db,
             request=request,
             usuario_id=usuario.id,
-            empresa_id=usuario.empresa_id,
+            empresa_id=trabajador.empresa_id if trabajador else None,
             accion=AccionAuditoriaEnum.MODIFICACION,
             detalle={
                 'recurso': 'usuarios',
@@ -529,6 +324,7 @@ def confirmar_cambio_email(
             },
             trabajador_id=usuario.trabajador_id,
         )
+        db.commit()
 
     except Exception as e:
         db.rollback()
@@ -540,72 +336,6 @@ def confirmar_cambio_email(
 
     print(f"¡Correo electrónico confirmado y actualizado con éxito en tu cuenta ({usuario.email}) y perfil de trabajador!")
     return {"detail": "¡Correo electrónico confirmado y actualizado con éxito en tu cuenta y perfil de trabajador!"}
-
-@router.put(
-    "/solicitar-cambio-password",
-    status_code=status.HTTP_200_OK,
-    summary="Solicitar código para cambio de contraseña",
-    description="Valida la contraseña actual del usuario autenticado, genera un código aleatorio de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.",
-)
-@limiter.limit("5/minute")
-def solicitar_cambio_password(
-    request: Request,
-    payload: PasswordCambioRequest,
-    token: str = Depends(oauth2_scheme),
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **POST /api/usuarios/solicitar-cambio-password**
-
-    Valida la contraseña actual del usuario autenticado, genera un código aleatorio
-    de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación de solicitar cambio password ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
-        print("La contraseña actual introducida no es correcta.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña actual introducida no es correcta."
-        )
-
-    codigo_aleatorio = f"{random.randint(0, 999999):06d}"
-
-    try:
-        setattr(usuario_actual, 'codigo_recuperacion', codigo_aleatorio)
-        setattr(usuario_actual, 'codigo_expira_at', datetime.now(timezone.utc) + timedelta(minutes=15))
-
-        db.add(usuario_actual)
-        db.commit()
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=request.headers.get('Empresa-ID'),
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': 'usuarios',
-                'accion': 'solicitar_cambio_password',
-            },
-            trabajador_id=usuario_actual.trabajador_id,
-        )
-
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido procesar la solicitud de cambio de contraseña: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se ha podido procesar la solicitud de cambio de contraseña."
-        )
-
-    enviar_correo_cambio_contraseña(usuario_actual.email, codigo_aleatorio)
-
-    print(f"Se ha enviado un código de verificación ({codigo_aleatorio}) a tu correo electrónico para confirmar el cambio.")
-    return {"detail": "Se ha enviado un código de verificación a tu correo electrónico para confirmar el cambio."}
 
 @router.post(
     "/confirmar-cambio-password",
@@ -627,36 +357,35 @@ def confirmar_cambio_password(
     Valida el código de 6 dígitos recibido por correo y actualiza la contraseña definitivamente.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación al confirmar el cambio de contraseña ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
-    # Validaciones estructurales básicas
-    if not usuario_actual.codigo_recuperacion or payload.codigo_verificacion != usuario_actual.codigo_recuperacion:
-        print("El código de verificación introducido es incorrecto.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código de verificación introducido es incorrecto."
-        )
+    print(f"Petición de modificación al confirmar el cambio de contraseña ([token oculto]) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
-    if usuario_actual.codigo_expira_at and datetime.now(timezone.utc) > usuario_actual.codigo_expira_at:
-        setattr(usuario_actual, 'codigo_recuperacion', None)
-        setattr(usuario_actual, 'codigo_expira_at', None)
+    if not usuario_actual.codigo_recuperacion or not usuario_actual.codigo_expira_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
+    if datetime.now(timezone.utc) > usuario_actual.codigo_expira_at:
+        setattr(usuario_actual, "codigo_recuperacion", None)
+        setattr(usuario_actual, "codigo_expira_at", None)
+        setattr(usuario_actual, "intentos_recuperacion", 0)
         db.commit()
-        print("El código de verificación ha expirado. Solicita uno nuevo.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código de verificación ha expirado. Solicita uno nuevo."
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
 
-    if len(payload.nueva_password) < 6:
-        print("La nueva contraseña debe tener al menos 6 caracteres.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La nueva contraseña debe tener al menos 6 caracteres."
-        )
+    codigo_hash = hashlib.sha256(payload.codigo_verificacion.encode("utf-8")).hexdigest()
+    codigo_guardado = str(usuario_actual.codigo_recuperacion)
+    codigo_valido = secrets.compare_digest(codigo_guardado, codigo_hash)
+    if len(codigo_guardado) == 6 and codigo_guardado.isdigit():
+        codigo_valido = codigo_valido or secrets.compare_digest(codigo_guardado, payload.codigo_verificacion)
+    if not codigo_valido:
+        setattr(usuario_actual, "intentos_recuperacion", usuario_actual.intentos_recuperacion + 1)
+        if usuario_actual.intentos_recuperacion >= 5:
+            setattr(usuario_actual, "codigo_recuperacion", None)
+            setattr(usuario_actual, "codigo_expira_at", None)
+            setattr(usuario_actual, "intentos_recuperacion", 0)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código no válido o caducado.")
 
     try:
         setattr(usuario_actual, 'password_hash', get_password_hash(payload.nueva_password))
         setattr(usuario_actual, 'codigo_recuperacion', None)
+        setattr(usuario_actual, 'intentos_recuperacion', 0)
         setattr(usuario_actual, 'codigo_expira_at', None)
         setattr(usuario_actual, 'updated_at', datetime.now(timezone.utc))
 
@@ -675,6 +404,7 @@ def confirmar_cambio_password(
             },
             trabajador_id=usuario_actual.trabajador_id,
         )
+        db.commit()
 
         print(f"La contraseña ({usuario_actual.email}) ha sido modificada correctamente.")
         return {"detail": "Tu contraseña ha sido modificada correctamente."}
@@ -683,5 +413,417 @@ def confirmar_cambio_password(
         print(f"No se ha podido modificar la contraseña: {str(e)}.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='No se ha podido modificar la contraseña.'  
+            detail='No se ha podido modificar la contraseña.'
+        )
+@router.post(
+    "/login",
+    summary="Inicio de sesión en la plataforma",
+    description="Autentica a un usuario validando su correo electrónico y contraseña, actualiza su último acceso y genera un token JWT de sesión.",
+)
+@limiter.limit("5/minute")
+def login_plataforma(
+    request: Request,
+    credenciales: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    **POST /api/usuarios/login**
+
+    Autentica a un usuario validando su correo electrónico y contraseña,
+    actualiza su último acceso y genera un token JWT de sesión.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Intento de inicio de sesión desde la IP ({cliente_ip})")
+
+    # Validaciones estructurales básicas
+    usuario = (
+        db.query(Usuarios).options(
+        joinedload(Usuarios.trabajador),
+        joinedload(Usuarios.usuarios_empresas))
+        .filter(Usuarios.email == str(credenciales.email).strip().lower(), Usuarios.activo.is_(True))
+        .first()
+    )
+
+    if not usuario:
+        print("No hay ningún usuario registrado con ese correo electrónico.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales incorrectas.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not verify_password(credenciales.password, str(usuario.password_hash)):
+        print("La contraseña introducida es incorrecta.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales incorrectas.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    setattr(usuario, "ultimo_acceso", datetime.now())
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': 'usuarios',
+            'accion': 'login',
+        },
+        trabajador_id=None,
+    )
+    db.commit()
+    db.refresh(usuario)
+
+    access_token = crear_token_acceso(data={"sub": str(usuario.id), "id": usuario.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "usuario": UsuarioSimpleResponse.model_validate(usuario),
+    }
+
+@router.post(
+    "/login-form",
+    summary="Inicio de sesión compatible con Swagger UI",
+    description="Endpoint auxiliar optimizado para autenticación OAuth2 estándar (Swagger UI).",
+)
+@limiter.limit("5/minute")
+def login_para_swagger(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    """
+    **POST /api/usuarios/login-form**
+
+    Endpoint auxiliar optimizado para autenticación OAuth2 estándar (Swagger UI).
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de login OAuth2 desde la IP ({cliente_ip}).")
+
+    # Validaciones estructurales básicas
+    user = db.query(Usuarios).filter(
+        Usuarios.email == form_data.username.strip().lower(),
+        Usuarios.activo.is_(True),
+    ).first()
+
+    if not user or not verify_password(form_data.password, user.password_hash):
+        print("Credenciales incorrectas o usuario no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales incorrectas o usuario no encontrado."
+        )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=user.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': 'usuarios',
+            'accion': 'login_swagger',
+        },
+        trabajador_id=user.trabajador_id,
+    )
+    db.commit()
+
+    access_token = crear_token_acceso(data={"sub": user.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
+@router.post(
+    "/registro",
+    response_model=UsuarioSimpleResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro inicial de usuario",
+    description="Busca al trabajador existente mediante la empresa y el NIF, y crea credenciales de usuario vinculadas con contraseña hasheada.",
+)
+@limiter.limit("5/minute")
+def crear_usuario(
+    request: Request,
+    payload: UsuarioCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    **POST /api/usuarios**
+
+    Crea un usuario nuevo.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de creación de usuario desde la IP ({cliente_ip}).")
+
+    # Validaciones estructurales básicas
+    email_limpio = str(payload.email).strip().lower()
+    email_existente = db.query(Usuarios).filter(
+        func.lower(Usuarios.email) == email_limpio,
+        Usuarios.activo.is_(True),
+    ).first()
+    if email_existente:
+        print("El correo electrónico ya se encuentra registrado en el sistema.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya se encuentra registrado en el sistema."
+        )
+
+    telefono_limpio = payload.telefono.strip() if payload.telefono else None
+    telefono_existente = (
+        db.query(Usuarios)
+        .filter(Usuarios.telefono == telefono_limpio, Usuarios.activo.is_(True))
+        .first()
+        if telefono_limpio
+        else None
+    )
+    if telefono_existente:
+        print("El número de teléfono ya se encuentra registrado en el sistema.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El número de teléfono ya se encuentra registrado en el sistema."
+        )
+
+    usuario_existente = db.query(Usuarios).filter(func.lower(Usuarios.email) == email_limpio).first()
+    if usuario_existente:
+        print("Este trabajador ya dispone de una cuenta de usuario registrada.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este trabajador ya dispone de una cuenta de usuario registrada."
+        )
+
+    nuevo_usuario = Usuarios(
+        nombre=payload.nombre,
+        email=email_limpio,
+        telefono=telefono_limpio,
+        password_hash=get_password_hash(payload.password),
+    )
+
+    db.add(nuevo_usuario)
+    db.flush()
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=nuevo_usuario.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CREACION,
+        detalle={
+            'recurso': 'usuarios',
+            'accion': 'crear',
+        },
+        trabajador_id=None,
+    )
+
+    db.commit()
+
+    usuario = (
+        db.query(Usuarios).options(
+        joinedload(Usuarios.trabajador),
+        joinedload(Usuarios.usuarios_empresas))
+        .filter(Usuarios.id == nuevo_usuario.id)
+        .first()
+    )
+
+    db.refresh(usuario)
+    return usuario
+
+@router.put(
+    "/solicitar-cambio-email",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar cambio de correo electrónico con verificación",
+    description="Valida la unicidad del nuevo correo, genera un token seguro de verificación y envía un enlace al nuevo correo electrónico para confirmar el cambio.",
+)
+@limiter.limit("5/minute")
+def solicitar_cambio_email(
+    request: Request,
+    nuevo_email: str,
+    background_tasks: BackgroundTasks,
+    token: str = Depends(oauth2_scheme),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS + "-" + AlcancePermisoEnum.PROPIO])),
+    db: Session = Depends(get_db),
+):
+    """
+    Valida la unicidad del nuevo correo, genera un token seguro de verificación
+    y envía un enlace al nuevo correo electrónico para confirmar el cambio.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación de solicitar cambio email desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    email_limpio = str(nuevo_email).strip().lower()
+    email_existente = db.query(Usuarios).filter(
+        Usuarios.email == email_limpio,
+        Usuarios.id != usuario_actual.id,
+        Usuarios.activo.is_(True),
+    ).first()
+    if email_existente:
+        print("El correo electrónico ya está en uso por otro usuario.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya está en uso por otro usuario."
+        )
+
+    token_verificacion = secrets.token_urlsafe(32)
+    expiracion = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    setattr(usuario_actual, "email_pendiente_verificacion", email_limpio)
+    setattr(usuario_actual, "token_cambio_email", token_verificacion)
+    setattr(usuario_actual, "token_cambio_email_expira_at", expiracion)
+    setattr(usuario_actual, "updated_at", datetime.now(timezone.utc))
+
+    background_tasks.add_task(enviar_correo_cambio_email, email_limpio, token_verificacion)
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=request.headers.get('Empresa-ID'),
+        accion=AccionAuditoriaEnum.MODIFICACION,
+        detalle={
+            'recurso': 'usuarios',
+            'accion': 'solicitar_cambio_email',
+        },
+        trabajador_id=usuario_actual.trabajador_id,
+    )
+
+    db.commit()
+    db.refresh(usuario_actual)
+
+    return {"detail": "Se ha enviado un enlace de confirmación a tu nuevo correo electrónico."}
+
+@router.put(
+    "/solicitar-cambio-password",
+    status_code=status.HTTP_200_OK,
+    summary="Solicitar código para cambio de contraseña",
+    description="Valida la contraseña actual del usuario autenticado, genera un código aleatorio de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.",
+)
+@limiter.limit("5/minute")
+def solicitar_cambio_password(
+    request: Request,
+    payload: PasswordCambioRequest,
+    token: str = Depends(oauth2_scheme),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS + "-" + AlcancePermisoEnum.PROPIO])),
+    db: Session = Depends(get_db),
+):
+    """
+    **POST /api/usuarios/solicitar-cambio-password**
+
+    Valida la contraseña actual del usuario autenticado, genera un código aleatorio
+    de 6 dígitos, lo guarda temporalmente y envía un correo electrónico de confirmación.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación de solicitar cambio password ([token oculto]) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    if not verify_password(payload.antigua_password, str(usuario_actual.password_hash)):
+        print("La contraseña actual introducida no es correcta.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual introducida no es correcta."
+        )
+
+    codigo_aleatorio = f"{secrets.randbelow(1_000_000):06d}"
+
+    try:
+        setattr(usuario_actual, 'codigo_recuperacion', hashlib.sha256(codigo_aleatorio.encode('utf-8')).hexdigest())
+        setattr(usuario_actual, 'codigo_expira_at', datetime.now(timezone.utc) + timedelta(minutes=15))
+        setattr(usuario_actual, 'intentos_recuperacion', 0)
+
+        db.add(usuario_actual)
+        db.commit()
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=request.headers.get('Empresa-ID'),
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                'recurso': 'usuarios',
+                'accion': 'solicitar_cambio_password',
+            },
+            trabajador_id=usuario_actual.trabajador_id,
+        )
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido procesar la solicitud de cambio de contraseña: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido procesar la solicitud de cambio de contraseña."
+        )
+
+    enviar_correo_cambio_contraseña(usuario_actual.email, codigo_aleatorio)
+
+    return {"detail": "Se ha enviado un código de verificación a tu correo electrónico para confirmar el cambio."}
+
+@router.put(
+    "/{id_usuario}/estado",
+    response_model=UsuarioSimpleResponse,
+    summary="Modificar estado de usuario",
+    description="Modifica el estado de un usuario.",
+)
+@limiter.limit("30/minute")
+def modificar_estado_usuario(
+    request: Request,
+    id_usuario: UUID,
+    payload: UsuarioUpdate,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.USUARIOS])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """
+    **PUT /api/usuarios/{id_usuario}/estado?activo=false**
+
+    Modifica el estado de un usuario.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación del estado del usuario ({id_usuario}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    usuario = (
+        db.query(Usuarios).options(
+        joinedload(Usuarios.trabajador),
+        joinedload(Usuarios.usuarios_empresas))
+        .filter(Usuarios.id == id_usuario)
+        .first()
+    )
+
+    if not usuario:
+        print(f"Usuario ({id_usuario}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado.",
+        )
+
+    try:
+        setattr(usuario, "activo", payload.activo)
+        setattr(usuario, "updated_at", datetime.now())
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=None,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                'recurso': 'usuarios',
+                'accion': 'modificar_estado',
+            },
+            trabajador_id=None,
+        )
+        db.commit()
+        db.refresh(usuario)
+
+        return usuario
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido modificar el estado del usuario: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se ha podido modificar el estado del usuario.",
         )

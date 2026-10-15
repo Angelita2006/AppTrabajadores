@@ -1,50 +1,107 @@
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
-from core.security import obtener_usuario_actual 
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from core.config import obtener_directorio_archivos
+from core.database import get_db
+from core.auditoria import registrar_auditoria
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, AlcancePermisoEnum, TipoPermisoEnum, TipoRolEnum
+from core.security import obtener_usuario_actual, verificar_permisos_requeridos
+from models.ausencias import Ausencias
+from models.contratos import Contratos
+from models.correcciones_fichaje import CorreccionesFichaje
+from models.empresas import Empresas
+from models.fichajes import Fichajes
+from models.roles import Roles
+from models.trabajadores import Trabajadores
+from models.usuarios import Usuarios
+from models.usuarios_empresas import UsuariosEmpresas
 
 router = APIRouter(prefix="/api/archivos", tags=["Archivos"])
-
-DIRECCION_ACTUAL = Path(__file__).resolve()
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
-
+BASE_STATIC_DIR = obtener_directorio_archivos()
 CARPETA_FOTOS_TRABAJADORES = BASE_STATIC_DIR / "fotos_trabajadores"
 CARPETA_LOGOS_EMPRESAS = BASE_STATIC_DIR / "logos_empresas"
-CARPETA_FIRMAS_FICHAJES = BASE_STATIC_DIR / "firmas_fichajes"
-CARPETA_FIRMAS_SOLICITUDES_CORRECCIONES_FICHAJES = BASE_STATIC_DIR / "firmas_solicitudes_correcciones_fichajes"
-CARPETA_FIRMAS_RESOLUCIONES_CORRECCIONES_FICHAJES = BASE_STATIC_DIR / "firmas_resoluciones_correcciones_fichajes"
-CARPETA_JUSTIFICANTES_AUSENCIAS = BASE_STATIC_DIR / "justificantes_ausencias"
-CARPETA_CONTRATOS = BASE_STATIC_DIR / "contratos"
+ARCHIVOS = {
+    "fotos_trabajadores": (Trabajadores, Trabajadores.foto_url, Trabajadores.empresa_id, TipoPermisoEnum.TRABAJADORES),
+    "logos_empresas": (Empresas, Empresas.logo_url, Empresas.id, TipoPermisoEnum.EMPRESAS),
+    "firmas_fichajes": (Fichajes, Fichajes.firma_digital, Fichajes.empresa_id, TipoPermisoEnum.FICHAJES),
+    "firmas_solicitudes_correcciones_fichajes": (CorreccionesFichaje, CorreccionesFichaje.firma_solicitante, CorreccionesFichaje.empresa_id, TipoPermisoEnum.CORRECCIONES_FICHAJE),
+    "firmas_resoluciones_correcciones_fichajes": (CorreccionesFichaje, CorreccionesFichaje.firma_resolutor, CorreccionesFichaje.empresa_id, TipoPermisoEnum.CORRECCIONES_FICHAJE),
+    "justificantes_ausencias": (Ausencias, Ausencias.justificante_url, Ausencias.empresa_id, TipoPermisoEnum.AUSENCIAS),
+    "contratos": (Contratos, Contratos.pdf_url, Contratos.empresa_id, TipoPermisoEnum.CONTRATOS),
+}
+
 
 @router.get("/{subcarpeta}/{nombre_archivo}")
 def obtener_archivo_protegido(
+    request: Request,
     subcarpeta: str,
     nombre_archivo: str,
-    usuario_actual = Depends(obtener_usuario_actual)
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
 ):
-    """
-    Endpoint protegido y genérico que sirve cualquier recurso de la carpeta static 
-    (logos, firmas, fotos_trabajadores) validando que el usuario esté autenticado.
-    """
-    # Lista blanca de subcarpetas permitidas por seguridad
-    CARPETAS_PERMITIDAS = ["fotos_trabajadores", "logos_empresas", "firmas_fichajes", "firmas_solicitudes_correcciones_fichajes", "firmas_resoluciones_correcciones_fichajes", "justificantes_ausencias", "contratos"]
-    
-    if subcarpeta not in CARPETAS_PERMITIDAS:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado a esta categoría de archivos."
-        )
+    """Entrega el archivo si sigue referenciado y el usuario tiene permiso sobre su empresa."""
+    if subcarpeta not in ARCHIVOS or Path(nombre_archivo).name != nombre_archivo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
 
-    # Construimos la ruta absoluta uniendo la base estática, la subcarpeta y el archivo
-    ruta_archivo = BASE_STATIC_DIR / subcarpeta / nombre_archivo
-    
-    # Validación contra Path Traversal y comprobación de existencia usando el objeto Path
-    if not ruta_archivo.exists() or not ruta_archivo.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El archivo solicitado no existe en la ruta: {ruta_archivo}"
-        )
+    modelo, columna_archivo, columna_empresa, tipo_permiso = ARCHIVOS[subcarpeta]
+    ruta_relativa = f"/api/archivos/{subcarpeta}/{nombre_archivo}"
+    columnas = [columna_empresa]
+    columna_trabajador = Trabajadores.id if modelo is Trabajadores else getattr(modelo, "trabajador_id", None)
+    if columna_trabajador is not None:
+        columnas.append(columna_trabajador)
+    registro = (
+        db.query(*columnas)
+        .filter(func.split_part(columna_archivo, "?", 1) == ruta_relativa)
+        .first()
+    )
+    if not registro or registro[0] is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+    empresa_id = registro[0]
 
-    print(ruta_archivo)
-        
+    superadmin = (
+        db.query(UsuariosEmpresas.id)
+        .join(Roles, UsuariosEmpresas.rol_id == Roles.id)
+        .filter(
+            UsuariosEmpresas.usuario_id == usuario_actual.id,
+            UsuariosEmpresas.empresa_id.is_(None),
+            UsuariosEmpresas.activo.is_(True),
+            Roles.tipo == TipoRolEnum.SUPERADMINISTRADOR,
+        )
+        .first()
+        is not None
+    )
+    if not superadmin:
+        if request.headers.get("Empresa-ID") != str(empresa_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+        permiso = f"{AccionPermisoEnum.CONSULTAR.value}-{tipo_permiso.value}"
+        verificar_permisos_requeridos([permiso])(request, usuario_actual, db)
+        if getattr(request.state, "alcance_efectivo", None) == AlcancePermisoEnum.PROPIO.value:
+            if columna_trabajador is None or len(registro) < 2:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+            usuario_propietario = (
+                db.query(Trabajadores.usuario_id)
+                .filter(Trabajadores.id == registro[1], Trabajadores.empresa_id == empresa_id)
+                .scalar()
+            )
+            if usuario_propietario != usuario_actual.id:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+
+    base = (BASE_STATIC_DIR / subcarpeta).resolve()
+    ruta_archivo = (base / nombre_archivo).resolve()
+    if base not in ruta_archivo.parents or not ruta_archivo.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+    trabajador_id = registro[1] if columna_trabajador is not None and len(registro) > 1 else None
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=empresa_id,
+        accion=AccionAuditoriaEnum.DESCARGA,
+        detalle={"recurso": subcarpeta, "accion": "descargar"},
+        trabajador_id=trabajador_id,
+    )
+    db.commit()
     return FileResponse(str(ruta_archivo))

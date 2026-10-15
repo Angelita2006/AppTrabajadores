@@ -28,7 +28,7 @@ class DispositivosFichaje(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del dispositivo de fichaje.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del dispositivo de fichaje.')
 
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='dispositivos_fichaje', doc='Empresa a la que pertenece el dispositivo.') # type: ignore
-    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', back_populates='dispositivos_fichaje', doc='Centro de trabajo al que pertenece el dispositivo.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='dispositivos_fichaje', doc='Empresa a la que pertenece el dispositivo.') # type: ignore
+    centro_trabajo: Mapped[Optional['CentrosTrabajo']] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='dispositivos_fichaje', doc='Centro de trabajo al que pertenece el dispositivo.') # type: ignore
     
-    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', back_populates='dispositivo', doc='Fichajes asociados al dispositivo.') # type: ignore
+    fichajes: Mapped[list['Fichajes']] = relationship('Fichajes', foreign_keys='Fichajes.dispositivo_id', back_populates='dispositivo', doc='Fichajes asociados al dispositivo.') # type: ignore

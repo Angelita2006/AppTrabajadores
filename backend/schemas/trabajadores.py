@@ -36,6 +36,7 @@ class TrabajadorCreate(TrabajadorBase):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
     rol_id: UUID = Field(..., description="UUID del rol asignado al trabajador en el sistema")
+    usuario_id: Optional[UUID] = Field(None, description="Cuenta de usuario vinculada al trabajador para acceso propio")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,8 +56,18 @@ class TrabajadorUpdate(BaseModel):
     
     fecha_alta_empresa: Optional[datetime.date] = Field(None, description="Fecha de alta del trabajador en la empresa")
     fecha_baja_empresa: Optional[datetime.date] = Field(None, description="Fecha de baja laboral en la empresa")
+    usuario_id: Optional[UUID] = Field(None, description="Cuenta vinculada; NULL para desvincularla")
 
     model_config = ConfigDict(from_attributes=True)
+
+class TrabajadorAutogestionUpdate(BaseModel):
+    """Campos personales que el trabajador puede actualizar sin editar su expediente laboral."""
+    nombre: Optional[str] = Field(None, max_length=50)
+    apellidos: Optional[str] = Field(None, max_length=100)
+    fecha_nacimiento: Optional[datetime.date] = None
+    foto_url: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
 
 class TrabajadorSimpleResponse(TrabajadorBase):
     """
@@ -66,6 +77,7 @@ class TrabajadorSimpleResponse(TrabajadorBase):
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del trabajador")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
     rol_id: UUID = Field(..., description="UUID del rol asignado al trabajador en el sistema")
+    usuario_id: Optional[UUID] = Field(None, description="Cuenta de usuario vinculada al trabajador")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación efectuada (now)")

@@ -262,10 +262,7 @@ export const confirmarCambioPassword = async (
  */
 export const obtenerUsuarioActual = async (): Promise<UsuarioResponse> => {
   try {
-    const token = await AsyncStorage.getItem("user_token");
-    const respuesta = await api.get<UsuarioResponse>(
-      `/api/usuarios/me?token=${token}`,
-    );
+    const respuesta = await api.get<UsuarioResponse>("/api/usuarios/me");
     return respuesta.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -273,4 +270,22 @@ export const obtenerUsuarioActual = async (): Promise<UsuarioResponse> => {
       apiMessage || "Error al recuperar la información del usuario actual.",
     );
   }
+};
+
+export interface AccesoUsuario {
+  membresia_id: string;
+  empresa_id: string | null;
+  rol: { id: string; nombre: string; tipo: string };
+  permisos: Array<{ recurso: string; accion: string; alcance: string }>;
+}
+
+/** Obtiene membresías y permisos efectivos de la cuenta autenticada. */
+export const obtenerMisAccesos = async (
+  empresaId?: string,
+): Promise<AccesoUsuario[]> => {
+  const respuesta = await api.get<AccesoUsuario[]>("/api/usuarios/me/accesos", {
+    params: empresaId ? { empresa_id: empresaId } : undefined,
+    skipEmpresaContext: true,
+  } as any);
+  return respuesta.data;
 };

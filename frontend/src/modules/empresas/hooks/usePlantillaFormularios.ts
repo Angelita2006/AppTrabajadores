@@ -11,6 +11,7 @@ import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { UsuarioSesion } from "@/src/modules/usuarios/types/usuario";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
+import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useEffect, useRef, useState } from "react";
 
 export type TipoModal =

@@ -5,6 +5,7 @@ import {
     registrarFichaje,
 } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
+import { TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -62,7 +63,7 @@ export default function HomeScreen() {
   const [accionPendiente, setAccionPendiente] = useState<{
     nuevoEstado: Estado;
     tipoEventoCodigo: string;
-    tipoEvento: string;
+    tipoEvento: TipoFichaje;
   } | null>(null);
   const signatureRef = useRef<any>(null);
   const webCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -340,7 +341,7 @@ export default function HomeScreen() {
     };
   }, [estadoActual, cargando, segundosAcumuladosHoy, timestampBaseActual]);
 
-  const iniciarProcesoFichaje = (nuevoEstado: Estado, codigoEvento: string) => {
+  const iniciarProcesoFichaje = (nuevoEstado: Estado, codigoEvento: TipoFichaje) => {
     if (
       !usuarioActual?.trabajador_id ||
       !empresaActual?.id ||
@@ -379,7 +380,7 @@ export default function HomeScreen() {
   const registrarMarcajeHorario = async (
     nuevoEstado: Estado,
     tipoEventoCodigo: string,
-    tipoEvento: string,
+    tipoEvento: TipoFichaje,
     signatureUri: string,
     forzarExtra: boolean = false,
   ) => {

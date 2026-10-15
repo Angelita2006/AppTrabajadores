@@ -9,7 +9,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from core.auditoria import registrar_auditoria
-from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, TipoPermisoEnum
+from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, AlcancePermisoEnum, TipoPermisoEnum
 from core.security import (
     get_db_with_advanced_security,
     verificar_permisos_requeridos,
@@ -29,6 +29,186 @@ router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
 
+@router.get(
+    "/empresa/{id_empresa}",
+    response_model=List[ContratoResponse],
+    summary="Obtener contratos laborales por empresa",
+    description="Obtiene los contratos laborales de una empresa.",
+)
+@limiter.limit("60/minute")
+def obtener_contratos_laborales_empresa(
+    request: Request,
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/contratos/empresa/{id_empresa}**
+
+    Obtiene los contratos laborales de una empresa.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de contratos laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    contratos = (
+        db.query(Contratos).options(
+        joinedload(Contratos.empresa),
+        joinedload(Contratos.centro_trabajo),
+        joinedload(Contratos.trabajador),
+        joinedload(Contratos.departamento),
+        joinedload(Contratos.calendarios_asociados)
+        .joinedload(ContratosCalendarios.calendario))
+        .filter(Contratos.empresa_id == id_empresa)
+        .all()
+    )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_empresa",
+        },
+        trabajador_id=None
+    )
+    db.commit()
+
+    return contratos
+
+
+@router.get(
+    "/trabajador/{id_trabajador}",
+    response_model=List[ContratoResponse],
+    summary="Obtener contratos laborales por trabajador",
+    description="Obtiene los contratos laborales del trabajador.",
+)
+@limiter.limit("60/minute")
+def obtener_contratos_laborales_trabajador(
+    request: Request,
+    id_trabajador: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS+"-"+AlcancePermisoEnum.PROPIO])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/contratos/trabajador/{id_trabajador}**
+
+    Obtiene los contratos laborales del trabajador.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de contratos para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
+    if not trabajador:
+        print(f"Trabajador ({id_trabajador}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trabajador no encontrado."
+        )
+
+    if (
+        getattr(request.state, "alcance_efectivo", None) == AlcancePermisoEnum.PROPIO.value
+        and trabajador.usuario_id != usuario_actual.id
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trabajador no encontrado.")
+
+    contratos = (
+        db.query(Contratos).options(
+        joinedload(Contratos.empresa),
+        joinedload(Contratos.centro_trabajo),
+        joinedload(Contratos.trabajador),
+        joinedload(Contratos.departamento),
+        joinedload(Contratos.calendarios_asociados)
+        .joinedload(ContratosCalendarios.calendario))
+        .filter(Contratos.trabajador_id == id_trabajador)
+        .all()
+    )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=trabajador.empresa_id,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_trabajador",
+        },
+        trabajador_id=id_trabajador
+    )
+    db.commit()
+
+    return contratos
+
+@router.get(
+    "/trabajador/{id_trabajador}/empresa/{id_empresa}/activo",
+    response_model=ContratoResponse,
+    summary="Obtener contrato laboral activo de un trabajador",
+    description="Obtiene el contrato laboral activo de un trabajador.",
+)
+@limiter.limit("60/minute")
+def obtener_contrato_laboral_activo_trabajador_empresa(
+    request: Request,
+    id_trabajador: UUID,
+    id_empresa: UUID,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo**
+
+    Obtiene el contrato laboral activo de un trabajador.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de contrato laboral activo para el trabajador ({id_trabajador}) en la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    hoy = date.today()
+    contrato_activo = (
+        db.query(Contratos).options(
+        joinedload(Contratos.empresa),
+        joinedload(Contratos.centro_trabajo),
+        joinedload(Contratos.trabajador),
+        joinedload(Contratos.departamento),
+        joinedload(Contratos.calendarios_asociados)
+        .joinedload(ContratosCalendarios.calendario))
+        .filter(
+            Contratos.trabajador_id == id_trabajador,
+            Contratos.empresa_id == id_empresa,
+            Contratos.activo.is_(True),
+            Contratos.fecha_inicio <= hoy,
+            or_(Contratos.fecha_fin.is_(None), Contratos.fecha_fin >= hoy)
+        )
+        .order_by(Contratos.fecha_inicio.desc())
+        .first()
+    )
+
+    if not contrato_activo:
+        print(f"No se ha encontrado ningún contrato activo para el trabajador ({id_trabajador}) en la empresa seleccionada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se ha encontrado ningún contrato activo para el trabajador en la empresa seleccionada."
+        )
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=id_empresa,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={
+            'recurso': "contratos",
+            'accion': "consultar_activo",
+        },
+        trabajador_id=id_trabajador
+    )
+    db.commit()
+
+    return contrato_activo
 @router.post(
     "",
     response_model=ContratoResponse,
@@ -144,6 +324,7 @@ def crear_contrato_laboral(
             },
             trabajador_id=payload.trabajador_id
         )
+        db.commit()
 
         return contrato_creado
     except Exception as e:
@@ -153,85 +334,6 @@ def crear_contrato_laboral(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se ha podido registrar el contrato."
         )
-
-@router.put(
-    "/{id_contrato}",
-    response_model=ContratoResponse,
-    summary="Modificar contrato laboral",
-    description="Modifica los datos de un contrato laboral existente.",
-)
-@limiter.limit("20/minute")
-def modificar_contrato_laboral(
-    request: Request,
-    id_contrato: UUID,
-    payload: ContratoUpdate,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CONTRATOS])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **PUT /api/contratos/{id_contrato}**
-
-    Modifica los datos de un contrato laboral existente.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de modificación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
-    if not contrato:
-        print(f"Contrato laboral ({id_contrato}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Contrato laboral no encontrado."
-        )
-
-    try:
-        setattr(contrato, "tipo_contrato", payload.tipo_contrato)
-        setattr(contrato, "tipo_jornada", payload.tipo_jornada)
-        setattr(contrato, "horas_semana", payload.horas_semana)
-        setattr(contrato, "puesto_trabajo", payload.puesto_trabajo)
-        setattr(contrato, "categoria_profesional", payload.categoria_profesional)
-        setattr(contrato, "pdf_url", payload.pdf_url)
-        setattr(contrato, "fecha_inicio", payload.fecha_inicio)
-        setattr(contrato, "fecha_fin", payload.fecha_fin)
-        setattr(contrato, "activo", payload.activo)
-        setattr(contrato, "updated_at", datetime.now())
-        db.commit()
-
-        contrato_actualizado = (
-            db.query(Contratos).options(
-            joinedload(Contratos.empresa),
-            joinedload(Contratos.centro_trabajo),
-            joinedload(Contratos.trabajador),
-            joinedload(Contratos.departamento),
-            joinedload(Contratos.calendarios_asociados)
-            .joinedload(ContratosCalendarios.calendario))
-            .filter(Contratos.id == id_contrato)
-            .first()
-        )
-
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=contrato.empresa_id,
-            accion=AccionAuditoriaEnum.MODIFICACION,
-            detalle={
-                'recurso': "contratos",
-                'accion': "modificar",
-            },
-            trabajador_id=contrato.trabajador_id
-        )
-
-        return contrato_actualizado
-    except Exception as e:
-        db.rollback()
-        print(f"No se ha podido actualizar el contrato laboral: {str(e)}.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se ha podido actualizar el contrato laboral."
-        )
-
 
 @router.put(
     "/{id_contrato}/finalizar",
@@ -302,6 +404,7 @@ def finalizar_contrato_laboral(
             },
             trabajador_id=contrato.trabajador_id
         )
+        db.commit()
 
         return contrato_finalizado
     except Exception as e:
@@ -311,6 +414,86 @@ def finalizar_contrato_laboral(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No se ha podido finalizar el contrato laboral."
         )
+
+@router.put(
+    "/{id_contrato}",
+    response_model=ContratoResponse,
+    summary="Modificar contrato laboral",
+    description="Modifica los datos de un contrato laboral existente.",
+)
+@limiter.limit("20/minute")
+def modificar_contrato_laboral(
+    request: Request,
+    id_contrato: UUID,
+    payload: ContratoUpdate,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.MODIFICAR+"-"+TipoPermisoEnum.CONTRATOS])),
+    db: Session = Depends(get_db_with_advanced_security)
+):
+    """
+    **PUT /api/contratos/{id_contrato}**
+
+    Modifica los datos de un contrato laboral existente.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de modificación del contrato laboral ({id_contrato}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    # Validaciones estructurales básicas
+    contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
+    if not contrato:
+        print(f"Contrato laboral ({id_contrato}) no encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Contrato laboral no encontrado."
+        )
+
+    try:
+        setattr(contrato, "tipo_contrato", payload.tipo_contrato)
+        setattr(contrato, "tipo_jornada", payload.tipo_jornada)
+        setattr(contrato, "horas_semana", payload.horas_semana)
+        setattr(contrato, "puesto_trabajo", payload.puesto_trabajo)
+        setattr(contrato, "categoria_profesional", payload.categoria_profesional)
+        setattr(contrato, "pdf_url", payload.pdf_url)
+        setattr(contrato, "fecha_inicio", payload.fecha_inicio)
+        setattr(contrato, "fecha_fin", payload.fecha_fin)
+        setattr(contrato, "activo", payload.activo)
+        setattr(contrato, "updated_at", datetime.now())
+        db.commit()
+
+        contrato_actualizado = (
+            db.query(Contratos).options(
+            joinedload(Contratos.empresa),
+            joinedload(Contratos.centro_trabajo),
+            joinedload(Contratos.trabajador),
+            joinedload(Contratos.departamento),
+            joinedload(Contratos.calendarios_asociados)
+            .joinedload(ContratosCalendarios.calendario))
+            .filter(Contratos.id == id_contrato)
+            .first()
+        )
+
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={
+                'recurso': "contratos",
+                'accion': "modificar",
+            },
+            trabajador_id=contrato.trabajador_id
+        )
+        db.commit()
+
+        return contrato_actualizado
+    except Exception as e:
+        db.rollback()
+        print(f"No se ha podido actualizar el contrato laboral: {str(e)}.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se ha podido actualizar el contrato laboral."
+        )
+
 
 @router.delete(
     "/{id_contrato}",
@@ -358,6 +541,7 @@ def eliminar_contrato_laboral(
             },
             trabajador_id=contrato.trabajador_id
         )
+        db.commit()
 
         print(f"El contrato ({id_contrato}) ha sido eliminado correctamente.")
         return {"detail": "El contrato ha sido eliminado correctamente."}
@@ -369,174 +553,3 @@ def eliminar_contrato_laboral(
             detail=f"No se ha podido eliminar el contrato laboral."
         )
 
-@router.get(
-    "/trabajador/{id_trabajador}",
-    response_model=List[ContratoResponse],
-    summary="Obtener contratos laborales por trabajador",
-    description="Obtiene los contratos laborales del trabajador.",
-)
-@limiter.limit("60/minute")
-def obtener_contratos_laborales_trabajador(
-    request: Request,
-    id_trabajador: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/contratos/trabajador/{id_trabajador}**
-
-    Obtiene los contratos laborales del trabajador.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de contratos para el trabajador ({id_trabajador}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    trabajador = db.query(Trabajadores).filter(Trabajadores.id == id_trabajador).first()
-    if not trabajador:
-        print(f"Trabajador ({id_trabajador}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trabajador no encontrado."
-        )
-
-    contratos = (
-        db.query(Contratos).options(
-        joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
-        joinedload(Contratos.trabajador),
-        joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
-        .filter(Contratos.trabajador_id == id_trabajador)
-        .all()
-    )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=trabajador.empresa_id,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': "contratos",
-            'accion': "consultar_trabajador",
-        },
-        trabajador_id=id_trabajador
-    )
-
-    return contratos
-
-@router.get(
-    "/empresa/{id_empresa}",
-    response_model=List[ContratoResponse],
-    summary="Obtener contratos laborales por empresa",
-    description="Obtiene los contratos laborales de una empresa.",
-)
-@limiter.limit("60/minute")
-def obtener_contratos_laborales_empresa(
-    request: Request,
-    id_empresa: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/contratos/empresa/{id_empresa}**
-
-    Obtiene los contratos laborales de una empresa.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de contratos laborales para la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    contratos = (
-        db.query(Contratos).options(
-        joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
-        joinedload(Contratos.trabajador),
-        joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
-        .filter(Contratos.empresa_id == id_empresa)
-        .all()
-    )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=id_empresa,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': "contratos",
-            'accion': "consultar_empresa",
-        },
-        trabajador_id=None
-    )
-
-    return contratos
-
-
-@router.get(
-    "/trabajador/{id_trabajador}/empresa/{id_empresa}/activo",
-    response_model=ContratoResponse,
-    summary="Obtener contrato laboral activo de un trabajador",
-    description="Obtiene el contrato laboral activo de un trabajador.",
-)
-@limiter.limit("60/minute")
-def obtener_contrato_laboral_activo_trabajador_empresa(
-    request: Request,
-    id_trabajador: UUID,
-    id_empresa: UUID,
-    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR+"-"+TipoPermisoEnum.CONTRATOS])),
-    db: Session = Depends(get_db_with_advanced_security)
-):
-    """
-    **GET /api/contratos/trabajador/{id_trabajador}/empresa/{id_empresa}/activo**
-
-    Obtiene el contrato laboral activo de un trabajador.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de contrato laboral activo para el trabajador ({id_trabajador}) en la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-
-    # Validaciones estructurales básicas
-    hoy = date.today()
-    contrato_activo = (
-        db.query(Contratos).options(
-        joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
-        joinedload(Contratos.trabajador),
-        joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
-        .filter(
-            Contratos.trabajador_id == id_trabajador,
-            Contratos.empresa_id == id_empresa,
-            Contratos.activo == True,
-            Contratos.fecha_inicio <= hoy,
-            or_(Contratos.fecha_fin.is_(None), Contratos.fecha_fin >= hoy)
-        )
-        .order_by(Contratos.fecha_inicio.desc())
-        .first()
-    )
-
-    if not contrato_activo:
-        print(f"No se ha encontrado ningún contrato activo para el trabajador ({id_trabajador}) en la empresa seleccionada.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se ha encontrado ningún contrato activo para el trabajador en la empresa seleccionada."
-        )
-
-    registrar_auditoria(
-        db=db,
-        request=request,
-        usuario_id=usuario_actual.id,
-        empresa_id=id_empresa,
-        accion=AccionAuditoriaEnum.CONSULTA,
-        detalle={
-            'recurso': "contratos",
-            'accion': "consultar_activo",
-        },
-        trabajador_id=id_trabajador
-    )
-
-    return contrato_activo

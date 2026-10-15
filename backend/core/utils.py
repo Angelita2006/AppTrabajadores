@@ -1,19 +1,21 @@
 import base64
+import binascii
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import hashlib
 import json
 import math
-from pathlib import Path
+import os
 import smtplib
 import uuid
 from datetime import datetime
+from urllib.parse import urlencode
 from fastapi import HTTPException, status
 from google import genai
 from google.genai import types
 import httpx
 from sqlalchemy.orm import Session
-from core.config import settings
+from core.config import obtener_directorio_archivos, obtener_url_publica, settings
 from models.contratos import Contratos
 from models.contratos_calendarios import ContratosCalendarios
 from models.calendarios_laborales import CalendariosLaborales
@@ -27,10 +29,8 @@ SMTP_USER = settings.SMTP_USER
 SMTP_PASSWORD = settings.SMTP_PASSWORD
 EMAILS_FROM = settings.EMAILS_FROM
 
-# Rutas base de archivos estáticos adaptadas al nuevo esquema centralizado
-DIRECCION_ACTUAL = Path(__file__).resolve()
-# Ajusta los niveles de .parent según dónde ubiques este archivo de utilidades respecto a la raíz 'static'
-BASE_STATIC_DIR = DIRECCION_ACTUAL.parent.parent.parent.parent / "static" 
+# Archivos privados fuera del directorio público del servidor web.
+BASE_STATIC_DIR = obtener_directorio_archivos()
 
 CARPETAS_ARCHIVOS_MAP = {
     "firmas_fichajes": BASE_STATIC_DIR / "firmas_fichajes",
@@ -64,7 +64,14 @@ def procesar_y_guardar_firma(data_firma: str, tipo_carpeta: str = "firmas_fichaj
         return ""
         
     data_encoded = data_firma.split(",", 1)[1] if "," in data_firma else data_firma
-    bytes_imagen = base64.b64decode(data_encoded)
+    if len(data_encoded) > 1_400_000:
+        raise ValueError("La firma supera el tamano maximo permitido.")
+    try:
+        bytes_imagen = base64.b64decode(data_encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("La firma no contiene una imagen Base64 valida.") from exc
+    if not bytes_imagen.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("La firma debe ser una imagen PNG valida.")
 
     nombre_archivo = f"firma_{uuid.uuid4().hex}.png"
     
@@ -74,8 +81,17 @@ def procesar_y_guardar_firma(data_firma: str, tipo_carpeta: str = "firmas_fichaj
     carpeta_destino.mkdir(parents=True, exist_ok=True)
     ruta_destino = carpeta_destino / nombre_archivo
 
-    with open(ruta_destino, "wb") as buffer:
-        buffer.write(bytes_imagen)
+    descriptor = os.open(
+        ruta_destino,
+        os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0),
+        0o600,
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as buffer:
+            buffer.write(bytes_imagen)
+    except Exception:
+        ruta_destino.unlink(missing_ok=True)
+        raise
 
     # Devuelve la URL formateada para que encaje perfectamente con el endpoint genérico /api/archivos/{subcarpeta}/{nombre_archivo}
     return f"/api/archivos/{tipo_carpeta}/{nombre_archivo}"
@@ -112,7 +128,7 @@ def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fe
     """Valida si el día del fichaje es festivo o laborable."""
     contrato = db.query(Contratos).filter(
         Contratos.trabajador_id == trabajador_id,
-        Contratos.activo == True,
+        Contratos.activo.is_(True),
         Contratos.fecha_inicio <= fecha_fichaje,
         (Contratos.fecha_fin == None) | (Contratos.fecha_fin >= fecha_fichaje)
     ).first()
@@ -248,7 +264,7 @@ def enviar_correo_cambio_contraseña(destinatario: str, codigo: str):
 
 def enviar_correo_cambio_email(destinatario: str, token: str):
     """Función auxiliar para enviar el enlace de confirmación de cambio de correo mediante SMTP"""
-    url_confirmacion = "http://"+settings.URL+f"/confirmar-cambio-email?token={token}"
+    url_confirmacion = f"{obtener_url_publica()}/confirmar-cambio-email?{urlencode({'token': token})}"
     
     try:
         mensaje = MIMEMultipart("alternative")
@@ -336,7 +352,7 @@ def enviar_sms_cambio_contraseña(destinatario: str):
 
 def enviar_sms_cambio_telefono(destinatario: str, token: str):
     """Función auxiliar para enviar el enlace de confirmación de cambio de teléfono mediante SMS con Twilio"""
-    url_confirmacion = "http://"+settings.URL+f"/confirmar-cambio-telefono?token={token}"
+    url_confirmacion = f"{obtener_url_publica()}/confirmar-cambio-telefono?{urlencode({'token': token})}"
     
     try:
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)

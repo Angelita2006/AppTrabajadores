@@ -12,6 +12,7 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    CicloFacturacionEnum,
     EstadoSuscripcionEnum,
     TipoPermisoEnum,
     TipoRolEnum,
@@ -47,7 +48,7 @@ def _licencia(db: Session, id_licencia: UUID) -> Licencias:
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="No se encontró la licencia."
         )
-    
+
     return licencia
 
 def _es_superadmin_global(db: Session, usuario_id: UUID) -> bool:
@@ -88,6 +89,32 @@ def obtener_licencias(
 
     return db.query(Licencias).order_by(Licencias.created_at.desc()).all()
 
+@router.get(
+    "/{id_licencia}",
+    response_model=LicenciaResponse,
+    summary="Obtener licencia por id",
+    description="Obtiene una licencia por su id.",
+)
+@limiter.limit("60/minute")
+def obtener_licencia_id(
+    request: Request,
+    id_licencia: UUID,
+    usuario_actual: Usuarios = Depends(
+        verificar_permisos_requeridos([
+            AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.LICENCIAS
+        ])
+    ),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**GET /api/licencias/{id_licencia}**
+
+    Obtiene una licencia por su id.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(f"Petición de consulta de licencia por id ({id_licencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+
+    return _licencia(db, id_licencia)
+
 @router.post(
     "",
     response_model=LicenciaSimpleResponse,
@@ -112,7 +139,7 @@ def crear_licencia(
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de creación de licencia desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
+
     # Validaciones estructurales básicas
     if not _es_superadmin_global(db, usuario_actual.id):
         print("Solo el superadministrador global puede emitir licencias.")
@@ -120,7 +147,7 @@ def crear_licencia(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Solo el superadministrador global puede emitir licencias."
         )
-    
+
     codigo = secrets.token_hex(6).upper()
     while db.query(Licencias.id).filter(Licencias.codigo == codigo).first():
         codigo = secrets.token_hex(6).upper()
@@ -152,32 +179,6 @@ def crear_licencia(
     db.commit()
 
     return licencia
-
-@router.get(
-    "/{id_licencia}",
-    response_model=LicenciaResponse,
-    summary="Obtener licencia por id",
-    description="Obtiene una licencia por su id.",
-)
-@limiter.limit("60/minute")
-def obtener_licencia_id(
-    request: Request,
-    id_licencia: UUID,
-    usuario_actual: Usuarios = Depends(
-        verificar_permisos_requeridos([
-            AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.LICENCIAS
-        ])
-    ),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """**GET /api/licencias/{id_licencia}**
-
-    Obtiene una licencia por su id.
-    """
-    cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta de licencia por id ({id_licencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
-    return _licencia(db, id_licencia)
 
 @router.patch(
     "/{id_licencia}",
@@ -214,14 +215,14 @@ def modificar_licencia(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Debe indicar al menos un campo para actualizar."
         )
-    
+
     if any(campo in cambios and cambios[campo] is None for campo in ("fecha_inicio", "fecha_expiracion")):
         print("Las fechas de inicio y expiración son obligatorias.")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
             detail="Las fechas de inicio y expiración son obligatorias."
         )
-    
+
     inicio = cambios.get("fecha_inicio", licencia.fecha_inicio)
     expiracion = cambios.get("fecha_expiracion", licencia.fecha_expiracion)
     if expiracion is not None and expiracion < inicio:
@@ -230,7 +231,7 @@ def modificar_licencia(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
             detail="La fecha de expiración no puede ser anterior a la fecha de inicio."
         )
-    
+
     for campo, valor in cambios.items():
         setattr(licencia, campo, valor)
     setattr(licencia, "updated_at", datetime.now(timezone.utc))
@@ -275,7 +276,7 @@ def revocar_licencia(
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
     print(f"Petición de modificación de baja lógica de la licencia ({id_licencia}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
-    
+
     # Validaciones estructurales básicas
     licencia = _licencia(db, id_licencia)
 

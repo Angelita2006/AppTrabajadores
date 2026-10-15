@@ -1,12 +1,12 @@
-import os
 import logging
+from pathlib import Path
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core import archivos
 from core.init_db import inicializar_permisos_sistema, inicializar_roles_sistema, inicializar_relaciones_roles_permisos, inicializar_politica_retencion_global
-from core.config import settings
+from core.config import settings, validar_configuracion_produccion
 from core.database import SessionLocal, engine
 from routes import (
     asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales,
@@ -26,11 +26,16 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+API_DOCUMENTATION_FILE = (
+    Path(__file__).resolve().parent
+    / "docs"
+    / "documentacion_api.html"
+)
 
 app = FastAPI(
     title="API de Registro horario trabajadores",
     description="API centralizada para gestionar fichajes, jornadas, trabajadores, roles y empresas de FICHAPP.",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 @app.on_event("startup")
@@ -38,15 +43,18 @@ def startup_event():
     """
     Inicializa tareas en segundo plano y carga los datos semilla esenciales al arrancar la API.
     """
+    validar_configuracion_produccion()
+
     db = SessionLocal()
     try:
         inicializar_roles_sistema(db)
         inicializar_permisos_sistema(db)
         inicializar_relaciones_roles_permisos(db)
         inicializar_politica_retencion_global(db)
-        logger.info("Roles del sistema verificados/inicializados correctamente.")
+        logger.info("Roles del sistema, permisos de seguridad del sistema, sus respectivas asignaciones y la política de retención global inicializados correctamente.")
     except Exception as e:
-        logger.error(f"Error crítico al inicializar los roles del sistema: {e}")
+        logger.error(f"Error crítico al inicializar los roles del sistema: {str(e)}.")
+        raise
     finally:
         db.close()
 
@@ -56,7 +64,8 @@ async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     return response
 
 # rate limiting
@@ -84,7 +93,7 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 @app.exception_handler(FastAPIHTTPException)
 async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
-    logger.warning(f"HTTP Error {exc.status_code} en {request.url.path}: {exc.detail}")
+    logger.warning(f"HTTP Error {exc.status_code} en {request.url.path}")
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -105,14 +114,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 # GESTIÓN DE CORS SEGURA
-origins_env = os.getenv("ALLOWED_ORIGINS")
-origins = [origin.strip() for origin in origins_env.split(",")] if origins_env else []
+origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins, 
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"], 
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Empresa-ID"],
 )
 
@@ -148,8 +156,21 @@ app.include_router(contratos_calendarios.router)
 @app.get(
     "/api",
     summary="Documentación de la API",
-    description="Redirige a la documentación interactiva de Swagger UI.",
+    description="Muestra la documentación funcional y técnica generada para la API de Fichapp.",
 )
 def read_root():
-    """Redirige automáticamente a la interfaz de documentación de la API."""
-    return RedirectResponse(url="/docs", status_code=status.HTTP_303_SEE_OTHER)
+    """Sirve la página HTML de documentación generada desde el contrato OpenAPI."""
+    if not API_DOCUMENTATION_FILE.is_file():
+        raise FastAPIHTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "La página de documentación aún no se ha generado. "
+                "Ejecuta: python docs/generate_api_docs.py desde backend."
+            ),
+        )
+
+    return FileResponse(
+        API_DOCUMENTATION_FILE,
+        media_type="text/html",
+        filename=None,
+    )

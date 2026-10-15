@@ -23,5 +23,5 @@ class ContratosCalendarios(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación de la relación contrato-calendario.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización de la relación contrato-calendario.')
 
-    contrato: Mapped['Contratos'] = relationship('Contratos', back_populates='calendarios_asociados', doc='Contrato al que pertenece la relación.')  # type: ignore
-    calendario_laboral: Mapped['CalendariosLaborales'] = relationship('CalendariosLaborales', back_populates='contratos_asociados', doc='Calendario laboral al que pertenece la relación.')  # type: ignore
+    contrato: Mapped['Contratos'] = relationship('Contratos', back_populates='calendarios_laborales', doc='Contrato al que pertenece la relación.')  # type: ignore
+    calendario_laboral: Mapped['CalendariosLaborales'] = relationship('CalendariosLaborales', back_populates='contratos', doc='Calendario laboral al que pertenece la relación.')  # type: ignore

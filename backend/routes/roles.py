@@ -10,6 +10,7 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    TipoRolEnum,
     TipoPermisoEnum,
 )
 from core.security import (
@@ -17,6 +18,7 @@ from core.security import (
     verificar_permisos_requeridos,
 )
 from models.roles import Roles
+from models.usuarios_empresas import UsuariosEmpresas
 from models.usuarios import Usuarios
 from schemas.roles import RolCreate, RolResponse
 
@@ -25,6 +27,21 @@ router = APIRouter(prefix="/api/roles", tags=["Roles del Sistema"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
+
+
+def _es_superadmin_global(db: Session, usuario_id: UUID) -> bool:
+    return (
+        db.query(UsuariosEmpresas.id)
+        .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+        .filter(
+            UsuariosEmpresas.usuario_id == usuario_id,
+            UsuariosEmpresas.empresa_id.is_(None),
+            UsuariosEmpresas.activo.is_(True),
+            Roles.tipo == TipoRolEnum.SUPERADMINISTRADOR,
+        )
+        .first()
+        is not None
+    )
 
 @router.get(
     "",
@@ -148,8 +165,29 @@ def crear_rol_seguridad(
     print(f"Petición de creación de rol desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
+    es_superadmin = _es_superadmin_global(db, usuario_actual.id)
+    empresa_contexto = request.headers.get("Empresa-ID")
+    if payload.empresa_id is None and not es_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el superadministrador global puede crear roles globales.",
+        )
+    if payload.empresa_id is not None and str(payload.empresa_id) != empresa_contexto and not es_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo se pueden crear roles para la empresa activa.",
+        )
+    if payload.tipo != TipoRolEnum.OTRO and not es_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el superadministrador global puede crear roles especiales.",
+        )
+
     try:
-        rol_existente = db.query(Roles).filter(Roles.nombre == payload.nombre).first()
+        rol_existente = db.query(Roles).filter(
+            Roles.nombre == payload.nombre,
+            Roles.empresa_id == payload.empresa_id,
+        ).first()
         if rol_existente:
             print(f"Ya existe un rol registrado con el nombre '{payload.nombre}'.")
             raise HTTPException(
@@ -157,7 +195,12 @@ def crear_rol_seguridad(
                 detail=f"Ya existe un rol registrado con el nombre '{payload.nombre}'."
             )
 
-        nuevo_rol = Roles(nombre=payload.nombre, descripcion=payload.descripcion)
+        nuevo_rol = Roles(
+            empresa_id=payload.empresa_id,
+            nombre=payload.nombre,
+            tipo=payload.tipo,
+            descripcion=payload.descripcion,
+        )
         db.add(nuevo_rol)
 
         registrar_auditoria(
@@ -177,6 +220,9 @@ def crear_rol_seguridad(
         db.refresh(nuevo_rol)
 
         return nuevo_rol
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         print(f"No se ha podido crear el rol: {str(e)}")

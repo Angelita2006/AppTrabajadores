@@ -73,99 +73,6 @@ def _validar_vigencia_calendario(
         )
 
 
-@router.post(
-    "",
-    response_model=ContratoCalendarioResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Asociar un calendario laboral a un contrato",
-    description="Asocia un calendario laboral anual a un contrato.",
-)
-@limiter.limit("20/minute")
-def crear_contrato_calendario(
-    request: Request,
-    payload: ContratoCalendarioCreate,
-    usuario_actual: Usuarios = Depends(
-        verificar_permisos_requeridos([
-            AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.CONTRATOS_CALENDARIOS
-        ])
-    ),
-    db: Session = Depends(get_db_with_advanced_security),
-):
-    """
-    **POST /api/contratos-calendarios**
-
-    Asocia un calendario laboral anual a un contrato.
-    """
-    # Validaciones estructurales básicas
-    contrato = (
-        db.query(Contratos)
-        .filter(Contratos.id == payload.contrato_id, Contratos.activo.is_(True))
-        .first()
-    )
-    if not contrato:
-        print(f"Contrato laboral ({payload.contrato_id}) no encontrado.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato activo no encontrado.")
-
-    calendario = (
-        db.query(CalendariosLaborales)
-        .filter(
-            CalendariosLaborales.id == payload.calendario_laboral_id,
-            CalendariosLaborales.activo.is_(True),
-        )
-        .first()
-    )
-    if not calendario:
-        print(f"Calendario laboral ({payload.calendario_laboral_id}) no encontrado.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario activo no encontrado.")
-
-    _validar_vigencia_calendario(contrato, calendario)
-
-    existente = (
-        db.query(ContratosCalendarios)
-        .filter(
-            ContratosCalendarios.contrato_id == contrato.id,
-            ContratosCalendarios.calendario_laboral_id == calendario.id,
-        )
-        .first()
-    )
-    if existente:
-        print("Ya existe una asociación entre este contrato y calendario.")
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe una asociación entre este contrato y calendario.",
-        )
-
-    relacion = ContratosCalendarios(
-        contrato_id=contrato.id,
-        calendario_laboral_id=calendario.id,
-        activa=True,
-    )
-    try:
-        db.add(relacion)
-        db.flush()
-        registrar_auditoria(
-            db=db,
-            request=request,
-            usuario_id=usuario_actual.id,
-            empresa_id=contrato.empresa_id,
-            accion=AccionAuditoriaEnum.CREACION,
-            detalle={
-                'recurso': "contratos_calendarios",
-                'accion': "asociar",
-            },
-            trabajador_id=contrato.trabajador_id,
-        )
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se pudo asociar el calendario al contrato.",
-        )
-
-    return _obtener_relacion_o_404(db, relacion.id)
-
-
 @router.get(
     "/contrato/{id_contrato}",
     response_model=List[ContratoCalendarioResponse],
@@ -268,6 +175,99 @@ def obtener_contrato_calendario(
     """
     # Validaciones estructurales básicas
     return _obtener_relacion_o_404(db, id_relacion)
+
+
+@router.post(
+    "",
+    response_model=ContratoCalendarioResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Asociar un calendario laboral a un contrato",
+    description="Asocia un calendario laboral anual a un contrato.",
+)
+@limiter.limit("20/minute")
+def crear_contrato_calendario(
+    request: Request,
+    payload: ContratoCalendarioCreate,
+    usuario_actual: Usuarios = Depends(
+        verificar_permisos_requeridos([
+            AccionPermisoEnum.CREAR + "-" + TipoPermisoEnum.CONTRATOS_CALENDARIOS
+        ])
+    ),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """
+    **POST /api/contratos-calendarios**
+
+    Asocia un calendario laboral anual a un contrato.
+    """
+    # Validaciones estructurales básicas
+    contrato = (
+        db.query(Contratos)
+        .filter(Contratos.id == payload.contrato_id, Contratos.activo.is_(True))
+        .first()
+    )
+    if not contrato:
+        print(f"Contrato laboral ({payload.contrato_id}) no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato activo no encontrado.")
+
+    calendario = (
+        db.query(CalendariosLaborales)
+        .filter(
+            CalendariosLaborales.id == payload.calendario_laboral_id,
+            CalendariosLaborales.activo.is_(True),
+        )
+        .first()
+    )
+    if not calendario:
+        print(f"Calendario laboral ({payload.calendario_laboral_id}) no encontrado.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendario activo no encontrado.")
+
+    _validar_vigencia_calendario(contrato, calendario)
+
+    existente = (
+        db.query(ContratosCalendarios)
+        .filter(
+            ContratosCalendarios.contrato_id == contrato.id,
+            ContratosCalendarios.calendario_laboral_id == calendario.id,
+        )
+        .first()
+    )
+    if existente:
+        print("Ya existe una asociación entre este contrato y calendario.")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una asociación entre este contrato y calendario.",
+        )
+
+    relacion = ContratosCalendarios(
+        contrato_id=contrato.id,
+        calendario_laboral_id=calendario.id,
+        activa=True,
+    )
+    try:
+        db.add(relacion)
+        db.flush()
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.CREACION,
+            detalle={
+                'recurso': "contratos_calendarios",
+                'accion': "asociar",
+            },
+            trabajador_id=contrato.trabajador_id,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo asociar el calendario al contrato.",
+        )
+
+    return _obtener_relacion_o_404(db, relacion.id)
 
 
 @router.patch(

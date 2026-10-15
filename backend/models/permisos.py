@@ -5,13 +5,13 @@ from sqlalchemy import DateTime, Enum, PrimaryKeyConstraint, String, UniqueConst
 from core.database import Base
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
-from core.enums import AccionPermisoEnum, TipoPermisoEnum
+from core.enums import AccionPermisoEnum, AlcancePermisoEnum, TipoPermisoEnum
 
 class Permisos(Base):
     __tablename__ = 'permisos'
     __table_args__ = (
         PrimaryKeyConstraint('id', name='permisos_pkey'), # Identificador único del permiso
-        UniqueConstraint('tipo', 'accion', name='permisos_tipo_accion_key'), # Cada permiso sólo puede tener una única combinación de tipo y accion
+        UniqueConstraint('tipo', 'accion', 'alcance', name='permisos_tipo_accion_alcance_key'),
         {'comment': 'Permisos que pueden ser asignados a roles para controlar el acceso a funcionalidades del sistema.'},
     )
 
@@ -19,6 +19,7 @@ class Permisos(Base):
    
     tipo: Mapped[TipoPermisoEnum] = mapped_column(Enum(TipoPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_permiso_enum'), nullable=False, server_default=text("'usuarios'::tipo_permiso_enum"), comment='Recurso o área funcional a la que aplica el permiso.')
     accion: Mapped[AccionPermisoEnum] = mapped_column(Enum(AccionPermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='accion_permiso_enum'), nullable=False, server_default=text("'consultar'::accion_permiso_enum"), comment='Operación autorizada sobre el recurso.')
+    alcance: Mapped[AlcancePermisoEnum] = mapped_column(Enum(AlcancePermisoEnum, values_callable=lambda cls: [member.value for member in cls], name='alcance_permiso_enum'), nullable=False, server_default=text("'empresa'::alcance_permiso_enum"), comment='Ámbito del permiso: datos propios, empresa o plataforma global.')
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Descripción del permiso.')
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la licencia.')

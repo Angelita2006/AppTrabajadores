@@ -71,10 +71,8 @@ export interface CorreccionFichajeBase {
  * Sincronizado exactamente con el esquema 'CorreccionFichajeCreate' del backend.
  */
 export interface CorreccionFichajeCreate extends CorreccionFichajeBase {
-  /** ID del usuario que realiza la petición. */
-  solicitado_por_usuario_id: string;
   /** Firma digital del usuario solicitante en Base64 o data URL. */
-  firma_solicitante?: string | null;
+  firma_solicitante: string;
 }
 
 /**
@@ -98,9 +96,9 @@ export interface CorreccionFichajeSimpleResponse extends CorreccionFichajeBase {
   /** Estado actual de la solicitud. */
   estado: EstadoCorreccion;
   /** ID del usuario solicitante. */
-  solicitado_por_usuario_id: string;
+  usuario_solicitador_id: string;
   /** ID del usuario que aprobó/resolvió la incidencia. */
-  aprobado_por_usuario_id?: string | null;
+  usuario_aprobador_id?: string | null;
   /** Fecha y hora de la solicitud en formato ISO DateTime. */
   fecha_solicitud: string;
   /** Fecha y hora de la resolución en formato ISO DateTime. */
@@ -124,9 +122,9 @@ export interface CorreccionFichajeResponse extends CorreccionFichajeSimpleRespon
   /** Detalles del trabajador afectado. */
   trabajador?: Trabajador | null;
   /** Detalles del usuario solicitante. */
-  solicitado_por_usuario?: UsuarioResponse | null;
+  usuario_solicitador?: UsuarioResponse | null;
   /** Detalles del fichaje original afectado. */
   fichaje_afectado?: RegistroFichaje | null;
   /** Detalles del usuario que aprobó la solicitud. */
-  aprobado_por_usuario?: UsuarioResponse | null;
+  usuario_aprobador?: UsuarioResponse | null;
 }

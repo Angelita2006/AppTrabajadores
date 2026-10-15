@@ -43,10 +43,10 @@ class Contratos(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de creación del contrato.')
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha y hora de la última actualización del contrato.')
     
-    empresa: Mapped['Empresas'] = relationship('Empresas', back_populates='contratos', doc='Empresa a la que pertenece el contrato.') # type: ignore
-    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', back_populates='contratos', doc='Trabajador al que corresponde el contrato.') # type: ignore
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', back_populates='contratos', doc='Centro de trabajo al que pertenece el contrato.') # type: ignore
-    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', back_populates='contratos', doc='Departamento al que pertenece el contrato.') # type: ignore
+    empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='contratos', doc='Empresa a la que pertenece el contrato.') # type: ignore
+    trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', foreign_keys=[trabajador_id], back_populates='contratos', doc='Trabajador al que corresponde el contrato.') # type: ignore
+    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='contratos', doc='Centro de trabajo al que pertenece el contrato.') # type: ignore
+    departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', foreign_keys=[departamento_id], back_populates='contratos', doc='Departamento al que pertenece el contrato.') # type: ignore
     
-    calendarios_laborales: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', back_populates='contrato', cascade='all, delete-orphan', doc='Calendarios laborales pertenecientes al contrato.') # type: ignore
+    calendarios_laborales: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', foreign_keys='ContratosCalendarios.contrato_id', back_populates='contrato', cascade='all, delete-orphan', doc='Calendarios laborales pertenecientes al contrato.') # type: ignore
     asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='contrato', doc='Asignaciones de turno del contrato.') # type: ignore
