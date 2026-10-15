@@ -1,6 +1,6 @@
-import api from "@/src/service/api/api";
+﻿import api from "@/src/service/api/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { registrarTokenDispositivo } from "../../another-services/services";
+import { Platform } from "react-native";
 import {
   LoginResponse,
   UsuarioRegisterRequest,
@@ -139,16 +139,51 @@ export const iniciarSesion = async (
       await AsyncStorage.setItem("user_token", respuesta.data.access_token);
       api.defaults.headers.common["Authorization"] =
         `Bearer ${respuesta.data.access_token}`;
-
-      if (respuesta.data.usuario?.id) {
-        await registrarTokenDispositivo(respuesta.data.usuario.id);
-      }
     }
 
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error.detail;
     throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
+  }
+};
+
+/**
+ * Sube el avatar global de la cuenta, separado de la fotografía laboral.
+ * URI: PUT /api/usuarios/me/foto
+ *
+ * @async
+ * @function actualizarFotoUsuario
+ * @param {string} fileUri - URI local de la imagen seleccionada.
+ * @param {string} fileName - Nombre del archivo de imagen.
+ * @param {string} fileType - Tipo MIME de la imagen.
+ * @returns {Promise<UsuarioResponse>} Datos de la cuenta con su nuevo avatar.
+ * @throws {Error} Mensaje de la API o error genérico de subida.
+ */
+export const actualizarFotoUsuario = async (
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+): Promise<UsuarioResponse> => {
+  const formData = new FormData();
+  if (Platform.OS === "web") {
+    const response = await fetch(fileUri);
+    const blob = await response.blob();
+    formData.append("file", blob, fileName);
+  } else {
+    formData.append("file", { uri: fileUri, name: fileName, type: fileType } as any);
+  }
+
+  try {
+    const respuesta = await api.put<UsuarioResponse>("/api/usuarios/me/foto", formData, {
+      ...(Platform.OS === "web"
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {}),
+    });
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.message ?? error?.response?.data?.detail;
+    throw new Error(apiMessage || "No se pudo actualizar el avatar de la cuenta.");
   }
 };
 
@@ -201,11 +236,31 @@ export const solicitarCambioEmail = async (
   }
 };
 
-export const confirmarCambioEmail = async (token: string) => {
-  const response = await api.post(
-    `/api/usuarios/confirmar-cambio-email?token=${token}`,
-  );
-  return response.data;
+/**
+ * Confirma el cambio de correo electrónico mediante el token recibido.
+ * URI: POST /api/usuarios/confirmar-cambio-email?token={token}
+ *
+ * @async
+ * @function confirmarCambioEmail
+ * @param {string} token - Token de verificación del cambio de correo.
+ * @returns {Promise<any>} Respuesta de confirmación de la API.
+ * @throws {Error} Mensaje de la API o error genérico de confirmación.
+ */
+export const confirmarCambioEmail = async (token: string): Promise<any> => {
+  try {
+    const response = await api.post(
+      "/api/usuarios/confirmar-cambio-email",
+      null,
+      { params: { token } },
+    );
+    return response.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(
+      apiMessage || "Error al confirmar el cambio de correo electrónico.",
+    );
+  }
 };
 
 /**
@@ -279,13 +334,31 @@ export interface AccesoUsuario {
   permisos: Array<{ recurso: string; accion: string; alcance: string }>;
 }
 
-/** Obtiene membresías y permisos efectivos de la cuenta autenticada. */
+/**
+ * Obtiene membresías y permisos efectivos de la cuenta autenticada.
+ * URI: GET /api/usuarios/me/accesos
+ *
+ * @async
+ * @function obtenerMisAccesos
+ * @param {string} [empresaId] - Empresa para filtrar los accesos cuando se indique.
+ * @returns {Promise<AccesoUsuario[]>} Membresías y permisos efectivos.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
+ */
 export const obtenerMisAccesos = async (
   empresaId?: string,
 ): Promise<AccesoUsuario[]> => {
-  const respuesta = await api.get<AccesoUsuario[]>("/api/usuarios/me/accesos", {
-    params: empresaId ? { empresa_id: empresaId } : undefined,
-    skipEmpresaContext: true,
-  } as any);
-  return respuesta.data;
+  try {
+    const respuesta = await api.get<AccesoUsuario[]>(
+      "/api/usuarios/me/accesos",
+      {
+        params: empresaId ? { empresa_id: empresaId } : undefined,
+        skipEmpresaContext: true,
+      } as any,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage =
+      error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al obtener los accesos de la cuenta.");
+  }
 };

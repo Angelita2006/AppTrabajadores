@@ -5,12 +5,26 @@
  * @returns Cadena de texto limpia y comprensible para mostrar al usuario final.
  */
 export const obtenerMensajeAmigableError = (error: any): string => {
+  const respuestaApi = error?.response?.data;
+  const detalleApi = respuestaApi?.message ?? respuestaApi?.detail;
+
+  if (typeof detalleApi === "string" && detalleApi.trim()) {
+    return detalleApi;
+  }
+
+  if (Array.isArray(detalleApi)) {
+    const mensajes = detalleApi
+      .map((detalle: any) => detalle?.msg)
+      .filter((mensaje: unknown): mensaje is string => typeof mensaje === "string");
+    if (mensajes.length > 0) return mensajes.join(" ");
+  }
+
   if (error.message) {
     return error.message;
   }
 
   // Traducción de códigos de estado HTTP a mensajes comprensibles
-  const status = error.status_code;
+  const status = error?.response?.status ?? error.status_code;
   if (status) {
     switch (status) {
       case 400:

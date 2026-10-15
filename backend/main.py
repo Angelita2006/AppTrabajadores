@@ -14,7 +14,7 @@ from routes import (
     dispositivos_fichaje, empresas, festivos, fichajes, motivos_pausa,
     permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
     trabajadores, turnos, usuarios, licencias, usuarios_empresas, gestorias_empresas, 
-    contratos_calendarios, auth
+    contratos_calendarios, auth, compras
 )
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -115,14 +115,33 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 # GESTIÓN DE CORS SEGURA
 origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()]
+es_produccion = settings.ENVIRONMENT.strip().lower() == "production"
+if not origins and not es_produccion:
+    # Orígenes web locales habituales de Expo. En producción la lista debe
+    # configurarse explícitamente y nunca se amplía automáticamente.
+    origins = [
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:19006",
+        "http://127.0.0.1:19006",
+    ]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins, 
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Empresa-ID"],
-)
+configuracion_cors = {
+    "allow_origins": origins,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allow_headers": ["Authorization", "Content-Type", "Accept", "Empresa-ID"],
+}
+if not es_produccion:
+    # Expo puede elegir puertos distintos y, al abrirse desde otro dispositivo,
+    # publicar el frontend mediante una IP privada de la red local.
+    configuracion_cors["allow_origin_regex"] = (
+        r"^https?://(?:localhost|127\.0\.0\.1|\[::1\]|"
+        r"10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|"
+        r"172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})(?::\d+)?$"
+    )
+
+app.add_middleware(CORSMiddleware, **configuracion_cors)
 
 # Registro de las URIs y enrutadores modulares
 app.include_router(asignaciones_turno.router)
@@ -148,6 +167,7 @@ app.include_router(turnos.router)
 app.include_router(usuarios.router) 
 app.include_router(auth.router)
 app.include_router(archivos.router)
+app.include_router(compras.router)
 app.include_router(licencias.router)
 app.include_router(usuarios_empresas.router)
 app.include_router(gestorias_empresas.router)

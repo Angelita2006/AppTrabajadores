@@ -1,10 +1,13 @@
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -24,6 +27,8 @@ import VideoBackground from "../../src/shared/ui/Background.web";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function RegistroScreen() {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   const router = useRouter();
   const [cargando, setCargando] = useState(false);
   const [isObscured, setIsObscured] = useState(true);
@@ -128,10 +133,10 @@ export default function RegistroScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
-      {mostrarFondo &&
+      {mostrarFondo && theme === "dark" &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
@@ -139,10 +144,17 @@ export default function RegistroScreen() {
         bounces={false}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={[styles.loginCard, estiloTarjetaAnimada]}>
+        <Animated.View
+          style={[styles.loginCard, { backgroundColor: colors.card }, estiloTarjetaAnimada]}
+        >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
-              <IconSymbol name="person" size={26} color="#FFFFFF" />
+              <Image
+                source={require("../../assets/icons/logoB.png")}
+                style={styles.logoImage}
+                resizeMode="cover"
+                accessibilityLabel="Logotipo de Fichapp"
+              />
             </View>
             <ThemedText style={styles.mainTitle}>Alta de Usuario</ThemedText>
             <ThemedText style={styles.subtitle}>
@@ -395,11 +407,16 @@ const styles = StyleSheet.create({
   logoBranding: {
     width: 52,
     height: 52,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#011640",
+    overflow: "hidden",
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   mainTitle: {
     fontSize: 24,

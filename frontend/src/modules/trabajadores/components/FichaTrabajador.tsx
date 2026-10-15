@@ -8,7 +8,6 @@ import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno
 import { obtenerContratoActivoTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
 import { ImagenConToken } from "../../empresas/components/Archivos";
-import { obtenerRolPorId } from "../../roles/api/services";
 import { obtenerTurnoPorId } from "../../turnos/api/services";
 import { Turno } from "../../turnos/types/turno";
 import { ESTADOS_TRABAJADOR, FichaTrabajadorProps } from "../types/trabajador";
@@ -46,7 +45,6 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   onMostrarError,
 }) => {
   const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [nombreRol, setNombreRol] = useState<string>("Sin rol");
 
   const [contratoActivo, setContratoActivo] = useState<Contrato | null>(null);
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
@@ -70,37 +68,6 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   };
 
   const asignacionesVigentes = asignacionesTurno.filter(esAsignacionVigente);
-
-  // Efecto para buscar el nombre del rol usando el id
-  useEffect(() => {
-    let isMounted = true;
-
-    const cargarRol = async () => {
-      if (!item.rol_id) {
-        if (isMounted) setNombreRol("Sin rol");
-        return;
-      }
-      try {
-        const rolData = await obtenerRolPorId(item.rol_id);
-        if (isMounted) {
-          setNombreRol(
-            rolData?.nombre.toUpperCase().replace("_", " ") ||
-              "Rol desconocido",
-          );
-        }
-      } catch (error) {
-        if (isMounted) {
-          setNombreRol("Error al cargar rol");
-        }
-      }
-    };
-
-    cargarRol();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [item.rol_id]);
 
   // Efecto para buscar los datos relacionales (Contrato y Turnos) al montar o cambiar de trabajador
   useEffect(() => {
@@ -199,7 +166,7 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
             {item.nombre} {item.apellidos}
           </ThemedText>
           <ThemedText style={{ fontSize: 11, color: "#64748B" }}>
-            Rol: {nombreRol}
+            Puesto: {contratoActivo?.puesto_trabajo || "Sin puesto asignado"}
             {Platform.OS == "android" ? "\n" : " | "}Estado: {textoEstado}
           </ThemedText>
         </View>

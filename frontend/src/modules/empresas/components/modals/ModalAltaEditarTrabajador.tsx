@@ -1,4 +1,3 @@
-import { Rol } from "@/src/modules/roles/types/rol";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import {
@@ -11,7 +10,7 @@ import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 
 /**
  * Propiedades requeridas para el funcionamiento del componente ModalAltaEditarTrabajador.
- * Define los estados de los datos del trabajador, catálogos de roles, funciones de actualización
+ * Define los estados de los datos del trabajador, funciones de actualización
  * y referencias de inputs para formularios de alta y edición.
  */
 interface ModalAltaEditarTrabajadorProps {
@@ -46,13 +45,6 @@ interface ModalAltaEditarTrabajadorProps {
   /** Función para actualizar la fecha de nacimiento. */
   setFechaNacimiento: (val: string) => void;
 
-  /** Identificador o tipo de rol asignado actualmente al trabajador. */
-  tipoRol: string;
-  /** Función para actualizar el rol asignado. */
-  setTipoRol: (val: string) => void;
-  /** Listado completo de roles disponibles en el sistema. */
-  rolesDisponibles: Rol[];
-
   /** Función callback ejecutada al superar satisfactoriamente todas las validaciones. */
   onGuardar: () => void;
   /** Estado booleano que indica si se está ejecutando una operación asíncrona de guardado. */
@@ -74,7 +66,7 @@ interface ModalAltaEditarTrabajadorProps {
 /**
  * Componente modal interactivo para el alta y edición de expedientes de trabajadores.
  * Implementa validaciones robustas y centralizadas para cada campo obligatorio (nombre,
- * apellidos, NIF/NIE, email, teléfono, NSS, fecha de nacimiento real y rol), emitiendo
+ * apellidos, NIF/NIE, email, teléfono, NSS y fecha de nacimiento real), emitiendo
  * mensajes de error específicos y feedback visual.
  *
  * @param props - Propiedades de configuración, estados y manejadores del modal.
@@ -98,9 +90,6 @@ export const ModalAltaEditarTrabajador: React.FC<
   setNss,
   fechaNacimiento,
   setFechaNacimiento,
-  tipoRol,
-  setTipoRol,
-  rolesDisponibles,
   onGuardar,
   procesando,
   styles,
@@ -193,14 +182,6 @@ export const ModalAltaEditarTrabajador: React.FC<
     ) {
       mostrarError(
         "La fecha introducida no corresponde a una fecha real del calendario.",
-      );
-      return;
-    }
-
-    // 8. Validar Rol obligatorio en el sistema
-    if (!tipoRol || tipoRol.trim() === "") {
-      mostrarError(
-        "Por favor, selecciona un rol en el sistema para el trabajador.",
       );
       return;
     }
@@ -316,56 +297,6 @@ export const ModalAltaEditarTrabajador: React.FC<
           returnKeyType="next"
           onSubmitEditing={() => inputRefs.botonGuardarRef?.current?.focus()}
         />
-      </View>
-
-      {/* Selector Dinámico de Roles del Sistema */}
-      <View style={styles.campoForm}>
-        <ThemedText style={styles.labelForm}>Rol en el Sistema *</ThemedText>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 8,
-            marginTop: 6,
-          }}
-        >
-          {rolesDisponibles
-            .filter(
-              (r) =>
-                r.nombre !== "Admin_empresa" &&
-                r.nombre !== "Admin_gestoría" &&
-                r.nombre !== "Auditor_itss",
-            )
-            .map((rol: Rol) => {
-              const seleccionado = tipoRol === rol.id;
-              return (
-                <Pressable
-                  key={rol.id}
-                  onPress={() => setTipoRol(rol.id)}
-                  style={[
-                    {
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: seleccionado ? "#2563EB" : "#D1D5DB",
-                      backgroundColor: seleccionado ? "#EFF6FF" : "#FFFFFF",
-                    },
-                  ]}
-                >
-                  <ThemedText
-                    style={{
-                      color: seleccionado ? "#1D4ED8" : "#374151",
-                      fontWeight: seleccionado ? "bold" : "normal",
-                      fontSize: 14,
-                    }}
-                  >
-                    {rol.nombre.replace("_", " ").toUpperCase()}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-        </View>
       </View>
 
       <Pressable

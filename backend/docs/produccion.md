@@ -163,3 +163,8 @@ Con cuentas de prueba de dos empresas y una gestoría:
 8. Desplegar con observación de errores y latencia, y tener un procedimiento de rollback probado. No rebajar el esquema a ciegas si v2 ya ha escrito datos.
 
 La puesta en producción queda pendiente mientras no se hayan verificado los roles de base de datos, RLS con el usuario real de API, la restauración de una copia y las pruebas de staging. La revisión jurídica y de privacidad específica de Fichapp también debe cerrarse con asesoramiento competente.
+
+### Compra de planes
+
+La configuración y los pasos de Checkout, webhook, precios recurrentes, Stripe Tax y migración están documentados en [compras_stripe.md](compras_stripe.md). No activar ventas live hasta probar el flujo con claves test y verificar el registro fiscal de los precios en Stripe.
+

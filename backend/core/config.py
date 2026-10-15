@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     URL: str = ""
     ALLOWED_ORIGINS: str = ""
     UPLOAD_DIR: str = ""
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_BASICO_MENSUAL: str = ""
+    STRIPE_PRICE_BASICO_ANUAL: str = ""
+    STRIPE_PRICE_PRO_MENSUAL: str = ""
+    STRIPE_PRICE_PRO_ANUAL: str = ""
+    STRIPE_PRICE_ENTERPRISE_MENSUAL: str = ""
+    STRIPE_PRICE_ENTERPRISE_ANUAL: str = ""
+    STRIPE_SUCCESS_URL: str = ""
+    STRIPE_CANCEL_URL: str = ""
+    STRIPE_AUTOMATIC_TAX_ENABLED: bool = False
     
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

@@ -12,15 +12,17 @@ export interface CalendarioFestivo {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID único del centro de trabajo o sede física vinculada. */
-  centro_trabajo_id: string | null;
+  centro_trabajo_id: string;
   /** Nombre identificativo o descriptivo del calendario laboral, o nulo si no se especifica. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
   anio: number;
   /** Indica si el calendario laboral está activo. */
-  activo: boolean;
+  activo: boolean | null;
   /** Listado de días festivos asociados y anidados al calendario. */
   festivos: Festivo[];
+  created_at?: string;
+  updated_at?: string;
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
   /** Relación opcional enriquecida para cargas anidadas del centro de trabajo vinculado. */
@@ -35,7 +37,7 @@ export interface CalendarioLaboralCreate {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID del centro de trabajo vinculado, o nulo si es general. */
-  centro_trabajo_id?: string | null;
+  centro_trabajo_id: string;
   /** Nombre identificativo del calendario laboral. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
@@ -46,14 +48,10 @@ export interface CalendarioLaboralCreate {
  * Estructura de datos para la actualización parcial o total de los parámetros de un calendario laboral existente.
  */
 export interface CalendarioLaboralUpdate {
-  /** Identificador UUID actualizado del centro de trabajo vinculado. */
-  centro_trabajo_id?: string | null;
   /** Nuevo nombre identificativo del calendario laboral. */
   nombre?: string;
-  /** Año natural actualizado al que corresponde el calendario. */
-  anio?: number;
   /** Estado de activación del calendario. */
-  activo?: boolean;
+  activo?: boolean | null;
 }
 
 /**
@@ -66,18 +64,24 @@ export interface CalendarioLaboralResponse {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID del centro de trabajo vinculado. */
-  centro_trabajo_id: string | null;
+  centro_trabajo_id: string;
   /** Nombre identificativo o descriptivo del calendario laboral. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
   anio: number;
   /** Indica si el calendario laboral está activo. */
-  activo: boolean;
+  activo: boolean | null;
   /** Marca de tiempo (ISO 8601 con zona horaria) de la fecha de creación del registro. */
   created_at: string;
+  updated_at: string;
 
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
   /** Relación opcional enriquecida para cargas anidadas del centro de trabajo vinculado. */
   centro_trabajo?: CentroTrabajo | null;
+}
+
+/** Respuesta para el calendario junto con sus festivos asociados. */
+export interface CalendarioConFestivosResponse extends CalendarioLaboralResponse {
+  festivos: Festivo[];
 }

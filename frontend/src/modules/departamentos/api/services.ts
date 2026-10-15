@@ -74,7 +74,8 @@ export const actualizarDepartamento = async (
 ): Promise<Departamento> => {
   try {
     const response = await api.put<Departamento>(
-      `/api/departamentos/${idDepartamento}?nuevo_nombre=${encodeURIComponent(nuevoNombre)}`,
+      `/api/departamentos/${idDepartamento}`,
+      { nombre: nuevoNombre },
     );
     return response.data;
   } catch (error: any) {

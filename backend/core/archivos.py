@@ -22,6 +22,7 @@ from models.usuarios_empresas import UsuariosEmpresas
 router = APIRouter(prefix="/api/archivos", tags=["Archivos"])
 BASE_STATIC_DIR = obtener_directorio_archivos()
 CARPETA_FOTOS_TRABAJADORES = BASE_STATIC_DIR / "fotos_trabajadores"
+CARPETA_FOTOS_USUARIOS = BASE_STATIC_DIR / "fotos_usuarios"
 CARPETA_LOGOS_EMPRESAS = BASE_STATIC_DIR / "logos_empresas"
 ARCHIVOS = {
     "fotos_trabajadores": (Trabajadores, Trabajadores.foto_url, Trabajadores.empresa_id, TipoPermisoEnum.TRABAJADORES),
@@ -32,6 +33,47 @@ ARCHIVOS = {
     "justificantes_ausencias": (Ausencias, Ausencias.justificante_url, Ausencias.empresa_id, TipoPermisoEnum.AUSENCIAS),
     "contratos": (Contratos, Contratos.pdf_url, Contratos.empresa_id, TipoPermisoEnum.CONTRATOS),
 }
+
+
+@router.get("/fotos_usuarios/{nombre_archivo}")
+def obtener_avatar_usuario(
+    request: Request,
+    nombre_archivo: str,
+    usuario_actual: Usuarios = Depends(obtener_usuario_actual),
+    db: Session = Depends(get_db),
+):
+    """Entrega exclusivamente el avatar que está asociado a la cuenta autenticada."""
+    if Path(nombre_archivo).name != nombre_archivo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+
+    ruta_relativa = f"/api/archivos/fotos_usuarios/{nombre_archivo}"
+    usuario = (
+        db.query(Usuarios)
+        .filter(
+            Usuarios.id == usuario_actual.id,
+            func.split_part(Usuarios.foto_url, "?", 1) == ruta_relativa,
+        )
+        .first()
+    )
+    if usuario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+
+    ruta_base = CARPETA_FOTOS_USUARIOS.resolve()
+    ruta_archivo = (ruta_base / nombre_archivo).resolve()
+    if ruta_base not in ruta_archivo.parents or not ruta_archivo.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archivo no encontrado.")
+
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.DESCARGA,
+        detalle={"recurso": "fotos_usuarios", "accion": "descargar_avatar_propio"},
+        trabajador_id=None,
+    )
+    db.commit()
+    return FileResponse(str(ruta_archivo))
 
 
 @router.get("/{subcarpeta}/{nombre_archivo}")

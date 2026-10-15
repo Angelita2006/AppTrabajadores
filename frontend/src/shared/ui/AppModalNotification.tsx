@@ -2,6 +2,8 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import { Modal, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Colors } from "../../constants/theme";
+import { useColorScheme } from "../../hooks/use-color-scheme";
 
 type TipoModal = "mensaje" | "error";
 
@@ -15,6 +17,8 @@ const ModalContext = createContext<ModalContextType | undefined>(undefined);
 export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   const [visible, setVisible] = useState(false);
   const [tipo, setTipo] = useState("mensaje");
   const [titulo, setTitulo] = useState("");
@@ -81,10 +85,13 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
       <View
         style={[
           styles.overlay,
+          { backgroundColor: colors.overlay },
           Platform.OS === "web" && ({ pointerEvents: "auto" } as any),
         ]}
       >
-        <View style={styles.modalContainer}>
+        <View
+          style={[styles.modalContainer, { backgroundColor: colors.card }]}
+        >
           <ThemedText
             style={[
               styles.titulo,
@@ -97,11 +104,16 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
           <Pressable
             style={[
               styles.boton,
-              tipo === "error" ? styles.botonError : styles.botonMensaje,
+              {
+                backgroundColor:
+                  tipo === "error" ? colors.danger : colors.primary,
+              },
             ]}
             onPress={cerrarModal}
           >
-            <ThemedText style={styles.textoBoton}>Aceptar</ThemedText>
+            <ThemedText style={[styles.textoBoton, { color: colors.onPrimary }]}>
+              Aceptar
+            </ThemedText>
           </Pressable>
         </View>
       </View>
@@ -157,7 +169,6 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
       },
     }),
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -167,7 +178,6 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     maxWidth: 380,
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 24,
     shadowColor: "#000",
@@ -197,12 +207,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
-  },
-  botonError: {
-    backgroundColor: "#DC2626",
-  },
-  botonMensaje: {
-    backgroundColor: "#0284C7",
   },
   textoBoton: {
     color: "#FFFFFF",

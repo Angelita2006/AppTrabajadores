@@ -6,10 +6,13 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -30,6 +33,8 @@ import { IconSymbol } from "../src/shared/ui/IconSymbol";
 let isAuthenticatingGlobal = false;
 
 export default function RootIndexScreen() {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   const {
     usuarioActual,
     setUsuarioActual,
@@ -143,7 +148,7 @@ export default function RootIndexScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
@@ -152,10 +157,21 @@ export default function RootIndexScreen() {
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
       >
-        <Animated.View style={[styles.loginCard, estiloTarjetaAnimada]}>
+        <Animated.View
+          style={[
+            styles.loginCard,
+            { backgroundColor: colors.card },
+            estiloTarjetaAnimada,
+          ]}
+        >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
-              <IconSymbol name="schedule" size={28} color="#FFFFFF" />
+              <Image
+                source={require("../assets/icons/logoB.png")}
+                style={styles.logoImage}
+                resizeMode="cover"
+                accessibilityLabel="Logotipo de Fichapp"
+              />
             </View>
             <ThemedText style={styles.mainTitle}>FICHAPP</ThemedText>
             <ThemedText style={styles.subtitle}>
@@ -168,7 +184,12 @@ export default function RootIndexScreen() {
             <View
               style={[
                 styles.inputWrapper,
-                errorEmail && styles.inputWrapperError,
+                {
+                  backgroundColor: errorEmail
+                    ? colors.dangerBackground
+                    : colors.surfaceAlt,
+                  borderColor: errorEmail ? colors.danger : colors.border,
+                },
               ]}
             >
               <IconSymbol
@@ -183,7 +204,7 @@ export default function RootIndexScreen() {
                   setEmail(text);
                   if (errorEmail) setErrorEmail(false);
                 }}
-                style={styles.inputContainer}
+                style={[styles.inputContainer, { color: colors.text }]}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 placeholder="nombre@empresa.com"
@@ -205,7 +226,12 @@ export default function RootIndexScreen() {
             <View
               style={[
                 styles.inputWrapper,
-                errorPassword && styles.inputWrapperError,
+                {
+                  backgroundColor: errorPassword
+                    ? colors.dangerBackground
+                    : colors.surfaceAlt,
+                  borderColor: errorPassword ? colors.danger : colors.border,
+                },
               ]}
             >
               <IconSymbol
@@ -222,7 +248,7 @@ export default function RootIndexScreen() {
                   if (errorPassword) setErrorPassword(false);
                 }}
                 secureTextEntry={isObscured}
-                style={styles.inputContainer}
+                style={[styles.inputContainer, { color: colors.text }]}
                 placeholder="Introduce tu contraseña"
                 placeholderTextColor="#94A3B8"
                 editable={!cargando}
@@ -263,15 +289,20 @@ export default function RootIndexScreen() {
           <Pressable
             style={[
               styles.primaryButton,
+              { backgroundColor: colors.primary },
               cargando && styles.primaryButtonDisabled,
             ]}
             onPress={handleLogin}
             disabled={cargando}
           >
             {cargando ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={colors.onPrimary} />
             ) : (
-              <ThemedText style={styles.buttonText}>Iniciar Sesión</ThemedText>
+              <ThemedText
+                style={[styles.buttonText, { color: colors.onPrimary }]}
+              >
+                Iniciar Sesión
+              </ThemedText>
             )}
           </Pressable>
 
@@ -302,6 +333,18 @@ export default function RootIndexScreen() {
             </ThemedText>
           </Pressable>
 
+          {Platform.OS === "web" && (
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push("/planes")}
+              style={{ alignSelf: "center", padding: 10 }}
+            >
+              <ThemedText style={{ color: colors.primary, fontWeight: "700" }}>
+                Ver planes y empezar una prueba gratuita
+              </ThemedText>
+            </Pressable>
+          )}
+
           <Pressable
             onPress={() => router.push("/politica-privacidad")}
             style={{ alignSelf: "center", marginTop: 20 }}
@@ -324,7 +367,6 @@ export default function RootIndexScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
   },
   scrollContainer: {
     flexGrow: 1,
@@ -344,7 +386,6 @@ const styles = StyleSheet.create({
     width: "90%",
     maxWidth: 420,
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
     alignItems: "center",
@@ -363,11 +404,16 @@ const styles = StyleSheet.create({
   logoBranding: {
     width: 56,
     height: 56,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#011640",
+    overflow: "hidden",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   mainTitle: {
     fontSize: 26,
@@ -384,7 +430,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#E2E8F0",
     borderRadius: 14,
-    backgroundColor: "#F8FAFC",
     paddingHorizontal: 14,
     height: 52,
   },

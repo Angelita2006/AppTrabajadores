@@ -16,6 +16,7 @@ export interface TurnoCreate {
   duracion_pausa_minutos?: number;
   /** Días de la semana aplicables al turno (1=lunes ... 7=domingo). */
   dias_semana: number[];
+  activo?: boolean | null;
 }
 
 /**
@@ -23,17 +24,17 @@ export interface TurnoCreate {
  */
 export interface TurnoUpdate {
   /** Nombre identificativo del turno. */
-  nombre?: string;
+  nombre?: string | null;
   /** Hora de inicio del turno en formato HH:MM:SS o HH:MM. */
-  hora_inicio?: string;
+  hora_inicio?: string | null;
   /** Hora de finalización del turno en formato HH:MM:SS o HH:MM. */
-  hora_fin?: string;
+  hora_fin?: string | null;
   /** Duración de la pausa o descanso reglamentario en minutos. */
-  duracion_pausa_minutos?: number;
+  duracion_pausa_minutos?: number | null;
   /** Días de la semana aplicables al turno (1=lunes ... 7=domingo). */
-  dias_semana?: number[];
+  dias_semana?: number[] | null;
   /** Estado de activación del turno. */
-  activo?: boolean;
+  activo?: boolean | null;
 }
 
 /**
@@ -55,9 +56,10 @@ export interface Turno {
   /** Días de la semana aplicables al turno (1=lunes ... 7=domingo). */
   dias_semana: number[];
   /** Indica si el turno está activo. */
-  activo: boolean;
+  activo: boolean | null;
   /** Timestamp fecha y hora de la creación del turno. */
   created_at: string;
+  updated_at: string;
 
   /** Relación opcional con la entidad empresa cargada por el backend si se requiere. */
   empresa?: Empresa | null;

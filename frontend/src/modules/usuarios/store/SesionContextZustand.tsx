@@ -381,6 +381,22 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         if (isCancelled) return;
         useSesionStore.getState().setAccesos(accesos);
 
+        // Resuelve primero el rol global: la carga de empresas depende de otra
+        // petición y un fallo suyo no debe ocultar la consola al superadmin.
+        const accesoGlobal = accesos.find(
+          (acceso) =>
+            acceso.empresa_id === null &&
+            acceso.rol.tipo === "Superadministrador",
+        );
+        if (accesoGlobal) {
+          setRolActual(accesoGlobal.rol.tipo as TipoUsuarioEnum);
+          setUsuarioActual({
+            ...usuarioActual,
+            tipo_usuario: accesoGlobal.rol.tipo as TipoUsuarioEnum,
+            empresa_id: null,
+          });
+        }
+
         const empresaContextoInicial = empresaGuardada?.id ??
           accesos.find((acceso) => acceso.empresa_id)?.empresa_id ?? null;
         await setEmpresaContext(empresaContextoInicial);
@@ -434,15 +450,18 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           const trabajador = await obtenerMiTrabajador();
           if (isCancelled) return;
           setTrabajadorActual(trabajador);
-          if (usuarioActual.trabajador_id !== trabajador.id) {
-            const usuarioEnStore = useSesionStore.getState().usuarioActual;
-            setUsuarioActual({
-              ...(usuarioEnStore ?? usuarioActual),
-              trabajador_id: trabajador.id,
-            });
+          const usuarioEnStore = useSesionStore.getState().usuarioActual;
+          if (usuarioEnStore && usuarioEnStore.trabajador_id !== trabajador.id) {
+            setUsuarioActual({ ...usuarioEnStore, trabajador_id: trabajador.id });
           }
         } catch {
-          if (!isCancelled) setTrabajadorActual(null);
+          if (!isCancelled) {
+            setTrabajadorActual(null);
+            const usuarioEnStore = useSesionStore.getState().usuarioActual;
+            if (usuarioEnStore?.trabajador_id) {
+              setUsuarioActual({ ...usuarioEnStore, trabajador_id: null });
+            }
+          }
         }
       } catch (error: any) {
         if (!isCancelled) {
@@ -458,7 +477,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [usuarioActual, empresaActual?.id, cargandoSesionLocal]);
+  }, [usuarioActual?.id, empresaActual?.id, cargandoSesionLocal]);
 
   // MOTOR 3: CARGA DE EXPEDIENTE LABORAL
   useEffect(() => {
@@ -466,26 +485,29 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     let isCancelled = false;
 
     async function cargarFichaLaboralCompuesta() {
-      if (!usuarioActual?.trabajador_id || !empresaActual?.id) {
-        if (!usuarioActual?.trabajador_id) {
-          setTrabajadorActual(null);
-          setContratoActual(null);
-          setTurnoActual(null);
-          setCentroTrabajoActual(null);
-        }
+      if (!usuarioActual || !empresaActual?.id) {
+        setTrabajadorActual(null);
+        setContratoActual(null);
+        setTurnoActual(null);
+        setCentroTrabajoActual(null);
+        return;
+      }
+      if (!trabajadorActual || trabajadorActual.empresa_id !== empresaActual.id) {
+        setContratoActual(null);
+        setTurnoActual(null);
+        setCentroTrabajoActual(null);
         return;
       }
 
       try {
-        const [datosTrabajador, listaContratos, listaTurnos] =
+        const idTrabajador = trabajadorActual.id;
+        const [listaContratos, listaTurnos] =
           await Promise.all([
-            obtenerTrabajador(usuarioActual.trabajador_id),
-            obtenerContratosPorTrabajador(usuarioActual.trabajador_id),
-            obtenerAsignacionesTurnoTrabajador(usuarioActual.trabajador_id),
+            obtenerContratosPorTrabajador(idTrabajador),
+            obtenerAsignacionesTurnoTrabajador(idTrabajador),
           ]);
 
         if (isCancelled) return;
-        setTrabajadorActual(datosTrabajador);
 
         const contratoVigente = listaContratos.find(
           (c: Contrato) =>
@@ -514,6 +536,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         const hoyStr = new Date().toISOString().split("T")[0];
         const turnosConEmpresa = await Promise.all(
           listaTurnos.map(async (t: AsignacionTurno) => {
+            if (!t.trabajador_id) return null;
             const trabajadorTurno = await obtenerTrabajador(t.trabajador_id);
             return {
               turno: t,
@@ -524,7 +547,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
         if (isCancelled) return;
 
-        const turnoVigenteObj = turnosConEmpresa.find(
+        const turnosConEmpresaValidos = turnosConEmpresa.filter((item) => item !== null);
+        const turnoVigenteObj = turnosConEmpresaValidos.find(
           ({ turno, empresaId }) => {
             const coincideFiltro = empresaId === empresaActual.id;
             const esPosteriorInicio = turno.fecha_inicio <= hoyStr;
@@ -551,7 +575,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return () => {
       isCancelled = true;
     };
-  }, [usuarioActual?.trabajador_id, empresaActual?.id, cargandoSesionLocal]);
+  }, [usuarioActual?.id, trabajadorActual?.id, empresaActual?.id, cargandoSesionLocal]);
 
   // MOTOR 4: PERSISTENCIA ACTIVA DE ESCRITURA EN DISCO
   useEffect(() => {

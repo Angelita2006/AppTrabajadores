@@ -2,11 +2,23 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Colors } from "../src/constants/theme";
+import { useColorScheme } from "../src/hooks/use-color-scheme";
 
 export default function PoliticaPrivacidadScreen() {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: colors.background },
+      ]}
+    >
+      <View
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
         <ThemedText style={styles.title}>Política de Privacidad</ThemedText>
         <ThemedText style={styles.subtitle}>
           Información legal sobre el control horario
@@ -78,7 +90,7 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 600,
-    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
     borderRadius: 20,
     padding: 24,
     marginVertical: 20,

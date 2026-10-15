@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from typing import Optional
-from sqlalchemy import Boolean, DateTime, Index, PrimaryKeyConstraint, String, Uuid, text
+from sqlalchemy import Boolean, DateTime, Index, PrimaryKeyConstraint, String, Text, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship 
 from core.database import Base
 
@@ -20,6 +20,7 @@ class Usuarios(Base):
     
     email: Mapped[str] = mapped_column(String(30), nullable=False, comment='Dirección de correo electrónico del usuario.')    
     telefono: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment='Número de teléfono del usuario.')
+    foto_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='Ruta privada del avatar de la cuenta de usuario.')
     
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False, comment='Hash de la contraseña del usuario.')
     mfa_habilitado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text('false'), comment='Indica si el usuario tiene habilitada la autenticación de dos factores.')
@@ -43,7 +44,7 @@ class Usuarios(Base):
     token_cambio_telefono_expira_at = mapped_column(DateTime(timezone=True), nullable=True, comment='Fecha de expiración del token para cambiar el número de teléfono.')
 
     usuarios_empresas: Mapped[list['UsuariosEmpresas']] = relationship('UsuariosEmpresas', back_populates='usuario', doc='Relación con las empresas a las que tiene acceso el usuario.') # type: ignore
-    trabajador: Mapped[Optional['Trabajadores']] = relationship('Trabajadores', foreign_keys='Trabajadores.usuario_id', uselist=False, back_populates='usuario', doc='Ficha de trabajador vinculada a esta cuenta.') # type: ignore
+    trabajadores: Mapped[list['Trabajadores']] = relationship('Trabajadores', foreign_keys='Trabajadores.usuario_id', back_populates='usuario', doc='Fichas laborales del usuario, una por cada empresa donde trabaja.') # type: ignore
     auditoria_accesos: Mapped[list['AuditoriaAccesos']] = relationship('AuditoriaAccesos', back_populates='usuario', doc='Auditoría de accesos del usuario.') # type: ignore
     correcciones_fichaje_usuario_aprobador: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.usuario_aprobador_id]', back_populates='usuario_aprobador', doc='Correcciones de fichaje aprobadas por el usuario.') # type: ignore
     correcciones_fichaje_usuario_solicitador: Mapped[list['CorreccionesFichaje']] = relationship('CorreccionesFichaje', foreign_keys='[CorreccionesFichaje.usuario_solicitador_id]', back_populates='usuario_solicitador', doc='Correcciones de fichaje solicitadas por el usuario.') # type: ignore
@@ -52,5 +53,7 @@ class Usuarios(Base):
 
     @property
     def trabajador_id(self) -> Optional[uuid.UUID]:
-        """Compatibilidad de lectura con auditorías que registran el trabajador asociado."""
-        return self.trabajador.id if self.trabajador is not None else None
+        """Devuelve la ficha si solo existe una; evita elegir una empresa arbitraria."""
+        if len(self.trabajadores) == 1:
+            return self.trabajadores[0].id
+        return None

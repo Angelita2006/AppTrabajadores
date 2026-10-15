@@ -11,7 +11,6 @@ import {
 } from "@/src/modules/contratos/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
-import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import {
     actualizarAsignacionTurno,
     actualizarTrabajador,
@@ -108,9 +107,6 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     setNss,
     fechaNacimiento,
     setFechaNacimiento,
-    tipoRol,
-    setTipoRol,
-    rolesDisponibles,
     fechaInicio,
     setFechaInicio,
     fechaFin,
@@ -188,11 +184,10 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
       setNombre(trabajadorActual.nombre);
       setApellidos(trabajadorActual.apellidos);
       setNifNie(trabajadorActual.dni_nif_nie);
-      setEmail(trabajadorActual.email!);
-      setTelefono(trabajadorActual.telefono!);
-      setNss(trabajadorActual.numero_seguridad_social);
-      setFechaNacimiento(trabajadorActual.fecha_nacimiento);
-      setTipoRol(trabajadorActual.rol_id);
+      setEmail(trabajadorActual.email ?? "");
+      setTelefono(trabajadorActual.telefono ?? "");
+      setNss(trabajadorActual.numero_seguridad_social ?? "");
+      setFechaNacimiento(trabajadorActual.fecha_nacimiento ?? "");
     } else if (esCreacion) {
       setNombre("");
       setApellidos("");
@@ -218,76 +213,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     }
   }, [modalActivo, contratoAEditar]);
 
-  const [trabajadoresValidosIds, setTrabajadoresValidosIds] = useState<
-    string[] | null
-  >(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function procesarPlantilla() {
-      if (!plantilla || plantilla.length === 0) {
-        if (isMounted) {
-          setTrabajadoresValidosIds([]);
-        }
-        return;
-      }
-
-      const rolesIdsUnicos = Array.from(
-        new Set(
-          plantilla
-            .map((item: Trabajador) => item.rol_id)
-            .filter((id): id is string => Boolean(id)),
-        ),
-      );
-
-      try {
-        const rolesPromesas = rolesIdsUnicos.map(async (rolId) => {
-          try {
-            const rol = await obtenerRolPorId(rolId);
-            return { rolId, rol };
-          } catch {
-            return { rolId, rol: null };
-          }
-        });
-
-        const resultadosRoles = await Promise.all(rolesPromesas);
-        const mapaRoles = new Map(resultadosRoles.map((r) => [r.rolId, r.rol]));
-        const idsValidos: string[] = [];
-
-        plantilla.forEach((item: Trabajador) => {
-          let esAdmin = false;
-          if (item.rol_id) {
-            const rol = mapaRoles.get(item.rol_id);
-            esAdmin =
-              Boolean(rol?.nombre?.toLowerCase().includes("admin")) ||
-              Boolean(rol?.descripcion?.toLowerCase().includes("admin"));
-          }
-
-          if (!esAdmin) {
-            idsValidos.push(item.id);
-          }
-        });
-
-        if (isMounted) {
-          setTrabajadoresValidosIds(idsValidos);
-        }
-      } catch {
-        if (isMounted) {
-          setTrabajadoresValidosIds(plantilla.map((t: Trabajador) => t.id));
-        }
-      }
-    }
-
-    procesarPlantilla();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [plantilla, centroTrabajoId]);
-
   const plantillaFiltrada = useMemo(() => {
-    if (!trabajadoresValidosIds) return [];
     const fuenteDatos = plantilla.length > 0 ? plantilla : plantilla;
     return fuenteDatos.filter((item: Trabajador) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
@@ -296,8 +222,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         ? true
         : item.empresa_id === empresaIdActiva;
       const coincideEstado = filtroEstado === "todos" || item.activo;
-      const noEsAdmin = trabajadoresValidosIds.includes(item.id);
-      return coincideTenant && coincideEstado && noEsAdmin;
+      return coincideTenant && coincideEstado;
     });
   }, [
     plantilla,
@@ -305,7 +230,6 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     usuarioActual,
     esGestoria,
     esAdminEmpresa,
-    trabajadoresValidosIds,
     empresaIdActiva,
   ]);
 
@@ -558,8 +482,6 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     try {
       setProcesando(true);
       await actualizarTrabajador(trabajadorActual.id, {
-        empresa_id: trabajadorActual.empresa_id,
-        rol_id: tipoRol,
         dni_nif_nie: trabajadorActual.dni_nif_nie,
         nombre: trabajadorActual.nombre,
         apellidos: trabajadorActual.apellidos,
@@ -658,9 +580,6 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
             setNss={setNss}
             fechaNacimiento={fechaNacimiento}
             setFechaNacimiento={setFechaNacimiento}
-            tipoRol={tipoRol}
-            setTipoRol={setTipoRol}
-            rolesDisponibles={rolesDisponibles}
             onGuardar={
               modalActivo === "editar_trabajador"
                 ? handleEditarTrabajador

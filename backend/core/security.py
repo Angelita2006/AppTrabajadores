@@ -127,8 +127,8 @@ def obtener_usuario_actual(
     except JWTError:
         raise credentials_exception
 
-    if "@" in user_id: 
-        usuario = db.query(Usuarios).filter(Usuarios.email == user_id.strip().lower(), Usuarios.activo.is_(True)).first()
+    if "@" in str(user_id): 
+        usuario = db.query(Usuarios).filter(Usuarios.email == str(user_id).strip().lower(), Usuarios.activo.is_(True)).first()
     else:
         usuario = db.query(Usuarios).filter(Usuarios.id == user_id).first()    
         
@@ -167,7 +167,6 @@ def get_db_with_advanced_security(
             .filter(
                 UsuariosEmpresas.usuario_id == usuario_actual.id,
                 UsuariosEmpresas.activo.is_(True),
-                Roles.activo.is_(True),
             )
             .all()
         )

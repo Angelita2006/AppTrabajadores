@@ -4,7 +4,7 @@
     "slug": "FICHAPP",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/foreground-image.png",
+    "icon": "./assets/icons/logoB.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -20,7 +20,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/foreground-image.png"
+        "foregroundImage": "./assets/icons/icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -33,7 +33,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/icons/favicon.png",
+      "favicon": "./assets/icons/faviconNB2.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -84,7 +84,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true,
-      "baseUrl": "/mobile/dist"
+      "baseUrl": "/frontend/dist"
     },
     "extra": {
       "router": {},

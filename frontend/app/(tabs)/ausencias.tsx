@@ -149,7 +149,7 @@ export default function VacacionesScreen() {
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
         motivo: motivo.trim(),
-        justificante_metadata: {},
+        justificante_url: null,
       };
 
       const respuestaBackend: AusenciaResponse =
@@ -318,7 +318,7 @@ export default function VacacionesScreen() {
               <View style={styles.solicitudItem}>
                 <View style={styles.solicitudHeader}>
                   <ThemedText style={styles.solicitudTipo}>
-                    {item.tipo_ausencia.replace(/_/g, " ").toUpperCase()}
+                    {(item.tipo_ausencia ?? "Ausencia_injustificada").replace(/_/g, " ").toUpperCase()}
                   </ThemedText>
                   <View
                     style={[
@@ -331,7 +331,7 @@ export default function VacacionesScreen() {
                     ]}
                   >
                     <ThemedText style={styles.badgeText}>
-                      {item.estado.toUpperCase()}
+                      {(item.estado ?? "Pendiente").toUpperCase()}
                     </ThemedText>
                   </View>
                 </View>

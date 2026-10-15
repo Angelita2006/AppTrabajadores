@@ -9,9 +9,8 @@ import {
     RegistroFichaje,
     TipoFichaje,
     TIPOS_FICHAJE,
+    TIPOS_EVENTO_FICHAJE_API,
 } from "@/src/modules/fichajes/types/registrofichaje";
-// Ya no necesitamos obtenerRolPorId ni obtenerTrabajador uno a uno si el backend puede devolver los datos poblados o si filtramos por rol_id directamente si viene incluido en el objeto Trabajador.
-import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -108,25 +107,7 @@ export default function GestionIncidenciasScreen() {
       try {
         const lista = await obtenerTrabajadoresEmpresa(empresaActual.id);
         if (Array.isArray(lista)) {
-          const trabajadoresSinAdmin = (
-            await Promise.all(
-              lista.map(async (t: Trabajador) => {
-                if (!t.rol_id) return t;
-                try {
-                  const rol = await obtenerRolPorId(t.rol_id);
-                  const esAdmin =
-                    rol?.nombre === "Admin_empresa" ||
-                    rol?.nombre === "Admin_gestoría";
-                  const esActivo = t.activo;
-                  return esAdmin ? null : esActivo ? t : null;
-                } catch {
-                  return t;
-                }
-              }),
-            )
-          ).filter(Boolean) as Trabajador[];
-
-          const trabajadoresFiltrados = trabajadoresSinAdmin.sort((a, b) => {
+          const trabajadoresFiltrados = lista.filter((t) => t.activo).sort((a, b) => {
             const nombreA = `${a.nombre ?? ""} ${a.apellidos ?? ""}`
               .trim()
               .toLowerCase();
@@ -325,7 +306,7 @@ export default function GestionIncidenciasScreen() {
         empresa_id: empresaActual.id,
         trabajador_id: trabajadorSeleccionadoId,
         tipo_correccion: tipoCorreccion,
-        tipo_evento: tipoEventoSolicitado,
+        tipo_evento: TIPOS_EVENTO_FICHAJE_API[tipoEventoSolicitado],
         firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:

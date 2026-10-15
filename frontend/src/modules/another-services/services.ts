@@ -1,9 +1,6 @@
 import api from "@/src/service/api/api";
-import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
 import {
-  RegistroOrganizacionDTO,
+  RegistroOrganizacionFormulario,
   RespuestaRegistroCompleto,
 } from "../empresas/types/empresa";
 
@@ -18,7 +15,7 @@ import {
  * @throws {Error} Lanza un error si falla la transacción atómica en el servidor.
  */
 export const registrarOrganizacionCompleta = async (
-  payload: RegistroOrganizacionDTO,
+  payload: RegistroOrganizacionFormulario,
 ): Promise<RespuestaRegistroCompleto> => {
   try {
     // Petición única y atómica al backend que maneja el rollback automático si algo falla
@@ -33,21 +30,17 @@ export const registrarOrganizacionCompleta = async (
         configuracion: {},
         codigo_cnae: payload.codigo_cnae ? String(payload.codigo_cnae) : null,
         convenio_colectivo: payload.convenio_colectivo,
-        direccion_fiscal: payload.direccion_fiscal,
+        direccion: payload.direccion,
         logo_url: payload.logo_url || null,
         es_gestoria: payload.es_gestoria ?? false,
 
         // Datos del administrador / trabajador inicial
-        nombre_admin: payload.nombre_admin,
-        apellidos_admin: payload.apellidos_admin,
-        dni_nif_nie_admin: payload.dni_nif_nie_admin,
+        nombre_admin: [payload.nombre_admin, payload.apellidos_admin].filter(Boolean).join(" "),
         email_admin: payload.email_admin,
-        password_raw: payload.password_raw,
+        password: payload.password,
         telefono_admin: payload.telefono_admin
           ? String(payload.telefono_admin)
           : null,
-        nss_admin: payload.nss_admin ? String(payload.nss_admin) : null,
-        fecha_nacimiento_admin: payload.fecha_nacimiento_admin,
       },
     );
 
@@ -111,59 +104,5 @@ export const confirmarCambioPassword = async (payload: {
     throw new Error(
       apiMessage || "Error al confirmar el cambio de contraseña.",
     );
-  }
-};
-
-/**
- * Solicita permisos de notificaciones push, obtiene el token de Expo y lo registra en el servidor vinculado al usuario.
- * URI: POST /api/dispositivos-push/
- *
- * @async
- * @function registrarTokenDispositivo
- * @param {string} idUsuario - Identificador UUID único del usuario de sesión.
- * @returns {Promise<void>} Promesa que se resuelve cuando se completa el registro del token de dispositivo.
- * @throws {Error} Registra los errores en consola si no se otorgan permisos o falla la petición.
- */
-export const registrarTokenDispositivo = async (
-  idUsuario: string,
-): Promise<void> => {
-  try {
-    // 1. Solicitar permisos (fundamental para iOS, Android y Web)
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== "granted") {
-      console.log("Permiso de notificaciones denegado.");
-      return;
-    }
-
-    // 2. Obtener el projectId directamente desde app.json de forma segura
-    const projectId =
-      (Constants.expoConfig?.extra as { eas?: { projectId?: string } })?.eas
-        ?.projectId ?? Constants.easConfig?.projectId;
-
-    if (!projectId) {
-      console.error("No se encontró el projectId de EAS en la configuración.");
-      return;
-    }
-
-    // 3. Obtener el token de Expo Push
-    const pushTokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId,
-    });
-
-    const fcmToken = pushTokenData.data; // Token que se enviará al backend
-
-    // 4. Enviar el token a la API de FastAPI usando Axios
-    const response = await api.post("/api/dispositivos-push/", {
-      usuario_id: idUsuario,
-      fcm_token: fcmToken,
-      plataforma: Platform.OS,
-    });
-
-    console.log(
-      "Token push registrado con éxito en el servidor:",
-      response.data,
-    );
-  } catch (error: any) {
-    console.error("Error al registrar token de Expo:", error);
   }
 };

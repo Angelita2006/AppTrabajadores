@@ -417,12 +417,12 @@ export default function TabCentros({
                   } else {
                     setCentroEnEdicion(centro);
                     setNombreCentro(centro.nombre);
-                    setActivoCentro(centro.activo);
+                    setActivoCentro(centro.activo ?? false);
                     setDireccionCentro(centro.direccion || "");
                     setZonaHoraria(centro.zona_horaria || "");
                     setCodigoCcc(centro.codigo_ccc?.toString() || "");
-                    setLatitudCentro(centro.latitud);
-                    setLongitudCentro(centro.longitud);
+                    setLatitudCentro(centro.latitud ?? 0);
+                    setLongitudCentro(centro.longitud ?? 0);
                     setMostrarFormCentro(false);
                   }
                 }}

@@ -10,8 +10,18 @@ import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Colors } from "../src/constants/theme";
+import { useColorScheme } from "../src/hooks/use-color-scheme";
+import { useTemaStore } from "../src/modules/tema/store/temaStore";
+import { TipoRolEnum } from "../src/constants/enums";
 import {
   ProveedorSesion,
   useSesion,
@@ -31,10 +41,17 @@ Notifications.setNotificationHandler({
 SplashScreen.preventAutoHideAsync?.();
 
 function InitialLayout() {
-  const { usuarioActual, cargandoSesionLocal } = useSesion();
+  const { usuarioActual, rolActual, cargandoSesionLocal } = useSesion();
+  const temaInicializado = useTemaStore((state) => state.inicializado);
+  const inicializarTema = useTemaStore((state) => state.inicializarTema);
+  const tema = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
   const [estaListo, setEstaListo] = useState(false);
+
+  useEffect(() => {
+    void inicializarTema();
+  }, [inicializarTema]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,27 +72,31 @@ function InitialLayout() {
 
     const enGrupoTabs = segments[0] === "(tabs)";
     const tieneSesion = usuarioActual !== null;
+    const enFlujoCompra = segments[0] === "planes" || segments[0] === "checkout";
 
-    if (tieneSesion && !enGrupoTabs) {
+    if (tieneSesion && !enGrupoTabs && !enFlujoCompra) {
       // Todos los usuarios van directamente al perfil tras iniciar sesión
-      router.replace("/(tabs)/perfil");
+      const esSuperadministrador =
+        rolActual === TipoRolEnum.SUPERADMINISTRADOR ||
+        usuarioActual?.tipo_usuario === TipoRolEnum.SUPERADMINISTRADOR;
+      router.replace(esSuperadministrador ? "/(tabs)/superadministracion" : "/(tabs)/perfil");
     } else if (!tieneSesion && enGrupoTabs) {
       // Si no hay sesión y está intentando ver las pestañas, lo mandamos al inicio
       router.replace("/");
     }
-  }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
+  }, [usuarioActual, rolActual, cargandoSesionLocal, estaListo, segments]);
 
-  if (!estaListo || cargandoSesionLocal) {
+  if (!estaListo || cargandoSesionLocal || !temaInicializado) {
     return (
       <View
         style={{
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#0F172A",
+          backgroundColor: Colors[tema].background,
         }}
       >
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors[tema].primary} />
       </View>
     );
   }
@@ -91,6 +112,7 @@ function InitialLayout() {
         name="confirmar-cambio-email"
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="planes" options={{ headerShown: false }} />
       <Stack.Screen name="(authentication)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
@@ -98,6 +120,7 @@ function InitialLayout() {
 }
 
 export default function RootLayout() {
+  const tema = useColorScheme();
   // Carga explícita de mapas de iconos para entornos Web y Móvil
   const [fuentesCargadas, errorFuentes] = useFonts({
     ...FontAwesome.font,
@@ -114,10 +137,10 @@ export default function RootLayout() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#0F172A",
+          backgroundColor: Colors[tema].background,
         }}
       >
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={Colors[tema].primary} />
       </View>
     );
   }
@@ -125,7 +148,13 @@ export default function RootLayout() {
   return (
     <ProveedorSesion>
       <AppModalProvider>
-        <InitialLayout />
+        <ThemeProvider value={tema === "dark" ? DarkTheme : DefaultTheme}>
+          <StatusBar
+            style={tema === "dark" ? "light" : "dark"}
+            backgroundColor={Colors[tema].background}
+          />
+          <InitialLayout />
+        </ThemeProvider>
       </AppModalProvider>
     </ProveedorSesion>
   );

@@ -231,9 +231,7 @@ export function useTabCalendario({
     try {
       setGuardando(true);
       const payload: CalendarioLaboralUpdate = {
-        anio: anioNum,
         nombre: editNombre.trim() || `Calendario Anual ${anioNum}`,
-        centro_trabajo_id: editCentroId!,
       };
 
       const respuestaBackend: CalendarioLaboralResponse =
@@ -395,7 +393,6 @@ export function useTabCalendario({
       let festivoGuardadoBackend: Festivo;
       if (festivoExistente) {
         festivoGuardadoBackend = await editarFestivo(festivoExistente.id, {
-          calendario_id: calendarioActual.id,
           fecha: diaSeleccionadoCtx,
           tipo: tipoValido,
           descripcion: nuevaDescFestivo.trim(),

@@ -8,8 +8,10 @@ import {
     obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
+import { TipoRolEnum } from "@/src/constants/enums";
 import {
     obtenerUsuarioActual,
+    actualizarFotoUsuario,
     solicitarCambioEmail,
     solicitarCambioPassword,
 } from "@/src/modules/usuarios/api/services";
@@ -44,6 +46,7 @@ export default function PerfilScreen() {
     setTrabajadorActual,
     empresaActual,
     setEmpresaActual,
+    empresas,
     contratoActual,
     centroTrabajoActual,
     setCentroTrabajoActual,
@@ -53,6 +56,9 @@ export default function PerfilScreen() {
   const esAdminGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
   const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
   const esAdmin = esAdminGestoria || esAdminEmpresa;
+  const esSuperadministrador =
+    usuarioActual?.tipo_usuario === TipoRolEnum.SUPERADMINISTRADOR;
+  const cuentaSinFichaTrabajador = Boolean(usuarioActual && !trabajadorActual);
 
   const [cargandoCentros, setCargandoCentros] = useState(false);
   const [centrosDisponibles, setCentrosDisponibles] = useState<CentroTrabajo[]>(
@@ -68,6 +74,8 @@ export default function PerfilScreen() {
     trabajadorActual?.numero_seguridad_social ?? "",
   );
   const [fotoUrl, setFotoUrl] = useState(trabajadorActual?.foto_url ?? "");
+  const [fotoUsuarioUrl, setFotoUsuarioUrl] = useState(usuarioActual?.foto_url ?? "");
+  const [guardandoFotoUsuario, setGuardandoFotoUsuario] = useState(false);
   const [nuevaFotoAsset, setNuevaFotoAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
 
@@ -99,6 +107,10 @@ export default function PerfilScreen() {
       setNuevaFotoAsset(null);
     }
   }, [trabajadorActual]);
+
+  useEffect(() => {
+    setFotoUsuarioUrl(usuarioActual?.foto_url ?? "");
+  }, [usuarioActual?.foto_url]);
 
   useEffect(() => {
     let isMounted = true;
@@ -174,6 +186,41 @@ export default function PerfilScreen() {
     }
   };
 
+  const handleCambiarFotoUsuario = async () => {
+    if (!usuarioActual || guardandoFotoUsuario) return;
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        mostrarMensaje("Permiso denegado", "Se requiere acceso a la galería para elegir un avatar.");
+        return;
+      }
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (resultado.canceled || !resultado.assets?.length) return;
+
+      setGuardandoFotoUsuario(true);
+      const asset = resultado.assets[0];
+      const fileName = asset.fileName || asset.uri.split("/").pop() || "avatar.jpg";
+      const extension = /\.(\w+)$/.exec(fileName)?.[1]?.toLowerCase();
+      const fileType = extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+      const usuarioActualizado = await actualizarFotoUsuario(asset.uri, fileName, fileType);
+      const fotoConCacheBust = usuarioActualizado.foto_url
+        ? `${usuarioActualizado.foto_url.split("?")[0]}?t=${Date.now()}`
+        : "";
+      setUsuarioActual({ ...usuarioActual, ...usuarioActualizado, foto_url: fotoConCacheBust });
+      setFotoUsuarioUrl(fotoConCacheBust);
+      mostrarMensaje("Éxito", "Avatar de la cuenta actualizado.");
+    } catch (error: any) {
+      mostrarError("No se pudo actualizar el avatar: " + obtenerMensajeAmigableError(error));
+    } finally {
+      setGuardandoFotoUsuario(false);
+    }
+  };
+
   const handleGuardarPerfil = async () => {
     try {
       setGuardando(true);
@@ -198,7 +245,6 @@ export default function PerfilScreen() {
 
       // 2. Actualizamos los datos de texto (teléfono y NSS)
       await actualizarTrabajador(trabajadorActual.id, {
-        telefono: telefono.trim() || undefined,
         numero_seguridad_social: nss.trim() || undefined,
       });
 
@@ -367,21 +413,21 @@ export default function PerfilScreen() {
 
   return (
     <AppScreen
-      title={esAdmin && !trabajadorActual ? "Panel de Gestión" : "Mi Perfil"}
+      title={cuentaSinFichaTrabajador && esAdmin ? "Panel de Gestión" : "Mi Perfil"}
     >
       <Row>
-        {esAdmin && !trabajadorActual ? (
-          <StatCard
-            label="Rol de Sistema"
-            value={
-              usuarioActual?.tipo_usuario
-                ? usuarioActual.tipo_usuario
-                    .toString()
-                    .replace("_", " ")
-                    .toUpperCase()
-                : "SIN ROL"
-            }
-          />
+        {cuentaSinFichaTrabajador ? (
+          <>
+            <StatCard
+              label="Estado de la cuenta"
+              value={usuarioActual?.activo ? "Activo" : "Inactivo"}
+              tone={usuarioActual?.activo ? "success" : "danger"}
+            />
+            <StatCard
+              label="Rol de sistema"
+              value={usuarioActual?.tipo_usuario?.toString().replaceAll("_", " ").toUpperCase() ?? "SIN ROL"}
+            />
+          </>
         ) : (
           <>
             <StatCard
@@ -397,40 +443,99 @@ export default function PerfilScreen() {
         )}
       </Row>
 
+
       <Animated.View
         style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
       >
-        {usuarioActual && esAdmin && !trabajadorActual ? (
+        {usuarioActual && (
+          <Card>
+            <View style={styles.seccionPerfilHeader}>
+              <IconSymbol name="person" size={20} color="#2563EB" />
+              <ThemedText style={styles.perfilTitle}>Perfil de usuario</ThemedText>
+            </View>
+            <View style={styles.separadorPerfil} />
+            <View style={styles.avatarContainer}>
+              <Pressable
+                onPress={handleCambiarFotoUsuario}
+                disabled={guardandoFotoUsuario}
+                style={styles.avatarPressableEditing}
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar foto de perfil de usuario"
+              >
+                {guardandoFotoUsuario ? (
+                  <ActivityIndicator size="small" color="#2563EB" />
+                ) : fotoUsuarioUrl ? (
+                  <ImagenConToken rutaRelativa={fotoUsuarioUrl} style={{ width: 72, height: 72 }} />
+                ) : (
+                  <ThemedText style={{ fontSize: 28 }}>👤</ThemedText>
+                )}
+              </Pressable>
+              <ThemedText style={styles.avatarHintText}>Toca la foto para cambiar tu avatar</ThemedText>
+            </View>
+            <View style={styles.detailGrid}>
+              <Detail label="Nombre de la cuenta" value={usuarioActual.nombre} />
+              <Detail label="Correo electrónico" value={usuarioActual.email} />
+            </View>
+          </Card>
+        )}
+
+        {empresas.length > 1 && !esSuperadministrador && (
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="business" size={20} color="#EA580C" />
-              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                Mi Empresa Activa
-              </ThemedText>
+              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>Mi ficha de trabajador</ThemedText>
             </View>
             <View style={styles.separadorPerfil} />
-            <View style={styles.detailGrid}>
-              <View style={styles.selectorContainer}>
-                <ThemedText style={styles.detailLabel}>
-                  Empresa vinculada
-                </ThemedText>
-                <View style={styles.pickerWrapper}>
-                  <ThemedText style={styles.selectorSingleText}>
-                    {empresaActual?.nombre_comercial ??
-                      "No hay empresa vinculada"}
+            <ThemedText style={styles.detailLabel}>Empresa activa y ficha laboral</ThemedText>
+            <View style={styles.pickerWrapperHorizontal}>
+              {empresas.map((empresa) => (
+                <Pressable
+                  key={empresa.id}
+                  onPress={() => setEmpresaActual(empresa)}
+                  style={[
+                    styles.chipCentro,
+                    empresaActual?.id === empresa.id && styles.chipCentroActivo,
+                  ]}
+                >
+                  <ThemedText
+                    style={[
+                      styles.chipCentroText,
+                      empresaActual?.id === empresa.id && styles.chipCentroTextActivo,
+                    ]}
+                  >
+                    {empresa.nombre_comercial}
                   </ThemedText>
-                </View>
-              </View>
-              <Detail
-                label="CIF / NIF"
-                value={empresaActual?.cif ?? "No disponible"}
-              />
-              <Detail
-                label="Zona Horaria"
-                value={empresaActual?.zona_horaria ?? "Europe/Madrid"}
-              />
+                </Pressable>
+              ))}
             </View>
           </Card>
+        )}
+
+        {usuarioActual && cuentaSinFichaTrabajador ? (
+          esAdmin && empresaActual ? (
+            <Card>
+                <View style={styles.seccionPerfilHeader}>
+                  <IconSymbol name="business" size={20} color="#EA580C" />
+                  <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
+                    Mi Empresa Activa
+                  </ThemedText>
+                </View>
+                <View style={styles.separadorPerfil} />
+                <View style={styles.detailGrid}>
+                  <Detail label="Empresa vinculada" value={empresaActual.nombre_comercial} />
+                  <Detail label="CIF / NIF" value={empresaActual.cif ?? "No disponible"} />
+                  <Detail label="Zona Horaria" value={empresaActual.zona_horaria ?? "Europe/Madrid"} />
+                </View>
+            </Card>
+          ) : !esSuperadministrador ? (
+            <Card>
+              <ThemedText style={styles.perfilTitle}>Datos laborales</ThemedText>
+              <View style={styles.separadorPerfil} />
+              <ThemedText style={styles.detailValue}>
+                No hay una ficha de trabajador vinculada a la empresa activa.
+              </ThemedText>
+            </Card>
+          ) : null
         ) : (
           <>
             {/* Información Personal */}
@@ -459,7 +564,7 @@ export default function PerfilScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-              <View style={styles.separadorPerfil} />
+            <View style={styles.separadorPerfil} />
 
               <View style={styles.avatarContainer}>
                 <Pressable

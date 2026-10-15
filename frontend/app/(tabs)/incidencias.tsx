@@ -6,7 +6,7 @@ import {
 } from "@/src/modules/correcciones-fichaje/api/services";
 import { obtenerFichajesTrabajadorEntreFechas } from "@/src/modules/fichajes/api/services";
 import { RegistroFichaje } from "@/src/modules/fichajes/types/registrofichaje";
-import { TIPOS_FICHAJE, TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
+import { TIPOS_EVENTO_FICHAJE_API, TIPOS_FICHAJE, TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { formatearFecha } from "@/src/utils/formaters";
@@ -239,7 +239,7 @@ export default function IncidenciasScreen() {
         empresa_id: empresaActual.id,
         trabajador_id: idTrabajadorEfectivo,
         tipo_correccion: tipoCorreccion,
-        tipo_evento: tipoEventoSolicitado,
+        tipo_evento: TIPOS_EVENTO_FICHAJE_API[tipoEventoSolicitado],
         firma_solicitante: firmaSolicitante,
         motivo: comentario.trim(),
         fichaje_afectado_id:

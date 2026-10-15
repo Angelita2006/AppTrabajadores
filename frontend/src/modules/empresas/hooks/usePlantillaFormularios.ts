@@ -1,13 +1,11 @@
 import { eliminarTodasAsignacionesTrabajador } from "@/src/modules/asignaciones-turno/api/services";
 import { crearContrato } from "@/src/modules/contratos/api/services";
 import { Contrato } from "@/src/modules/contratos/types/contrato";
-import { obtenerRoles } from "@/src/modules/roles/api/services";
-import { Rol } from "@/src/modules/roles/types/rol";
 import {
     actualizarTrabajador,
     crearTrabajador,
 } from "@/src/modules/trabajadores/api/services";
-import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { ESTADOS_TRABAJADOR, Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { UsuarioSesion } from "@/src/modules/usuarios/types/usuario";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
@@ -47,8 +45,6 @@ export function usePlantillaFormularios(
   const [nss, setNss] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
 
-  const [rolesDisponibles, setRolesDisponibles] = useState<Rol[]>([]);
-  const [tipoRol, setTipoRol] = useState<string>("");
 
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -62,22 +58,6 @@ export function usePlantillaFormularios(
   const [calendarioLaboralId, setCalendarioLaboralId] = useState<string>("");
   const [contratoAEditar, setContratoAEditar] = useState<Contrato>();
   const [turnosSeleccionados, setTurnosSeleccionados] = useState<Turno[]>([]);
-
-  useEffect(() => {
-    obtenerRoles()
-      .then((roles: Rol[]) => {
-        setRolesDisponibles(roles);
-        if (roles.length > 0 && !tipoRol) {
-          setTipoRol(roles[0].id);
-        }
-      })
-      .catch((error: any) => {
-        mostrarError(
-          "Error al cargar los roles disponibles del sistema: " +
-            obtenerMensajeAmigableError(error),
-        );
-      });
-  }, []);
 
   const inputNombreRef = useRef<any>(null);
   const inputApellidosRef = useRef<any>(null);
@@ -115,7 +95,6 @@ export function usePlantillaFormularios(
     setTelefono("");
     setNss("");
     setFechaNacimiento("");
-    setTipoRol(rolesDisponibles.length > 0 ? rolesDisponibles[0].id : "");
     setTipoContrato("");
     setTipoJornada("");
     setHorasSemana("");
@@ -144,11 +123,10 @@ export function usePlantillaFormularios(
         dni_nif_nie: nifNie.trim().toUpperCase(),
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
-        email: email.trim() ? email.trim().toLowerCase() : undefined,
-        telefono: telefono.trim() ? telefono.trim() : undefined,
         numero_seguridad_social: nss.trim(),
         fecha_nacimiento: fechaNacimiento.trim(),
-        rol_id: tipoRol,
+        estado: ESTADOS_TRABAJADOR.INACTIVO,
+        fecha_alta_empresa: new Date().toISOString().slice(0, 10),
       });
       cerrarModales();
       await cargarPlantilla();
@@ -184,11 +162,8 @@ export function usePlantillaFormularios(
         dni_nif_nie: nifNie.trim().toUpperCase(),
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
-        email: email.trim() ? email.trim().toLowerCase() : null,
-        telefono: telefono.trim() ? telefono.trim() : null,
         numero_seguridad_social: nss.trim(),
         fecha_nacimiento: fechaNacimiento.trim(),
-        rol_id: tipoRol,
       });
       await cargarPlantilla();
       cerrarModales();
@@ -282,9 +257,6 @@ export function usePlantillaFormularios(
     setNss,
     fechaNacimiento,
     setFechaNacimiento,
-    tipoRol,
-    setTipoRol,
-    rolesDisponibles,
     fechaInicio,
     setFechaInicio,
     fechaFin,

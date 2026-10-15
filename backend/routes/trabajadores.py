@@ -61,7 +61,7 @@ def obtener_mi_ficha_trabajador(
     """
     trabajador = (
         db.query(Trabajadores)
-        .options(joinedload(Trabajadores.empresa), joinedload(Trabajadores.rol))
+        .options(joinedload(Trabajadores.empresa))
         .filter(
             Trabajadores.usuario_id == usuario_actual.id,
             Trabajadores.empresa_id == request.headers.get("Empresa-ID"),
@@ -100,8 +100,8 @@ def obtener_trabajadores_empresa(
     # Validaciones estructurales básicas
     trabajadores = (
         db.query(Trabajadores).options(
-        joinedload(Trabajadores.empresa),
-        joinedload(Trabajadores.rol))
+            joinedload(Trabajadores.empresa),
+        )
         .filter(Trabajadores.empresa_id == id_empresa, Trabajadores.activo.is_(True))
         .all()
     )
@@ -147,8 +147,8 @@ def obtener_empresa_trabajador(
     # Validaciones estructurales básicas
     trabajador = (
         db.query(Trabajadores).options(
-        joinedload(Trabajadores.empresa),
-        joinedload(Trabajadores.rol))
+            joinedload(Trabajadores.empresa),
+        )
         .filter(Trabajadores.id == id_trabajador)
         .first()
     )
@@ -216,8 +216,8 @@ def obtener_trabajador_id(
     # Validaciones estructurales básicas
     trabajador = (
         db.query(Trabajadores).options(
-        joinedload(Trabajadores.empresa),
-        joinedload(Trabajadores.rol))
+            joinedload(Trabajadores.empresa),
+        )
         .filter(Trabajadores.id == id_trabajador)
         .first()
     )
@@ -259,7 +259,7 @@ def obtener_trabajador_id(
     response_model=TrabajadorResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Crear trabajador",
-    description="Crea un nuevo trabajador guardando su rol.",
+    description="Crea un expediente laboral de trabajador.",
 )
 @limiter.limit("15/minute")
 def crear_trabajador(
@@ -271,7 +271,7 @@ def crear_trabajador(
     """
     **POST /api/trabajadores**
 
-    Crea un nuevo trabajador guardando su rol.
+    Crea un expediente laboral de trabajador.
     """
     # Registrar metadatos de red y auditoría de la creación
     cliente_ip = request.client.host if request.client else "Desconocida"
@@ -303,12 +303,13 @@ def crear_trabajador(
             )
         trabajador_vinculado = db.query(Trabajadores.id).filter(
             Trabajadores.usuario_id == payload.usuario_id,
+            Trabajadores.empresa_id == payload.empresa_id,
         ).first()
         if trabajador_vinculado is not None:
-            print(f"El usuario ({payload.usuario_id}) ya está vinculado a un trabajador.")
+            print(f"El usuario ({payload.usuario_id}) ya está vinculado a un trabajador de la empresa ({payload.empresa_id}).")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="El usuario ya está vinculado a un trabajador.",
+                detail="El usuario ya está vinculado a un trabajador de esta empresa.",
             )
 
         membresia_trabajador = (
@@ -336,7 +337,6 @@ def crear_trabajador(
         apellidos=payload.apellidos,
         numero_seguridad_social=payload.numero_seguridad_social,
         fecha_nacimiento=payload.fecha_nacimiento,
-        rol_id=payload.rol_id,
         usuario_id=payload.usuario_id,
     )
 
@@ -361,8 +361,8 @@ def crear_trabajador(
 
         trabajador_con_relacion = (
             db.query(Trabajadores).options(
-            joinedload(Trabajadores.empresa),
-            joinedload(Trabajadores.rol))
+                joinedload(Trabajadores.empresa),
+            )
             .filter(Trabajadores.id == nuevo_trabajador.id)
             .first()
         )
@@ -534,8 +534,8 @@ async def modificar_foto_trabajador(
 
         trabajador_con_foto = (
             db.query(Trabajadores).options(
-            joinedload(Trabajadores.empresa),
-            joinedload(Trabajadores.rol))
+                joinedload(Trabajadores.empresa),
+            )
             .filter(Trabajadores.id == id_trabajador)
             .first()
         )
@@ -651,8 +651,8 @@ def modificar_estado_trabajador(
 
         trabajador_actualizado = (
             db.query(Trabajadores).options(
-            joinedload(Trabajadores.empresa),
-            joinedload(Trabajadores.rol))
+                joinedload(Trabajadores.empresa),
+            )
             .filter(Trabajadores.id == id_trabajador)
             .first()
         )
@@ -753,46 +753,10 @@ def modificar_trabajador(
             detail='No se han podido modificar los datos del trabajador.'
         )
 
-    # Mantener la cuenta de acceso vinculada al expediente, aunque cambie el correo.
-    usuario_asociado = (
-        db.query(Usuarios)
-        .filter(Usuarios.id == trabajador.usuario_id)
-        .first()
-        if trabajador.usuario_id is not None
-        else None
-    )
-    if usuario_asociado:
-        ur_existente = db.query(UsuariosEmpresas).filter(
-            UsuariosEmpresas.usuario_id == usuario_asociado.id,
-            UsuariosEmpresas.empresa_id == trabajador.empresa_id
-        ).first()
-        if trabajador.rol_id:
-            if ur_existente:
-                setattr(ur_existente, 'rol_id', trabajador.rol_id)
-            else:
-                nuevo_ur = UsuariosEmpresas(
-                    usuario_id=usuario_asociado.id,
-                    rol_id=trabajador.rol_id,
-                    empresa_id=trabajador.empresa_id
-                )
-                db.add(nuevo_ur)
-        else:
-            if ur_existente:
-                db.delete(ur_existente)
-        try:
-            db.commit()
-        except Exception as e:
-            print(f"No se han podido modificar los datos del trabajador ({id_trabajador}): {str(e)}.")
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail='No se han podido modificar los datos del trabajador.'
-            )
-
     trabajador_actualizado = (
         db.query(Trabajadores).options(
-        joinedload(Trabajadores.empresa),
-        joinedload(Trabajadores.rol))
+            joinedload(Trabajadores.empresa),
+        )
         .filter(Trabajadores.id == id_trabajador)
         .first()
     )

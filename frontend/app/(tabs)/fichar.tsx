@@ -9,6 +9,8 @@ import { TipoFichaje } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { formatearFecha, formatearSegundos } from "@/src/utils/formaters";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Location from "expo-location";
@@ -35,6 +37,8 @@ import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function HomeScreen() {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   const {
     usuarioActual,
     empresaActual,
@@ -87,10 +91,10 @@ export default function HomeScreen() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#0F172A",
+          backgroundColor: colors.background,
         }}
       >
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

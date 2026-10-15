@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+﻿import { Platform } from "react-native";
 import api from "../../../service/api/api";
 import { Empresa } from "../../empresas/types/empresa";
 import {

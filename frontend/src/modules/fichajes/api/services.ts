@@ -227,6 +227,7 @@ export const registrarFichaje = async (
     const respuesta = await api.post<RegistroFichaje>("/api/fichajes", {
       ...payload,
       tipo_evento: evento,
+      fecha_hora: payload.fecha_hora ?? payload.fecha_hora_dispositivo,
     });
     return normalizarFichaje(respuesta.data);
   } catch (error: any) {

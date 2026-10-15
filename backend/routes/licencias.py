@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List
 from uuid import UUID
 import secrets
@@ -34,6 +34,7 @@ router = APIRouter(prefix="/api/licencias", tags=["Licencias"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
+
 
 def _licencia(db: Session, id_licencia: UUID) -> Licencias:
     licencia = (
@@ -157,7 +158,11 @@ def crear_licencia(
         empresa_id=None,
         plan=payload.plan,
         ciclo=payload.ciclo,
-        estado=payload.ciclo,
+        estado=(
+            EstadoSuscripcionEnum.TRIALING
+            if payload.ciclo == CicloFacturacionEnum.TRIAL
+            else EstadoSuscripcionEnum.ACTIVA
+        ),
         fecha_inicio=payload.fecha_inicio,
         fecha_expiracion=payload.fecha_expiracion,
     )

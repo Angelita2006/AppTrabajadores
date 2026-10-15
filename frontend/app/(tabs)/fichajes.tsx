@@ -679,7 +679,7 @@ export default function FichajesHistorialScreen() {
           const razonSocial = empresaActual?.razon_social || "Sin identificar";
           const cifEmpresa = empresaActual?.cif || "-";
           const direccionEmpresa =
-            empresaActual?.direccion_fiscal || "No consta";
+            empresaActual?.direccion || "No consta";
           const cnaeEmpresa = empresaActual?.codigo_cnae || "No consta";
           const convenioEmpresa =
             empresaActual?.convenio_colectivo || "No consta";

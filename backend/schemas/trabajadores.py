@@ -4,7 +4,6 @@ from typing import Optional
 from uuid import UUID
 from core.enums import EstadoTrabajadorEnum
 from schemas.empresas import EmpresaSimpleResponse
-from schemas.roles import RolResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - TRABAJADORES
@@ -35,7 +34,6 @@ class TrabajadorCreate(TrabajadorBase):
     Contiene campos de contacto e identificación laboral opcionales.
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
-    rol_id: UUID = Field(..., description="UUID del rol asignado al trabajador en el sistema")
     usuario_id: Optional[UUID] = Field(None, description="Cuenta de usuario vinculada al trabajador para acceso propio")
 
     model_config = ConfigDict(from_attributes=True)
@@ -76,7 +74,6 @@ class TrabajadorSimpleResponse(TrabajadorBase):
     """
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del trabajador")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
-    rol_id: UUID = Field(..., description="UUID del rol asignado al trabajador en el sistema")
     usuario_id: Optional[UUID] = Field(None, description="Cuenta de usuario vinculada al trabajador")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
@@ -89,6 +86,4 @@ class TrabajadorResponse(TrabajadorSimpleResponse):
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
-    rol: Optional[RolResponse] = Field(None, description="Detalles del rol asociado")
-
     model_config = ConfigDict(from_attributes=True)

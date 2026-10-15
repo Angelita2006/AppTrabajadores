@@ -1,18 +1,12 @@
 import { CalendarioLaboralResponse } from "../../calendarios-laborales/types/calendario";
+import { TipoFestivoEnum } from "../../../constants/enums";
 
 /**
  * Listado estático de los ámbitos o tipos posibles de un día festivo en el calendario laboral,
  * sincronizados con los valores del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_FESTIVO = {
-  /** Festivo de ámbito nacional o estatal. */
-  NACIONAL: "Nacional",
-  /** Festivo de ámbito autonómico o regional. */
-  AUTONOMICO: "Autonómico",
-  /** Festivo de ámbito local o municipal. */
-  LOCAL: "Local",
-} as const;
+export const TIPOS_FESTIVO = TipoFestivoEnum;
 
 /**
  * Tipo de unión que representa los ámbitos o tipos posibles de un día festivo en el calendario laboral.
@@ -28,13 +22,16 @@ export interface Festivo {
   id: string;
   /** Identificador UUID único del calendario laboral asociado al festivo. */
   calendario_id: string;
+  created_at: string;
+  updated_at: string;
   /** Fecha correspondiente al día festivo en formato "AAAA-MM-DD". */
   fecha: string;
+  activo: boolean | null;
   /** Descripción detallada o nombre del día festivo, si aplica. */
   descripcion: string | null;
 
   /** Ámbito o tipo de festivo (puede ser de tipo `TipoFestivo` o texto plano, por defecto "nacional"). */
-  tipo: TipoFestivo | string;
+  tipo: TipoFestivo;
   /** Relación opcional enriquecida para cargas anidadas del calendario laboral vinculado. */
   calendario?: CalendarioLaboralResponse | null;
 }
@@ -49,7 +46,8 @@ export interface FestivoCreate {
   /** Fecha correspondiente al nuevo día festivo en formato "AAAA-MM-DD". */
   fecha: string;
   /** Ámbito o tipo opcional del festivo (por defecto "nacional"). */
-  tipo?: TipoFestivo | string;
+  tipo: TipoFestivo;
+  activo?: boolean | null;
   /** Descripción detallada o nombre opcional del día festivo. */
   descripcion?: string | null;
 }
@@ -59,12 +57,12 @@ export interface FestivoCreate {
  * Sincronizado con 'FestivoUpdate' del backend (donde todos los campos son opcionales para permitir actualizaciones parciales).
  */
 export interface FestivoUpdate {
-  /** Nuevo identificador UUID del calendario laboral. */
-  calendario_id: string;
   /** Nueva fecha a actualizar para el festivo en formato "AAAA-MM-DD". */
-  fecha: string;
+  fecha?: string;
   /** Nuevo ámbito o tipo a actualizar para el festivo. */
-  tipo: TipoFestivo;
+  tipo?: TipoFestivo;
   /** Nueva descripción o nombre actualizado para el festivo. */
-  descripcion: string;
+  descripcion?: string | null;
+  /** Estado de activación. */
+  activo?: boolean | null;
 }

@@ -1,5 +1,5 @@
 import api from "../../../service/api/api";
-import { ResumenJornada, ResumenJornadaCreate } from "../types/resumen-jornada";
+import { ResumenJornada } from "../types/resumen-jornada";
 
 /**
  * Servicio de Gestión de Resúmenes de Jornada.
@@ -79,33 +79,6 @@ export const obtenerCuadroMandosDiarioEmpresa = async (
     throw new Error(
       apiMessage ||
         "Error al recuperar el cuadro de mandos diario de la empresa.",
-    );
-  }
-};
-
-/**
- * Registra o actualiza el cálculo acumulado diario de la jornada de un operario.
- * URI: POST /api/resumenes-jornada
- *
- * @async
- * @function crearOActualizarResumen
- * @param {ResumenJornadaCreate} payload - Objeto con los datos del resumen de jornada a registrar o actualizar.
- * @returns {Promise<ResumenJornada>} Promesa con el resumen de jornada guardado o actualizado.
- * @throws {Error} Lanza un error si los datos no son válidos o falla la operación.
- */
-export const crearOActualizarResumen = async (
-  payload: ResumenJornadaCreate,
-): Promise<ResumenJornada> => {
-  try {
-    const respuesta = await api.post<ResumenJornada>(
-      "/api/resumenes-jornada",
-      payload,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al registrar o actualizar el resumen de jornada.",
     );
   }
 };

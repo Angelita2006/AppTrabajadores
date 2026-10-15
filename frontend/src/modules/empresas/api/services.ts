@@ -30,6 +30,12 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
 /** Lista exclusivamente las empresas que el backend concede a esta cuenta. */
 export const obtenerEmpresasDisponibles = obtenerEmpresas;
 
+/** GET /api/empresas/actual: devuelve la empresa seleccionada en el contexto. */
+export const obtenerEmpresaActual = async (): Promise<Empresa> => {
+  const respuesta = await api.get<Empresa>("/api/empresas/actual");
+  return respuesta.data;
+};
+
 /**
  * Recupera la información detallada de una empresa específica mediante su ID único.
  * URI: GET /api/empresas/{id_empresa}
@@ -118,7 +124,7 @@ export const crearEmpresa = async (payload: {
   configuracion?: Record<string, any>;
   codigo_cnae?: string | null;
   convenio_colectivo?: string | null;
-  direccion_fiscal?: string | null;
+  direccion?: string | null;
 }): Promise<Empresa> => {
   try {
     const respuesta = await api.post<Empresa>("/api/empresas", payload);
@@ -131,7 +137,7 @@ export const crearEmpresa = async (payload: {
 
 /**
  * Modifica la razón social de una empresa existente mediante parámetros en la URL (Query Params).
- * URI: PUT /api/empresas/{id_empresa}/razon-social
+ * URI: PUT /api/empresas/{id_empresa}
  *
  * @async
  * @function cambiarRazonSocialEmpresa
@@ -220,11 +226,11 @@ export const guardarDatosEmpresa = async (
       razon_social: razonSocial,
       cif: cif,
       zona_horaria: zonaHoraria,
-      activo: activo,
+      activa: activo,
       nombre_comercial: nombreComercial,
       convenio_colectivo: convenioColectivo,
       codigo_cnae: codigoCnae,
-      direccion_fiscal: direccionFiscal,
+      direccion: direccionFiscal,
     };
     const respuesta = await api.put<Empresa>(
       `/api/empresas/${idEmpresa}`,

@@ -21,8 +21,6 @@ export interface DepartamentoCreate {
 export interface DepartamentoUpdate {
   /** Nuevo nombre descriptivo para el departamento. */
   nombre?: string;
-  /** Nuevo identificador del centro de trabajo vinculado (UUID). */
-  centro_trabajo_id?: string;
   /** Estado de activación del departamento. */
   activo?: boolean;
 }

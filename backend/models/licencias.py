@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 from typing import Optional
 import uuid
 from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKeyConstraint, PrimaryKeyConstraint, String, UniqueConstraint, Uuid, text
@@ -9,31 +9,34 @@ from core.enums import CicloFacturacionEnum, EstadoSuscripcionEnum, PlanLicencia
 class Licencias(Base):
     __tablename__ = 'licencias'
     __table_args__ = (
-        PrimaryKeyConstraint('id', name='licencias_pkey'), # Identificador único de la licencia
-        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='CASCADE', name='licencias_empresa_id_fkey'), # Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado
+        PrimaryKeyConstraint('id', name='licencias_pkey'), # Identificador Ãºnico de la licencia
+        ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='CASCADE', name='licencias_empresa_id_fkey'), # Empresa que canjeÃ³ la licencia; NULL mientras el cÃ³digo no se haya utilizado
         UniqueConstraint('empresa_id', name='licencias_empresa_id_key'), # Cada empresa puede tener asignada una sola licencia comercial
         UniqueConstraint('codigo', name='licencias_codigo_key'),
-        CheckConstraint('fecha_expiracion IS NULL OR fecha_inicio IS NULL OR fecha_expiracion >= fecha_inicio', name='licencias_rango_vigencia_check'), # La fecha de expiración debe ser mayor o igual que la fecha de inicio de la vigencia
-        {'comment': 'Suscripciones y licencias SaaS de las empresas (Trial de 14 días, Básico, Pro, Enterprise con facturación mensual o anual).'}
+        CheckConstraint('fecha_expiracion IS NULL OR fecha_inicio IS NULL OR fecha_expiracion >= fecha_inicio', name='licencias_rango_vigencia_check'), # La fecha de expiraciÃ³n debe ser mayor o igual que la fecha de inicio de la vigencia
+        {'comment': 'Suscripciones y licencias SaaS de las empresas (Trial de 14 dÃ­as, BÃ¡sico, Pro, Enterprise con facturaciÃ³n mensual o anual).'}
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único de la licencia.')
-    empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Empresa que canjeó la licencia; NULL mientras el código no se haya utilizado.')
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador Ãºnico de la licencia.')
+    empresa_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True, comment='Empresa que canjeÃ³ la licencia; NULL mientras el cÃ³digo no se haya utilizado.')
 
-    codigo: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))"), comment='Código único para canjear la licencia comercial.')
+    codigo: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))"), comment='CÃ³digo Ãºnico para canjear la licencia comercial.')
 
-    plan: Mapped[PlanLicenciaEnum] = mapped_column(Enum(PlanLicenciaEnum, values_callable=lambda cls: [m.value for m in cls], name='plan_licencia_enum'), nullable=False, server_default=text("'Básico'::plan_licencia_enum"), comment='Nivel del plan contratado (Básico, Pro, Enterprise).')
-    ciclo: Mapped[CicloFacturacionEnum] = mapped_column(Enum(CicloFacturacionEnum, values_callable=lambda cls: [m.value for m in cls], name='ciclo_facturacion_enum'), nullable=False, server_default=text("'Trial'::ciclo_facturacion_enum"), comment='Ciclo de facturación (Trial, Mensual, Anual).')
-    estado: Mapped[EstadoSuscripcionEnum] = mapped_column(Enum(EstadoSuscripcionEnum, values_callable=lambda cls: [m.value for m in cls], name='estado_suscripcion_enum'), nullable=False, server_default=text("'Trialing'::estado_suscripcion_enum"), comment='Estado actual de la suscripción.')
+    plan: Mapped[PlanLicenciaEnum] = mapped_column(Enum(PlanLicenciaEnum, values_callable=lambda cls: [m.value for m in cls], name='plan_licencia_enum'), nullable=False, server_default=text("'BÃ¡sico'::plan_licencia_enum"), comment='Nivel del plan contratado (BÃ¡sico, Pro, Enterprise).')
+    ciclo: Mapped[CicloFacturacionEnum] = mapped_column(Enum(CicloFacturacionEnum, values_callable=lambda cls: [m.value for m in cls], name='ciclo_facturacion_enum'), nullable=False, server_default=text("'Trial'::ciclo_facturacion_enum"), comment='Ciclo de facturaciÃ³n (Trial, Mensual, Anual).')
+    estado: Mapped[EstadoSuscripcionEnum] = mapped_column(Enum(EstadoSuscripcionEnum, values_callable=lambda cls: [m.value for m in cls], name='estado_suscripcion_enum'), nullable=False, server_default=text("'Trialing'::estado_suscripcion_enum"), comment='Estado actual de la suscripciÃ³n.')
 
     fecha_inicio: Mapped[datetime.date] = mapped_column(Date, nullable=False, server_default=text('current_date'), comment='Inicio del periodo actual de vigencia.')
-    fecha_expiracion: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha exacta en que expira el periodo de prueba (Trial) o la suscripción pagada.')
+    fecha_expiracion: Mapped[datetime.date] = mapped_column(Date, nullable=False, comment='Fecha exacta en que expira el periodo de prueba (Trial) o la suscripciÃ³n pagada.')
 
-    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, comment='ID de la suscripción en la pasarela de pagos (Stripe).')
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, comment='ID de la suscripciÃ³n en la pasarela de pagos (Stripe).')
+    stripe_checkout_session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, comment='Stripe Checkout Session ID asociado a la compra de esta licencia.')
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='ID del cliente en la pasarela de pagos.')
+    stripe_checkout_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment='Correo indicado en Checkout para vincular el canje de la licencia comprada.')
    
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creación de la licencia.')
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualización de la licencia.')
-    revocada_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True, comment='Fecha en que se revocó la licencia, si corresponde.')
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de creaciÃ³n de la licencia.')
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), nullable=False, server_default=text('now()'), comment='Fecha de actualizaciÃ³n de la licencia.')
+    revocada_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True), nullable=True, comment='Fecha en que se revocÃ³ la licencia, si corresponde.')
 
     empresa: Mapped[Optional['Empresas']] = relationship('Empresas', back_populates='licencia', doc='Empresa que tiene asignada la licencia comercial.') # type: ignore
+

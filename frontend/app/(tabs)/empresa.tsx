@@ -120,7 +120,7 @@ export default function EmpresasScreen() {
       setRazonSocialInput(empresaActual.razon_social || "");
       setConvenioInput(empresaActual.convenio_colectivo || "");
       setCnaeInput(empresaActual.codigo_cnae || "");
-      setDireccionInput(empresaActual.direccion_fiscal || "");
+      setDireccionInput(empresaActual.direccion || "");
 
       cargarDatosEmpresa(empresaActual.id);
     }
@@ -193,7 +193,7 @@ export default function EmpresasScreen() {
         razonSocialInput.trim(),
         empresaActual.cif,
         empresaActual.zona_horaria,
-        empresaActual.activa,
+        empresaActual.activa ?? false,
         empresaActual.nombre_comercial,
         convenioInput.trim(),
         cnaeInput.trim(),

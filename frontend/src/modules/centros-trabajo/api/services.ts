@@ -153,15 +153,9 @@ export const cambiarEstadoCentroTrabajo = async (
   activo: boolean,
 ): Promise<CentroTrabajo> => {
   try {
-    if (activo) {
-      const response = await api.put<CentroTrabajo>(
-        `/api/centros-trabajo/${idCentro}`,
-        { activo: true },
-      );
-      return response.data;
-    }
-    await api.put(`/api/centros-trabajo/${idCentro}/desactivar`);
-    const response = await api.get<CentroTrabajo>(`/api/centros-trabajo/${idCentro}`);
+    const response = activo
+      ? await api.put<CentroTrabajo>(`/api/centros-trabajo/${idCentro}`, { activo: true })
+      : await api.put<CentroTrabajo>(`/api/centros-trabajo/${idCentro}/desactivar`);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;

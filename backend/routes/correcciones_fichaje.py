@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from core.jornada import calcular_resumen_jornada
 from core.auditoria import registrar_auditoria
-from core.database import get_db
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
@@ -23,7 +22,6 @@ from core.enums import (
 )
 from core.security import (
     get_db_with_advanced_security,
-    obtener_usuario_actual,
     verificar_permisos_requeridos,
 )
 from core.utils import calcular_hash_fichaje, procesar_y_guardar_firma

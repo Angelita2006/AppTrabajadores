@@ -1,39 +1,40 @@
-/**
- * Listado estático de los roles básicos disponibles en el sistema para la lógica de negocio y vistas.
- * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
- */
-export const ROLES = {
-  ADMIN_GESTORIA: "Admin_gestoría",
-  ADMIN_EMPRESA: "Admin_empresa",
-  RRHH: "Rrhh",
-  REPRESENTANTE_LEGAL: "Representante_legal",
-  TRABAJADOR: "Trabajador",
-  AUDITOR_ITSS: "Auditor_itss",
-} as const;
+import { Empresa } from "../../empresas/types/empresa";
+import { TipoRolEnum } from "../../../constants/enums";
 
-/**
- * Tipo de unión que representa los roles básicos disponibles en el sistema.
- */
-export type RolEnum = (typeof ROLES)[keyof typeof ROLES];
+export const TIPOS_ROL = TipoRolEnum;
+export type TipoRol = (typeof TIPOS_ROL)[keyof typeof TIPOS_ROL];
 
-/**
- * Representa la definición base y completa de un rol en la plataforma (Tabla: roles).
- */
-export interface Rol {
-  /** Identificador UUID único del rol. */
-  id: string;
-  /** Nombre descriptivo u oficial del rol en el sistema. */
+/** Legacy name retained for components; values come from TipoRolEnum. */
+export const ROLES = TIPOS_ROL;
+export type RolEnum = TipoRol;
+
+export interface RolBase {
   nombre: string;
-  /** Descripción detallada de las funciones y permisos asociados al rol. */
-  descripcion: string;
+  descripcion: string | null;
 }
 
-/**
- * Esquema para la creación o registro de un nuevo rol (POST /api/roles).
- */
-export interface RolCreate {
-  /** Nombre descriptivo u oficial del nuevo rol. */
-  nombre: string;
-  /** Descripción detallada de las funciones y permisos del nuevo rol. */
-  descripcion: string;
+/** Request body matching RolCreate. */
+export interface RolCreate extends RolBase {
+  empresa_id?: string | null;
+  tipo?: TipoRol;
+}
+
+/** Request body matching RolUpdate. */
+export interface RolUpdate {
+  nombre?: string | null;
+  descripcion?: string | null;
+}
+
+/** Response matching RolSimpleResponse. */
+export interface RolSimpleResponse extends RolBase {
+  id: string;
+  empresa_id: string | null;
+  tipo: TipoRol;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Response matching RolResponse. */
+export interface Rol extends RolSimpleResponse {
+  empresa: Empresa | null;
 }

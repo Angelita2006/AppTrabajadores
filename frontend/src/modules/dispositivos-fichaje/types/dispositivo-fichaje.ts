@@ -1,5 +1,6 @@
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../empresas/types/empresa";
+import { MetodoFichajeEnum } from "../../../constants/enums";
 
 /**
  * Listado estático de los diferentes tipos de dispositivos o canales
@@ -7,22 +8,7 @@ import { Empresa } from "../../empresas/types/empresa";
  * sincronizados exactamente con el esquema del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_DISPOSITIVO = {
-  /** Aplicación móvil corporativa para empleados (iOS / Android). */
-  APP_MOVIL: "App_móvil",
-  /** Terminal físico de fichaje mediante tarjetas de proximidad RFID. */
-  TERMINAL_RFID: "Terminal_rfid",
-  /** Terminal físico de fichaje basado en introducción de PIN numérico. */
-  TERMINAL_PIN: "Terminal_pin",
-  /** Dispositivo o sistema basado en lectura de códigos QR. */
-  LECTOR_QR: "Lector_qr",
-  /** Portal web corporativo de acceso para empleados o gestores. */
-  WEB: "Web",
-  /** Sistema de control horario automatizado por geolocalización o GPS. */
-  GEOLOCALIZACION: "Geolocalización",
-  /** Registro o modificación manual realizada por un administrador. */
-  MANUAL: "Manual",
-} as const;
+export const TIPOS_DISPOSITIVO = MetodoFichajeEnum;
 
 /**
  * Tipo de unión que representa los diferentes tipos de dispositivos o canales permitidos.
@@ -88,7 +74,8 @@ export interface DispositivoSimpleResponse {
   /** Indica si el dispositivo se encuentra activo y habilitado para registrar operaciones. */
   activo: boolean;
   /** Marca de tiempo (ISO 8601) de cuándo fue registrado el dispositivo en el sistema. */
-  creado_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /**

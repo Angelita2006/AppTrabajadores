@@ -1,4 +1,4 @@
-import { Trabajador } from "../../trabajadores/types/trabajador";
+import { ContratoSimpleResponse } from "../../contratos/types/contrato";
 import { Turno } from "../../turnos/types/turno";
 
 /**
@@ -9,7 +9,9 @@ export interface AsignacionTurno {
   /** Identificador único universal (UUID v4) de la asignación de turno. */
   id: string;
   /** Identificador UUID único del trabajador titular de la asignación. */
-  trabajador_id: string;
+  contrato_id: string;
+  /** Identificador derivado desde el contrato para vistas agrupadas por trabajador. */
+  trabajador_id?: string;
   /** Identificador UUID único del turno laboral teórico asignado. */
   turno_id: string;
   /** Fecha de inicio de vigencia de la asignación en formato estándar "AAAA-MM-DD". */
@@ -18,11 +20,12 @@ export interface AsignacionTurno {
   fecha_fin: string | null;
   /** Marca de tiempo (ISO 8601 con zona horaria) de la fecha de creación del registro. */
   created_at: string;
+  updated_at: string;
 
   /** Relación opcional enriquecida para cargas anidadas del turno vinculado. */
   turno?: Turno | null;
   /** Relación opcional enriquecida para cargas anidadas del trabajador vinculado. */
-  trabajador?: Trabajador | null;
+  contrato?: ContratoSimpleResponse | null;
 }
 
 /**
@@ -31,7 +34,7 @@ export interface AsignacionTurno {
  */
 export interface AsignacionTurnoCreate {
   /** Identificador UUID único del trabajador al que se le asigna el turno. */
-  trabajador_id: string;
+  contrato_id: string;
   /** Identificador UUID único del turno laboral teórico a asignar. */
   turno_id: string;
   /** Fecha de inicio de vigencia de la asignación en formato estándar "AAAA-MM-DD". */
@@ -46,7 +49,7 @@ export interface AsignacionTurnoCreate {
  */
 export interface AsignacionTurnoMasivaCreate {
   /** Identificador UUID único del trabajador al que se le asignan los turnos masivamente. */
-  trabajador_id: string;
+  contrato_id: string;
   /** Listado de identificadores UUID de los turnos a asignar (entre 1 y 100 elementos). */
   turnos_ids: string[];
   /** Fecha de inicio de vigencia para el bloque de turnos en formato estándar "AAAA-MM-DD". */

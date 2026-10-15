@@ -1,12 +1,13 @@
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+import secrets
 from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from core.archivos import CARPETA_LOGOS_EMPRESAS
@@ -17,9 +18,11 @@ from core.database import get_db
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    CicloFacturacionEnum,
     EstadoSuscripcionEnum,
     TipoPermisoEnum,
     TipoRolEnum,
+    PlanLicenciaEnum,
 )
 from core.security import (
     get_db_with_advanced_security,
@@ -117,7 +120,6 @@ def obtener_empresas_disponibles(
         .filter(
             UsuariosEmpresas.usuario_id == usuario_actual.id,
             UsuariosEmpresas.activo.is_(True),
-            Roles.activo.is_(True),
         )
         .all()
     )
@@ -363,24 +365,44 @@ def registrar_organizacion_completa(
     print(f"Petición de registro de organización completa desde la IP ({cliente_ip}).")
 
     # Validaciones estructurales básicas
-    licencia = (
-        db.query(Licencias)
-        .filter(Licencias.codigo == payload.codigo_licencia.strip().upper())
-        .with_for_update()
-        .first()
+    # Este contexto de sistema es local a la transacción de alta pública y se reinicia al confirmar o revertir.
+    db.execute(
+        text(
+            "SELECT set_config('app.is_superadmin', 'true', true), "
+            "set_config('app.current_empresa_id', '00000000-0000-0000-0000-000000000000', true), "
+            "set_config('app.allowed_empresa_ids', 'ARRAY[]', true)"
+        )
     )
-    if not licencia:
-        print(f"El código de licencia ({payload.codigo_licencia}) no existe.")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El código de licencia introducido no existe.")
-    if licencia.empresa_id is not None:
-        print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado.")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este código de licencia ya ha sido utilizado.")
-    if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
-        print("La licencia no está activa.")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
-    if licencia.fecha_expiracion < date.today():
-        print("La licencia está vencida.")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
+    licencia = None
+    codigo_licencia = (payload.codigo_licencia or "").strip().upper()
+    if codigo_licencia:
+        licencia = (
+            db.query(Licencias)
+            .filter(Licencias.codigo == codigo_licencia)
+            .with_for_update()
+            .first()
+        )
+        if not licencia:
+            print(f"El código de licencia ({codigo_licencia}) no existe.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El código de licencia introducido no existe.")
+        if licencia.empresa_id is not None:
+            print(f"Este código de licencia ({codigo_licencia}) ya ha sido utilizado.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este código de licencia ya ha sido utilizado.")
+        if (
+            licencia.stripe_checkout_email
+            and licencia.stripe_checkout_email.casefold() != payload.email_admin.strip().casefold()
+        ):
+            print(f"El correo ({payload.email_admin.strip().lower()}) no coincide con el de la compra de la licencia ({codigo_licencia}).")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Registra la empresa con el correo electrónico utilizado para comprar la licencia.",
+            )
+        if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
+            print("La licencia no está activa.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
+        if licencia.fecha_expiracion < date.today():
+            print("La licencia está vencida.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
 
     empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif.strip().upper()).first()
     if empresa_existente:
@@ -402,6 +424,23 @@ def registrar_organizacion_completa(
         )
 
     try:
+        if licencia is None:
+            fecha_inicio_prueba = date.today()
+            codigo_prueba = secrets.token_hex(6).upper()
+            while db.query(Licencias.id).filter(Licencias.codigo == codigo_prueba).first():
+                codigo_prueba = secrets.token_hex(6).upper()
+            licencia = Licencias(
+                codigo=codigo_prueba,
+                empresa_id=None,
+                plan=PlanLicenciaEnum.BASICO,
+                ciclo=CicloFacturacionEnum.TRIAL,
+                estado=EstadoSuscripcionEnum.TRIALING,
+                fecha_inicio=fecha_inicio_prueba,
+                fecha_expiracion=fecha_inicio_prueba + timedelta(days=14),
+            )
+            db.add(licencia)
+            db.flush()
+
         # Crear la Empresa (Soportando tipo Gestoría o Empresa normal)
         nueva_empresa = Empresas(
             razon_social=payload.razon_social,
@@ -512,30 +551,32 @@ def crear_empresa(
     print(f"Petición de crear de empresa desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
-    licencia = (
-        db.query(Licencias)
-        .filter(Licencias.codigo == payload.codigo_licencia.strip().upper())
-        .with_for_update()
-        .first()
-    )
-    if not licencia:
-        print(f"El código de licencia ({payload.codigo_licencia}) introducido no existe.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código de licencia introducido no existe."
+    licencia = None
+    if payload.codigo_licencia:
+        licencia = (
+            db.query(Licencias)
+            .filter(Licencias.codigo == payload.codigo_licencia.strip().upper())
+            .with_for_update()
+            .first()
         )
+        if not licencia:
+            print(f"El código de licencia ({payload.codigo_licencia}) introducido no existe.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El código de licencia introducido no existe."
+            )
 
-    if licencia.empresa_id is not None:
-        print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado por otra empresa.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este código de licencia ya ha sido utilizado por otra empresa."
-        )
+        if licencia.empresa_id is not None:
+            print(f"Este código de licencia ({payload.codigo_licencia}) ya ha sido utilizado por otra empresa.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Este código de licencia ya ha sido utilizado por otra empresa."
+            )
 
-    if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
-    if licencia.fecha_expiracion < date.today():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
+        if licencia.estado not in (EstadoSuscripcionEnum.TRIALING, EstadoSuscripcionEnum.ACTIVA):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia no está activa.")
+        if licencia.fecha_expiracion < date.today():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La licencia está vencida.")
 
     empresa_existente = db.query(Empresas).filter(Empresas.cif == payload.cif).first()
     if empresa_existente:
@@ -561,7 +602,10 @@ def crear_empresa(
 
         db.add(nueva_empresa)
         db.flush()
-        setattr(licencia, "empresa_id", nueva_empresa.id)
+
+        if licencia is not None:
+            setattr(licencia, "empresa_id", nueva_empresa.id)
+        
         db.commit()
         db.refresh(nueva_empresa)
 

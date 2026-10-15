@@ -2,9 +2,8 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { obtenerAsignacionesTurnoTrabajador } from "../modules/asignaciones-turno/api/services";
 import { obtenerTurnoPorId } from "../modules/turnos/api/services";
-import { obtenerUsuarioPorId } from "../modules/usuarios/api/services";
-import { UsuarioSesion } from "../modules/usuarios/types/usuario";
-import { TIPOS_USUARIO } from "../modules/usuarios_roles/types/usuario_rol";
+import { obtenerUsuarioActual } from "../modules/usuarios/api/services";
+import { obtenerMiTrabajador } from "../modules/trabajadores/api/services";
 
 // 1. Configuración global de comportamiento en primer plano
 Notifications.setNotificationHandler({
@@ -40,22 +39,6 @@ export const NotificationService = {
     return finalStatus === "granted";
   },
 
-  // probarNotificacionEnUnMinuto: async () => {
-  //   await Notifications.scheduleNotificationAsync({
-  //     content: {
-  //       title: "🧪 Prueba de Notificación",
-  //       body: "Si ves esto, el sistema de notificaciones funciona correctamente.",
-  //       sound: "default",
-  //     },
-  //     trigger: {
-  //       type: Notifications.SchedulableTriggerInputTypes.DATE,
-  //       seconds: 60,
-  //       repeats: false,
-  //       channelId: "fichapp_canal_v2",
-  //     } as any,
-  //   });
-  // },
-
   programarAlarmasTurno: async (usuarioId: string) => {
     try {
       if (Platform.OS === "web") return;
@@ -63,16 +46,14 @@ export const NotificationService = {
       // Limpiamos cualquier notificación anterior para evitar duplicados o basura previa
       await Notifications.cancelAllScheduledNotificationsAsync();
 
-      const usuario: UsuarioSesion = await obtenerUsuarioPorId(usuarioId);
-
-      if (usuario.tipo_usuario !== TIPOS_USUARIO.TRABAJADOR) return;
-
-      // Si el usuario no existe o no tiene un trabajador_id asociado (ej. Admin puro), salimos.
-      if (!usuario?.trabajador_id) return;
+      const usuario = await obtenerUsuarioActual();
+      if (usuario.id !== usuarioId) return;
+      const trabajador = await obtenerMiTrabajador();
+      if (!trabajador?.id) return;
 
       // Obtenemos las asignaciones de turno del trabajador
       const asignaciones = await obtenerAsignacionesTurnoTrabajador(
-        usuario.trabajador_id,
+        trabajador.id,
       );
 
       // Si no tiene asignaciones creadas (no tiene turno asignado aún), no programamos nada.
@@ -130,7 +111,7 @@ export const NotificationService = {
                 trigger: {
                   type: Notifications.SchedulableTriggerInputTypes
                     .TIME_INTERVAL,
-                  seconds: segundosEntrada,
+                  seconds: segundosEntrada - 300,
                   repeats: false,
                   channelId: "fichapp_canal_v2",
                 } as any,
@@ -164,7 +145,7 @@ export const NotificationService = {
                 trigger: {
                   type: Notifications.SchedulableTriggerInputTypes
                     .TIME_INTERVAL,
-                  seconds: segundosSalida,
+                  seconds: segundosSalida - 300,
                   repeats: false,
                   channelId: "fichapp_canal_v2",
                 } as any,

@@ -1,3 +1,4 @@
+import { EstadoFichajeEnum, MetodoFichajeEnum, OrigenFichajeEnum, TipoEventoFichajeEnum } from "../../../constants/enums";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 
 /**
@@ -19,23 +20,27 @@ export const TIPOS_FICHAJE = {
  * Tipo de unión que representa los tipos de eventos o acciones posibles en un fichaje laboral.
  */
 export type TipoFichaje = (typeof TIPOS_FICHAJE)[keyof typeof TIPOS_FICHAJE];
+/** Valores serializados por el esquema del backend. */
+export const TIPOS_EVENTO_FICHAJE_API = TipoEventoFichajeEnum;
+export type TipoEventoFichajeApi = (typeof TIPOS_EVENTO_FICHAJE_API)[keyof typeof TIPOS_EVENTO_FICHAJE_API];
 
 /**
  * Listado estático de los posibles estados de validez de un registro de fichaje.
  * Sincronizado con 'EstadoFichajeEnum' de Pydantic.
  */
-export const ESTADOS_FICHAJE = {
-  /** El registro de fichaje es correcto y validado por el sistema. */
-  VALIDO: "Válido",
-  /** El registro de fichaje se encuentra pendiente de revisión o corrección manual. */
-  PENDIENTE_REVISION: "Pendiente_revisión",
-} as const;
+export const ESTADOS_FICHAJE = EstadoFichajeEnum;
 
 /**
  * Tipo de unión que representa los posibles estados de validez de un registro de fichaje.
  */
 export type EstadoFichaje =
   (typeof ESTADOS_FICHAJE)[keyof typeof ESTADOS_FICHAJE];
+
+export const METODOS_FICHAJE = MetodoFichajeEnum;
+export type MetodoFichaje = (typeof METODOS_FICHAJE)[keyof typeof METODOS_FICHAJE];
+
+export const ORIGENES_FICHAJE = OrigenFichajeEnum;
+export type OrigenFichaje = (typeof ORIGENES_FICHAJE)[keyof typeof ORIGENES_FICHAJE];
 
 /**
  * Catálogo ordenado de los días de la semana utilizado para la planificación de turnos y reportes.
@@ -55,16 +60,16 @@ export const DIAS_SEMANA = [
  * Sincronizado con 'FichajeBase' de Pydantic.
  */
 export interface FichajeBase {
-  /** Identificador único UUID de la empresa. */
-  empresa_id: string;
-  /** Identificador único UUID del trabajador. */
-  trabajador_id: string;
-  /** Identificador único UUID del centro de trabajo. */
-  centro_trabajo_id: string;
-  /** Identificador único UUID del tipo de evento. */
-  tipo_evento: TipoFichaje;
-  /** Método utilizado para realizar el marcaje. */
-  metodo_fichaje: string;
+  tipo_evento: TipoEventoFichajeApi;
+  metodo_fichaje: MetodoFichaje;
+  fecha_hora: string;
+  fecha_hora_dispositivo: string;
+  origen: OrigenFichaje;
+  estado: EstadoFichaje;
+  latitud: number | null;
+  longitud: number | null;
+  ip_address: string | null;
+  observaciones: string | null;
 }
 
 /**
@@ -79,12 +84,12 @@ export interface FichajeCreateParams {
   centro_trabajo_id: string;
   /** Identificador del tipo de evento horario. */
   tipo_evento: TipoFichaje;
+  /** Estado aceptado actualmente por el flujo de fichaje de la interfaz. */
+  estado?: EstadoFichaje;
   /** Canal: app_movil, web, qr, etc. */
-  metodo_fichaje: string;
-  /** Origen del fichaje. */
-  origen?: string;
-  /** Estado de validez. */
-  estado?: string;
+  metodo_fichaje: MetodoFichaje;
+  fecha_hora?: string;
+  fecha_hora_dispositivo: string;
   /** Coordenada de latitud. */
   latitud?: number | null;
   /** Coordenada de longitud. */
@@ -92,17 +97,22 @@ export interface FichajeCreateParams {
   /** IP resuelta por la red. */
   ip_address?: string | null;
   /** ID del motivo de pausa si aplica. */
-  motivo_pausa_id?: number | null;
+  motivo_pausa_id?: string | null;
   /** ID del dispositivo de fichaje. */
   dispositivo_id?: string | null;
   /** Fecha y hora reportada por el dispositivo en formato de cadena. */
-  fecha_hora_dispositivo?: string | null;
   /** Observaciones adicionales. */
   observaciones?: string | null;
   /** Firma digitalizada codificada en Base64 o URL del almacenamiento. */
-  firma_digital?: string | null;
+  firma_digital: string;
   /** Bandera para forzar fichaje en festivo como horas extra. */
   forzar_hora_extra?: boolean;
+}
+
+/** Cuerpo HTTP exacto de FichajeCreate en el backend. */
+export interface FichajeCreateRequest extends Omit<FichajeCreateParams, "tipo_evento" | "fecha_hora"> {
+  tipo_evento: TipoEventoFichajeApi;
+  fecha_hora: string;
 }
 
 /**
@@ -113,38 +123,37 @@ export interface FichajeSimpleResponse extends FichajeBase {
   /** Identificador único UUID autogenerado (gen_random_uuid). */
   id: string;
   /** Instante oficial del fichaje con zona horaria (referencia legal) en formato ISO DateTime. */
-  fecha_hora: string;
-  /** Origen del registro. */
-  origen: string;
-  /** Estado de validez del fichaje. */
-  estado: string;
+  empresa_id: string;
+  trabajador_id: string;
+  centro_trabajo_id: string;
+  dispositivo_id: string | null;
+  fichaje_sustituido_id: string | null;
+  motivo_pausa_id: string | null;
   /** Firma SHA-256 de seguridad de la fila. */
   hash_integridad: string;
   /** Fecha de inserción real e inmutable calculada por el servidor (now) en formato ISO DateTime. */
   created_at: string;
   /** ID del motivo de pausa. */
-  motivo_pausa_id?: number | null;
-  /** Fecha y hora reportada por el dispositivo. */
-  fecha_hora_dispositivo?: string | null;
-  /** ID del dispositivo de fichaje. */
-  dispositivo_id?: string | null;
-  /** Latitud. */
-  latitud?: number | null;
-  /** Longitud. */
-  longitud?: number | null;
-  /** ID del fichaje anterior al que reemplaza este registro. */
-  fichaje_sustituido_id?: string | null;
-  /** Observaciones adicionales. */
-  observaciones?: string | null;
-  /** Firma digitalizada almacenada. */
-  firma_digital?: string | null;
+}
+
+export interface FichajeResponse extends FichajeSimpleResponse {
+  empresa: import("../../empresas/types/empresa").Empresa | null;
+  trabajador: Trabajador | null;
+  centro_trabajo: import("../../centros-trabajo/types/centro-trabajo").CentroTrabajo | null;
+  dispositivo: import("../../dispositivos-fichaje/types/dispositivo-fichaje").DispositivoSimpleResponse | null;
+  fichaje_sustituido: FichajeSimpleResponse | null;
+  motivo_pausa: import("../../motivos-pausa/types/motivo-pausa").MotivoPausaSimpleResponse | null;
 }
 
 /**
  * Representa la definición completa de un registro de fichaje con sus relaciones anidadas en la plataforma.
  * Sincronizado con 'FichajeResponse' de Pydantic.
  */
-export interface RegistroFichaje extends FichajeSimpleResponse {
+export interface RegistroFichaje extends Omit<FichajeResponse, "tipo_evento"> {
+  /** Evento normalizado para presentación en la interfaz. */
+  tipo_evento: TipoFichaje;
+  /** Algunos endpoints de detalle incluyen la firma digital. */
+  firma_digital?: string | null;
   /** Nombre del turno laboral asignado al trabajador en el momento del fichaje (campo complementario). */
   turno_nombre: string;
   /** Detalles del trabajador asociado. */

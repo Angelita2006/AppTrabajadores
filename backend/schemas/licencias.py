@@ -1,6 +1,7 @@
 import datetime
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, model_validator
 from typing import Optional
+from uuid import UUID
 from uuid import UUID
 from core.enums import CicloFacturacionEnum, EstadoSuscripcionEnum, PlanLicenciaEnum
 from schemas.empresas import EmpresaSimpleResponse
@@ -108,4 +109,19 @@ class LicenciaEmitirRequest(BaseModel):
     def validar_fechas(self) -> "LicenciaEmitirRequest":
         if self.fecha_expiracion < self.fecha_inicio:
             raise ValueError("La fecha de expiración debe ser igual o posterior a la fecha de inicio.")
+        return self
+
+
+class CrearCheckoutRequest(BaseModel):
+    """Datos mínimos necesarios para iniciar una compra de suscripción."""
+
+    email: EmailStr
+    plan: PlanLicenciaEnum
+    ciclo: CicloFacturacionEnum
+    clave_idempotencia: UUID
+
+    @model_validator(mode="after")
+    def validar_plan_de_pago(self) -> "CrearCheckoutRequest":
+        if self.ciclo == CicloFacturacionEnum.TRIAL:
+            raise ValueError("La prueba gratuita no se compra; inicia el registro de prueba.")
         return self

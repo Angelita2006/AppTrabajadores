@@ -77,7 +77,7 @@ export const crearFestivo = async (
 
 /**
  * Modifica un festivo existente mediante parámetros en la URL (Query Params).
- * URI: PUT /api/festivos/{id_festivo}/editar
+ * URI: PUT /api/festivos/{id_festivo}
  *
  * @async
  * @function editarFestivo
@@ -91,17 +91,7 @@ export const editarFestivo = async (
   params: FestivoUpdate,
 ): Promise<Festivo> => {
   try {
-    const response = await api.put<Festivo>(
-      `/api/festivos/${idFestivo}`,
-      null,
-      {
-        params: {
-          nueva_fecha: params.fecha,
-          nuevo_tipo: params.tipo,
-          nueva_descripcion: params.descripcion,
-        },
-      },
-    );
+    const response = await api.put<Festivo>(`/api/festivos/${idFestivo}`, params);
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;

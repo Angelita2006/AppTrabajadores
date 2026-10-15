@@ -33,7 +33,7 @@ export const crearCorreccion = async (
 ): Promise<CorreccionFichajeResponse> => {
   try {
     const response = await api.post<CorreccionFichajeResponse>(
-      "/api/correcciones-fichaje",
+      "/api/correcciones",
       {
         ...payload,
         tipo_evento: EVENTOS_BACKEND[payload.tipo_evento] ?? payload.tipo_evento,
@@ -62,7 +62,7 @@ export const obtenerTodasLasCorrecciones = async (idEmpresa: string): Promise<
 > => {
   try {
     const response =
-      await api.get<CorreccionFichajeResponse[]>(`/api/correcciones-fichaje/empresa/${idEmpresa}`);
+      await api.get<CorreccionFichajeResponse[]>(`/api/correcciones/empresa/${idEmpresa}`);
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
@@ -87,7 +87,7 @@ export const obtenerCorreccionesPorEmpresa = async (
 ): Promise<CorreccionFichajeResponse[]> => {
   try {
     const response = await api.get<CorreccionFichajeResponse[]>(
-      `/api/correcciones-fichaje/empresa/${idEmpresa}`,
+      `/api/correcciones/empresa/${idEmpresa}`,
     );
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
@@ -114,7 +114,7 @@ export const obtenerCorreccionesPorTrabajador = async (
 ): Promise<CorreccionFichajeResponse[]> => {
   try {
     const response = await api.get<CorreccionFichajeResponse[]>(
-      `/api/correcciones-fichaje/trabajador/${idTrabajador}`,
+      `/api/correcciones/trabajador/${idTrabajador}`,
     );
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
@@ -146,7 +146,7 @@ export const resolverCorreccion = async (
 ): Promise<any> => {
   try {
     const response = await api.put<CorreccionFichajeResponse>(
-      `/api/correcciones-fichaje/${idCorreccion}/resolver`,
+      `/api/correcciones/${idCorreccion}/resolver`,
       { estado: nuevoEstado, firma_resolutor: firmaResolutor },
     );
     return normalizarCorreccion(response.data);
@@ -173,7 +173,7 @@ export const eliminarCorreccion = async (
   idCorreccion: string,
 ): Promise<void> => {
   try {
-    await api.delete(`/api/correcciones-fichaje/${idCorreccion}`);
+    await api.delete(`/api/correcciones/${idCorreccion}`);
   } catch (error: any) {
     const apiMessage = error?.response?.data?.message;
     throw new Error(

@@ -4,7 +4,6 @@ import {
     solicitarAusencia,
 } from "@/src/modules/ausencias/api/services";
 import { obtenerTrabajadoresEmpresa } from "@/src/modules/empresas/api/services";
-import { obtenerRolPorId } from "@/src/modules/roles/api/services";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
@@ -81,25 +80,7 @@ export default function GestionAusenciasScreen() {
       try {
         const lista = await obtenerTrabajadoresEmpresa(empresaActual.id);
         if (Array.isArray(lista)) {
-          const trabajadoresSinAdmin = (
-            await Promise.all(
-              lista.map(async (t: Trabajador) => {
-                if (!t.rol_id) return t;
-                try {
-                  const rol = await obtenerRolPorId(t.rol_id);
-                  const esAdmin =
-                    rol?.nombre === "Admin_empresa" ||
-                    rol?.nombre === "Admin_gestoría";
-                  const esActivo = t.activo;
-                  return esAdmin ? null : esActivo ? t : null;
-                } catch {
-                  return t;
-                }
-              }),
-            )
-          ).filter(Boolean) as Trabajador[];
-
-          const trabajadoresFiltrados = trabajadoresSinAdmin.sort((a, b) => {
+          const trabajadoresFiltrados = lista.filter((t) => t.activo).sort((a, b) => {
             const nombreA = `${a.nombre ?? ""} ${a.apellidos ?? ""}`
               .trim()
               .toLowerCase();
@@ -500,7 +481,7 @@ export default function GestionAusenciasScreen() {
       ) : (
         <View style={{ paddingBottom: 40 }}>
           {listaFiltrada.map((item) => {
-            const colores = getColoresEstado(item.estado);
+            const colores = getColoresEstado(item.estado ?? "Pendiente");
             const isBusy = procesandoId !== null;
             const isCurrentProcessing = procesandoId === item.id;
 

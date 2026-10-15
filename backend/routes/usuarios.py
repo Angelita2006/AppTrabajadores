@@ -3,21 +3,25 @@ from typing import Optional
 from uuid import UUID
 import hashlib
 import secrets
+import os
 
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    File,
     HTTPException,
     Request,
     status,
+    UploadFile,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy import func
-from sqlalchemy.orm import joinedload, Session
+from sqlalchemy.orm import joinedload, selectinload, Session
 
+from core.archivos import CARPETA_FOTOS_USUARIOS
 from core.auditoria import registrar_auditoria
 from core.database import get_db
 from core.enums import (
@@ -133,7 +137,6 @@ def obtener_mis_accesos(
             .filter(
                 UsuariosEmpresas.usuario_id == usuario_actual.id,
                 UsuariosEmpresas.activo.is_(True),
-                Roles.activo.is_(True),
                 Roles.tipo == TipoRolEnum.ADMIN_GESTORIA,
                 GestoriasEmpresas.empresa_cliente_id == empresa_id,
                 GestoriasEmpresas.activo.is_(True),
@@ -191,6 +194,119 @@ def obtener_mis_accesos(
     db.commit()
     return accesos
 
+
+@router.put(
+    "/me/foto",
+    response_model=UsuarioSimpleResponse,
+    summary="Actualizar mi avatar de cuenta",
+    description="Guarda una imagen privada asociada a la cuenta, independiente de las fotografías laborales.",
+)
+@limiter.limit("20/minute")
+async def actualizar_mi_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.MODIFICAR
+        + "-"
+        + TipoPermisoEnum.USUARIOS
+        + "-"
+        + AlcancePermisoEnum.PROPIO
+    ])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**PUT /api/usuarios/me/foto**
+
+    Actualiza el avatar global de la cuenta autenticada.
+    """
+    contenido = await file.read(5_000_001)
+    if len(contenido) > 5_000_000:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="La imagen supera el tamaño máximo de 5 MB.",
+        )
+
+    extensiones = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    extension = extensiones.get(file.content_type or "")
+    firma_valida = (
+        (extension == "jpg" and contenido.startswith(b"\xff\xd8\xff"))
+        or (extension == "png" and contenido.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (
+            extension == "webp"
+            and len(contenido) >= 12
+            and contenido[:4] == b"RIFF"
+            and contenido[8:12] == b"WEBP"
+        )
+    )
+    if not extension or not firma_valida:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo no es una imagen JPEG, PNG o WEBP válida.",
+        )
+
+    # La dependencia de permisos autentica con get_db, mientras este endpoint
+    # persiste con get_db_with_advanced_security. Vuelve a cargar la cuenta en
+    # la sesión de escritura para no modificar una instancia ya separada.
+    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_actual.id).first()
+    if usuario is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No se pudo validar la cuenta autenticada.",
+        )
+
+    os.makedirs(CARPETA_FOTOS_USUARIOS, exist_ok=True)
+    nombre_archivo = f"usuario_{usuario.id}.{extension}"
+    ruta_destino = CARPETA_FOTOS_USUARIOS / nombre_archivo
+    ruta_anterior = usuario.foto_url
+    try:
+        ruta_destino.write_bytes(contenido)
+        setattr(
+            usuario,
+            "foto_url",
+            f"/api/archivos/fotos_usuarios/{nombre_archivo}?t={int(datetime.now().timestamp())}",
+        )
+        setattr(usuario, "updated_at", datetime.now(timezone.utc))
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario.id,
+            empresa_id=None,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "usuarios", "accion": "actualizar_avatar"},
+            trabajador_id=None,
+        )
+        db.commit()
+        db.refresh(usuario)
+
+        if ruta_anterior:
+            nombre_anterior = ruta_anterior.split("?", 1)[0].rsplit("/", 1)[-1]
+            if nombre_anterior != nombre_archivo:
+                archivo_anterior = CARPETA_FOTOS_USUARIOS / nombre_anterior
+                try:
+                    if archivo_anterior.is_file():
+                        archivo_anterior.unlink()
+                except OSError as error_limpieza:
+                    # La actualización ya está confirmada; un fallo de limpieza no debe
+                    # convertir una subida correcta en una respuesta de error.
+                    print(
+                        f"No se pudo eliminar el avatar anterior del usuario "
+                        f"({usuario.id}): {error_limpieza}."
+                    )
+        return usuario
+    except OSError as error:
+        db.rollback()
+        print(f"No se pudo guardar el avatar de usuario ({usuario.id}): {error}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo guardar la imagen de perfil.",
+        ) from error
+    except Exception as error:
+        db.rollback()
+        print(f"No se pudo actualizar el avatar de usuario ({usuario.id}): {error}.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo actualizar la imagen de perfil.",
+        ) from error
+
 @router.get(
     "/me",
     response_model=UsuarioSimpleResponse,
@@ -215,7 +331,7 @@ def obtener_mi_usuario(
     # Validaciones estructurales básicas
     usuario = (
         db.query(Usuarios).options(
-        joinedload(Usuarios.trabajador),
+        selectinload(Usuarios.trabajadores),
         joinedload(Usuarios.usuarios_empresas))
         .filter(Usuarios.id == usuario_actual.id)
         .first()
@@ -304,9 +420,10 @@ def confirmar_cambio_email(
 
         db.add(usuario)
 
-        trabajador = db.query(Trabajadores).filter(Trabajadores.id == usuario.trabajador_id).first()
-
-        if trabajador:
+        trabajadores = db.query(Trabajadores).filter(
+            Trabajadores.usuario_id == usuario.id,
+        ).all()
+        for trabajador in trabajadores:
             setattr(trabajador, 'updated_at', datetime.now(timezone.utc))
             db.add(trabajador)
 
@@ -316,13 +433,13 @@ def confirmar_cambio_email(
             db=db,
             request=request,
             usuario_id=usuario.id,
-            empresa_id=trabajador.empresa_id if trabajador else None,
+            empresa_id=None,
             accion=AccionAuditoriaEnum.MODIFICACION,
             detalle={
                 'recurso': 'usuarios',
                 'accion': 'confirmar_cambio_email',
             },
-            trabajador_id=usuario.trabajador_id,
+            trabajador_id=None,
         )
         db.commit()
 
@@ -438,7 +555,7 @@ def login_plataforma(
     # Validaciones estructurales básicas
     usuario = (
         db.query(Usuarios).options(
-        joinedload(Usuarios.trabajador),
+        selectinload(Usuarios.trabajadores),
         joinedload(Usuarios.usuarios_empresas))
         .filter(Usuarios.email == str(credenciales.email).strip().lower(), Usuarios.activo.is_(True))
         .first()
@@ -622,7 +739,7 @@ def crear_usuario(
 
     usuario = (
         db.query(Usuarios).options(
-        joinedload(Usuarios.trabajador),
+        selectinload(Usuarios.trabajadores),
         joinedload(Usuarios.usuarios_empresas))
         .filter(Usuarios.id == nuevo_usuario.id)
         .first()
@@ -787,7 +904,7 @@ def modificar_estado_usuario(
     # Validaciones estructurales básicas
     usuario = (
         db.query(Usuarios).options(
-        joinedload(Usuarios.trabajador),
+        selectinload(Usuarios.trabajadores),
         joinedload(Usuarios.usuarios_empresas))
         .filter(Usuarios.id == id_usuario)
         .first()

@@ -216,7 +216,7 @@ def enviar_correo_recuperacion_contraseña(destinatario: str, codigo: str):
 
         mensaje.attach(MIMEText(html, "html", "utf-8"))
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as servidor:
+        with smtplib.SMTP(str(SMTP_SERVER), SMTP_PORT) as servidor:
             servidor.starttls()
             servidor.login(SMTP_USER, SMTP_PASSWORD)
             servidor.sendmail(SMTP_USER, destinatario, mensaje.as_string())

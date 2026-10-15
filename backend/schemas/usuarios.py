@@ -16,6 +16,7 @@ class UsuarioBase(BaseModel):
 
     email: EmailStr = Field(..., max_length=30, description="Correo electrónico único de acceso")
     telefono: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso")
+    foto_url: Optional[str] = Field(None, description="Ruta privada del avatar de la cuenta")
 
     activo: Optional[bool] = Field(True, description="Indica si el usuario está activo o no")
 

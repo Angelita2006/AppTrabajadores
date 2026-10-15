@@ -1,3 +1,4 @@
+import { TipoContratoEnum, TipoJornadaEnum } from "../../../constants/enums";
 import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Departamento } from "../../departamentos/types/departamento";
@@ -9,20 +10,7 @@ import { Trabajador } from "../../trabajadores/types/trabajador";
  * sincronizados exactamente con el esquema del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_CONTRATO = {
-  /** Contrato laboral de duración indefinida. */
-  INDEFINIDO: "Indefinido",
-  /** Contrato laboral de carácter temporal o por obra/servicio. */
-  TEMPORAL: "Temporal",
-  /** Contrato enfocado a la formación y aprendizaje del empleado. */
-  FORMACION: "Formación",
-  /** Contrato en prácticas profesionales para titulados. */
-  PRACTICAS: "Prácticas",
-  /** Contrato fijo discontinuo para trabajos estacionales o periódicos. */
-  FIJO_DISCONTINUO: "Fijo_discontinuo",
-  /** Cualquier otro tipo de modalidad contractual no especificada. */
-  OTRO: "Otro",
-} as const;
+export const TIPOS_CONTRATO = TipoContratoEnum;
 
 /**
  * Tipo de unión que representa los diferentes tipos de contratos laborales permitidos.
@@ -34,12 +22,7 @@ export type TipoContrato = (typeof TIPOS_CONTRATO)[keyof typeof TIPOS_CONTRATO];
  * sincronizados exactamente con el esquema del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_JORNADA = {
-  /** Jornada laboral completa según convenio o legislación vigente. */
-  COMPLETA: "Completa",
-  /** Jornada laboral parcial con cómputo reducido de horas semanales. */
-  PARCIAL: "Parcial",
-} as const;
+export const TIPOS_JORNADA = TipoJornadaEnum;
 
 /**
  * Tipo de unión que representa los regímenes de jornada laboral permitidos.
@@ -57,10 +40,8 @@ export interface ContratoCreate {
   empresa_id: string;
   /** Identificador UUID único del centro de trabajo asignado. */
   centro_trabajo_id: string;
-  /** Identificador UUID opcional del departamento al que pertenece el contrato. */
-  departamento_id?: string | null;
-  /** Identificador UUID opcional del calendario laboral o festivo asignado. */
-  calendario_laboral_id?: string | null;
+  /** Identificador UUID del departamento vinculado. */
+  departamento_id: string;
   /** Modalidad o tipo de contrato aplicable. */
   tipo_contrato: TipoContrato;
   /** Régimen de la jornada laboral aplicable. */
@@ -71,6 +52,7 @@ export interface ContratoCreate {
   puesto_trabajo?: string | null;
   /** Categoría profesional asignada según convenio. */
   categoria_profesional?: string | null;
+  pdf_url?: string | null;
   /** Fecha de inicio de vigencia del contrato en formato "AAAA-MM-DD". */
   fecha_inicio: string;
   /** Fecha de finalización del contrato en formato "AAAA-MM-DD", o nula si es indefinido. */
@@ -84,14 +66,12 @@ export interface ContratoCreate {
  * Sincronizado con 'ContratoUpdate' de Pydantic (campos opcionales).
  */
 export interface ContratoUpdate {
-  centro_trabajo_id?: string;
-  departamento_id?: string | null;
-  calendario_laboral_id?: string | null;
   tipo_contrato?: TipoContrato;
   tipo_jornada?: TipoJornada;
   horas_semana?: number;
   puesto_trabajo?: string | null;
   categoria_profesional?: string | null;
+  pdf_url?: string | null;
   fecha_inicio?: string;
   fecha_fin?: string | null;
   activo?: boolean;
@@ -111,9 +91,7 @@ export interface ContratoSimpleResponse {
   /** Identificador UUID único del centro de trabajo asignado. */
   centro_trabajo_id: string;
   /** Identificador UUID opcional del departamento al que pertenece el contrato. */
-  departamento_id?: string | null;
-  /** Identificador UUID opcional del calendario laboral o festivo asignado. */
-  calendario_laboral_id?: string | null;
+  departamento_id: string;
   /** Modalidad o tipo de contrato aplicable. */
   tipo_contrato: TipoContrato;
   /** Régimen de la jornada laboral aplicable. */
@@ -124,12 +102,13 @@ export interface ContratoSimpleResponse {
   puesto_trabajo?: string | null;
   /** Categoría profesional asignada según convenio. */
   categoria_profesional?: string | null;
+  pdf_url?: string | null;
   /** Fecha de inicio de vigencia del contrato en formato estándar "AAAA-MM-DD". */
   fecha_inicio: string;
   /** Fecha de finalización del contrato en formato "AAAA-MM-DD", o nula si es indefinido. */
   fecha_fin?: string | null;
   /** Indicador booleano que determina si el contrato se encuentra activo actualmente. */
-  activo: boolean;
+  activo: boolean | null;
   /** Marca de tiempo (ISO 8601 con zona horaria) de la fecha de creación del registro. */
   created_at: string;
   /** Marca de tiempo (ISO 8601 con zona horaria) de la última actualización del registro. */
@@ -142,6 +121,8 @@ export interface ContratoSimpleResponse {
  * (trabajador, empresa, centro_trabajo, departamento y calendario_laboral).
  */
 export interface Contrato extends ContratoSimpleResponse {
+  /** Campo legado/derivado usado por algunas pantallas, fuera del contrato REST. */
+  calendario_laboral_id?: string | null;
   /** Relación opcional enriquecida para cargas anidadas del trabajador vinculado. */
   trabajador?: Trabajador | null;
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
@@ -150,6 +131,9 @@ export interface Contrato extends ContratoSimpleResponse {
   centro_trabajo?: CentroTrabajo | null;
   /** Relación opcional enriquecida para cargas anidadas del departamento vinculado. */
   departamento?: Departamento | null;
-  /** Relación opcional enriquecida para cargas anidadas del calendario festivo vinculado. */
+}
+
+/** Campos calculados por la interfaz; no forman parte de ContratoResponse. */
+export interface ContratoView extends Contrato {
   calendario_laboral?: CalendarioFestivo | null;
 }

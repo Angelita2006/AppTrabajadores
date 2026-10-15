@@ -7,9 +7,12 @@ import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -28,6 +31,8 @@ import { ThemedText } from "../../src/shared/components/ThemedText";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
 
 export default function RecuperarPasswordScreen() {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   const router = useRouter();
   const [paso, setPaso] = useState<1 | 2>(1); // 1 = Pedir Email, 2 = Validar Código y Cambiar Password
 
@@ -133,20 +138,27 @@ export default function RecuperarPasswordScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
-      {mostrarFondo &&
+      {mostrarFondo && theme === "dark" &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
       >
-        <Animated.View style={[styles.loginCard, estiloTarjetaAnimada]}>
+        <Animated.View
+          style={[styles.loginCard, { backgroundColor: colors.card }, estiloTarjetaAnimada]}
+        >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
-              <IconSymbol name="lock" size={26} color="#FFFFFF" />
+              <Image
+                source={require("../../assets/icons/logoB.png")}
+                style={styles.logoImage}
+                resizeMode="cover"
+                accessibilityLabel="Logotipo de Fichapp"
+              />
             </View>
             <ThemedText style={styles.mainTitle}>Recuperación</ThemedText>
             <ThemedText style={styles.subtitle}>
@@ -326,11 +338,16 @@ const styles = StyleSheet.create({
   logoBranding: {
     width: 52,
     height: 52,
-    backgroundColor: "#EA580C",
+    backgroundColor: "#011640",
+    overflow: "hidden",
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   mainTitle: {
     fontSize: 24,

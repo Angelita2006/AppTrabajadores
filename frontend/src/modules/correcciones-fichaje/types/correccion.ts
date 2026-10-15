@@ -1,5 +1,6 @@
+import { TipoCorreccionEnum, EstadoCorreccionEnum } from "../../../constants/enums";
 import { Empresa } from "../../empresas/types/empresa";
-import { RegistroFichaje, TipoFichaje } from "../../fichajes/types/registrofichaje";
+import { RegistroFichaje, TipoEventoFichajeApi } from "../../fichajes/types/registrofichaje";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { UsuarioResponse } from "../../usuarios/types/usuario";
 
@@ -8,14 +9,7 @@ import { UsuarioResponse } from "../../usuarios/types/usuario";
  * sincronizadas exactamente con el esquema del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_CORRECCION = {
-  /** Alta manual de un registro horario. */
-  ALTA_MANUAL: "Alta_manual",
-  /** Modificación de un registro horario existente. */
-  MODIFICACION: "Modificación",
-  /** Anulación de un registro horario. */
-  ANULACION: "Anulación",
-} as const;
+export const TIPOS_CORRECCION = TipoCorreccionEnum;
 
 /**
  * Tipo de unión que representa las diferentes categorías de corrección o ajuste permitidas.
@@ -28,14 +22,7 @@ export type TipoCorreccion =
  * sincronizadas exactamente con el esquema del backend.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const ESTADOS_CORRECCION = {
-  /** La incidencia ha sido creada y está pendiente de revisión por parte de un administrador o supervisor. */
-  PENDIENTE: "Pendiente",
-  /** La incidencia ha sido evaluada y aprobada oficialmente en el sistema. */
-  APROBADA: "Aprobada",
-  /** La incidencia ha sido rechazada por el administrador o supervisor. */
-  RECHAZADA: "Rechazada",
-} as const;
+export const ESTADOS_CORRECCION = EstadoCorreccionEnum;
 
 /**
  * Tipo de unión que representa los estados posibles en el flujo de aprobación de una incidencia.
@@ -55,7 +42,7 @@ export interface CorreccionFichajeBase {
   /** Tipo de rectificación horaria solicitada. */
   tipo_correccion: TipoCorreccion;
   /** ID único UUID del tipo de evento de fichaje correspondiente. */
-  tipo_evento: TipoFichaje;
+  tipo_evento: TipoEventoFichajeApi;
   /** ID del fichaje original que se desea corregir o anular. */
   fichaje_afectado_id?: string | null;
   /** Valores previos almacenados en formato JSON. */

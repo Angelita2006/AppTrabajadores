@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+from uuid import UUID
 from models.roles import Roles
 from models.permisos import Permisos
 from models.roles_permisos import RolesPermisos
@@ -62,8 +64,19 @@ def inicializar_roles_sistema(db: Session):
     Verifica si existen los roles del sistema base y los inserta si falta alguno,
     respetando los UUIDs predefinidos.
     """
+    # La política RLS de roles globales solo permite su gestión desde el proceso
+    # de inicialización del sistema o desde un superadministrador autorizado.
+    db.execute(
+        text(
+            "SELECT set_config('app.is_superadmin', 'true', true), "
+            "set_config('app.current_empresa_id', '00000000-0000-0000-0000-000000000000', true), "
+            "set_config('app.allowed_empresa_ids', 'ARRAY[]', true)"
+        )
+    )
+
     for rol_data in ROLES_SISTEMA_INICIALES:
-        rol_existente = db.query(Roles).filter(Roles.id == rol_data["id"]).first()
+        id_rol = UUID(rol_data["id"])
+        rol_existente = db.query(Roles).filter(Roles.id == id_rol).first()
         if rol_existente is None:
             rol_existente = (
                 db.query(Roles)
@@ -75,7 +88,7 @@ def inicializar_roles_sistema(db: Session):
             )
         if not rol_existente:
             nuevo_rol = Roles(
-                id=rol_data["id"],
+                id=id_rol,
                 empresa_id=None,
                 nombre=rol_data["nombre"],
                 tipo=rol_data["tipo"],
@@ -280,6 +293,13 @@ def inicializar_relaciones_roles_permisos(db: Session) -> None:
 
 def inicializar_politica_retencion_global(db: Session) -> None:
     """Crea la política global legal mínima si no existe todavía."""
+    db.execute(
+        text(
+            "SELECT set_config('app.is_superadmin', 'true', true), "
+            "set_config('app.current_empresa_id', '00000000-0000-0000-0000-000000000000', true), "
+            "set_config('app.allowed_empresa_ids', 'ARRAY[]', true)"
+        )
+    )
     politica = db.query(PoliticasRetencion).filter(
         PoliticasRetencion.empresa_id.is_(None)
     ).first()
@@ -289,4 +309,4 @@ def inicializar_politica_retencion_global(db: Session) -> None:
             anios_conservacion=4,
             accion_tras_periodo=AccionRetencionEnum.ARCHIVAR,
         ))
-        db.commit()
+    db.commit()

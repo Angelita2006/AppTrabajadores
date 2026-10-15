@@ -1,19 +1,12 @@
 import { Empresa } from "../../empresas/types/empresa";
 import { Trabajador } from "../../trabajadores/types/trabajador";
+import { TipoRolEnum } from "../../../constants/enums";
 
 /**
  * Listado estático de los tipos de perfiles de usuario permitidos dentro de la aplicación.
  * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
  */
-export const TIPOS_USUARIO = {
-  SUPERADMINISTRADOR: "Superadministrador",
-  ADMIN_GESTORIA: "Admin_gestoría",
-  ADMIN_EMPRESA: "Admin_empresa",
-  RRHH: "Rrhh",
-  REPRESENTANTE_LEGAL: "Representante_legal",
-  TRABAJADOR: "Trabajador",
-  AUDITOR_ITSS: "Auditor_itss",
-} as const;
+export const TIPOS_USUARIO = TipoRolEnum;
 
 /**
  * Tipo de unión que representa los perfiles de usuario permitidos dentro de la aplicación.
@@ -37,6 +30,24 @@ export interface UsuarioCreateRequest {
   empresa_id?: string | null;
   /** Identificador del trabajador asociado (UUID). */
   trabajador_id?: string | null;
+}
+
+/** Request alineado con UsuarioCreate del backend. */
+export interface UsuarioCreate {
+  nombre: string;
+  email: string;
+  telefono?: string | null;
+  password: string;
+  activo?: boolean | null;
+}
+
+/** Request parcial alineado con UsuarioUpdate del backend. */
+export interface UsuarioUpdate {
+  nombre?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  password?: string | null;
+  activo?: boolean | null;
 }
 
 /**
@@ -69,8 +80,6 @@ export interface LoginRequest {
 export interface UsuarioResponse {
   /** Identificador de la empresa asociada (UUID). */
   empresa_id?: string | null;
-  /** Identificador del trabajador asociado (UUID). */
-  trabajador_id?: string | null;
   /** Identificador único del usuario (UUID). */
   id: string;
   /** Nombre completo. */
@@ -89,6 +98,8 @@ export interface UsuarioResponse {
   updated_at: string;
   /** Timestamp fecha y hora del último acceso del usuario o null si todavía no ha accedido. */
   ultimo_acceso: string | null;
+  /** Ruta privada del avatar propio, independiente de las fotos laborales. */
+  foto_url: string | null;
 
   /** Detalles opcionales de la empresa asociada. */
   empresa?: Empresa | null;
@@ -116,10 +127,10 @@ export interface LoginResponse {
 export interface UsuarioSesion {
   /** Identificador único universal (UUID) de la cuenta de usuario. */
   id: string;
+  /** ID de la ficha laboral de la empresa activa; enriquecido en cliente. */
+  trabajador_id?: string | null;
   /** Identificador de la empresa asociada (UUID). */
   empresa_id?: string | null;
-  /** Identificador del trabajador asociado (UUID). */
-  trabajador_id?: string | null;
   /** Nombre completo del usuario. */
   nombre: string;
   /** Correo electrónico de acceso. */
@@ -136,6 +147,8 @@ export interface UsuarioSesion {
   created_at: string;
   /** Timestamp de la fecha y hora de la última modificación de la cuenta. */
   updated_at: string;
+  /** Ruta privada del avatar propio, independiente de las fotos laborales. */
+  foto_url?: string | null;
 
   /** Relación opcional de la empresa vinculada a la sesión. */
   empresa?: Empresa | null;

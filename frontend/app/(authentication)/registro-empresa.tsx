@@ -1,7 +1,10 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -35,6 +38,10 @@ import {
  * Componente principal que renderiza el formulario de alta de organización, trabajador admin y usuario.
  */
 export default function RegistroOrganizacionScreen() {
+  const parametros = useLocalSearchParams<{ prueba?: string; codigo_licencia?: string }>();
+  const esPrueba = parametros.prueba === "1";
+  const theme = useColorScheme();
+  const colors = Colors[theme];
   // Campo de Licencia
   const [codigoLicencia, setCodigoLicencia] = useState("");
 
@@ -101,8 +108,14 @@ export default function RegistroOrganizacionScreen() {
     return () => clearTimeout(timer);
   }, [opacidadTarjeta]);
 
+  useEffect(() => {
+    if (typeof parametros.codigo_licencia === "string") {
+      setCodigoLicencia(parametros.codigo_licencia.toUpperCase());
+    }
+  }, [parametros.codigo_licencia]);
+
   const validarFormulario = () => {
-    const esLicenciaValida = validarTextoObligatorio(codigoLicencia, 3);
+    const esLicenciaValida = esPrueba || validarTextoObligatorio(codigoLicencia, 3);
     const esRazonValida = validarTextoObligatorio(razonSocial, 3);
     const esCifValido = validarCifNifOrganizacion(cif);
     const esNombreAdminValido = validarTextoObligatorio(nombreAdmin, 2);
@@ -134,7 +147,7 @@ export default function RegistroOrganizacionScreen() {
 
   const handleRegistroOrganizacion = async () => {
     // 1. Validar Licencia obligatoria
-    if (!validarTextoObligatorio(codigoLicencia, 3)) {
+    if (!esPrueba && !validarTextoObligatorio(codigoLicencia, 3)) {
       mostrarError(
         "Por favor, introduce un código de licencia válido (mínimo 3 caracteres).",
       );
@@ -221,11 +234,12 @@ export default function RegistroOrganizacionScreen() {
       setCargando(true);
 
       await registrarOrganizacionCompleta({
-        codigo_licencia: codigoLicencia.trim().toUpperCase(),
+        codigo_licencia: esPrueba ? "" : codigoLicencia.trim().toUpperCase(),
         razon_social: razonSocial.trim(),
         nombre_comercial: nombreComercial.trim(),
         cif: cif.trim().toUpperCase(),
-        direccion_fiscal: direccionFiscal.trim(),
+        zona_horaria: "Europe/Madrid",
+        direccion: direccionFiscal.trim(),
         codigo_cnae: codigoCnae.trim(),
         convenio_colectivo: convenioColectivo.trim(),
         logo_url: null,
@@ -234,7 +248,7 @@ export default function RegistroOrganizacionScreen() {
         apellidos_admin: apellidosAdmin.trim(),
         dni_nif_nie_admin: dniAdmin.trim().toUpperCase(),
         email_admin: emailAdmin.trim(),
-        password_raw: password,
+        password,
         telefono_admin: telefonoAdmin.trim(),
         nss_admin: nssAdmin.trim(),
         fecha_nacimiento_admin: fechaNacimientoAdmin.trim(),
@@ -271,9 +285,9 @@ export default function RegistroOrganizacionScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
     >
-      {mostrarFondo &&
+      {mostrarFondo && theme === "dark" &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
@@ -281,16 +295,28 @@ export default function RegistroOrganizacionScreen() {
         bounces={false}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={[styles.registerCard, estiloTarjetaAnimada]}>
+        <Animated.View
+          style={[
+            styles.registerCard,
+            { backgroundColor: colors.card },
+            estiloTarjetaAnimada,
+          ]}
+        >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
-              <IconSymbol name="business" size={28} color="#FFFFFF" />
+              <Image
+                source={require("../../assets/icons/logoB.png")}
+                style={styles.logoImage}
+                resizeMode="cover"
+                accessibilityLabel="Logotipo de Fichapp"
+              />
             </View>
             <ThemedText style={styles.mainTitle}>
               Registro de Empresa
             </ThemedText>
           </View>
 
+          {!esPrueba && <>
           {/* SECCIÓN: DATOS DE LICENCIA */}
           <ThemedText style={styles.seccionSubtitulo}>
             Licencia de Activación
@@ -336,6 +362,7 @@ export default function RegistroOrganizacionScreen() {
           </View>
 
           <View style={styles.divisor} />
+          </>}
 
           {/* SECCIÓN: DATOS DE LA EMPRESA */}
           <ThemedText style={styles.seccionSubtitulo}>
@@ -900,11 +927,16 @@ const styles = StyleSheet.create({
   logoBranding: {
     width: 56,
     height: 56,
-    backgroundColor: "#EA580C",
+    backgroundColor: "#011640",
+    overflow: "hidden",
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
   mainTitle: {
     fontSize: 24,

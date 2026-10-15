@@ -1,5 +1,7 @@
 import { ReactNode } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { Colors } from "../../constants/theme";
+import { useColorScheme } from "../../hooks/use-color-scheme";
 import { ThemedText } from "../components/ThemedText";
 
 // INTERFACES (TIPOS)
@@ -27,10 +29,15 @@ interface StatCardProps {
  * estándar con scroll automático
  */
 export function AppScreen({ title, subtitle, children }: AppScreenProps) {
+  const theme = useColorScheme();
+
   return (
     <View style={styles.mainContainer}>
       {/* ScrollView por encima del fondo */}
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={[styles.screen, { backgroundColor: Colors[theme].background }]}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.header}>
           <ThemedText style={styles.kicker}>FICHAPP</ThemedText>
 
@@ -54,7 +61,17 @@ export function AppScreen({ title, subtitle, children }: AppScreenProps) {
  * secciones de información
  */
 export function Card({ children }: { children: ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
+  const theme = useColorScheme();
+  return (
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: Colors[theme].card, borderColor: Colors[theme].border },
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 /**
@@ -70,8 +87,26 @@ export function Row({ children }: { children: ReactNode }) {
  * color de fondo según su estado emocional/tono
  */
 export function StatCard({ label, value, tone = "neutral" }: StatCardProps) {
+  const theme = useColorScheme();
+  const colors = Colors[theme];
+  const toneStyles = {
+    neutral: { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+    success: {
+      backgroundColor: colors.successBackground,
+      borderColor: colors.successBorder,
+    },
+    warning: {
+      backgroundColor: colors.warningBackground,
+      borderColor: colors.warningBorder,
+    },
+    danger: {
+      backgroundColor: colors.dangerBackground,
+      borderColor: colors.dangerBorder,
+    },
+  }[tone];
+
   return (
-    <View style={[styles.stat, styles[tone]]}>
+    <View style={[styles.stat, toneStyles]}>
       <ThemedText style={styles.statLabel}>{label}</ThemedText>
       <ThemedText style={styles.statValue}>{value}</ThemedText>
     </View>
@@ -88,7 +123,6 @@ const styles = StyleSheet.create({
     // hace que ocupe todo el espacio disponible del dispositivo
     flex: 1,
     // color de fondo (gris)
-    backgroundColor: "#F6F8FB",
   },
   // contenedor del contenido
   content: {
@@ -144,9 +178,6 @@ const styles = StyleSheet.create({
   // estilo de tarjetas
   card: {
     // fondo blanco
-    backgroundColor: "#FFFFFF",
-    // borde gris claro
-    borderColor: "#E2E8F0",
     // bordes redondeados
     borderRadius: 8,
     // ancho del borde (1)
@@ -177,26 +208,6 @@ const styles = StyleSheet.create({
     minWidth: 150,
     // espacio interno de 14 px
     padding: 14,
-  },
-  // fondo gris claro con borde gris (informativo general)
-  neutral: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-  },
-  // fondo verce claro con borde verde (positivo)
-  success: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#BBF7D0",
-  },
-  // fondo amarillo claro con borde amarillo (advertencia)
-  warning: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
-  },
-  // fondo rojo claro con borde rojo (error)
-  danger: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FECACA",
   },
   // texto del mensaje
   statLabel: {
