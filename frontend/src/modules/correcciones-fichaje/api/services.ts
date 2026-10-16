@@ -41,7 +41,7 @@ export const crearCorreccion = async (
     );
     return normalizarCorreccion(response.data);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar la solicitud de corrección horaria.",
     );
@@ -65,7 +65,7 @@ export const obtenerTodasLasCorrecciones = async (idEmpresa: string): Promise<
       await api.get<CorreccionFichajeResponse[]>(`/api/correcciones/empresa/${idEmpresa}`);
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener el listado completo de correcciones.",
     );
@@ -91,7 +91,7 @@ export const obtenerCorreccionesPorEmpresa = async (
     );
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener las correcciones de la empresa ${idEmpresa}.`,
@@ -118,7 +118,7 @@ export const obtenerCorreccionesPorTrabajador = async (
     );
     return response.data.map(normalizarCorreccion);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener las correcciones del trabajador ${idTrabajador}.`,
@@ -151,7 +151,7 @@ export const resolverCorreccion = async (
     );
     return normalizarCorreccion(response.data);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al resolver la solicitud de corrección ${idCorreccion}.`,
@@ -175,7 +175,7 @@ export const eliminarCorreccion = async (
   try {
     await api.delete(`/api/correcciones/${idCorreccion}`);
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al eliminar la solicitud de corrección ${idCorreccion}.`,

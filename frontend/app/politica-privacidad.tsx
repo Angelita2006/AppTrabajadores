@@ -1,7 +1,14 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Colors } from "../src/constants/theme";
 import { useColorScheme } from "../src/hooks/use-color-scheme";
 
@@ -17,10 +24,29 @@ export default function PoliticaPrivacidadScreen() {
       ]}
     >
       <View
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
       >
+        {/* Cabecera con Logotipo y Branding unificado */}
+        <View style={styles.headerContenedor}>
+          <View style={styles.logoBranding}>
+            <Image
+              source={require("../assets/icons/logo.png")}
+              style={styles.logoImage}
+              resizeMode="cover"
+              accessibilityLabel="Logotipo de Fichapp"
+            />
+          </View>
+          <ThemedText style={styles.mainTitle}>FICHAPP</ThemedText>
+          <ThemedText style={styles.subtitle}>
+            Portal de Control Horario
+          </ThemedText>
+        </View>
+
         <ThemedText style={styles.title}>Política de Privacidad</ThemedText>
-        <ThemedText style={styles.subtitle}>
+        <ThemedText style={styles.subtitleCard}>
           Información legal sobre el control horario
         </ThemedText>
 
@@ -63,10 +89,10 @@ export default function PoliticaPrivacidadScreen() {
 
         <Pressable
           onPress={() => router.push("/")}
-          style={{ alignSelf: "center", marginTop: 20 }}
+          style={{ alignSelf: "center", marginTop: 24 }}
         >
           <ThemedText
-            style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}
+            style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}
           >
             Vuelve al{" "}
             <ThemedText style={{ color: "#2563EB", fontWeight: "700" }}>
@@ -94,28 +120,68 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginVertical: 20,
+    ...Platform.select({
+      web: { boxShadow: "0px 10px 25px rgba(0, 0, 0, 0.1)" } as any,
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+      },
+    }),
+  },
+  headerContenedor: {
+    alignItems: "center",
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    paddingBottom: 16,
+  },
+  logoBranding: {
+    width: 80,
+    height: 80,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logoImage: {
+    width: "100%",
+    height: "100%",
+  },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+    letterSpacing: 1.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "900",
     color: "#0F172A",
     marginBottom: 4,
   },
-  subtitle: {
+  subtitleCard: {
     fontSize: 14,
     color: "#64748B",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: "#1E293B",
     marginTop: 16,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   paragraph: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#475569",
-    lineHeight: 20,
+    lineHeight: 18,
   },
 });

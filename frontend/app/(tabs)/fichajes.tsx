@@ -5,16 +5,21 @@ import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/cal
 import { obtenerContratoActivoTrabajador } from "@/src/modules/contratos/api/services";
 import { obtenerUrlLogo } from "@/src/modules/empresas/api/services";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
-import { obtenerFichajesEmpresaEntreFechas } from "@/src/modules/fichajes/api/services";
 import {
-    DIAS_SEMANA,
-    RegistroFichaje,
+  obtenerFichajesEmpresaEntreFechas,
+  obtenerFichajesTrabajadorEntreFechas,
+} from "@/src/modules/fichajes/api/services";
+import {
+  DIAS_SEMANA,
+  RegistroFichaje,
 } from "@/src/modules/fichajes/types/registrofichaje";
 import { obtenerTrabajador } from "@/src/modules/trabajadores/api/services";
 import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnoPorId } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
+import { usePermisos } from "@/src/hooks/usePermisos";
+import { Can } from "@/src/shared/components/Can";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
@@ -93,6 +98,7 @@ const firmaComoHtml = async (
 
 export default function FichajesHistorialScreen() {
   const { empresaActual, usuarioActual } = useSesion();
+  const { tienePermiso } = usePermisos();
   const [fichajesPeriodo, setFichajesPeriodo] = useState<RegistroFichaje[]>([]);
   const [tipoVista, setTipoVista] = useState<"semana" | "mes" | "trimestre">(
     "semana",
@@ -178,13 +184,12 @@ export default function FichajesHistorialScreen() {
 
   const cargarFichajesYTurnosPeriodo = async () => {
     try {
-      if (
-        usuarioActual?.tipo_usuario !== "Admin_empresa" &&
-        usuarioActual?.tipo_usuario !== "Admin_gestoría" &&
-        usuarioActual?.tipo_usuario !== "Auditor_itss" &&
-        usuarioActual?.tipo_usuario !== "Rrhh"
-      )
+      const puedeConsultarEmpresa = tienePermiso("fichajes", "consultar", "empresa");
+      const puedeConsultarPropio = tienePermiso("fichajes", "consultar", "propio");
+      if (!puedeConsultarEmpresa && !puedeConsultarPropio) {
+        setCargando(false);
         return;
+      }
       setCargando(true);
 
       const fechaIteracion = new Date(rangoFechasCalculado.inicio);
@@ -199,20 +204,35 @@ export default function FichajesHistorialScreen() {
         new Date(fechaFinLimite.getTime() - offset * 60 * 1000),
       );
 
-      promesasFichajes.push(
-        obtenerFichajesEmpresaEntreFechas(
-          empresaActual?.id || "",
-          fechaInicio,
-          fechaFin,
-        ).catch((error: any) => {
-          mostrarError(
-            `No se pudieron obtener fichajes entre las fechas ${fechaInicio}-${fechaFin} : ` +
-              obtenerMensajeAmigableError(error),
-          );
-          return [];
-        }),
-      );
-      fechaIteracion.setDate(fechaIteracion.getDate() + 1);
+      if (puedeConsultarEmpresa && empresaActual?.id) {
+        promesasFichajes.push(
+          obtenerFichajesEmpresaEntreFechas(
+            empresaActual.id,
+            fechaInicio,
+            fechaFin,
+          ).catch((error: any) => {
+            mostrarError(
+              `No se pudieron obtener fichajes de la empresa entre ${fechaInicio}-${fechaFin} : ` +
+                obtenerMensajeAmigableError(error),
+            );
+            return [];
+          }),
+        );
+      } else if (usuarioActual?.trabajador_id) {
+        promesasFichajes.push(
+          obtenerFichajesTrabajadorEntreFechas(
+            usuarioActual.trabajador_id,
+            fechaInicio,
+            fechaFin,
+          ).catch((error: any) => {
+            mostrarError(
+              `No se pudieron obtener fichajes del trabajador entre ${fechaInicio}-${fechaFin} : ` +
+                obtenerMensajeAmigableError(error),
+            );
+            return [];
+          }),
+        );
+      }
 
       const resultadosFichajes = await Promise.all(promesasFichajes);
       const todosLosFichajes: RegistroFichaje[] = resultadosFichajes.flat();
@@ -962,17 +982,26 @@ export default function FichajesHistorialScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        style={[styles.botonPDF, { marginBottom: 14 }]}
-        onPress={() => handleExportarPDF(tipoVista)}
-      >
-        <FontAwesome5 name="file-pdf" size={14} color="#FFFFFF" />
-        <ThemedText style={styles.textoBotonPDF}>
-          {cargandoPdf
-            ? "Generando documento..."
-            : `Exportar Registro de ${capitalizar(tipoVista)} en PDF`}
+      {/* Aviso de inmutabilidad legal (principio append-only del backend) */}
+      <View style={styles.bannerInmutabilidad}>
+        <ThemedText style={styles.bannerInmutabilidadTexto}>
+          ⚖️ Registro inmutable (Art. 34.9 ET): Los fichajes son definitivos. Para subsanar incidencias, tramita una corrección en el módulo de incidencias.
         </ThemedText>
-      </Pressable>
+      </View>
+
+      <Can recurso="fichajes" accion="exportar">
+        <Pressable
+          style={[styles.botonPDF, { marginBottom: 14 }]}
+          onPress={() => handleExportarPDF(tipoVista)}
+        >
+          <FontAwesome5 name="file-pdf" size={14} color="#FFFFFF" />
+          <ThemedText style={styles.textoBotonPDF}>
+            {cargandoPdf
+              ? "Generando documento..."
+              : `Exportar Registro de ${capitalizar(tipoVista)} en PDF`}
+          </ThemedText>
+        </Pressable>
+      </Can>
 
       <Row>
         <StatCard
@@ -1322,4 +1351,17 @@ const styles = StyleSheet.create({
   },
   textoTipoFiltro: { fontSize: 12, fontWeight: "700", color: "#64748B" },
   textoTipoActivo: { color: "#2563EB" },
+  bannerInmutabilidad: {
+    backgroundColor: "#F1F5F9",
+    borderLeftWidth: 4,
+    borderLeftColor: "#2563EB",
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  bannerInmutabilidadTexto: {
+    fontSize: 11,
+    color: "#334155",
+    lineHeight: 16,
+  },
 });

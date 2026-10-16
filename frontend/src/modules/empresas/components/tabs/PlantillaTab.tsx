@@ -1,44 +1,50 @@
-import { obtenerAsignacionesTurnoTrabajador } from "@/src/modules/asignaciones-turno/api/services";
+import { usePermisos } from "@/src/hooks/usePermisos";
+import {
+  actualizarAsignacionTurno,
+  asignarTurnosTrabajador,
+  obtenerAsignacionesTurnoTrabajador,
+} from "@/src/modules/asignaciones-turno/api/services";
 import { AsignacionTurno } from "@/src/modules/asignaciones-turno/types/asignacion-turno";
 import { obtenerCalendariosFestivosPorEmpresa } from "@/src/modules/calendarios-laborales/api/services";
 import { CalendarioFestivo } from "@/src/modules/calendarios-laborales/types/calendario";
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import {
-    actualizarContrato,
-    obtenerContratoActivoTrabajador,
-    rescindirContratoActivoTrabajador,
+  actualizarContrato,
+  subirDocumentoContrato,
+  obtenerContratoActivoTrabajador,
+  rescindirContratoActivoTrabajador,
 } from "@/src/modules/contratos/api/services";
+import { crearContratoCalendario, desactivarContratoCalendario, obtenerCalendariosContrato } from "@/src/modules/contratos-calendarios/api/services";
 import { obtenerDepartamentosEmpresa } from "@/src/modules/departamentos/api/services";
 import { Departamento } from "@/src/modules/departamentos/types/departamento";
 import {
-    actualizarAsignacionTurno,
-    actualizarTrabajador,
-    asignarTurnosTrabajador,
-    tramitarBajaTotalTrabajador,
+  actualizarTrabajador,
+  tramitarBajaTotalTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { FichaTrabajador } from "@/src/modules/trabajadores/components/FichaTrabajador";
-import { Trabajador } from "@/src/modules/trabajadores/types/trabajador";
+import { ESTADOS_TRABAJADOR, Trabajador } from "@/src/modules/trabajadores/types/trabajador";
 import { obtenerTurnosEmpresa } from "@/src/modules/turnos/api/services";
 import { Turno } from "@/src/modules/turnos/types/turno";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
+import { Can } from "@/src/shared/components/Can";
 import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { FontAwesome5 } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextStyle,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextStyle,
+  View,
+  ViewStyle,
 } from "react-native";
 import {
-    TipoModal,
-    usePlantillaFormularios,
+  TipoModal,
+  usePlantillaFormularios,
 } from "../../hooks/usePlantillaFormularios";
 import { Empresa } from "../../types/empresa";
 import { ModalAltaEditarTrabajador } from "../modals/ModalAltaEditarTrabajador";
@@ -67,7 +73,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
   const empresaIdActiva = empresaActual.id || usuarioActual?.empresa_id;
 
   const { plantilla, cargando, cargarPlantilla, inicializado } = usePlantilla();
-  const [filtroEstado] = useState<"todos" | "altas">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"activos" | "bajas">("activos");
   const [turnosEmpresa, setTurnosEmpresa] = useState<Turno[]>([]);
   const [cargandoSelectores, setCargandoSelectores] = useState(false);
   const [listaCentros, setListaCentros] = useState<CentroTrabajo[]>([]);
@@ -80,11 +86,8 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
   const [turnosInicialesVigentes, setTurnosInicialesVigentes] = useState<
     Turno[]
   >([]);
-
-  const esGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
-  const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
-  const esRRHH = usuarioActual?.tipo_usuario === "Rrhh";
-  const puedeAcceder = esGestoria || esAdminEmpresa || esRRHH;
+  const { tienePermiso, esAdminEmpresa } = usePermisos();
+  const puedeAcceder = tienePermiso("trabajadores", "consultar", "empresa");
 
   const {
     procesando,
@@ -103,6 +106,8 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     setEmail,
     telefono,
     setTelefono,
+    passwordInicial,
+    setPasswordInicial,
     nss,
     setNss,
     fechaNacimiento,
@@ -123,10 +128,14 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     setTipoJornada,
     horasSemana,
     setHorasSemana,
-    centroTrabajoId,
-    setCentroTrabajoId,
+    centrosTrabajoIds,
+    setCentrosTrabajoIds,
     calendarioLaboralId,
     setCalendarioLaboralId,
+    calendariosSeleccionadosIds,
+    setCalendariosSeleccionadosIds,
+    archivoContrato,
+    setArchivoContrato,
     contratoAEditar,
     setContratoAEditar,
     turnosSeleccionados,
@@ -137,7 +146,11 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     handleGuardarContrato,
     handleEliminarTurnos,
     inputRefs,
-  } = usePlantillaFormularios(usuarioActual!, cargarPlantilla);
+  } = usePlantillaFormularios(
+    usuarioActual!,
+    cargarPlantilla,
+    empresaIdActiva ?? undefined,
+  );
 
   const { mostrarError, mostrarMensaje } = useAppModal();
 
@@ -179,13 +192,12 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
       setPuestoTrabajo(contratoAEditar.puesto_trabajo!);
       setCategoriaProfesional(contratoAEditar.categoria_profesional!);
       setDepartamentoId(contratoAEditar.departamento_id!);
-      setCalendarioLaboralId(contratoAEditar.calendario_laboral_id!);
     } else if (esEdicionTrabajador && trabajadorActual) {
       setNombre(trabajadorActual.nombre);
       setApellidos(trabajadorActual.apellidos);
       setNifNie(trabajadorActual.dni_nif_nie);
-      setEmail(trabajadorActual.email ?? "");
-      setTelefono(trabajadorActual.telefono ?? "");
+      setEmail(trabajadorActual.usuario?.email ?? trabajadorActual.email ?? "");
+      setTelefono(trabajadorActual.usuario?.telefono ?? trabajadorActual.telefono ?? "");
       setNss(trabajadorActual.numero_seguridad_social ?? "");
       setFechaNacimiento(trabajadorActual.fecha_nacimiento ?? "");
     } else if (esCreacion) {
@@ -194,6 +206,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
       setNifNie("");
       setEmail("");
       setTelefono("");
+      setPasswordInicial("");
       setNss("");
       setFechaNacimiento("");
       setTipoContrato("");
@@ -204,8 +217,11 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
       setPuestoTrabajo("");
       setCategoriaProfesional("");
       setDepartamentoId("");
-      setCentroTrabajoId("");
+      setCentrosTrabajoIds([]);
       setCalendarioLaboralId("");
+      setCalendariosSeleccionadosIds([]);
+      setArchivoContrato(null);
+      setTurnosSeleccionados([]);
     } else if (modalActivo === "asignar_turno") {
       setFechaInicio(new Date().toISOString().split("T")[0]);
       setFechaFin("");
@@ -218,17 +234,17 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     return fuenteDatos.filter((item: Trabajador) => {
       const esElJefeActual = item.id === usuarioActual?.trabajador_id;
       if (esElJefeActual && esAdminEmpresa) return false;
-      const coincideTenant = esGestoria
+      const coincideTenant = empresaActual.es_gestoria
         ? true
         : item.empresa_id === empresaIdActiva;
-      const coincideEstado = filtroEstado === "todos" || item.activo;
+      const coincideEstado = filtroEstado === "activos" ? item.activo : !item.activo;
       return coincideTenant && coincideEstado;
     });
   }, [
     plantilla,
     filtroEstado,
     usuarioActual,
-    esGestoria,
+    empresaActual.es_gestoria,
     esAdminEmpresa,
     empresaIdActiva,
   ]);
@@ -241,19 +257,32 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
     try {
       setProcesando(true);
       await actualizarContrato(contratoAEditar.id, {
-        empresa_id: empresaIdActiva!,
-        centro_trabajo_id: centroTrabajoId,
-        tipo_contrato: tipoContrato,
-        tipo_jornada: tipoJornada,
+        tipo_contrato:
+          tipoContrato as import("@/src/modules/contratos/types/contrato").TipoContrato,
+        tipo_jornada:
+          tipoJornada as import("@/src/modules/contratos/types/contrato").TipoJornada,
         horas_semana: Number(horasSemana),
         fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin || "",
-        departamento_id: departamentoId,
+        fecha_fin: fechaFin || null,
         puesto_trabajo: puestoTrabajo,
         categoria_profesional: categoriaProfesional,
-        trabajador_id: trabajadorActual!.id,
-        calendario_laboral_id: calendarioLaboralId,
+        centros_trabajo_ids: centrosTrabajoIds,
       });
+      const calendariosElegidos = calendariosSeleccionadosIds.length ? calendariosSeleccionadosIds : (calendarioLaboralId ? [calendarioLaboralId] : []);
+      if (calendariosElegidos.length) {
+        const existentes = await obtenerCalendariosContrato(contratoAEditar.id);
+        for (const relacion of existentes) {
+          if (relacion.activa && !calendariosElegidos.includes(relacion.calendario_laboral_id)) {
+            await desactivarContratoCalendario(relacion.id);
+          }
+        }
+        for (const calendarioId of calendariosElegidos) {
+          if (!existentes.some((relacion) => relacion.calendario_laboral_id === calendarioId && relacion.activa)) {
+            await crearContratoCalendario({ contrato_id: contratoAEditar.id, calendario_laboral_id: calendarioId });
+          }
+        }
+      }
+      if (archivoContrato) await subirDocumentoContrato(contratoAEditar.id, archivoContrato);
       await cargarPlantilla();
       cerrarModales();
     } catch (error: any) {
@@ -299,8 +328,22 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
           }
         }
         if (turnosANuevo.length > 0) {
+          if (!empresaIdActiva) {
+            throw new Error("Selecciona una empresa antes de asignar turnos.");
+          }
+          const contratoActivo =
+            trabajadorActual.contratoActivo ??
+            (await obtenerContratoActivoTrabajador(
+              trabajadorActual.id,
+              empresaIdActiva,
+            ));
+          if (!contratoActivo) {
+            throw new Error(
+              "El trabajador no tiene un contrato activo para asignar turnos.",
+            );
+          }
           await asignarTurnosTrabajador(
-            trabajadorActual.id,
+            contratoActivo.id,
             turnosANuevo.map((t: Turno) => t.id),
             fechaInicio,
             fechaFin || null,
@@ -319,8 +362,22 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
           }
         }
       } else {
+        if (!empresaIdActiva) {
+          throw new Error("Selecciona una empresa antes de asignar turnos.");
+        }
+        const contratoActivo =
+          trabajadorActual.contratoActivo ??
+          (await obtenerContratoActivoTrabajador(
+            trabajadorActual.id,
+            empresaIdActiva,
+          ));
+        if (!contratoActivo) {
+          throw new Error(
+            "El trabajador no tiene un contrato activo para asignar turnos.",
+          );
+        }
         await asignarTurnosTrabajador(
-          trabajadorActual.id,
+          contratoActivo.id,
           turnosSeleccionados.map((t: Turno) => t.id),
           fechaInicio,
           fechaFin || null,
@@ -409,11 +466,12 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         setCategoriaProfesional(
           contratoActivoDelTrabajador.categoria_profesional || "",
         );
-        setCentroTrabajoId(contratoActivoDelTrabajador.centro_trabajo_id || "");
+        setCentrosTrabajoIds(contratoActivoDelTrabajador.centros_trabajo_ids || contratoActivoDelTrabajador.centros_trabajo?.map((centro) => centro.id) || []);
         setDepartamentoId(contratoActivoDelTrabajador.departamento_id || "");
-        setCalendarioLaboralId(
-          contratoActivoDelTrabajador.calendario_laboral_id || "",
-        );
+        const relacionesCalendario = await obtenerCalendariosContrato(contratoActivoDelTrabajador.id);
+        const calendariosVigentes = relacionesCalendario.filter((relacion) => relacion.activa).map((relacion) => relacion.calendario_laboral_id);
+        setCalendariosSeleccionadosIds(calendariosVigentes);
+        setCalendarioLaboralId(calendariosVigentes[0] ?? "");
         setModalActivo("editar_contrato");
       } else {
         setContratoAEditar(undefined);
@@ -424,9 +482,10 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         setFechaFin("");
         setPuestoTrabajo("");
         setCategoriaProfesional("");
-        setCentroTrabajoId("");
+        setCentrosTrabajoIds([]);
         setDepartamentoId("");
         setCalendarioLaboralId("");
+        setCalendariosSeleccionadosIds([]);
         setModalActivo("nuevo_contrato");
       }
     } catch {
@@ -485,6 +544,7 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         dni_nif_nie: trabajadorActual.dni_nif_nie,
         nombre: trabajadorActual.nombre,
         apellidos: trabajadorActual.apellidos,
+        estado: ESTADOS_TRABAJADOR.ACTIVO,
         fecha_nacimiento: trabajadorActual.fecha_nacimiento,
         numero_seguridad_social: trabajadorActual.numero_seguridad_social,
         activo: true,
@@ -516,16 +576,26 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
       >
-        <Pressable
-          style={styles.botonAltaGlobal}
-          onPress={() => setModalActivo("alta_trabajador")}
-        >
-          <FontAwesome5 name="user-plus" size={14} color="#FFFFFF" />
-          <ThemedText style={styles.textoAltaGlobal}>
-            {" "}
-            Dar de Alta Nuevo Trabajador{" "}
-          </ThemedText>
-        </Pressable>
+        <Can recurso="trabajadores" accion="crear">
+          <Pressable
+            style={styles.botonAltaGlobal}
+            onPress={() => setModalActivo("alta_trabajador")}
+          >
+            <FontAwesome5 name="user-plus" size={14} color="#FFFFFF" />
+            <ThemedText style={styles.textoAltaGlobal}>
+              {" "}
+              Dar de Alta Nuevo Trabajador{" "}
+            </ThemedText>
+          </Pressable>
+        </Can>
+
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 18, marginBottom: 16 }}>
+          {(["activos", "bajas"] as const).map((estado) => (
+            <Pressable key={estado} onPress={() => setFiltroEstado(estado)} style={{ padding: 10, borderRadius: 8, backgroundColor: filtroEstado === estado ? "#1D4ED8" : "#E2E8F0" }}>
+              <ThemedText style={{ color: filtroEstado === estado ? "#FFFFFF" : "#334155" }}>{estado === "activos" ? "Plantilla activa" : "Trabajadores dados de baja"}</ThemedText>
+            </Pressable>
+          ))}
+        </View>
 
         {cargando || cargandoSelectores ? (
           <ActivityIndicator
@@ -576,6 +646,8 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
             setEmail={setEmail}
             telefono={telefono}
             setTelefono={setTelefono}
+            passwordInicial={passwordInicial}
+            setPasswordInicial={setPasswordInicial}
             nss={nss}
             setNss={setNss}
             fechaNacimiento={fechaNacimiento}
@@ -618,15 +690,22 @@ function PlantillaScreen({ empresaActual }: PlantillaTabProps) {
             setPuestoTrabajo={setPuestoTrabajo}
             categoriaProfesional={categoriaProfesional}
             setCategoriaProfesional={setCategoriaProfesional}
-            centroTrabajoId={centroTrabajoId}
-            setCentroTrabajoId={setCentroTrabajoId}
+            centrosTrabajoIds={centrosTrabajoIds}
+            setCentrosTrabajoIds={setCentrosTrabajoIds}
             departamentoId={departamentoId}
             setDepartamentoId={setDepartamentoId}
             calendarioLaboralId={calendarioLaboralId}
             setCalendarioLaboralId={setCalendarioLaboralId}
+            calendariosSeleccionadosIds={calendariosSeleccionadosIds}
+            setCalendariosSeleccionadosIds={setCalendariosSeleccionadosIds}
             listaCentros={listaCentros}
             listaDepartamentos={listaDepartamentos}
             listaCalendariosLaborales={listaCalendariosLaborales}
+            turnosEmpresa={turnosEmpresa}
+            turnosSeleccionados={turnosSeleccionados}
+            setTurnosSeleccionados={setTurnosSeleccionados}
+            archivoContrato={archivoContrato}
+            setArchivoContrato={setArchivoContrato}
             onGuardar={
               modalActivo === "editar_contrato"
                 ? handleEditarContrato
@@ -720,7 +799,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    marginTop: 4,
+    marginTop: 8,
+    marginBottom: 8,
   } as ViewStyle,
   textoAltaGlobal: {
     color: "#FFFFFF",

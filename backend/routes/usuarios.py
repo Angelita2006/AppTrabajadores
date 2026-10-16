@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 import hashlib
 import secrets
@@ -326,7 +326,7 @@ def obtener_mi_usuario(
     Busca los detalles de una cuenta mediante su identificador único UUID de forma protegida.
     """
     cliente_ip = request.client.host if request.client else "Desconocida"
-    print(f"Petición de consulta del usuario autenticado ([token oculto]) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
+    print(f"Petición de consulta del usuario autenticado ({token}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
     usuario = (
@@ -359,6 +359,52 @@ def obtener_mi_usuario(
     db.commit()
 
     return usuario
+
+
+@router.get(
+    "",
+    response_model=List[UsuarioSimpleResponse],
+    summary="Listar cuentas de usuario de la plataforma",
+    description="Permite al superadministrador consultar las cuentas para asignar accesos y gestionar perfiles.",
+)
+@limiter.limit("30/minute")
+def obtener_usuarios_plataforma(
+    request: Request,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.CONSULTAR
+        + "-"
+        + TipoPermisoEnum.USUARIOS
+        + "-"
+        + AlcancePermisoEnum.GLOBAL
+    ])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**GET /api/usuarios**
+
+    Lista las cuentas de usuario visibles al superadministrador global.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(
+        f"Petición de consulta de usuarios de la plataforma desde la IP "
+        f"({cliente_ip}) por el usuario: {usuario_actual.email}."
+    )
+
+    usuarios = (
+        db.query(Usuarios)
+        .order_by(Usuarios.nombre.asc(), Usuarios.email.asc())
+        .all()
+    )
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "usuarios", "accion": "consultar_plataforma"},
+        trabajador_id=None,
+    )
+    db.commit()
+    return usuarios
 
 
 @router.post(
@@ -565,7 +611,7 @@ def login_plataforma(
         print("No hay ningún usuario registrado con ese correo electrónico.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas.",
+            detail="No hay ningún usuario registrado con ese correo electrónico.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -573,7 +619,7 @@ def login_plataforma(
         print("La contraseña introducida es incorrecta.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas.",
+            detail="La contraseña introducida es incorrecta.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -622,33 +668,43 @@ def login_para_swagger(
     print(f"Petición de login OAuth2 desde la IP ({cliente_ip}).")
 
     # Validaciones estructurales básicas
-    user = db.query(Usuarios).filter(
+    usuario = db.query(Usuarios).filter(
         Usuarios.email == form_data.username.strip().lower(),
         Usuarios.activo.is_(True),
     ).first()
 
-    if not user or not verify_password(form_data.password, user.password_hash):
-        print("Credenciales incorrectas o usuario no encontrado.")
+
+    if not usuario:
+        print("No hay ningún usuario registrado con ese correo electrónico.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas o usuario no encontrado."
+            detail="No hay ningún usuario registrado con ese correo electrónico.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if not verify_password(form_data.password, str(usuario.password_hash)):
+        print("La contraseña introducida es incorrecta.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="La contraseña introducida es incorrecta.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     registrar_auditoria(
         db=db,
         request=request,
-        usuario_id=user.id,
+        usuario_id=usuario.id,
         empresa_id=None,
         accion=AccionAuditoriaEnum.CONSULTA,
         detalle={
             'recurso': 'usuarios',
             'accion': 'login_swagger',
         },
-        trabajador_id=user.trabajador_id,
+        trabajador_id=None,
     )
     db.commit()
 
-    access_token = crear_token_acceso(data={"sub": user.email})
+    access_token = crear_token_acceso(data={"sub": usuario.email})
 
     return {
         "access_token": access_token,

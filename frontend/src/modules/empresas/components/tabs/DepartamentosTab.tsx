@@ -1,8 +1,8 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { Can } from "@/src/shared/components/Can";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
-import { Picker } from "@react-native-picker/picker";
 import React, { useRef, useState } from "react";
 import {
     ActivityIndicator,
@@ -12,7 +12,6 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import {
     crearDepartamento,
     editarDepartamento,
@@ -29,8 +28,6 @@ interface TabDepartamentosProps {
   departamentosEmpresa: Departamento[];
   /** Función para actualizar el estado del listado de departamentos. */
   setDepartamentosEmpresa: React.Dispatch<React.SetStateAction<Departamento[]>>;
-  /** Listado de centros de trabajo de la empresa. */
-  centrosEmpresa: CentroTrabajo[];
   /** Objeto que representa la empresa seleccionada actualmente. */
   empresaActual: Empresa | null;
   /** Estado booleano que indica si se está ejecutando una operación de guardado/carga. */
@@ -43,7 +40,7 @@ interface TabDepartamentosProps {
 
 /**
  * Componente que gestiona la pestaña de departamentos de una empresa,
- * permitiendo crear, listar, editar y eliminar departamentos vinculados a centros de trabajo.
+ * permitiendo crear, listar, editar y eliminar departamentos de la empresa.
  *
  * @component
  * @param {TabDepartamentosProps} props - Propiedades del componente.
@@ -51,7 +48,6 @@ interface TabDepartamentosProps {
 export default function TabDepartamentos({
   departamentosEmpresa,
   setDepartamentosEmpresa,
-  centrosEmpresa,
   empresaActual,
   guardando,
   setGuardando,
@@ -62,7 +58,6 @@ export default function TabDepartamentos({
   const [nombreDepto, setNombreDepto] = useState("");
   const [departamentoEnEdicion, setDepartamentoEnEdicion] =
     useState<Departamento | null>(null);
-  const [centroTrabajoId, setCentroTrabajoId] = useState("");
 
   // ==========================================
   // REFERENCIAS PARA CREACIÓN Y EDICIÓN
@@ -96,12 +91,10 @@ export default function TabDepartamentos({
       const nuevoDepto = await crearDepartamento({
         empresa_id: empresaActual.id,
         nombre: nombreDepto.trim(),
-        centro_trabajo_id: centroTrabajoId || "",
       });
 
       setDepartamentosEmpresa([...departamentosEmpresa, nuevoDepto]);
       setNombreDepto("");
-      setCentroTrabajoId("");
       setMostrarFormDepartamento(false);
       mostrarMensaje("Éxito", "Departamento creado correctamente.");
     } catch (error: any) {
@@ -131,7 +124,6 @@ export default function TabDepartamentos({
       setGuardando(true);
       const payload = {
         nombre: nombreDepto.trim(),
-        centro_trabajo_id: centroTrabajoId || "",
       };
 
       await editarDepartamento(departamentoEnEdicion.id, payload);
@@ -146,7 +138,6 @@ export default function TabDepartamentos({
       setMostrarFormDepartamento(false);
       setDepartamentoEnEdicion(null);
       setNombreDepto("");
-      setCentroTrabajoId("");
     } catch (error: any) {
       mostrarError(
         "Error al actualizar el departamento: " +
@@ -231,28 +222,29 @@ export default function TabDepartamentos({
 
   return (
     <View>
-      <Pressable
-        style={[
-          styles.botonAccionHeader,
-          {
-            backgroundColor: mostrarFormDepartamento ? "#64748B" : "#7C3AED",
-          },
-          guardando && { opacity: 0.7 },
-        ]}
-        disabled={guardando}
-        onPress={() => {
-          if (!mostrarFormDepartamento) {
-            setNombreDepto("");
-            setCentroTrabajoId("");
-          }
-          setMostrarFormDepartamento(!mostrarFormDepartamento);
-          setDepartamentoEnEdicion(null);
-        }}
-      >
-        <ThemedText style={styles.textoBotonGuardar}>
-          {mostrarFormDepartamento ? "✕ Cancelar" : "＋ Añadir Departamento"}
-        </ThemedText>
-      </Pressable>
+      <Can recurso="departamentos" accion="crear">
+        <Pressable
+          style={[
+            styles.botonAccionHeader,
+            {
+              backgroundColor: mostrarFormDepartamento ? "#64748B" : "#7C3AED",
+            },
+            guardando && { opacity: 0.7 },
+          ]}
+          disabled={guardando}
+          onPress={() => {
+            if (!mostrarFormDepartamento) {
+              setNombreDepto("");
+            }
+            setMostrarFormDepartamento(!mostrarFormDepartamento);
+            setDepartamentoEnEdicion(null);
+          }}
+        >
+          <ThemedText style={styles.textoBotonGuardar}>
+            {mostrarFormDepartamento ? "✕ Cancelar" : "＋ Añadir Departamento"}
+          </ThemedText>
+        </Pressable>
+      </Can>
 
       {mostrarFormDepartamento && (
         <View style={styles.contenedorFormDesplegado}>
@@ -274,28 +266,6 @@ export default function TabDepartamentos({
               onSubmitEditing={handleCrearDepartamento}
               blurOnSubmit={false}
             />
-          </View>
-          <View style={styles.campoFormulario}>
-            <ThemedText style={styles.labelInput}>Centro de Trabajo</ThemedText>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={centroTrabajoId}
-                onValueChange={(val) => setCentroTrabajoId(val)}
-                style={styles.picker}
-                enabled={!guardando}
-              >
-                <Picker.Item
-                  label="Seleccionar centro..."
-                  value=""
-                  enabled={false}
-                />
-                {centrosEmpresa
-                  .filter((ct) => ct.activo === true)
-                  .map((ct: CentroTrabajo) => (
-                    <Picker.Item key={ct.id} label={ct.nombre} value={ct.id} />
-                  ))}
-              </Picker>
-            </View>
           </View>
           <Pressable
             style={[
@@ -322,10 +292,6 @@ export default function TabDepartamentos({
       </ThemedText>
 
       {departamentosActivos.map((dept: Departamento) => {
-        const centro: CentroTrabajo | undefined = centrosEmpresa.find(
-          (c: CentroTrabajo) => c.id === dept.centro_trabajo_id,
-        );
-
         return (
           <View key={dept.id}>
             <View
@@ -343,54 +309,55 @@ export default function TabDepartamentos({
                 <ThemedText style={styles.nombreElementoLista}>
                   {dept.nombre}
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, color: "#64748B" }}>
-                  {centro ? `📍 ${centro.nombre}` : "Sin centro asignado"}
-                </ThemedText>
               </View>
 
               <Row>
-                <Pressable
-                  style={[
-                    {
-                      backgroundColor: "#475569",
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 16,
-                      marginRight: 8,
-                    },
-                    guardando && { opacity: 0.7 },
-                  ]}
-                  disabled={guardando}
-                  onPress={() => {
-                    if (departamentoEnEdicion?.id === dept.id) {
-                      setDepartamentoEnEdicion(null);
-                    } else {
-                      setDepartamentoEnEdicion(dept);
-                      setNombreDepto(dept.nombre);
-                      setCentroTrabajoId(dept.centro_trabajo_id || "");
-                      setMostrarFormDepartamento(false);
+                <Can recurso="departamentos" accion="modificar">
+                  <Pressable
+                    style={[
+                      {
+                        backgroundColor: "#475569",
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 16,
+                        marginRight: 8,
+                      },
+                      guardando && { opacity: 0.7 },
+                    ]}
+                    disabled={guardando}
+                    onPress={() => {
+                      if (departamentoEnEdicion?.id === dept.id) {
+                        setDepartamentoEnEdicion(null);
+                      } else {
+                        setDepartamentoEnEdicion(dept);
+                        setNombreDepto(dept.nombre);
+                        setMostrarFormDepartamento(false);
+                      }
+                    }}
+                  >
+                    <ThemedText>✏️</ThemedText>
+                  </Pressable>
+                </Can>
+
+                <Can recurso="departamentos" accion="eliminar">
+                  <Pressable
+                    style={[
+                      {
+                        backgroundColor: "#fee2e2",
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 16,
+                      },
+                      guardando && { opacity: 0.7 },
+                    ]}
+                    disabled={guardando}
+                    onPress={() =>
+                      handleEliminarDepartamento(dept.id, dept.nombre)
                     }
-                  }}
-                >
-                  <ThemedText>✏️</ThemedText>
-                </Pressable>
-                <Pressable
-                  style={[
-                    {
-                      backgroundColor: "#fee2e2",
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 16,
-                    },
-                    guardando && { opacity: 0.7 },
-                  ]}
-                  disabled={guardando}
-                  onPress={() =>
-                    handleEliminarDepartamento(dept.id, dept.nombre)
-                  }
-                >
-                  <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
-                </Pressable>
+                  >
+                    <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
+                  </Pressable>
+                </Can>
               </Row>
             </View>
 
@@ -414,34 +381,6 @@ export default function TabDepartamentos({
                     onSubmitEditing={handleEditarDepartamento}
                     blurOnSubmit={false}
                   />
-                </View>
-                <View style={styles.campoFormulario}>
-                  <ThemedText style={styles.labelInput}>
-                    Centro de Trabajo
-                  </ThemedText>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={centroTrabajoId}
-                      onValueChange={(val) => setCentroTrabajoId(val)}
-                      style={styles.picker}
-                      enabled={!guardando}
-                    >
-                      <Picker.Item
-                        label="Seleccionar centro..."
-                        value=""
-                        enabled={false}
-                      />
-                      {centrosEmpresa
-                        .filter((ct) => ct.activo === true)
-                        .map((ct: CentroTrabajo) => (
-                          <Picker.Item
-                            key={ct.id}
-                            label={ct.nombre}
-                            value={ct.id}
-                          />
-                        ))}
-                    </Picker>
-                  </View>
                 </View>
                 <Pressable
                   style={[

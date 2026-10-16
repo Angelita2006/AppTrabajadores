@@ -18,7 +18,7 @@ class Usuarios(Base):
     
     nombre: Mapped[str] = mapped_column(String(150), nullable=False, comment='Nombre completo del usuario.')
     
-    email: Mapped[str] = mapped_column(String(30), nullable=False, comment='Dirección de correo electrónico del usuario.')    
+    email: Mapped[str] = mapped_column(String(150), nullable=False, comment='Dirección de correo electrónico del usuario.')    
     telefono: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, comment='Número de teléfono del usuario.')
     foto_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment='Ruta privada del avatar de la cuenta de usuario.')
     

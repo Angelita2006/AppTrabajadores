@@ -97,6 +97,9 @@ export const setEmpresaContext = async (empresaId) => {
 api.interceptors.request.use(
   async (config) => {
     try {
+      const empresaContextoExplicito = config.empresaIdContext;
+      delete config.empresaIdContext;
+
       if (!memoryToken) {
         if (Platform.OS === "web" && typeof window !== "undefined") {
           memoryToken = localStorage.getItem("user_token") || "";
@@ -114,6 +117,8 @@ api.interceptors.request.use(
       }
       if (config.skipEmpresaContext) {
         config.headers.delete("Empresa-ID");
+      } else if (empresaContextoExplicito) {
+        config.headers.set("Empresa-ID", empresaContextoExplicito);
       } else if (memoryEmpresaId) {
         config.headers.set("Empresa-ID", memoryEmpresaId);
       } else {

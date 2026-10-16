@@ -1,4 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { Can } from "@/src/shared/components/Can";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -38,6 +39,7 @@ export default function TabTurnos({
   const [horaInicio, setHoraInicio] = useState<string>("");
   const [horaFin, setHoraFin] = useState<string>("");
   const [duracionPausa, setDuracionPausa] = useState<string>("0");
+  const [diasSemana, setDiasSemana] = useState<number[]>([1, 2, 3, 4, 5]);
   const [turnoEnEdicion, setTurnoEnEdicion] = useState<Turno | null>(null);
 
   // ==========================================
@@ -56,6 +58,20 @@ export default function TabTurnos({
     (turno) => turno.activo === false,
   );
   const { mostrarError, mostrarMensaje } = useAppModal();
+  const diasDisponibles = [
+    { id: 1, nombre: "L" }, { id: 2, nombre: "M" }, { id: 3, nombre: "X" },
+    { id: 4, nombre: "J" }, { id: 5, nombre: "V" }, { id: 6, nombre: "S" }, { id: 7, nombre: "D" },
+  ];
+  const selectorDias = (seleccionados: number[], onChange: (dias: number[]) => void) => (
+    <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+      {diasDisponibles.map((dia) => {
+        const activo = seleccionados.includes(dia.id);
+        return <Pressable key={dia.id} onPress={() => onChange(activo ? seleccionados.filter((id) => id !== dia.id) : [...seleccionados, dia.id].sort())} style={{ padding: 9, borderRadius: 20, backgroundColor: activo ? "#2563EB" : "#E2E8F0" }}>
+          <ThemedText style={{ color: activo ? "white" : "#334155" }}>{dia.nombre}</ThemedText>
+        </Pressable>;
+      })}
+    </View>
+  );
 
   /**
    * Valida de forma integral los campos del formulario de turnos utilizando las funciones de validación.
@@ -86,6 +102,7 @@ export default function TabTurnos({
     if (!validarDuracionPausa(duracionPausa)) {
       return "La duración de la pausa debe ser un valor numérico válido mayor o igual a cero.";
     }
+    if (diasSemana.length === 0) return "Selecciona al menos un día de la semana.";
     return null;
   };
 
@@ -112,7 +129,7 @@ export default function TabTurnos({
         hora_inicio: horaInicio.trim(),
         hora_fin: horaFin.trim(),
         duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
-        dias_semana: [1, 2, 3, 4, 5],
+        dias_semana: diasSemana,
       });
 
       if (nuevoTurno) {
@@ -127,6 +144,7 @@ export default function TabTurnos({
       setHoraInicio("");
       setHoraFin("");
       setDuracionPausa("0");
+      setDiasSemana([1, 2, 3, 4, 5]);
       setMostrarFormTurno(false);
     } catch (error: any) {
       mostrarError(
@@ -252,28 +270,31 @@ export default function TabTurnos({
   return (
     <View>
       {/* Botón principal para alternar la visibilidad del formulario de creación de turnos */}
-      <Pressable
-        style={[
-          styles.botonAccionHeader,
-          {
-            backgroundColor: mostrarFormTurno ? "#64748B" : "#16A34A",
-          },
-        ]}
-        onPress={() => {
-          if (!mostrarFormTurno) {
-            setNombreTurno("");
-            setHoraInicio("");
-            setHoraFin("");
-            setDuracionPausa("0");
-          }
-          setMostrarFormTurno(!mostrarFormTurno);
-          setTurnoEnEdicion(null);
-        }}
-      >
-        <ThemedText style={styles.textoBotonGuardar}>
-          {mostrarFormTurno ? "✕ Cancelar" : "＋ Crear Turno"}
-        </ThemedText>
-      </Pressable>
+      <Can recurso="turnos" accion="crear">
+        <Pressable
+          style={[
+            styles.botonAccionHeader,
+            {
+              backgroundColor: mostrarFormTurno ? "#64748B" : "#16A34A",
+            },
+          ]}
+          onPress={() => {
+            if (!mostrarFormTurno) {
+              setNombreTurno("");
+              setHoraInicio("");
+              setHoraFin("");
+              setDuracionPausa("0");
+              setDiasSemana([1, 2, 3, 4, 5]);
+            }
+            setMostrarFormTurno(!mostrarFormTurno);
+            setTurnoEnEdicion(null);
+          }}
+        >
+          <ThemedText style={styles.textoBotonGuardar}>
+            {mostrarFormTurno ? "✕ Cancelar" : "＋ Crear Turno"}
+          </ThemedText>
+        </Pressable>
+      </Can>
 
       {/* Formulario desplegable para la creación de un nuevo turno */}
       {mostrarFormTurno && (
@@ -346,6 +367,11 @@ export default function TabTurnos({
             />
           </View>
 
+          <View style={styles.campoFormulario}>
+            <ThemedText style={styles.labelInput}>Días de la semana *</ThemedText>
+            {selectorDias(diasSemana, setDiasSemana)}
+          </View>
+
           <Pressable
             style={[styles.botonGuardar, { backgroundColor: "#16A34A" }]}
             onPress={handleCrearTurno}
@@ -386,41 +412,46 @@ export default function TabTurnos({
 
             <Row>
               {/* Botón para alternar el modo de edición del turno */}
-              <Pressable
-                style={{
-                  backgroundColor: "#475569",
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 16,
-                  marginRight: 8,
-                }}
-                onPress={() => {
-                  if (turnoEnEdicion?.id === turno.id) {
-                    setTurnoEnEdicion(null);
-                  } else {
-                    setTurnoEnEdicion(turno);
-                    setNombreTurno(turno.nombre);
-                    setHoraInicio(turno.hora_inicio);
-                    setHoraFin(turno.hora_fin);
-                    setDuracionPausa(turno.duracion_pausa_minutos.toString());
-                    setMostrarFormTurno(false);
-                  }
-                }}
-              >
-                <ThemedText>✏️</ThemedText>
-              </Pressable>
+              <Can recurso="turnos" accion="modificar">
+                <Pressable
+                  style={{
+                    backgroundColor: "#475569",
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 16,
+                    marginRight: 8,
+                  }}
+                  onPress={() => {
+                    if (turnoEnEdicion?.id === turno.id) {
+                      setTurnoEnEdicion(null);
+                    } else {
+                      setTurnoEnEdicion(turno);
+                      setNombreTurno(turno.nombre);
+                      setHoraInicio(turno.hora_inicio);
+                      setHoraFin(turno.hora_fin);
+                      setDuracionPausa(turno.duracion_pausa_minutos.toString());
+                      setDiasSemana(turno.dias_semana);
+                      setMostrarFormTurno(false);
+                    }
+                  }}
+                >
+                  <ThemedText>✏️</ThemedText>
+                </Pressable>
+              </Can>
               {/* Botón para eliminar el turno */}
-              <Pressable
-                style={{
-                  backgroundColor: "#fee2e2",
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 16,
-                }}
-                onPress={() => handleEliminarTurno(turno.id, turno.nombre)}
-              >
-                <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
-              </Pressable>
+              <Can recurso="turnos" accion="eliminar">
+                <Pressable
+                  style={{
+                    backgroundColor: "#fee2e2",
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 16,
+                  }}
+                  onPress={() => handleEliminarTurno(turno.id, turno.nombre)}
+                >
+                  <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
+                </Pressable>
+              </Can>
             </Row>
           </View>
 
@@ -445,6 +476,11 @@ export default function TabTurnos({
                   blurOnSubmit={false}
                 />
               </View>
+
+          <View style={styles.campoFormulario}>
+            <ThemedText style={styles.labelInput}>Días de la semana *</ThemedText>
+            {selectorDias(diasSemana, setDiasSemana)}
+          </View>
 
               <Row>
                 <View
@@ -498,6 +534,7 @@ export default function TabTurnos({
                       hora_inicio: horaInicio.trim(),
                       hora_fin: horaFin.trim(),
                       duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
+                      dias_semana: diasSemana,
                     });
                   }}
                   blurOnSubmit={false}
@@ -516,6 +553,7 @@ export default function TabTurnos({
                     hora_inicio: horaInicio.trim(),
                     hora_fin: horaFin.trim(),
                     duracion_pausa_minutos: parseInt(duracionPausa, 10) || 0,
+                    dias_semana: diasSemana,
                   });
                 }}
                 disabled={guardando}
@@ -567,6 +605,7 @@ export default function TabTurnos({
                   </ThemedText>
                 </Pressable>
               </View>
+
             ))}
         </View>
       )}

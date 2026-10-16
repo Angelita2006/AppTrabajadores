@@ -44,7 +44,7 @@ export interface CentroTrabajoCreate {
   /** Estado inicial de actividad del centro de trabajo. */
   activo?: boolean | null;
   /** Zona horaria aplicable (por defecto "Europe/Madrid"). */
-  zona_horaria: string;
+  zona_horaria?: string;
   /** Código de Cuenta de Cotización (CCC). */
   codigo_ccc?: string | null;
   /** Dirección física o postal completa de la sede. */

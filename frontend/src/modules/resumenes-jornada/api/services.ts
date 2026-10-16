@@ -1,108 +1,117 @@
 import api from "../../../service/api/api";
-import { ResumenJornada } from "../types/resumen-jornada";
+import {
+  ResumenJornada,
+  ResumenJornadaResponse,
+} from "../types/resumen-jornada";
 
 /**
  * Servicio de Gestión de Resúmenes de Jornada.
- * Contiene todas las operaciones CRUD y lógicas de negocio para el registro, cálculo acumulado, consulta de cuadros de mando y cierre de jornadas laborales.
+ * Consulta y consolida los resúmenes diarios de jornada devueltos por la API.
  */
 
 /**
- * Obtiene el histórico completo de resúmenes de jornada del sistema (filtrado por tenant en el backend).
- * URI: GET /api/resumenes-jornada
+ * Convierte la respuesta de la API al modelo utilizado por las pantallas.
+ * El schema actual de Pydantic no incluye `fecha`, así que se deriva de `hora_entrada`.
+ */
+const convertirResumenJornada = (
+  resumen: ResumenJornadaResponse,
+  fecha?: string,
+): ResumenJornada => ({
+  ...resumen,
+  fecha: fecha || resumen.hora_entrada.slice(0, 10),
+});
+
+/**
+ * Obtiene el historial de resúmenes de jornada de un trabajador.
+ * URI: GET /api/resumenes-jornada/trabajador/{id_trabajador}
  *
  * @async
  * @function obtenerResumenesJornada
- * @returns {Promise<ResumenJornada[]>} Promesa con el listado completo de resúmenes de jornada.
- * @throws {Error} Lanza un error si ocurre un fallo al recuperar los registros.
+ * @param {string} idTrabajador - Identificador UUID del trabajador.
+ * @returns {Promise<ResumenJornada[]>} Resúmenes del trabajador.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerResumenesJornada = async (idTrabajador: string): Promise<ResumenJornada[]> => {
+export const obtenerResumenesJornada = async (
+  idTrabajador: string,
+): Promise<ResumenJornada[]> => {
   try {
-    const respuesta = await api.get<ResumenJornada[]>(`/api/resumenes-jornada/trabajador/${idTrabajador}`);
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al recuperar los resúmenes de jornada.",
+    const respuesta = await api.get<ResumenJornadaResponse[]>(
+      `/api/resumenes-jornada/trabajador/${idTrabajador}`,
     );
+    return respuesta.data.map((resumen) => convertirResumenJornada(resumen));
+  } catch (error: any) {
+    const mensaje = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(mensaje || "Error al recuperar los resúmenes de jornada.");
   }
 };
 
 /**
- * Obtiene los resúmenes de jornada asociados a un trabajador específico mediante su UUID.
+ * Obtiene los resúmenes de jornada de un trabajador concreto.
  * URI: GET /api/resumenes-jornada/trabajador/{id_trabajador}
  *
  * @async
  * @function obtenerResumenesPorTrabajador
- * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
- * @returns {Promise<ResumenJornada[]>} Promesa con el listado de resúmenes de jornada del trabajador.
- * @throws {Error} Lanza un error si el trabajador no existe o falla la recuperación.
+ * @param {string} idTrabajador - Identificador UUID del trabajador.
+ * @returns {Promise<ResumenJornada[]>} Resúmenes del trabajador.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
 export const obtenerResumenesPorTrabajador = async (
   idTrabajador: string,
-): Promise<ResumenJornada[]> => {
-  try {
-    const respuesta = await api.get<ResumenJornada[]>(
-      `/api/resumenes-jornada/trabajador/${idTrabajador}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        "Error al recuperar los resúmenes de jornada del trabajador.",
-    );
-  }
-};
+): Promise<ResumenJornada[]> => obtenerResumenesJornada(idTrabajador);
 
 /**
- * Obtiene el cuadro de mandos diario de una empresa para una fecha concreta (AAAA-MM-DD).
+ * Obtiene el cuadro diario de jornada de una empresa para una fecha concreta.
  * URI: GET /api/resumenes-jornada/empresa/{id_empresa}/fecha/{fecha_dia}
  *
  * @async
  * @function obtenerCuadroMandosDiarioEmpresa
- * @param {string} idEmpresa - Identificador único universal (UUID) de la empresa.
- * @param {string} fechaDia - Fecha consultada en formato "AAAA-MM-DD".
- * @returns {Promise<ResumenJornada[]>} Promesa con el cuadro de mandos diario de la empresa.
- * @throws {Error} Lanza un error si la consulta no se puede completar.
+ * @param {string} idEmpresa - Identificador UUID de la empresa.
+ * @param {string} fechaDia - Fecha consultada en formato YYYY-MM-DD.
+ * @param {string} empresaIdContext - Empresa activa usada por el interceptor de la API.
+ * @returns {Promise<ResumenJornada[]>} Resúmenes diarios de la empresa.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
 export const obtenerCuadroMandosDiarioEmpresa = async (
   idEmpresa: string,
   fechaDia: string,
+  empresaIdContext: string = idEmpresa,
 ): Promise<ResumenJornada[]> => {
   try {
-    const respuesta = await api.get<ResumenJornada[]>(
+    const respuesta = await api.get<ResumenJornadaResponse[]>(
       `/api/resumenes-jornada/empresa/${idEmpresa}/fecha/${fechaDia}`,
+      { empresaIdContext } as any,
     );
-    return respuesta.data;
+    return respuesta.data.map((resumen) =>
+      convertirResumenJornada(resumen, fechaDia),
+    );
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
+    const mensaje = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
-      apiMessage ||
-        "Error al recuperar el cuadro de mandos diario de la empresa.",
+      mensaje || "Error al recuperar el cuadro de mandos diario de la empresa.",
     );
   }
 };
 
 /**
- * Consolida de manera definitiva (cierra) una fila diaria de resumen de jornada.
+ * Consolida y cierra un resumen diario de jornada.
  * URI: PUT /api/resumenes-jornada/{id_resumen}/cerrar
  *
  * @async
  * @function consolidarJornadaMensual
- * @param {string} idResumen - Identificador único universal (UUID) del resumen de jornada a cerrar.
- * @returns {Promise<ResumenJornada>} Promesa con el resumen de jornada consolidado.
- * @throws {Error} Lanza un error si el registro no existe o la API rechaza el cierre.
+ * @param {string} idResumen - Identificador UUID del resumen que se va a cerrar.
+ * @returns {Promise<ResumenJornada>} Resumen consolidado.
+ * @throws {Error} Mensaje de la API o error genérico de cierre.
  */
 export const consolidarJornadaMensual = async (
   idResumen: string,
 ): Promise<ResumenJornada> => {
   try {
-    const respuesta = await api.put<ResumenJornada>(
+    const respuesta = await api.put<ResumenJornadaResponse>(
       `/api/resumenes-jornada/${idResumen}/cerrar`,
     );
-    return respuesta.data;
+    return convertirResumenJornada(respuesta.data);
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || "Error al consolidar la jornada.");
+    const mensaje = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(mensaje || "Error al consolidar la jornada.");
   }
 };

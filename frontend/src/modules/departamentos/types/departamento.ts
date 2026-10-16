@@ -1,4 +1,3 @@
-import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../empresas/types/empresa";
 
 /**
@@ -11,7 +10,7 @@ export interface DepartamentoCreate {
   /** Nombre descriptivo del nuevo departamento. */
   nombre: string;
   /** Identificador del centro de trabajo al que se asociará inicialmente (UUID). */
-  centro_trabajo_id: string;
+  activo?: boolean | null;
 }
 
 /**
@@ -37,9 +36,8 @@ export interface DepartamentoSimpleResponse {
   /** Nombre descriptivo asignado al departamento. */
   nombre: string;
   /** Indica si el departamento está activo. */
-  activo: boolean;
+  activo: boolean | null;
   /** Identificador del centro de trabajo vinculado al departamento. */
-  centro_trabajo_id: string;
   /** Marca de tiempo de cuándo fue creado el departamento en el sistema en formato ISO DateTime. */
   created_at: string;
   /** Marca de tiempo de la última modificación realizada en el departamento en formato ISO DateTime. */
@@ -54,5 +52,4 @@ export interface Departamento extends DepartamentoSimpleResponse {
   /** Relación opcional con la entidad empresa asociada cargada por el backend. */
   empresa?: Empresa | null;
   /** Relación opcional con la entidad centro de trabajo asociada cargada por el backend. */
-  centro_trabajo?: CentroTrabajo | null;
 }

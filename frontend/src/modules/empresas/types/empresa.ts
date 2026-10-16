@@ -36,12 +36,25 @@ export interface EmpresaCreate {
 }
 
 /** Request body matching EmpresaUpdate. */
-export type EmpresaUpdate = Partial<EmpresaCreate>;
+export interface EmpresaUpdate {
+  nombre_comercial?: string | null;
+  razon_social?: string | null;
+  cif?: string | null;
+  zona_horaria?: string | null;
+  activa?: boolean | null;
+  configuracion?: Record<string, unknown> | null;
+  es_gestoria?: boolean | null;
+  codigo_cnae?: string | null;
+  convenio_colectivo?: string | null;
+  direccion?: string | null;
+  fecha_baja?: string | null;
+  logo_url?: string | null;
+}
 
 /** Request body matching RegistroOrganizacionCompleta. */
 export interface RegistroOrganizacionDTO extends EmpresaCreate {
   zona_horaria: string;
-  codigo_licencia: string;
+  codigo_licencia?: string | null;
   nombre_admin: string;
   email_admin: string;
   telefono_admin?: string | null;

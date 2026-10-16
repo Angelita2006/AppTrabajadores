@@ -75,7 +75,7 @@ def obtener_calendarios_laborales_festivos_empresa(
 
     calendarios = (
         db.query(CalendariosLaborales)
-        .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
+        .options(joinedload(CalendariosLaborales.empresa))
         .filter(CalendariosLaborales.empresa_id == id_empresa, CalendariosLaborales.activo.is_(True))
         .all()
     )
@@ -87,28 +87,19 @@ def obtener_calendarios_laborales_festivos_empresa(
             Festivos.activo.is_(True),
         ).order_by(Festivos.fecha.asc()).all()
 
-        lista_festivos = []
-        for f in festivos_db:
-            lista_festivos.append(
-                Festivos(
-                    id=f.id,
-                    fecha=f.fecha,
-                    activo=f.activo,
-                    descripcion=f.descripcion if f.descripcion is not None else "",
-                    tipo=f.tipo
-                )
-            )
-
         resultado.append(
             CalendariosLaborales(
                 id=cal.id,
+                empresa_id=cal.empresa_id,
                 nombre=cal.nombre,
                 anio=cal.anio,
                 activo=cal.activo,
-                centro_trabajo_id=cal.centro_trabajo_id,
-                festivos=lista_festivos,
+                created_at=cal.created_at,
+                updated_at=cal.updated_at,
+                # Conserva los campos requeridos por FestivoSimpleResponse,
+                # incluidos calendario_id y las marcas temporales.
+                festivos=festivos_db,
                 empresa=cal.empresa,
-                centro_trabajo=cal.centro_trabajo
             )
         )
 
@@ -157,8 +148,8 @@ def obtener_calendarios_laborales_centro(
 
     calendarios = (
         db.query(CalendariosLaborales)
-        .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
-        .filter(CalendariosLaborales.centro_trabajo_id == id_centro, CalendariosLaborales.activo.is_(True))
+        .options(joinedload(CalendariosLaborales.empresa))
+        .filter(CalendariosLaborales.empresa_id == centro.empresa_id, CalendariosLaborales.activo.is_(True))
         .all()
     )
 
@@ -207,7 +198,7 @@ def obtener_calendarios_laborales_empresa(
 
     calendarios = (
         db.query(CalendariosLaborales)
-        .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
+        .options(joinedload(CalendariosLaborales.empresa))
         .filter(CalendariosLaborales.empresa_id == id_empresa, CalendariosLaborales.activo.is_(True))
         .all()
     )
@@ -238,7 +229,7 @@ def obtener_calendario_laboral_id(
     # Validaciones estructurales básicas
     calendario = (
         db.query(CalendariosLaborales)
-        .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
+        .options(joinedload(CalendariosLaborales.empresa))
         .filter(CalendariosLaborales.id == id_calendario)
         .first()
     )
@@ -287,10 +278,8 @@ def obtener_calendario_laboral_id(
         nombre=calendario.nombre,
         activo=calendario.activo,
         anio=calendario.anio,
-        centro_trabajo_id=calendario.centro_trabajo_id,
         festivos=lista_festivos,
         empresa=calendario.empresa,
-        centro_trabajo=calendario.centro_trabajo
     )
 
     return calendario
@@ -325,25 +314,12 @@ def crear_calendario_laboral(
             detail=f"Empresa no encontrada."
         )
 
-    centro = db.query(CentrosTrabajo).filter(
-        CentrosTrabajo.id == payload.centro_trabajo_id,
-        CentrosTrabajo.activo.is_(True),
-    ).first()
-
-    if not centro:
-        print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo no encontrado."
-        )
-
     try:
         nuevo_calendario = CalendariosLaborales(
             empresa_id=payload.empresa_id,
             anio=payload.anio,
             nombre=payload.nombre,
             activo=payload.activo,
-            centro_trabajo_id=payload.centro_trabajo_id
         )
 
         db.add(nuevo_calendario)
@@ -365,7 +341,7 @@ def crear_calendario_laboral(
 
         calendario_creado = (
             db.query(CalendariosLaborales)
-            .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
+            .options(joinedload(CalendariosLaborales.empresa))
             .filter(CalendariosLaborales.id == nuevo_calendario.id)
             .first()
         )
@@ -600,7 +576,7 @@ def modificar_calendario_laboral(
 
         calendario_actualizado = (
             db.query(CalendariosLaborales)
-            .options(joinedload(CalendariosLaborales.empresa), joinedload(CalendariosLaborales.centro_trabajo))
+            .options(joinedload(CalendariosLaborales.empresa))
             .filter(CalendariosLaborales.id == id_calendario)
             .first()
         )

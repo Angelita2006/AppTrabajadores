@@ -47,12 +47,12 @@ class ConfirmarCambioTelefono(BaseModel):
 
 class PasswordCambioRequest(BaseModel):
     antigua_password: str = Field(..., min_length=6, max_length=255, description="Contraseña actual del usuario")
-    nueva_password: str = Field(..., min_length=6, max_length=255, description="Nueva contraseña del usuario")
+    nueva_password: Optional[str] = Field(None, min_length=6, max_length=255, description="Nueva contraseña del usuario, si el flujo la solicita directamente")
 
     @field_validator("nueva_password")
     @classmethod
-    def validar_limite_bcrypt(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > 72:
+    def validar_limite_bcrypt(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and len(value.encode("utf-8")) > 72:
             raise ValueError("Password exceeds bcrypt 72-byte limit.")
         return value
 

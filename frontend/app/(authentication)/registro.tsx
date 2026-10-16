@@ -1,25 +1,25 @@
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { registrarUsuarioAcceso } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
-import { Colors } from "@/src/constants/theme";
-import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import LottieBackground from "../../src/shared/ui/Background.native";
@@ -34,13 +34,11 @@ export default function RegistroScreen() {
   const [isObscured, setIsObscured] = useState(true);
   const [mostrarFondo, setMostrarVideo] = useState(false);
 
-  // Estados del Formulario Multiempresa adaptados a tu backend de PostgreSQL
+  // Datos básicos de la cuenta.
   const [nombre, setNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
-  const [nifNie, setNifNie] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [empresaCif, setEmpresaCif] = useState(""); // Código UUID del Tenant entregado por la empresa
 
   // Estados de Validación Visual
   const [errorEmail, setErrorEmail] = useState(false);
@@ -48,7 +46,6 @@ export default function RegistroScreen() {
 
   const nombreRef = useRef<TextInput>(null);
   const apellidosRef = useRef<TextInput>(null);
-  const nifNieRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -71,8 +68,7 @@ export default function RegistroScreen() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const esEmailValido = emailRegex.test(email);
     const esPasswordValido = password.length >= 6;
-    const camposCompletos =
-      nombre.trim() && apellidos.trim() && nifNie.trim() && empresaCif.trim();
+    const camposCompletos = nombre.trim() && apellidos.trim();
 
     setErrorEmail(!esEmailValido);
     setErrorPassword(!esPasswordValido);
@@ -80,7 +76,7 @@ export default function RegistroScreen() {
     if (!camposCompletos) {
       mostrarMensaje(
         "Campos Vacíos",
-        "Por favor, rellena todos los parámetros obligatorios de tu contrato.",
+        "Por favor, indica tu nombre y apellidos.",
       );
       return false;
     }
@@ -94,22 +90,22 @@ export default function RegistroScreen() {
     try {
       setCargando(true);
 
-      // Llama al endpoint de registro de usuario vinculando el expediente existente
+      // El endpoint crea una cuenta de usuario; la membresía empresarial se gestiona por separado.
       await registrarUsuarioAcceso({
-        empresa_cif: empresaCif.trim(),
-        dni_nif_nie: nifNie.trim().toUpperCase(),
+        nombre: `${nombre.trim()} ${apellidos.trim()}`,
         email: email.trim().toLowerCase(),
+        telefono: null,
         password: password,
       });
 
       mostrarMensaje(
-        "Alta Consolidada",
-        "Tu cuenta de usuario ha sido vinculada correctamente a tu expediente.",
+        "Cuenta creada",
+        "Tu cuenta se ha creado correctamente. El acceso a una empresa requiere que te asignen una membresía.",
       );
       router.replace("/");
     } catch (error: any) {
       mostrarError(
-        "Error al completar el registro y vinculación del usuario: " +
+        "Error al crear la cuenta de usuario: " +
           obtenerMensajeAmigableError(error),
       );
     } finally {
@@ -136,7 +132,7 @@ export default function RegistroScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
-      {mostrarFondo && theme === "dark" &&
+      {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
@@ -145,12 +141,16 @@ export default function RegistroScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
-          style={[styles.loginCard, { backgroundColor: colors.card }, estiloTarjetaAnimada]}
+          style={[
+            styles.loginCard,
+            { backgroundColor: colors.card },
+            estiloTarjetaAnimada,
+          ]}
         >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
               <Image
-                source={require("../../assets/icons/logoB.png")}
+                source={require("../../assets/icons/logo.png")}
                 style={styles.logoImage}
                 resizeMode="cover"
                 accessibilityLabel="Logotipo de Fichapp"
@@ -158,36 +158,11 @@ export default function RegistroScreen() {
             </View>
             <ThemedText style={styles.mainTitle}>Alta de Usuario</ThemedText>
             <ThemedText style={styles.subtitle}>
-              Vincula tu perfil al control horario de tu empresa
+              Crea tu cuenta para acceder a Fichapp
             </ThemedText>
           </View>
 
           <View style={styles.formulario}>
-            {/* Campo: Código de Empresa (Tenant) */}
-            <View style={styles.field}>
-              <ThemedText style={styles.label}>CIF de Empresa</ThemedText>
-              <View style={styles.inputWrapper}>
-                <IconSymbol
-                  name="briefcase.fill"
-                  size={20}
-                  color="#94A3B8"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  value={empresaCif}
-                  onChangeText={setEmpresaCif}
-                  style={styles.inputContainer}
-                  autoCapitalize="none"
-                  placeholder="Introduce el CIF de tu corporación"
-                  placeholderTextColor="#94A3B8"
-                  editable={!cargando}
-                  returnKeyType="next"
-                  onSubmitEditing={() => nombreRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
-              </View>
-            </View>
-
             {/* Fila: Nombre y Apellidos */}
             <View style={styles.rowCampos}>
               <View style={[styles.field, { flex: 1 }]}>
@@ -213,34 +188,6 @@ export default function RegistroScreen() {
                   onChangeText={setApellidos}
                   style={styles.inputPlano}
                   placeholder="Tus apellidos"
-                  placeholderTextColor="#94A3B8"
-                  editable={!cargando}
-                  returnKeyType="next"
-                  onSubmitEditing={() => nifNieRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
-              </View>
-            </View>
-
-            {/* Campo: NIF / NIE */}
-            <View style={styles.field}>
-              <ThemedText style={styles.label}>
-                Identificación (NIF / NIE)
-              </ThemedText>
-              <View style={styles.inputWrapper}>
-                <IconSymbol
-                  name="group"
-                  size={20}
-                  color="#94A3B8"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  ref={nifNieRef}
-                  value={nifNie}
-                  onChangeText={setNifNie}
-                  style={styles.inputContainer}
-                  autoCapitalize="characters"
-                  placeholder="Ej: 12345678X"
                   placeholderTextColor="#94A3B8"
                   editable={!cargando}
                   returnKeyType="next"
@@ -405,11 +352,9 @@ const styles = StyleSheet.create({
   },
   headerContenedor: { alignItems: "center", marginBottom: 20 },
   logoBranding: {
-    width: 52,
-    height: 52,
-    backgroundColor: "#011640",
+    width: 120,
+    height: 120,
     overflow: "hidden",
-    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,

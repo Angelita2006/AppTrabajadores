@@ -4,6 +4,7 @@ import { Contrato } from "../../contratos/types/contrato";
 export interface ContratoCalendarioCreate {
   contrato_id: string;
   calendario_laboral_id: string;
+  activa?: boolean | null;
 }
 export interface ContratoCalendarioUpdate { activa?: boolean | null }
 export interface ContratoCalendarioSimpleResponse {

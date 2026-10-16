@@ -28,7 +28,6 @@ import {
     CalendarioLaboralResponse,
     CalendarioLaboralUpdate,
 } from "../../../calendarios-laborales/types/calendario";
-import { CentroTrabajo } from "../../../centros-trabajo/types/centro-trabajo";
 import { crearFestivo, editarFestivo } from "../../../festivos/api/services";
 import { Festivo } from "../../../festivos/types/festivo";
 import { Empresa } from "../../types/empresa";
@@ -46,7 +45,6 @@ interface UseTabCalendarioProps {
     React.SetStateAction<CalendarioFestivo[]>
   >;
   /** Listado de centros de trabajo disponibles para asociar a los calendarios. */
-  centrosEmpresa: CentroTrabajo[];
   /** Empresa que se encuentra seleccionada en el contexto actual de la aplicación. */
   empresaActual: Empresa;
   /** Calendario laboral que el usuario ha seleccionado para visualizar o editar. */
@@ -58,13 +56,11 @@ interface UseTabCalendarioProps {
   /** Valor en texto del nombre descriptivo para el formulario de edición. */
   editNombre: string;
   /** Identificador del centro de trabajo asociado en el modo de edición. */
-  editCentroId: string | null;
   /** Función para actualizar el año en el formulario de edición. */
   setEditAnio: (anio: string) => void;
   /** Función para actualizar el nombre en el formulario de edición. */
   setEditNombre: (nombre: string) => void;
   /** Función para actualizar el identificador del centro en el modo de edición. */
-  setEditCentroId: (centroId: string | null) => void;
   /** Estado booleano que indica si se está ejecutando una operación asíncrona de guardado. */
   guardando: boolean;
   /** Función para actualizar el estado booleano de guardado. */
@@ -81,23 +77,18 @@ interface UseTabCalendarioProps {
 export function useTabCalendario({
   calendariosEmpresa,
   setCalendariosEmpresa,
-  centrosEmpresa,
   empresaActual,
   calendarioActual,
   setCalendarioActual,
   editAnio,
   editNombre,
-  editCentroId,
   setEditAnio,
   setEditNombre,
-  setEditCentroId,
   guardando,
   setGuardando,
 }: UseTabCalendarioProps) {
   const [anoNuevoCalendario, setAnoNuevoCalendario] = useState("");
   const [nombreNuevoCalendario, setNombreNuevoCalendario] = useState("");
-  const [centroNuevoCalendario, setCentroNuevoCalendario] =
-    useState<string>("");
   const [importandoPdf, setImportandoPdf] = useState(false);
   const [mostrarEdicionCampos, setMostrarEdicionCampos] = useState(false);
   const [diaSeleccionadoCtx, setDiaSeleccionadoCtx] = useState<string | null>(
@@ -120,17 +111,6 @@ export function useTabCalendario({
   /**
    * Efecto para sincronizar el centro de trabajo por defecto al actualizar la lista de centros.
    */
-  useEffect(() => {
-    const centrosActivos = centrosEmpresa.filter(
-      (centro) => centro.activo === true,
-    );
-    if (centrosActivos.length > 0) {
-      setCentroNuevoCalendario(centrosActivos[0].id);
-    } else {
-      setCentroNuevoCalendario("");
-    }
-  }, [centrosEmpresa]);
-
   /**
    * Efecto para actualizar los campos de edición cuando se selecciona un calendario diferente.
    */
@@ -138,13 +118,10 @@ export function useTabCalendario({
     if (calendarioActual) {
       setEditAnio(String(calendarioActual.anio));
       setEditNombre(calendarioActual.nombre);
-      setEditCentroId(calendarioActual.centro_trabajo_id);
     }
   }, [calendarioActual]);
 
-  const tieneCentrosValidos = centrosEmpresa.some(
-    (centro) => centro.activo === true,
-  );
+  const tieneCentrosValidos = Boolean(empresaActual.id);
 
   /**
    * Valida los datos introducidos y ejecuta la petición para registrar un nuevo calendario laboral.
@@ -153,7 +130,7 @@ export function useTabCalendario({
     if (!tieneCentrosValidos) {
       mostrarMensaje(
         "Acción Bloqueada",
-        "No se puede crear un calendario si la empresa no tiene centros de trabajo.",
+        "Selecciona una empresa válida antes de crear un calendario.",
       );
       return;
     }
@@ -172,7 +149,6 @@ export function useTabCalendario({
         empresa_id: empresaActual.id,
         anio: ano,
         nombre: nombreNuevoCalendario.trim() || `Calendario Anual ${ano}`,
-        centro_trabajo_id: centroNuevoCalendario,
       };
 
       const respuestaBackend: CalendarioLaboralResponse =
@@ -181,7 +157,6 @@ export function useTabCalendario({
       const nuevoCalendarioUI: CalendarioFestivo = {
         id: respuestaBackend.id,
         empresa_id: respuestaBackend.empresa_id,
-        centro_trabajo_id: respuestaBackend.centro_trabajo_id ?? "",
         nombre: respuestaBackend.nombre,
         anio: respuestaBackend.anio,
         activo: respuestaBackend.activo,
@@ -192,13 +167,6 @@ export function useTabCalendario({
       setCalendarioActual(nuevoCalendarioUI);
       setAnoNuevoCalendario("");
       setNombreNuevoCalendario("");
-
-      const centrosActivos = centrosEmpresa.filter(
-        (centro) => centro.activo === true,
-      );
-      if (centrosActivos.length > 0) {
-        setCentroNuevoCalendario(centrosActivos[0].id);
-      }
 
       mostrarMensaje(
         "Éxito",
@@ -243,7 +211,6 @@ export function useTabCalendario({
             ...c,
             anio: respuestaBackend.anio,
             nombre: respuestaBackend.nombre,
-            centro_trabajo_id: respuestaBackend.centro_trabajo_id,
           };
         }
         return c;
@@ -254,7 +221,6 @@ export function useTabCalendario({
         ...calendarioActual,
         anio: respuestaBackend.anio,
         nombre: respuestaBackend.nombre,
-        centro_trabajo_id: respuestaBackend.centro_trabajo_id,
       });
 
       setMostrarEdicionCampos(false);
@@ -527,8 +493,6 @@ export function useTabCalendario({
     setAnoNuevoCalendario,
     nombreNuevoCalendario,
     setNombreNuevoCalendario,
-    centroNuevoCalendario,
-    setCentroNuevoCalendario,
     importandoPdf,
     mostrarEdicionCampos,
     setMostrarEdicionCampos,
@@ -567,16 +531,13 @@ interface TabCalendarioProps extends UseTabCalendarioProps {
 export default function TabCalendario({
   calendariosEmpresa,
   setCalendariosEmpresa,
-  centrosEmpresa,
   empresaActual,
   calendarioActual,
   setCalendarioActual,
   editAnio,
   editNombre,
-  editCentroId,
   setEditAnio,
   setEditNombre,
-  setEditCentroId,
   guardando,
   setGuardando,
   styles,
@@ -586,8 +547,6 @@ export default function TabCalendario({
     setAnoNuevoCalendario,
     nombreNuevoCalendario,
     setNombreNuevoCalendario,
-    centroNuevoCalendario,
-    setCentroNuevoCalendario,
     importandoPdf,
     mostrarEdicionCampos,
     setMostrarEdicionCampos,
@@ -613,16 +572,13 @@ export default function TabCalendario({
   } = useTabCalendario({
     calendariosEmpresa,
     setCalendariosEmpresa,
-    centrosEmpresa,
     empresaActual,
     calendarioActual,
     setCalendarioActual,
     editAnio,
     editNombre,
-    editCentroId,
     setEditAnio,
     setEditNombre,
-    setEditCentroId,
     guardando,
     setGuardando,
   });
@@ -678,51 +634,7 @@ export default function TabCalendario({
       {/* Formulario de Inicialización */}
       <View style={styles.contenedorFormDesplegado}>
         <ThemedText style={styles.labelInput}>
-          1. Centro de Trabajo Destino *
-        </ThemedText>
-        {!tieneCentrosValidos ? (
-          <View style={styles.bannerError}>
-            <ThemedText style={styles.textoBannerError}>
-              ⚠️ No existen centros de trabajo registrados. Dirígete primero a
-              la pestaña 'Centros de Trabajo'.
-            </ThemedText>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 14, marginTop: 4 }}
-          >
-            {centrosEmpresa
-              .filter((centro) => centro.activo === true)
-              .map((centro) => {
-                const esEsteCentro = centroNuevoCalendario === centro.id;
-                return (
-                  <Pressable
-                    key={centro.id}
-                    style={[
-                      styles.chipAno,
-                      esEsteCentro && { backgroundColor: "#2563EB" },
-                    ]}
-                    onPress={() => setCentroNuevoCalendario(centro.id)}
-                  >
-                    <ThemedText
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "600",
-                        color: esEsteCentro ? "#FFFFFF" : "#475569",
-                      }}
-                    >
-                      {centro.nombre} {esEsteCentro ? "✓" : ""}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-          </ScrollView>
-        )}
-
-        <ThemedText style={styles.labelInput}>
-          2. Identificación del Calendario
+          Calendario de empresa
         </ThemedText>
         <TextInput
           ref={crearNombreInputRef}
@@ -784,14 +696,9 @@ export default function TabCalendario({
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <Row>
                 {calendariosActivos.map((cal) => {
-                  const centroAsociado = centrosEmpresa.find(
-                    (c) => c.id === cal.centro_trabajo_id,
-                  );
-                  const nombreCentro =
-                    centroAsociado?.nombre || "Global Empresa";
                   const displayLabel = cal.nombre
-                    ? `${cal.nombre} (${nombreCentro})`
-                    : `Año ${cal.anio} (${nombreCentro})`;
+                    ? `${cal.nombre} (${cal.anio})`
+                    : `Calendario ${cal.anio}`;
                   const estaSeleccionado = calendarioActual?.id === cal.id;
 
                   return (
@@ -955,44 +862,7 @@ export default function TabCalendario({
                   blurOnSubmit={false}
                 />
               </View>
-              <View style={styles.campoFormulario}>
-                <ThemedText style={styles.labelInput}>
-                  Centro de Trabajo Asignado
-                </ThemedText>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ marginTop: 4 }}
-                >
-                  {centrosEmpresa
-                    .filter((centro) => centro.activo === true)
-                    .map((centro) => {
-                      const esEsteCentro = editCentroId === centro.id;
-                      return (
-                        <Pressable
-                          key={centro.id}
-                          style={[
-                            styles.chipAno,
-                            esEsteCentro && { backgroundColor: "#0F172A" },
-                          ]}
-                          onPress={() => setEditCentroId(centro.id)}
-                          disabled={guardando}
-                        >
-                          <ThemedText
-                            style={{
-                              fontSize: 11,
-                              fontWeight: "600",
-                              color: esEsteCentro ? "#FFFFFF" : "#475569",
-                            }}
-                          >
-                            {centro.nombre} {esEsteCentro ? "✓" : ""}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                </ScrollView>
-              </View>
-              <Pressable
+<Pressable
                 style={[
                   styles.botonGuardar,
                   { backgroundColor: "#0F172A", height: 40, marginTop: 5 },

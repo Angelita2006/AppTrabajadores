@@ -1,42 +1,28 @@
-import { Empresa } from "../../empresas/types/empresa";
+﻿import { Empresa } from "../../empresas/types/empresa";
 import { Trabajador } from "../../trabajadores/types/trabajador";
 import { TipoRolEnum } from "../../../constants/enums";
 
 /**
- * Listado estático de los tipos de perfiles de usuario permitidos dentro de la aplicación.
- * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automáticamente.
+ * Listado estÃ¡tico de los tipos de perfiles de usuario permitidos dentro de la aplicaciÃ³n.
+ * Se utiliza `as const` para congelar los valores y permitir inferir los tipos automÃ¡ticamente.
  */
 export const TIPOS_USUARIO = TipoRolEnum;
 
 /**
- * Tipo de unión que representa los perfiles de usuario permitidos dentro de la aplicación.
+ * Tipo de uniÃ³n que representa los perfiles de usuario permitidos dentro de la aplicaciÃ³n.
  */
 export type TipoUsuarioEnum =
   (typeof TIPOS_USUARIO)[keyof typeof TIPOS_USUARIO];
 
 /**
- * Interface para la creación de un usuario 'UsuarioCreate'.
+ * Interface para la creaciÃ³n de un usuario 'UsuarioCreate'.
  */
-export interface UsuarioCreateRequest {
-  /** Nombre completo del usuario. */
-  nombre: string;
-  /** Correo electrónico único para el acceso. */
-  email: string;
-  /** Tipo (rol) del usuario. */
-  tipo_usuario: TipoUsuarioEnum;
-  /** Contraseña en texto plano para su posterior cifrado en servidor. */
-  password_raw: string;
-  /** Identificador de la empresa asociada (UUID). */
-  empresa_id?: string | null;
-  /** Identificador del trabajador asociado (UUID). */
-  trabajador_id?: string | null;
-}
-
-/** Request alineado con UsuarioCreate del backend. */
+/** Payload alineado con UsuarioCreate del backend. */
 export interface UsuarioCreate {
   nombre: string;
   email: string;
   telefono?: string | null;
+  foto_url?: string | null;
   password: string;
   activo?: boolean | null;
 }
@@ -50,65 +36,58 @@ export interface UsuarioUpdate {
   activo?: boolean | null;
 }
 
+/** Login payload aligned with schemas.auth.LoginRequest. */
+export interface LoginRequest {
+  email?: string | null;
+  telefono?: string | null;
+  password: string;
+}
+
+/** Request body consumed by PUT /usuarios/solicitar-cambio-password. */
+export interface PasswordCambioRequest {
+  antigua_password: string;
+}
+
+/** Request body consumed by POST /usuarios/confirmar-cambio-password. */
+export interface ConfirmarPasswordRecuperacionRequest {
+  email?: string | null;
+  telefono?: string | null;
+  codigo_verificacion: string;
+  nueva_password: string;
+}
+
+/** Effective company membership and permissions returned by /usuarios/me/accesos. */
+export interface AccesoUsuario {
+  membresia_id: string;
+  empresa_id: string | null;
+  rol: { id: string; nombre: string; tipo: string };
+  permisos: Array<{ recurso: string; accion: string; alcance: string }>;
+}
+
 /**
  * Interface para el registro de usuarios (POST /api/usuarios/registro) 'UsuarioRegisterCreate'.
  */
-export interface UsuarioRegisterRequest {
-  /** CIF de la empresa a la que se vincula. */
-  empresa_cif: string;
-  /** NIF o NIE del usuario. */
-  dni_nif_nie: string;
-  /** Correo electrónico de contacto. */
-  email: string;
-  /** Contraseña de acceso. */
-  password: string;
-}
-
-/**
- * Interface para las credenciales de inicio de sesión (POST /api/usuarios/login) 'LoginRequest'.
- */
-export interface LoginRequest {
-  /** Correo electrónico registrado. */
-  email: string;
-  /** Contraseña de acceso. */
-  password: string;
-}
-
 /**
  * Interface que representa la respuesta del objeto Usuario completo 'UsuarioResponse'.
  */
-export interface UsuarioResponse {
-  /** Identificador de la empresa asociada (UUID). */
-  empresa_id?: string | null;
-  /** Identificador único del usuario (UUID). */
+/** Response matching UsuarioSimpleResponse from the backend. */
+export interface UsuarioSimpleResponse {
   id: string;
-  /** Nombre completo. */
   nombre: string;
-  /** Correo electrónico. */
   email: string;
-  /** Tipo de usuario asignado. */
-  tipo_usuario: TipoUsuarioEnum;
-  /** Indica si la autenticación multifactor (MFA) está habilitada. */
-  mfa_habilitado: boolean;
-  /** Indica si la cuenta se encuentra activa. */
-  activo: boolean;
-  /** Timestamp fecha y hora del registro. */
-  created_at: string;
-  /** Timestamp fecha y hora de última actualización. */
-  updated_at: string;
-  /** Timestamp fecha y hora del último acceso del usuario o null si todavía no ha accedido. */
-  ultimo_acceso: string | null;
-  /** Ruta privada del avatar propio, independiente de las fotos laborales. */
+  telefono: string | null;
   foto_url: string | null;
-
-  /** Detalles opcionales de la empresa asociada. */
-  empresa?: Empresa | null;
-  /** Detalles opcionales del trabajador asociado. */
-  trabajador?: Trabajador | null;
+  activo: boolean | null;
+  created_at: string;
+  updated_at: string;
+  ultimo_acceso: string | null;
 }
 
+/** Alias compatible con los consumidores existentes de respuestas de usuario. */
+export type UsuarioResponse = UsuarioSimpleResponse;
+
 /**
- * Interface para la respuesta de inicio de sesión (LoginResponse).
+ * Interface para la respuesta de inicio de sesiÃ³n (LoginResponse).
  * Devuelve el token JWT y la entidad de usuario asociada.
  */
 export interface LoginResponse {
@@ -116,16 +95,16 @@ export interface LoginResponse {
   access_token: string;
   /** Tipo de token (por lo general "bearer"). */
   token_type: string;
-  /** Entidad de usuario asociada a la sesión. */
-  usuario: UsuarioResponse;
+  /** Entidad de usuario asociada a la sesiÃ³n. */
+  usuario: UsuarioSimpleResponse;
 }
 
 /**
  * Interfaz oficial de la Cuenta de Acceso (Tabla: usuarios).
- * Este es el objeto raíz que inyecta el backend tras el inicio de sesión exitoso.
+ * Este es el objeto raÃ­z que inyecta el backend tras el inicio de sesiÃ³n exitoso.
  */
 export interface UsuarioSesion {
-  /** Identificador único universal (UUID) de la cuenta de usuario. */
+  /** Identificador Ãºnico universal (UUID) de la cuenta de usuario. */
   id: string;
   /** ID de la ficha laboral de la empresa activa; enriquecido en cliente. */
   trabajador_id?: string | null;
@@ -133,48 +112,49 @@ export interface UsuarioSesion {
   empresa_id?: string | null;
   /** Nombre completo del usuario. */
   nombre: string;
-  /** Correo electrónico de acceso. */
+  /** Correo electrÃ³nico de acceso. */
   email: string;
   /** Tipo (rol) de usuario asignado. */
-  tipo_usuario: TipoUsuarioEnum;
-  /** Indica si la autenticación multifactor (MFA) se encuentra habilitada. */
-  mfa_habilitado: boolean;
-  /** Indica si la cuenta de usuario está activa. */
-  activo: boolean;
-  /** Timestamp de la fecha y hora del último acceso del usuario o null si no ha accedido. */
+  tipo_usuario?: TipoUsuarioEnum;
+  /** Indica si la autenticaciÃ³n multifactor (MFA) se encuentra habilitada. */
+  mfa_habilitado?: boolean;
+  /** Indica si la cuenta de usuario estÃ¡ activa. */
+  activo: boolean | null;
+  telefono?: string | null;
+  /** Timestamp de la fecha y hora del Ãºltimo acceso del usuario o null si no ha accedido. */
   ultimo_acceso?: string | null;
-  /** Timestamp de la fecha y hora de creación de la cuenta. */
+  /** Timestamp de la fecha y hora de creaciÃ³n de la cuenta. */
   created_at: string;
-  /** Timestamp de la fecha y hora de la última modificación de la cuenta. */
+  /** Timestamp de la fecha y hora de la Ãºltima modificaciÃ³n de la cuenta. */
   updated_at: string;
   /** Ruta privada del avatar propio, independiente de las fotos laborales. */
   foto_url?: string | null;
 
-  /** Relación opcional de la empresa vinculada a la sesión. */
+  /** RelaciÃ³n opcional de la empresa vinculada a la sesiÃ³n. */
   empresa?: Empresa | null;
-  /** Relación opcional del trabajador vinculado a la sesión. */
+  /** RelaciÃ³n opcional del trabajador vinculado a la sesiÃ³n. */
   trabajador?: Trabajador | null;
 }
 
 /**
- * Interface para listados en paneles de administración o tablas de usuarios.
+ * Interface para listados en paneles de administraciÃ³n o tablas de usuarios.
  */
 export interface ItemUsuario {
-  /** Identificador único del usuario (UUID). */
+  /** Identificador Ãºnico del usuario (UUID). */
   id: string;
   /** Nombre completo. */
   nombre: string;
-  /** Correo electrónico. */
+  /** Correo electrÃ³nico. */
   email: string;
   /** Tipo (rol) de usuario. */
   tipo_usuario: TipoUsuarioEnum;
   /** Indica si la cuenta se encuentra activa. */
   activo: boolean;
-  /** Timestamp fecha y hora del último acceso o null si todavía no ha accedido. */
+  /** Timestamp fecha y hora del Ãºltimo acceso o null si todavÃ­a no ha accedido. */
   ultimo_acceso: string | null;
 
-  /** Relación opcional de la empresa vinculada a la sesión. */
+  /** RelaciÃ³n opcional de la empresa vinculada a la sesiÃ³n. */
   empresa?: Empresa | null;
-  /** Relación opcional del trabajador vinculado a la sesión. */
+  /** RelaciÃ³n opcional del trabajador vinculado a la sesiÃ³n. */
   trabajador?: Trabajador | null;
 }

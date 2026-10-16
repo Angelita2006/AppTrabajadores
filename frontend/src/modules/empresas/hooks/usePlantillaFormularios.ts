@@ -1,5 +1,7 @@
 import { eliminarTodasAsignacionesTrabajador } from "@/src/modules/asignaciones-turno/api/services";
-import { crearContrato } from "@/src/modules/contratos/api/services";
+import { crearContrato, subirDocumentoContrato } from "@/src/modules/contratos/api/services";
+import { crearContratoCalendario } from "@/src/modules/contratos-calendarios/api/services";
+import { asignarTurnosTrabajador } from "@/src/modules/asignaciones-turno/api/services";
 import { Contrato } from "@/src/modules/contratos/types/contrato";
 import {
     actualizarTrabajador,
@@ -28,6 +30,7 @@ export type TipoModal =
 export function usePlantillaFormularios(
   usuarioActual: UsuarioSesion,
   cargarPlantilla: () => Promise<void>,
+  empresaIdActiva?: string,
 ) {
   const { mostrarError, mostrarMensaje } = useAppModal();
 
@@ -42,6 +45,7 @@ export function usePlantillaFormularios(
   const [nifNie, setNifNie] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [passwordInicial, setPasswordInicial] = useState("");
   const [nss, setNss] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
 
@@ -54,8 +58,10 @@ export function usePlantillaFormularios(
   const [tipoContrato, setTipoContrato] = useState("");
   const [tipoJornada, setTipoJornada] = useState("");
   const [horasSemana, setHorasSemana] = useState("");
-  const [centroTrabajoId, setCentroTrabajoId] = useState("");
+  const [centrosTrabajoIds, setCentrosTrabajoIds] = useState<string[]>([]);
   const [calendarioLaboralId, setCalendarioLaboralId] = useState<string>("");
+  const [calendariosSeleccionadosIds, setCalendariosSeleccionadosIds] = useState<string[]>([]);
+  const [archivoContrato, setArchivoContrato] = useState<{ uri: string; name: string; mimeType?: string | null } | null>(null);
   const [contratoAEditar, setContratoAEditar] = useState<Contrato>();
   const [turnosSeleccionados, setTurnosSeleccionados] = useState<Turno[]>([]);
 
@@ -93,6 +99,7 @@ export function usePlantillaFormularios(
     setNifNie("");
     setEmail("");
     setTelefono("");
+    setPasswordInicial("");
     setNss("");
     setFechaNacimiento("");
     setTipoContrato("");
@@ -102,14 +109,17 @@ export function usePlantillaFormularios(
     setFechaFin("");
     setPuestoTrabajo("");
     setCategoriaProfesional("");
-    setCentroTrabajoId("");
+    setCentrosTrabajoIds([]);
     setDepartamentoId("");
     setCalendarioLaboralId("");
+    setCalendariosSeleccionadosIds([]);
+    setArchivoContrato(null);
     setTurnosSeleccionados([]);
   };
 
   const handleAltaTrabajadorCompleta = async () => {
-    if (!nombre || !apellidos || !nifNie || !usuarioActual?.empresa_id) {
+    const empresaId = empresaIdActiva ?? usuarioActual?.empresa_id;
+    if (!nombre || !apellidos || !nifNie || !empresaId) {
       mostrarMensaje(
         "Alerta",
         "Por favor, rellena los campos obligatorios y asegúrate de que la sesión cuenta con una empresa asignada.",
@@ -119,18 +129,24 @@ export function usePlantillaFormularios(
     try {
       setProcesando(true);
       await crearTrabajador({
-        empresa_id: usuarioActual.empresa_id,
+        empresa_id: empresaId,
+        email: email.trim().toLowerCase(),
+        telefono: telefono.trim() || null,
+        password: passwordInicial || null,
         dni_nif_nie: nifNie.trim().toUpperCase(),
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
         numero_seguridad_social: nss.trim(),
-        fecha_nacimiento: fechaNacimiento.trim(),
+        fecha_nacimiento: fechaNacimiento.trim() || null,
         estado: ESTADOS_TRABAJADOR.INACTIVO,
         fecha_alta_empresa: new Date().toISOString().slice(0, 10),
       });
       cerrarModales();
       await cargarPlantilla();
-      mostrarMensaje("Éxito", "Trabajador dado de alta correctamente.");
+      mostrarMensaje(
+        "Éxito",
+        "Trabajador dado de alta. Si se creó una cuenta nueva, comunícale la contraseña inicial indicada; si el correo ya tenía cuenta, deberá usar su contraseña actual.",
+      );
     } catch (error: any) {
       mostrarError(
         "Error al procesar el alta del trabajador: " +
@@ -179,7 +195,8 @@ export function usePlantillaFormularios(
   };
 
   const handleGuardarContrato = async () => {
-    if (!usuarioActual?.empresa_id) {
+    const empresaId = empresaIdActiva ?? usuarioActual?.empresa_id;
+    if (!empresaId || !trabajadorActual?.id) {
       mostrarMensaje(
         "Alerta",
         "No se ha podido identificar la empresa de la sesión actual.",
@@ -188,20 +205,26 @@ export function usePlantillaFormularios(
     }
     try {
       setProcesando(true);
-      await crearContrato({
-        empresa_id: usuarioActual.empresa_id,
-        centro_trabajo_id: centroTrabajoId,
-        tipo_contrato: tipoContrato,
-        tipo_jornada: tipoJornada,
+      const contrato = await crearContrato({
+        empresa_id: empresaId,
+        centros_trabajo_ids: centrosTrabajoIds,
+        tipo_contrato: tipoContrato as import("@/src/modules/contratos/types/contrato").TipoContrato,
+        tipo_jornada: tipoJornada as import("@/src/modules/contratos/types/contrato").TipoJornada,
         horas_semana: Number(horasSemana),
         fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin || "",
+        fecha_fin: fechaFin || null,
         departamento_id: departamentoId,
         puesto_trabajo: puestoTrabajo,
         categoria_profesional: categoriaProfesional,
-        trabajador_id: trabajadorActual!.id,
-        calendario_laboral_id: calendarioLaboralId,
+        trabajador_id: trabajadorActual.id,
       });
+      for (const calendarioId of calendariosSeleccionadosIds.length ? calendariosSeleccionadosIds : (calendarioLaboralId ? [calendarioLaboralId] : [])) {
+        await crearContratoCalendario({ contrato_id: contrato.id, calendario_laboral_id: calendarioId });
+      }
+      if (turnosSeleccionados.length) {
+        await asignarTurnosTrabajador(contrato.id, turnosSeleccionados.map((turno) => turno.id), fechaInicio, fechaFin || null);
+      }
+      if (archivoContrato) await subirDocumentoContrato(contrato.id, archivoContrato);
       await cargarPlantilla();
       cerrarModales();
       mostrarMensaje("Éxito", "Contrato registrado correctamente.");
@@ -253,6 +276,8 @@ export function usePlantillaFormularios(
     setEmail,
     telefono,
     setTelefono,
+    passwordInicial,
+    setPasswordInicial,
     nss,
     setNss,
     fechaNacimiento,
@@ -273,10 +298,14 @@ export function usePlantillaFormularios(
     setTipoJornada,
     horasSemana,
     setHorasSemana,
-    centroTrabajoId,
-    setCentroTrabajoId,
+    centrosTrabajoIds,
+    setCentrosTrabajoIds,
     calendarioLaboralId,
     setCalendarioLaboralId,
+    calendariosSeleccionadosIds,
+    setCalendariosSeleccionadosIds,
+    archivoContrato,
+    setArchivoContrato,
     contratoAEditar,
     setContratoAEditar,
     turnosSeleccionados,

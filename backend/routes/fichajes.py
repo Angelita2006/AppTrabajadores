@@ -32,6 +32,8 @@ from core.utils import (
 from models.asignaciones_turno import AsignacionesTurno
 from models.ausencias import Ausencias
 from models.centros_trabajo import CentrosTrabajo
+from models.contratos import Contratos
+from models.contratos_centros_trabajo import ContratosCentrosTrabajo
 from models.dispositivos_fichaje import DispositivosFichaje
 from models.correcciones_fichaje import CorreccionesFichaje
 from models.empresas import Empresas
@@ -94,8 +96,9 @@ def obtener_fichajes_turno_actual(
 
     asignaciones_vigentes = (
         db.query(AsignacionesTurno)
+        .join(Contratos, AsignacionesTurno.contrato_id == Contratos.id)
         .filter(
-            AsignacionesTurno.trabajador_id == id_trabajador,
+            Contratos.trabajador_id == id_trabajador,
             AsignacionesTurno.fecha_inicio <= hoy,
             or_(AsignacionesTurno.fecha_fin.is_(None), AsignacionesTurno.fecha_fin >= hoy))
         .all()
@@ -659,6 +662,25 @@ def crear_fichaje(
 
     if centro_trabajo.empresa_id != empresa.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Centro de trabajo no encontrado.")
+
+    centro_asignado_al_contrato = (
+        db.query(ContratosCentrosTrabajo.id)
+        .join(Contratos, Contratos.id == ContratosCentrosTrabajo.contrato_id)
+        .filter(
+            ContratosCentrosTrabajo.empresa_id == empresa.id,
+            ContratosCentrosTrabajo.centro_trabajo_id == centro_trabajo.id,
+            Contratos.trabajador_id == trabajador.id,
+            Contratos.activo.is_(True),
+            Contratos.fecha_inicio <= fecha_a_validar.date(),
+            or_(Contratos.fecha_fin.is_(None), Contratos.fecha_fin >= fecha_a_validar.date()),
+        )
+        .first()
+    )
+    if not centro_asignado_al_contrato:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El centro de trabajo no está asociado a un contrato vigente del trabajador.",
+        )
 
     if payload.dispositivo_id:
         dispositivo = (

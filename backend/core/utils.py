@@ -140,10 +140,9 @@ def validar_dia_laboral_o_marcar_extra(db: Session, trabajador_id: uuid.UUID, fe
         CalendariosLaborales, Festivos.calendario_id == CalendariosLaborales.id
     ).join(
         ContratosCalendarios,
-        ContratosCalendarios.calendario_id == CalendariosLaborales.id,
+        ContratosCalendarios.calendario_laboral_id == CalendariosLaborales.id,
     ).filter(
         CalendariosLaborales.anio == fecha_fichaje.year,
-        CalendariosLaborales.centro_trabajo_id == contrato.centro_trabajo_id,
         ContratosCalendarios.contrato_id == contrato.id,
         Festivos.fecha == fecha_fichaje.date()
     ).first()

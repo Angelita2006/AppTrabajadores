@@ -35,6 +35,7 @@ import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { AppScreen, Card, Row, StatCard } from "../../src/shared/ui/AppSurface";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
+import { usePermisos } from "@/src/hooks/usePermisos";
 
 export default function HomeScreen() {
   const theme = useColorScheme();
@@ -46,6 +47,7 @@ export default function HomeScreen() {
     centroTrabajoActual,
     cargandoSesionLocal,
   } = useSesion();
+  const { tienePermiso } = usePermisos();
 
   const [horaActual, setHoraActual] = useState("");
   const [estadoActual, setEstadoActual] = useState<Estado>(
@@ -74,13 +76,11 @@ export default function HomeScreen() {
   const isDrawingRef = useRef(false);
 
   useEffect(() => {
-    const esAdmin =
-      usuarioActual?.tipo_usuario === "Admin_empresa" ||
-      usuarioActual?.tipo_usuario === "Admin_gestoría";
-    if (!cargandoSesionLocal && esAdmin) {
+    const puedeFichar = tienePermiso("fichajes", "crear", "propio");
+    if (!cargandoSesionLocal && !puedeFichar) {
       router.replace("/(tabs)/perfil");
     }
-  }, [usuarioActual, cargandoSesionLocal]);
+  }, [tienePermiso, cargandoSesionLocal]);
 
   // Si está cargando o es un administrador intentando entrar, mostramos un loader vacío
   // para evitar que se renderice ni un solo segundo la interfaz de fichaje.
@@ -444,7 +444,6 @@ export default function HomeScreen() {
         tipo_evento: tipoEvento,
         metodo_fichaje: Platform.OS === "web" ? "Web" : "App_móvil",
         fecha_hora_dispositivo: fechaHoraAjustada,
-        estado: "Válido",
         latitud: latitude,
         longitud: longitude,
         forzar_hora_extra: forzarExtra,

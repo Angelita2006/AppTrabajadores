@@ -25,7 +25,7 @@ export const crearDepartamento = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al registrar el nuevo departamento.");
   }
 };
@@ -49,7 +49,7 @@ export const obtenerDepartamentoPorId = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al recuperar la información del departamento ${idDepartamento}.`,
@@ -79,7 +79,7 @@ export const actualizarDepartamento = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al actualizar el nombre del departamento ${idDepartamento}.`,
@@ -109,7 +109,7 @@ export const editarDepartamento = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al editar el departamento ${idDepartamento}.`,
     );
@@ -128,11 +128,14 @@ export const editarDepartamento = async (
  */
 export const eliminarDepartamento = async (
   idDepartamento: string,
-): Promise<void> => {
+): Promise<{ detail: string }> => {
   try {
-    await api.put(`/api/departamentos/${idDepartamento}/desactivar`);
+    const respuesta = await api.put<{ detail: string }>(
+      `/api/departamentos/${idDepartamento}/desactivar`,
+    );
+    return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al desactivar el departamento ${idDepartamento}.`,
     );
@@ -158,7 +161,7 @@ export const obtenerDepartamentosEmpresa = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener los departamentos de la empresa ${idEmpresa}.`,

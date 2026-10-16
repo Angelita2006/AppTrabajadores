@@ -20,7 +20,7 @@ export const obtenerTodosLosPermisos = async (): Promise<Permiso[]> => {
     const respuesta = await api.get<Permiso[]>("/api/permisos");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener el catálogo de permisos.");
   }
 };
@@ -42,7 +42,7 @@ export const crearPermisoSeguridad = async (
     const respuesta = await api.post<Permiso>("/api/permisos", payload);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Ha ocurrido un error al guardar el permiso.",
     );

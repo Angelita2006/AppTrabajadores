@@ -4,9 +4,17 @@ import { Empresa } from "../../empresas/types/empresa";
 import {
   Estado,
   Trabajador,
+  TrabajadorAutogestionUpdate,
   TrabajadorCreate,
   TrabajadorUpdate,
 } from "../types/trabajador";
+
+const mensajeErrorApi = (error: any, mensajeGenerico: string): Error =>
+  new Error(
+    error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      mensajeGenerico,
+  );
 
 /**
  * Servicio de Gestión de Trabajadores y Expedientes Laborales.
@@ -25,21 +33,18 @@ import {
  */
 export const obtenerTrabajadores = async (
   idEmpresa: string,
+  incluirInactivos = false,
 ): Promise<Trabajador[]> => {
   try {
     const respuesta = await api.get<Trabajador[]>(
       `/api/trabajadores/empresa/${idEmpresa}`,
+      { params: { incluir_inactivos: incluirInactivos }, empresaIdContext: idEmpresa } as any,
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        "Error al recuperar la plantilla de empleados de la empresa.",
-    );
+    throw mensajeErrorApi(error, "Error al recuperar la plantilla de empleados de la empresa.");
   }
 };
-
 /**
  * Recupera la información detallada de un trabajador específico mediante su UUID.
  * URI: GET /api/trabajadores/{id_trabajador}
@@ -59,17 +64,41 @@ export const obtenerTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al recuperar los detalles del trabajador.",
-    );
+    throw mensajeErrorApi(error, "Error al recuperar los detalles del trabajador.");
   }
 };
 
 /** Recupera el expediente laboral asociado al usuario autenticado. */
 export const obtenerMiTrabajador = async (): Promise<Trabajador> => {
-  const respuesta = await api.get<Trabajador>("/api/trabajadores/me");
-  return respuesta.data;
+  try {
+    const respuesta = await api.get<Trabajador>("/api/trabajadores/me");
+    return respuesta.data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al recuperar tu ficha de trabajador.");
+  }
+};
+
+/**
+ * Actualiza los campos personales permitidos de la ficha laboral propia.
+ * URI: PATCH /api/trabajadores/me
+ * @async
+ * @function modificarMiFichaTrabajador
+ * @param {TrabajadorAutogestionUpdate} payload - Datos personales a actualizar.
+ * @returns {Promise<Trabajador>} Ficha del trabajador actualizada.
+ * @throws {Error} Mensaje de la API o error genérico de modificación.
+ */
+export const modificarMiFichaTrabajador = async (
+  payload: TrabajadorAutogestionUpdate,
+): Promise<Trabajador> => {
+  try {
+    const respuesta = await api.patch<Trabajador>(
+      "/api/trabajadores/me",
+      payload,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al actualizar tu ficha de trabajador.");
+  }
 };
 
 /**
@@ -86,11 +115,12 @@ export const crearTrabajador = async (
   payload: TrabajadorCreate,
 ): Promise<Trabajador> => {
   try {
-    const respuesta = await api.post<Trabajador>("/api/trabajadores", payload);
+    const respuesta = await api.post<Trabajador>("/api/trabajadores", payload, {
+      empresaIdContext: payload.empresa_id,
+    } as any);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al registrar el nuevo trabajador.");
+    throw mensajeErrorApi(error, "Error al registrar el nuevo trabajador.");
   }
 };
 
@@ -116,11 +146,9 @@ export const actualizarTrabajador = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al actualizar el trabajador.");
+    throw mensajeErrorApi(error, "Error al actualizar el trabajador.");
   }
 };
-
 /**
  * Actualiza de forma independiente el estado operativo de un trabajador.
  * URI: PATCH /api/trabajadores/{id_trabajador}/estado
@@ -137,16 +165,13 @@ export const actualizarEstadoTrabajador = async (
   nuevoEstado: Estado,
 ): Promise<Trabajador> => {
   try {
-    const response = await api.patch(
+    const response = await api.patch<Trabajador>(
       `/api/trabajadores/${idTrabajador}/estado`,
-      { estado: nuevoEstado },
+      { estado: nuevoEstado } satisfies TrabajadorUpdate,
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al actualizar el estado del trabajador.",
-    );
+    throw mensajeErrorApi(error, "Error al actualizar el estado del trabajador.");
   }
 };
 
@@ -169,38 +194,30 @@ export const actualizarFotoTrabajador = async (
   fileName: string,
   fileType: string,
 ): Promise<Trabajador> => {
-  const formData = new FormData();
-
-  if (Platform.OS === "web") {
-    const response = await fetch(fileUri);
-    const blob = await response.blob();
-    formData.append("file", blob, fileName);
-  } else {
-    formData.append("file", {
-      uri: fileUri,
-      name: fileName,
-      type: fileType,
-    } as any);
-  }
-
   try {
+    const formData = new FormData();
+    if (Platform.OS === "web") {
+      const response = await fetch(fileUri);
+      if (!response.ok) {
+        throw new Error("No se pudo leer la imagen seleccionada.");
+      }
+      const blob = await response.blob();
+      formData.append("file", blob, fileName);
+    } else {
+      formData.append("file", {
+        uri: fileUri,
+        name: fileName,
+        type: fileType,
+      } as any);
+    }
+
     const response = await api.put<Trabajador>(
       `/api/trabajadores/${idTrabajador}/foto`,
       formData,
-      {
-        ...(Platform.OS === "web"
-          ? { headers: { "Content-Type": "multipart/form-data" } }
-          : {}),
-      },
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      typeof apiMessage === "string"
-        ? apiMessage
-        : "Error al actualizar la foto de perfil.",
-    );
+    throw mensajeErrorApi(error, "Error al actualizar la foto de perfil.");
   }
 };
 
@@ -230,133 +247,29 @@ export const obtenerEmpresaTrabajador = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al recuperar la empresa del trabajador.",
-    );
+    throw mensajeErrorApi(error, "Error al recuperar la empresa del trabajador.");
   }
 };
 
 /**
  * Tramita la baja total de un trabajador mediante una única petición atómica al backend.
- * URI: POST /api/trabajadores/{id}/baja-total
+ * URI: POST /api/trabajadores/{id_trabajador}/baja
  *
  * @async
  * @function tramitarBajaTotalTrabajador
  * @param {string} trabajadorId - Identificador único del trabajador.
- * @returns {Promise<void>}
+ * @returns {Promise<{ detail: string }>} Confirmación de la baja tramitada.
+ * @throws {Error} Mensaje de la API o error genérico de baja.
  */
 export const tramitarBajaTotalTrabajador = async (
   trabajadorId: string,
-): Promise<void> => {
-  try {
-    await api.post(`/api/trabajadores/${trabajadorId}/baja`);
-  } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
-    throw new Error(
-      apiMessage ||
-        "Ha ocurrido un error inesperado al procesar la baja total del trabajador.",
-    );
-  }
-};
-
-/**
- * Elimina un trabajador de la plataforma validando privilegios de administración o empresa.
- * URI: DELETE /api/trabajadores/{id_trabajador}
- *
- * @async
- * @function eliminarTrabajador
- * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador a eliminar.
- * @returns {Promise<{ detail: string }>} Promesa con el mensaje de confirmación de la eliminación.
- * @throws {Error} Lanza un error si el trabajador no existe o la API rechaza la petición.
- */
-export const eliminarTrabajador = async (
-  idTrabajador: string,
 ): Promise<{ detail: string }> => {
   try {
-    const respuesta = await api.delete<{ detail: string }>(
-      `/api/trabajadores/${idTrabajador}`,
+    const respuesta = await api.post<{ detail: string }>(
+      `/api/trabajadores/${trabajadorId}/baja`,
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al eliminar el trabajador.");
-  }
-};
-
-/**
- * Asigna turnos de forma masiva a un trabajador validando el ámbito de la empresa y los rangos de fechas opcionales.
- * URI: POST /api/trabajadores/turnos/{id_trabajador}
- *
- * @async
- * @function asignarTurnosTrabajador
- * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
- * @param {string[]} turnos - Lista de identificadores únicos (UUIDs) de los turnos a asignar.
- * @param {string} [fechaInicio] - Fecha inicial de vigencia en formato "AAAA-MM-DD".
- * @param {string | null} [fechaFin] - Fecha final de vigencia opcional en formato "AAAA-MM-DD".
- * @returns {Promise<{ status: string; detail: string; trabajador_id: string; turnos_asignados: string[]; }>} Promesa con el resultado de la asignación.
- * @throws {Error} Lanza un error si ocurre un fallo durante la asignación de los turnos.
- */
-export const asignarTurnosTrabajador = async (
-  idTrabajador: string,
-  turnos: string[],
-  fechaInicio: string,
-  fechaFin?: string | null,
-): Promise<{
-  status: string;
-  detail: string;
-  trabajador_id: string;
-  turnos_asignados: string[];
-}> => {
-  try {
-    const payload: any = {
-      turnos,
-      ...(fechaInicio && { fecha_inicio: fechaInicio }),
-      ...(fechaFin && { fecha_fin: fechaFin }),
-    };
-
-    const respuesta = await api.post(
-      `/api/trabajadores/turnos/${idTrabajador}`,
-      payload,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al asignar los turnos al trabajador.");
-  }
-};
-
-/**
- * Modifica los datos sobre una asignación de turno existente mediante parámetros en URL.
- * URI: PUT /api/asignaciones-turno/{id_asignacion}/editar
- *
- * @async
- * @function actualizarAsignacionTurno
- * @param {string} idAsignacion - Identificador único universal (UUID) de la asignación de turno.
- * @param {string} fechaInicio - Fecha de inicio de la asignación en formato "AAAA-MM-DD".
- * @param {string | null} fechaFin - Fecha de fin de la asignación opcional en formato "AAAA-MM-DD".
- * @returns {Promise<any>} Promesa con la respuesta de la edición de la asignación.
- * @throws {Error} Lanza un error si la actualización no se puede completar.
- */
-export const actualizarAsignacionTurno = async (
-  idAsignacion: string,
-  fechaInicio: string,
-  fechaFin: string | null,
-): Promise<any> => {
-  try {
-    const params = new URLSearchParams();
-    if (fechaFin) params.append("fecha_fin", fechaFin);
-    if (fechaInicio) params.append("fecha_inicio", fechaInicio);
-
-    const respuesta = await api.put(
-      `/api/asignaciones-turno/${idAsignacion}/editar?${params.toString()}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al actualizar la asignación de turno.",
-    );
+    throw mensajeErrorApi(error, "Ha ocurrido un error al tramitar la baja del trabajador.");
   }
 };

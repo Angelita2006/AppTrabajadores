@@ -14,7 +14,7 @@ class UsuarioBase(BaseModel):
     """
     nombre: str = Field(..., max_length=150, description="Nombre completo del usuario")
 
-    email: EmailStr = Field(..., max_length=30, description="Correo electrónico único de acceso")
+    email: EmailStr = Field(..., max_length=150, description="Correo electrónico único de acceso")
     telefono: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso")
     foto_url: Optional[str] = Field(None, description="Ruta privada del avatar de la cuenta")
 
@@ -45,7 +45,7 @@ class UsuarioUpdate(BaseModel):
     """
     nombre: Optional[str] = Field(None, max_length=150, description="Nombre completo del usuario")
 
-    email: Optional[EmailStr] = Field(None, max_length=30, description="Correo electrónico único de acceso")
+    email: Optional[EmailStr] = Field(None, max_length=150, description="Correo electrónico único de acceso")
     telefono: Optional[str] = Field(None, max_length=30, description="Número de teléfono único de acceso")
 
     activo: Optional[bool] = Field(True, description="Indica si el usuario está activo o no")
@@ -71,9 +71,6 @@ class UsuarioSimpleResponse(UsuarioBase):
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de creación de la cuenta (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de la última modificación (now)")
     ultimo_acceso: Optional[datetime.datetime] = Field(None, description="Último inicio de sesión registrado en el servidor")
-
-
-
 
     model_config = ConfigDict(from_attributes=True)
 

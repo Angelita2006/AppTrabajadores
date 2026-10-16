@@ -1,9 +1,9 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { obtenerAsignacionesTurnoTrabajador } from "../modules/asignaciones-turno/api/services";
+import { obtenerMiTrabajador } from "../modules/trabajadores/api/services";
 import { obtenerTurnoPorId } from "../modules/turnos/api/services";
 import { obtenerUsuarioActual } from "../modules/usuarios/api/services";
-import { obtenerMiTrabajador } from "../modules/trabajadores/api/services";
 
 // 1. Configuración global de comportamiento en primer plano
 Notifications.setNotificationHandler({
@@ -48,7 +48,15 @@ export const NotificationService = {
 
       const usuario = await obtenerUsuarioActual();
       if (usuario.id !== usuarioId) return;
-      const trabajador = await obtenerMiTrabajador();
+
+      // Si el usuario no tiene ficha de trabajador (ej. administradores o perfiles sin expediente), no hacemos nada
+      let trabajador = null;
+      try {
+        trabajador = await obtenerMiTrabajador();
+      } catch {
+        return;
+      }
+
       if (!trabajador?.id) return;
 
       // Obtenemos las asignaciones de turno del trabajador
@@ -159,8 +167,8 @@ export const NotificationService = {
       if (turnosValidosEncontrados === 0) {
         await Notifications.cancelAllScheduledNotificationsAsync();
       }
-    } catch (error) {
-      console.error("Error programando notificaciones:", error);
+    } catch (error: any) {
+      console.error("Error programando notificaciones:", error.message);
     }
   },
 

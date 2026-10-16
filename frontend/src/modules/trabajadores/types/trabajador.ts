@@ -10,6 +10,9 @@ export type Estado = (typeof ESTADOS_TRABAJADOR)[keyof typeof ESTADOS_TRABAJADOR
 export interface TrabajadorCreate {
   empresa_id: string;
   usuario_id?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  password?: string | null;
   dni_nif_nie: string;
   nombre: string;
   apellidos: string;
@@ -37,12 +40,20 @@ export interface TrabajadorUpdate {
   fecha_baja_empresa?: string | null;
 }
 
+/** Request body matching TrabajadorAutogestionUpdate. */
+export interface TrabajadorAutogestionUpdate {
+  nombre?: string | null;
+  apellidos?: string | null;
+  fecha_nacimiento?: string | null;
+  foto_url?: string | null;
+}
+
 export interface ActualizarEstadoRequest {
   estado: Estado;
 }
 
-/** Fields returned by TrabajadorSimpleResponse / TrabajadorResponse. */
-export interface TrabajadorResponse {
+/** Fields returned by TrabajadorSimpleResponse. */
+export interface TrabajadorSimpleResponse {
   id: string;
   empresa_id: string;
   usuario_id: string | null;
@@ -52,16 +63,19 @@ export interface TrabajadorResponse {
   numero_seguridad_social: string | null;
   fecha_nacimiento: string | null;
   foto_url: string | null;
-  activo: boolean;
+  activo: boolean | null;
   estado: Estado;
   fecha_alta_empresa: string;
   fecha_baja_empresa: string | null;
   created_at: string;
   updated_at: string;
-  empresa?: Empresa | null;
 }
 
-export type TrabajadorSimpleResponse = TrabajadorResponse;
+/** Response matching TrabajadorResponse, including the optional nested company. */
+export interface TrabajadorResponse extends TrabajadorSimpleResponse {
+  empresa?: Empresa | null;
+  usuario?: { id: string; nombre: string; email: string; telefono: string | null; foto_url: string | null; activo: boolean | null } | null;
+}
 
 /** Screen model with locally assembled schedule and contact information. */
 export interface Trabajador extends TrabajadorResponse {

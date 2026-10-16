@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import api from "../../../service/api/api";
-import { Empresa, EmpresaUpdate } from "../types/empresa";
+import {
+  Empresa,
+  EmpresaCreate,
+  EmpresaUpdate,
+  RegistroOrganizacionDTO,
+  RespuestaRegistroCompleto,
+} from "../types/empresa";
 
 /**
  * Servicio de Gestión de Empresas (Tenants).
@@ -22,7 +28,7 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
     const respuesta = await api.get<Empresa[]>("/api/empresas");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener el catálogo de empresas.");
   }
 };
@@ -30,10 +36,25 @@ export const obtenerEmpresas = async (): Promise<Empresa[]> => {
 /** Lista exclusivamente las empresas que el backend concede a esta cuenta. */
 export const obtenerEmpresasDisponibles = obtenerEmpresas;
 
+/** Recupera activas e inactivas para la consola del superadministrador. */
+export const obtenerTodasEmpresasPlataforma = async (): Promise<Empresa[]> => {
+  try {
+    return (await api.get<Empresa[]>("/api/empresas/plataforma", { skipEmpresaContext: true } as any)).data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al obtener todas las empresas de la plataforma.");
+  }
+};
+
 /** GET /api/empresas/actual: devuelve la empresa seleccionada en el contexto. */
 export const obtenerEmpresaActual = async (): Promise<Empresa> => {
-  const respuesta = await api.get<Empresa>("/api/empresas/actual");
-  return respuesta.data;
+  try {
+    const respuesta = await api.get<Empresa>("/api/empresas/actual");
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al obtener la empresa activa.");
+  }
 };
 
 /**
@@ -51,7 +72,7 @@ export const obtenerEmpresa = async (idEmpresa: string): Promise<Empresa> => {
     const respuesta = await api.get<Empresa>(`/api/empresas/${idEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar la información de la empresa.",
     );
@@ -75,7 +96,7 @@ export const obtenerEmpresaPorCif = async (
     const respuesta = await api.get<Empresa>(`/api/empresas/cif/${cifEmpresa}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al buscar la empresa por su CIF.");
   }
 };
@@ -92,14 +113,16 @@ export const obtenerEmpresaPorCif = async (
  */
 export const obtenerTrabajadoresEmpresa = async (
   idEmpresa: string,
+  empresaIdContext: string = idEmpresa,
 ): Promise<any[]> => {
   try {
     const respuesta = await api.get<any[]>(
       `/api/empresas/${idEmpresa}/trabajadores`,
+      { empresaIdContext } as any,
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los trabajadores de la empresa.",
     );
@@ -116,22 +139,38 @@ export const obtenerTrabajadoresEmpresa = async (
  * @returns {Promise<Empresa>} Promesa con la empresa recién creada.
  * @throws {Error} Lanza un error si los datos no son válidos o falla el registro.
  */
-export const crearEmpresa = async (payload: {
-  razon_social: string;
-  cif: string;
-  nombre_comercial?: string | null;
-  zona_horaria?: string;
-  configuracion?: Record<string, any>;
-  codigo_cnae?: string | null;
-  convenio_colectivo?: string | null;
-  direccion?: string | null;
-}): Promise<Empresa> => {
+export const crearEmpresa = async (payload: EmpresaCreate): Promise<Empresa> => {
   try {
     const respuesta = await api.post<Empresa>("/api/empresas", payload);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al registrar la nueva empresa.");
+  }
+};
+
+/**
+ * Registra de una vez la empresa y la cuenta de su administrador.
+ * URI: POST /api/empresas/registro-completo
+ *
+ * @async
+ * @function registrarOrganizacionCompleta
+ * @param {RegistroOrganizacionDTO} payload - Datos de empresa, licencia y administrador.
+ * @returns {Promise<RespuestaRegistroCompleto>} Empresa registrada y cuenta administradora.
+ * @throws {Error} Mensaje de la API o error genérico de registro.
+ */
+export const registrarOrganizacionCompleta = async (
+  payload: RegistroOrganizacionDTO,
+): Promise<RespuestaRegistroCompleto> => {
+  try {
+    const respuesta = await api.post<RespuestaRegistroCompleto>(
+      "/api/empresas/registro-completo",
+      payload,
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al registrar la organización.");
   }
 };
 
@@ -157,7 +196,7 @@ export const cambiarRazonSocialEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar la razón social.");
   }
 };
@@ -184,7 +223,7 @@ export const actualizarDatosEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al actualizar los datos de la empresa.",
     );
@@ -238,7 +277,7 @@ export const guardarDatosEmpresa = async (
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al guardar los datos de la empresa.");
   }
 };
@@ -289,7 +328,7 @@ export const actualizarLogoEmpresa = async (
 
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al actualizar el logo de la empresa.");
   }
 };

@@ -1,7 +1,7 @@
 import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from typing import Any, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 from core.enums import TipoContratoEnum, TipoJornadaEnum
 from schemas.centros_trabajo import CentroTrabajoSimpleResponse
@@ -40,7 +40,7 @@ class ContratoCreate(ContratoBase):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
+    centros_trabajo_ids: List[UUID] = Field(..., min_length=1, description="Centros donde la persona contratada puede prestar servicios")
     departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
 
     @field_validator('fecha_fin', mode='before')
@@ -90,6 +90,7 @@ class ContratoUpdate(BaseModel):
     fecha_fin: Optional[datetime.date] = Field(None, description="Fecha de finalización del contrato si aplica")
 
     activo: Optional[bool] = Field(True, description="Indica si el contrato está activo o no")
+    centros_trabajo_ids: Optional[List[UUID]] = Field(None, min_length=1, description="Lista completa de centros asociados al contrato")
 
     @field_validator('fecha_inicio', 'fecha_fin', mode='before')
     @classmethod
@@ -118,7 +119,7 @@ class ContratoSimpleResponse(ContratoBase):
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del contrato")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa contratante (tenant)")
     trabajador_id: UUID = Field(..., description="ID único UUID del trabajador contratado")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asignado")
+    centros_trabajo_ids: List[UUID] = Field(default_factory=list, description="Identificadores de centros de trabajo asociados")
     departamento_id: UUID = Field(..., description="ID único UUID del departamento asignado")
 
     created_at: datetime.datetime = Field(..., description="Fecha y hora de inserción real calculada por el servidor (now)")
@@ -131,7 +132,7 @@ class ContratoResponse(ContratoSimpleResponse):
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
-    centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
+    centros_trabajo: List[CentroTrabajoSimpleResponse] = Field(default_factory=list, description="Centros de trabajo asociados al contrato")
     trabajador: Optional[TrabajadorSimpleResponse] = Field(None, description="Detalles del trabajador asociado")
     departamento: Optional[DepartamentoSimpleResponse] = Field(None, description="Detalles del departamento asociado")
 

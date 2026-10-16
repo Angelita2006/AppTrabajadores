@@ -18,6 +18,7 @@ from core.database import get_db
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    AlcancePermisoEnum,
     CicloFacturacionEnum,
     EstadoSuscripcionEnum,
     TipoPermisoEnum,
@@ -48,7 +49,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.get(
     "/actual",
-    response_model=List[EmpresaSimpleResponse],
+    response_model=EmpresaSimpleResponse,
     summary="Obtener empresa actual para el usuario",
     description="Obtiene la empresa actual del usuario, si aplica.",
 )
@@ -201,6 +202,51 @@ def obtener_empresas_disponibles(
     )
     db.commit()
 
+    return empresas
+
+
+@router.get(
+    "/plataforma",
+    response_model=List[EmpresaSimpleResponse],
+    summary="Listar todas las empresas de la plataforma",
+    description="Permite al superadministrador consultar empresas activas e inactivas.",
+)
+@limiter.limit("30/minute")
+def obtener_empresas_plataforma(
+    request: Request,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.CONSULTAR
+        + "-"
+        + TipoPermisoEnum.EMPRESAS
+        + "-"
+        + AlcancePermisoEnum.GLOBAL
+    ])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**GET /api/empresas/plataforma**
+
+    Lista todas las empresas, incluidas las inactivas, para la consola global.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(
+        f"Petición de consulta global de empresas desde la IP ({cliente_ip}) "
+        f"por el usuario: {usuario_actual.email}."
+    )
+    empresas = (
+        db.query(Empresas)
+        .order_by(Empresas.activa.desc(), Empresas.nombre_comercial.asc())
+        .all()
+    )
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "empresas", "accion": "consultar_plataforma"},
+        trabajador_id=None,
+    )
+    db.commit()
     return empresas
 
 

@@ -6,6 +6,7 @@ import os
 from fastapi import APIRouter, Depends, File, HTTPException, Request, status, UploadFile
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, Session
 
 from core.archivos import CARPETA_FOTOS_TRABAJADORES
@@ -19,6 +20,7 @@ from core.enums import (
 )
 from core.security import (
     get_db_with_advanced_security,
+    get_password_hash,
     verificar_permisos_requeridos,
 )
 from models.contratos import Contratos
@@ -86,6 +88,7 @@ def obtener_mi_ficha_trabajador(
 def obtener_trabajadores_empresa(
     request: Request,
     id_empresa: UUID,
+    incluir_inactivos: bool = False,
     usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([AccionPermisoEnum.CONSULTAR + "-" + TipoPermisoEnum.TRABAJADORES])),
     db: Session = Depends(get_db_with_advanced_security),
 ):
@@ -98,13 +101,17 @@ def obtener_trabajadores_empresa(
     print(f"Petición de consulta de trabajadores de la empresa ({id_empresa}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
-    trabajadores = (
-        db.query(Trabajadores).options(
+    consulta_trabajadores = (
+        db.query(Trabajadores)
+        .options(
             joinedload(Trabajadores.empresa),
+            joinedload(Trabajadores.usuario),
         )
-        .filter(Trabajadores.empresa_id == id_empresa, Trabajadores.activo.is_(True))
-        .all()
+        .filter(Trabajadores.empresa_id == id_empresa)
     )
+    if not incluir_inactivos:
+        consulta_trabajadores = consulta_trabajadores.filter(Trabajadores.activo.is_(True))
+    trabajadores = consulta_trabajadores.all()
 
     registrar_auditoria(
         db=db,
@@ -278,6 +285,17 @@ def crear_trabajador(
     print(f"Petición de registro de trabajador desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
+    empresa_autorizada_id = getattr(request.state, "empresa_autorizada_id", None)
+    alcance_efectivo = getattr(request.state, "alcance_efectivo", None)
+    if (
+        alcance_efectivo != AlcancePermisoEnum.GLOBAL.value
+        and str(empresa_autorizada_id) != str(payload.empresa_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para crear trabajadores en esta empresa.",
+        )
+
     identidad_existente = db.query(Trabajadores).filter(
         Trabajadores.empresa_id == payload.empresa_id,
         Trabajadores.dni_nif_nie == payload.dni_nif_nie
@@ -341,6 +359,87 @@ def crear_trabajador(
     )
 
     try:
+        usuario_id = payload.usuario_id
+        if payload.email:
+            email_limpio = str(payload.email).strip().lower()
+            usuario_cuenta = (
+                db.query(Usuarios)
+                .filter(func.lower(Usuarios.email) == email_limpio)
+                .first()
+            )
+            if usuario_cuenta is not None and not usuario_cuenta.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="La cuenta asociada a ese correo está inactiva.",
+                )
+            if usuario_cuenta is None:
+                if not payload.password:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Indica una contraseña inicial de al menos 12 caracteres para crear la cuenta.",
+                    )
+                usuario_cuenta = Usuarios(
+                    nombre=f"{payload.nombre.strip()} {payload.apellidos.strip()}".strip(),
+                    email=email_limpio,
+                    telefono=payload.telefono,
+                    password_hash=get_password_hash(payload.password),
+                    activo=True,
+                )
+                db.add(usuario_cuenta)
+                db.flush()
+            if usuario_id is not None and usuario_id != usuario_cuenta.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="El correo y el identificador de usuario corresponden a cuentas distintas.",
+                )
+            usuario_id = usuario_cuenta.id
+
+            rol_trabajador = (
+                db.query(Roles)
+                .filter(
+                    Roles.empresa_id.is_(None),
+                    Roles.tipo == TipoRolEnum.TRABAJADOR,
+                )
+                .first()
+            )
+            if rol_trabajador is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="No está configurado el rol de trabajador del sistema.",
+                )
+
+            membresia = (
+                db.query(UsuariosEmpresas)
+                .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+                .filter(
+                    UsuariosEmpresas.usuario_id == usuario_id,
+                    UsuariosEmpresas.empresa_id == payload.empresa_id,
+                )
+                .first()
+            )
+            if membresia is None:
+                db.add(UsuariosEmpresas(
+                    usuario_id=usuario_id,
+                    empresa_id=payload.empresa_id,
+                    rol_id=rol_trabajador.id,
+                    activo=True,
+                ))
+            elif not membresia.activo:
+                setattr(membresia, "rol_id", rol_trabajador.id)
+                setattr(membresia, "activo", True)
+                setattr(membresia, "updated_at", datetime.now())
+            elif membresia.rol.tipo not in {
+                TipoRolEnum.TRABAJADOR,
+                TipoRolEnum.ADMIN_EMPRESA,
+                TipoRolEnum.ADMIN_GESTORIA,
+                TipoRolEnum.RRHH,
+            }:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="La cuenta ya tiene un rol incompatible con una ficha de trabajador en esta empresa.",
+                )
+
+        setattr(nuevo_trabajador, "usuario_id", usuario_id)
         db.add(nuevo_trabajador)
         db.flush()
 
@@ -362,12 +461,16 @@ def crear_trabajador(
         trabajador_con_relacion = (
             db.query(Trabajadores).options(
                 joinedload(Trabajadores.empresa),
+                joinedload(Trabajadores.usuario),
             )
             .filter(Trabajadores.id == nuevo_trabajador.id)
             .first()
         )
 
         return trabajador_con_relacion
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         print(f"No se ha podido crear el trabajador en la empresa: {str(e)}")
@@ -418,7 +521,7 @@ def baja_trabajador(
         ).all()
         for contrato in contratos_activos:
             setattr(contrato, 'activo', False)
-            setattr(contrato, 'fecha_fin', fecha_actual)
+            setattr(contrato, 'fecha_fin', max(fecha_actual, contrato.fecha_inicio))
 
         usuario_asociado = (
             db.query(Usuarios)
@@ -428,7 +531,19 @@ def baja_trabajador(
             else None
         )
         if usuario_asociado:
-            setattr(usuario_asociado, 'activo', False)
+            membresia = db.query(UsuariosEmpresas).filter(
+                UsuariosEmpresas.usuario_id == usuario_asociado.id,
+                UsuariosEmpresas.empresa_id == trabajador.empresa_id,
+            ).first()
+            if membresia and membresia.rol.tipo == TipoRolEnum.TRABAJADOR:
+                setattr(membresia, "activo", False)
+            db.flush()
+            tiene_otras_empresas_activas = db.query(UsuariosEmpresas.id).filter(
+                UsuariosEmpresas.usuario_id == usuario_asociado.id,
+                UsuariosEmpresas.activo.is_(True),
+            ).first() is not None
+            if not tiene_otras_empresas_activas:
+                setattr(usuario_asociado, "activo", False)
 
         registrar_auditoria(
             db=db,
@@ -652,6 +767,7 @@ def modificar_estado_trabajador(
         trabajador_actualizado = (
             db.query(Trabajadores).options(
                 joinedload(Trabajadores.empresa),
+                joinedload(Trabajadores.usuario),
             )
             .filter(Trabajadores.id == id_trabajador)
             .first()
@@ -731,6 +847,20 @@ def modificar_trabajador(
     for field, value in datos_actualizacion.items():
         setattr(trabajador, field, value)
 
+    if payload.activo is True:
+        setattr(trabajador, "fecha_baja_empresa", None)
+        if trabajador.usuario_id is not None:
+            membresia = db.query(UsuariosEmpresas).filter(
+                UsuariosEmpresas.usuario_id == trabajador.usuario_id,
+                UsuariosEmpresas.empresa_id == trabajador.empresa_id,
+            ).first()
+            if membresia:
+                setattr(membresia, "activo", True)
+                setattr(membresia, "updated_at", datetime.now())
+            usuario = db.query(Usuarios).filter(Usuarios.id == trabajador.usuario_id).first()
+            if usuario:
+                setattr(usuario, "activo", True)
+
     try:
         registrar_auditoria(
             db=db,
@@ -756,6 +886,7 @@ def modificar_trabajador(
     trabajador_actualizado = (
         db.query(Trabajadores).options(
             joinedload(Trabajadores.empresa),
+            joinedload(Trabajadores.usuario),
         )
         .filter(Trabajadores.id == id_trabajador)
         .first()

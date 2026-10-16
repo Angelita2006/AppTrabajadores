@@ -40,7 +40,7 @@ export interface TurnoUpdate {
 /**
  * Representa la definición base y completa de un horario laboral (Tabla: turnos).
  */
-export interface Turno {
+export interface TurnoSimpleResponse {
   /** Identificador único del turno maestro (UUID). */
   id: string;
   /** Identificador único de la empresa asociada (UUID). */
@@ -61,7 +61,10 @@ export interface Turno {
   created_at: string;
   updated_at: string;
 
-  /** Relación opcional con la entidad empresa cargada por el backend si se requiere. */
+}
+
+/** Response matching TurnoResponse, including its optional nested company. */
+export interface Turno extends TurnoSimpleResponse {
   empresa?: Empresa | null;
 }
 

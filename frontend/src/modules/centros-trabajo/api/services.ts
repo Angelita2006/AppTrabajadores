@@ -25,7 +25,7 @@ export const crearCentroTrabajo = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Ha ocurrido un error al crear el centro de trabajo.",
     );
@@ -48,7 +48,7 @@ export const obtenerTodosLosCentrosTrabajo = async (idEmpresa: string): Promise<
     const response = await api.get<CentroTrabajo[]>(`/api/centros-trabajo/empresa/${idEmpresa}`);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener el listado global de centros de trabajo.",
     );
@@ -74,7 +74,7 @@ export const obtenerCentrosTrabajoPorEmpresa = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al recuperar centros de trabajo de la empresa ${idEmpresa}.`,
@@ -101,7 +101,7 @@ export const obtenerCentroTrabajo = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Centro de trabajo con ID ${idCentro} no encontrado.`,
     );
@@ -130,7 +130,7 @@ export const actualizarCentroTrabajo = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al editar el centro de trabajo ${idCentro}.`,
     );
@@ -139,7 +139,7 @@ export const actualizarCentroTrabajo = async (
 
 /**
  * Cambia el estado de operatividad (activo/inactivo) de un centro de trabajo.
- * URI: PUT /api/centros-trabajo/{idCentro}/estado?activo=...
+ * URI: PUT /api/centros-trabajo/{idCentro}
  *
  * @async
  * @function cambiarEstadoCentroTrabajo
@@ -154,11 +154,11 @@ export const cambiarEstadoCentroTrabajo = async (
 ): Promise<CentroTrabajo> => {
   try {
     const response = activo
-      ? await api.put<CentroTrabajo>(`/api/centros-trabajo/${idCentro}`, { activo: true })
+      ? await api.put<CentroTrabajo>(`/api/centros-trabajo/${idCentro}`, { activo })
       : await api.put<CentroTrabajo>(`/api/centros-trabajo/${idCentro}/desactivar`);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al cambiar el estado del centro de trabajo ${idCentro}.`,
@@ -178,11 +178,14 @@ export const cambiarEstadoCentroTrabajo = async (
  */
 export const eliminarCentroTrabajo = async (
   idCentro: string,
-): Promise<void> => {
+): Promise<{ detail: string }> => {
   try {
-    await api.put(`/api/centros-trabajo/${idCentro}/desactivar`);
+    const respuesta = await api.put<{ detail: string }>(
+      `/api/centros-trabajo/${idCentro}/desactivar`,
+    );
+    return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al desactivar el centro de trabajo ${idCentro}.`,
     );

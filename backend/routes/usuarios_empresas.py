@@ -11,6 +11,7 @@ from core.auditoria import registrar_auditoria
 from core.enums import (
     AccionAuditoriaEnum,
     AccionPermisoEnum,
+    AlcancePermisoEnum,
     TipoPermisoEnum,
     TipoRolEnum,
 )
@@ -148,6 +149,57 @@ def obtener_membresias_globales(
             Roles.tipo == TipoRolEnum.SUPERADMINISTRADOR)
         .all()
     )
+
+
+@router.get(
+    "/auditores",
+    response_model=List[UsuarioEmpresaSimpleResponse],
+    summary="Listar asignaciones activas de auditores",
+    description="Devuelve las empresas asignadas a las cuentas con rol de auditor al superadministrador global.",
+)
+@limiter.limit("30/minute")
+def obtener_asignaciones_auditores(
+    request: Request,
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.CONSULTAR
+        + "-"
+        + TipoPermisoEnum.USUARIOS_EMPRESAS
+        + "-"
+        + AlcancePermisoEnum.GLOBAL
+    ])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """**GET /api/usuarios-empresas/auditores**
+
+    Lista únicamente membresías activas de auditor para la consola de plataforma.
+    """
+    cliente_ip = request.client.host if request.client else "Desconocida"
+    print(
+        f"Petición de consulta de asignaciones de auditores desde la IP "
+        f"({cliente_ip}) por el usuario: {usuario_actual.email}."
+    )
+    asignaciones = (
+        db.query(UsuariosEmpresas)
+        .join(Roles, Roles.id == UsuariosEmpresas.rol_id)
+        .filter(
+            UsuariosEmpresas.empresa_id.is_not(None),
+            UsuariosEmpresas.activo.is_(True),
+            Roles.tipo == TipoRolEnum.AUDITOR_ITSS,
+        )
+        .order_by(UsuariosEmpresas.created_at.desc())
+        .all()
+    )
+    registrar_auditoria(
+        db=db,
+        request=request,
+        usuario_id=usuario_actual.id,
+        empresa_id=None,
+        accion=AccionAuditoriaEnum.CONSULTA,
+        detalle={"recurso": "usuarios_empresas", "accion": "consultar_auditores"},
+        trabajador_id=None,
+    )
+    db.commit()
+    return asignaciones
 
 @router.get(
     "/empresa/{id_empresa}",

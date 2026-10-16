@@ -28,6 +28,8 @@ interface TabFiscalProps {
   guardando: boolean;
   /** Objeto de estilos personalizados de la aplicación. */
   styles: any;
+  /** Si el usuario tiene autorización para modificar los datos fiscales */
+  puedeModificar?: boolean;
 }
 
 /**
@@ -49,6 +51,7 @@ export default function TabFiscal({
   handleGuardarDatosEmpresa,
   guardando,
   styles,
+  puedeModificar = true,
 }: TabFiscalProps) {
   return (
     <View>
@@ -59,9 +62,10 @@ export default function TabFiscal({
       <View style={styles.campoFormulario}>
         <ThemedText style={styles.labelInput}>Razón Social</ThemedText>
         <TextInput
-          style={styles.inputForm}
+          style={[styles.inputForm, !puedeModificar && { opacity: 0.7 }]}
           value={razonSocialInput}
           onChangeText={setRazonSocialInput}
+          editable={puedeModificar}
           placeholder="Ej. Mi Empresa S.L."
         />
       </View>
@@ -69,9 +73,10 @@ export default function TabFiscal({
       <View style={styles.campoFormulario}>
         <ThemedText style={styles.labelInput}>Convenio Colectivo</ThemedText>
         <TextInput
-          style={styles.inputForm}
+          style={[styles.inputForm, !puedeModificar && { opacity: 0.7 }]}
           value={convenioInput}
           onChangeText={setConvenioInput}
+          editable={puedeModificar}
           placeholder="Ej. Convenio Colectivo General..."
         />
       </View>
@@ -79,9 +84,10 @@ export default function TabFiscal({
       <View style={styles.campoFormulario}>
         <ThemedText style={styles.labelInput}>Código CNAE</ThemedText>
         <TextInput
-          style={styles.inputForm}
+          style={[styles.inputForm, !puedeModificar && { opacity: 0.7 }]}
           value={cnaeInput}
           onChangeText={setCnaeInput}
+          editable={puedeModificar}
           keyboardType="numeric"
           placeholder="Ej. 6201"
         />
@@ -90,22 +96,25 @@ export default function TabFiscal({
       <View style={styles.campoFormulario}>
         <ThemedText style={styles.labelInput}>Dirección Social</ThemedText>
         <TextInput
-          style={styles.inputForm}
+          style={[styles.inputForm, !puedeModificar && { opacity: 0.7 }]}
           value={direccionInput}
           onChangeText={setDireccionInput}
+          editable={puedeModificar}
           placeholder="Ej. Calle Principal 123"
         />
       </View>
 
-      <Pressable
-        style={styles.botonGuardar}
-        onPress={handleGuardarDatosEmpresa}
-        disabled={guardando}
-      >
-        <ThemedText style={styles.textoBotonGuardar}>
-          Actualizar Información Fiscal
-        </ThemedText>
-      </Pressable>
+      {puedeModificar && (
+        <Pressable
+          style={styles.botonGuardar}
+          onPress={handleGuardarDatosEmpresa}
+          disabled={guardando}
+        >
+          <ThemedText style={styles.textoBotonGuardar}>
+            {guardando ? "Guardando..." : "Actualizar Información Fiscal"}
+          </ThemedText>
+        </Pressable>
+      )}
     </View>
   );
 }

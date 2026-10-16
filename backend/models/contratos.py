@@ -11,11 +11,10 @@ class Contratos(Base):
     __tablename__ = 'contratos'
     __table_args__ = (
         PrimaryKeyConstraint('id', name='contratos_pkey'), # Identificador único del contrato
-        ForeignKeyConstraint(['empresa_id', 'centro_trabajo_id'], ['centros_trabajo.empresa_id', 'centros_trabajo.id'], ondelete='RESTRICT', name='contratos_empresa_centro_fkey'), # El contrato debe pertenecer a la misma empresa y centro de trabajo
         ForeignKeyConstraint(['empresa_id', 'departamento_id'], ['departamentos.empresa_id', 'departamentos.id'], ondelete='RESTRICT', name='contratos_empresa_departamento_fkey'), # El contrato debe pertenecer al mismo departamento
         ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='RESTRICT', name='contratos_empresa_id_fkey'), # El contrato debe pertenecer a la misma empresa
         ForeignKeyConstraint(['empresa_id', 'trabajador_id'], ['trabajadores.empresa_id', 'trabajadores.id'], ondelete='RESTRICT', name='contratos_empresa_trabajador_fkey'), # El contrato debe pertenecer a la misma empresa y trabajador
-        UniqueConstraint('empresa_id', 'centro_trabajo_id', 'id', name='contratos_empresa_centro_id_key'), # Cada contrato es único por empresa y centro de trabajo
+        UniqueConstraint('empresa_id', 'id', name='contratos_empresa_id_id_key'),
         Index('contratos_un_activo_por_trabajador_empresa_key', 'empresa_id', 'trabajador_id', unique=True, postgresql_where=text('activo IS TRUE')), # Cada trabajador puede tener un único contrato activo por empresa
         CheckConstraint('fecha_fin IS NULL OR fecha_fin >= fecha_inicio', name='contratos_check'), # La fecha de fin del contrato debe ser mayor o igual a la fecha de inicio, si aplica
         CheckConstraint('horas_semana > 0::numeric', name='contratos_horas_semana_check'), # El número de horas semanales del contrato debe ser mayor que cero
@@ -25,7 +24,6 @@ class Contratos(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, nullable=False, server_default=text('gen_random_uuid()'), comment='Identificador único del contrato.')
     empresa_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador de la empresa a la que pertenece el contrato.')
     trabajador_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del trabajador al que corresponde el contrato.')
-    centro_trabajo_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Identificador del centro de trabajo al que pertenece el contrato.')
     departamento_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, comment='Departamento al que pertenece el contrato.')
     
     tipo_contrato: Mapped[TipoContratoEnum] = mapped_column(Enum(TipoContratoEnum, values_callable=lambda cls: [member.value for member in cls], name='tipo_contrato_enum'), nullable=False, server_default=text("'Temporal'::tipo_contrato_enum"), comment='Tipo de contrato.')
@@ -45,8 +43,16 @@ class Contratos(Base):
     
     empresa: Mapped['Empresas'] = relationship('Empresas', foreign_keys=[empresa_id], back_populates='contratos', doc='Empresa a la que pertenece el contrato.') # type: ignore
     trabajador: Mapped['Trabajadores'] = relationship('Trabajadores', foreign_keys=[trabajador_id], back_populates='contratos', doc='Trabajador al que corresponde el contrato.') # type: ignore
-    centro_trabajo: Mapped['CentrosTrabajo'] = relationship('CentrosTrabajo', foreign_keys=[centro_trabajo_id], back_populates='contratos', doc='Centro de trabajo al que pertenece el contrato.') # type: ignore
     departamento: Mapped[Optional['Departamentos']] = relationship('Departamentos', foreign_keys=[departamento_id], back_populates='contratos', doc='Departamento al que pertenece el contrato.') # type: ignore
+    centros_trabajo_relaciones: Mapped[list['ContratosCentrosTrabajo']] = relationship('ContratosCentrosTrabajo', back_populates='contrato', cascade='all, delete-orphan', overlaps='contratos_relaciones,centro_trabajo', doc='Centros de trabajo donde puede prestar servicios la persona contratada.') # type: ignore
     
     calendarios_laborales: Mapped[list['ContratosCalendarios']] = relationship('ContratosCalendarios', foreign_keys='ContratosCalendarios.contrato_id', back_populates='contrato', cascade='all, delete-orphan', doc='Calendarios laborales pertenecientes al contrato.') # type: ignore
     asignaciones_turno: Mapped[list['AsignacionesTurno']] = relationship('AsignacionesTurno', back_populates='contrato', doc='Asignaciones de turno del contrato.') # type: ignore
+
+    @property
+    def centros_trabajo(self):
+        return [relacion.centro_trabajo for relacion in self.centros_trabajo_relaciones if relacion.centro_trabajo is not None]
+
+    @property
+    def centros_trabajo_ids(self):
+        return [relacion.centro_trabajo_id for relacion in self.centros_trabajo_relaciones]

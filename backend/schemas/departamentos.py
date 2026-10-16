@@ -2,7 +2,6 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from uuid import UUID
-from schemas.centros_trabajo import CentroTrabajoSimpleResponse
 from schemas.empresas import EmpresaSimpleResponse
 
 # ==========================================
@@ -22,10 +21,9 @@ class DepartamentoBase(BaseModel):
 class DepartamentoCreate(DepartamentoBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un departamento.
-    Permite asociar opcionalmente el departamento a un centro de trabajo físico.
+    Los departamentos pertenecen a la empresa y son independientes de los centros físicos.
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,7 +43,6 @@ class DepartamentoSimpleResponse(DepartamentoBase):
     """
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del departamento")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado")
 
     created_at: datetime.datetime = Field(..., description="Fecha y hora de inserción real calculada por el servidor (now)")
     updated_at: datetime.datetime = Field(..., description="Fecha y hora de la última modificación efectuada (now)")
@@ -57,6 +54,5 @@ class DepartamentoResponse(DepartamentoSimpleResponse):
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
-    centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)

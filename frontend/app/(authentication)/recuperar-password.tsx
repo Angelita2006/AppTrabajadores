@@ -1,31 +1,31 @@
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import {
-    confirmarCambioPassword,
-    solicitarCodigoRecuperacion,
+  confirmarCambioPassword,
+  solicitarCodigoRecuperacion,
 } from "@/src/modules/another-services/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import { useRouter } from "expo-router";
-import { Colors } from "@/src/constants/theme";
-import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { ThemedText } from "../../src/shared/components/ThemedText";
 import { IconSymbol } from "../../src/shared/ui/IconSymbol";
@@ -141,7 +141,7 @@ export default function RecuperarPasswordScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       {/* Fondo condicional: Video para Web, Lottie para Android/Nativo */}
-      {mostrarFondo && theme === "dark" &&
+      {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
@@ -149,12 +149,16 @@ export default function RecuperarPasswordScreen() {
         bounces={false}
       >
         <Animated.View
-          style={[styles.loginCard, { backgroundColor: colors.card }, estiloTarjetaAnimada]}
+          style={[
+            styles.loginCard,
+            { backgroundColor: colors.card },
+            estiloTarjetaAnimada,
+          ]}
         >
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
               <Image
-                source={require("../../assets/icons/logoB.png")}
+                source={require("../../assets/icons/logo.png")}
                 style={styles.logoImage}
                 resizeMode="cover"
                 accessibilityLabel="Logotipo de Fichapp"
@@ -336,11 +340,9 @@ const styles = StyleSheet.create({
   },
   headerContenedor: { alignItems: "center", marginBottom: 24 },
   logoBranding: {
-    width: 52,
-    height: 52,
-    backgroundColor: "#011640",
+    width: 120,
+    height: 120,
     overflow: "hidden",
-    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,

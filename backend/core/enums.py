@@ -154,7 +154,6 @@ class AccionPermisoEnum(str, enum.Enum):
     IMPORTAR = "importar"
     EXPORTAR = "exportar"
 
-
 ACCIONES_PERMISOS_ACTIVAS = (
     AccionPermisoEnum.CONSULTAR,
     AccionPermisoEnum.CREAR,

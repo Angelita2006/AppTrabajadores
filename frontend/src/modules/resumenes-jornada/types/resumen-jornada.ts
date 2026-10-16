@@ -1,5 +1,5 @@
 import { Empresa } from "../../empresas/types/empresa";
-import { Trabajador } from "../../trabajadores/types/trabajador";
+import { TrabajadorSimpleResponse } from "../../trabajadores/types/trabajador";
 
 /** Fields shared by the Pydantic summary schemas. */
 export interface ResumenJornadaBase {
@@ -40,11 +40,11 @@ export interface ResumenJornadaSimpleResponse extends ResumenJornadaBase {
 
 /** Response body matching ResumenJornadaResponse. */
 export interface ResumenJornadaResponse extends ResumenJornadaSimpleResponse {
-  empresa: Empresa | null;
-  trabajador: Trabajador | null;
+  empresa?: Empresa | null;
+  trabajador?: TrabajadorSimpleResponse | null;
 }
 
-/** Modelo de vista; fecha se deriva de la jornada en las pantallas de calendario. */
+/** Modelo de vista; `fecha` se calcula a partir de la fecha de consulta o de `hora_entrada`. */
 export interface ResumenJornada extends ResumenJornadaResponse {
   fecha: string;
 }

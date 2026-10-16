@@ -29,3 +29,11 @@ class AsignacionesTurno(Base):
 
     contrato: Mapped['Contratos'] = relationship('Contratos', back_populates='asignaciones_turno', doc='Contrato al que se le asigna el turno.') # type: ignore
     turno: Mapped['Turnos'] = relationship('Turnos', back_populates='asignaciones_turno', doc='Turno que se asigna.') # type: ignore
+
+    @property
+    def empresa_id(self):
+        return self.contrato.empresa_id if self.contrato else None
+
+    @property
+    def trabajador_id(self):
+        return self.contrato.trabajador_id if self.contrato else None

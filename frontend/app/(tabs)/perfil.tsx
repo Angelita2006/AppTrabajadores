@@ -1,19 +1,19 @@
+import { TipoRolEnum } from "@/src/constants/enums";
 import { obtenerCentrosTrabajoPorEmpresa } from "@/src/modules/centros-trabajo/api/services";
 import { CentroTrabajo } from "@/src/modules/centros-trabajo/types/centro-trabajo";
 import { ImagenConToken } from "@/src/modules/empresas/components/Archivos";
 import {
-    actualizarEstadoTrabajador,
-    actualizarFotoTrabajador,
-    actualizarTrabajador,
-    obtenerTrabajador,
+  actualizarEstadoTrabajador,
+  actualizarFotoTrabajador,
+  actualizarTrabajador,
+  obtenerTrabajador,
 } from "@/src/modules/trabajadores/api/services";
 import { ESTADOS_TRABAJADOR } from "@/src/modules/trabajadores/types/trabajador";
-import { TipoRolEnum } from "@/src/constants/enums";
 import {
-    obtenerUsuarioActual,
-    actualizarFotoUsuario,
-    solicitarCambioEmail,
-    solicitarCambioPassword,
+  actualizarFotoUsuario,
+  obtenerUsuarioActual,
+  solicitarCambioEmail,
+  solicitarCambioPassword,
 } from "@/src/modules/usuarios/api/services";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -22,16 +22,16 @@ import { router } from "expo-router";
 import { useFocusEffect } from "expo-router/build/useFocusEffect";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useSesion } from "../../src/modules/usuarios/store/SesionContextZustand";
 import { ThemedText } from "../../src/shared/components/ThemedText";
@@ -59,12 +59,18 @@ export default function PerfilScreen() {
   const esSuperadministrador =
     usuarioActual?.tipo_usuario === TipoRolEnum.SUPERADMINISTRADOR;
   const cuentaSinFichaTrabajador = Boolean(usuarioActual && !trabajadorActual);
-
   const [cargandoCentros, setCargandoCentros] = useState(false);
   const [centrosDisponibles, setCentrosDisponibles] = useState<CentroTrabajo[]>(
     [],
   );
-
+  const centrosPerfil =
+    !esAdmin
+      ? contratoActual
+        ? centrosDisponibles.filter((centro) =>
+            contratoActual.centros_trabajo_ids?.includes(centro.id),
+          )
+        : []
+      : centrosDisponibles;
   const [isEditing, setIsEditing] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
@@ -74,7 +80,9 @@ export default function PerfilScreen() {
     trabajadorActual?.numero_seguridad_social ?? "",
   );
   const [fotoUrl, setFotoUrl] = useState(trabajadorActual?.foto_url ?? "");
-  const [fotoUsuarioUrl, setFotoUsuarioUrl] = useState(usuarioActual?.foto_url ?? "");
+  const [fotoUsuarioUrl, setFotoUsuarioUrl] = useState(
+    usuarioActual?.foto_url ?? "",
+  );
   const [guardandoFotoUsuario, setGuardandoFotoUsuario] = useState(false);
   const [nuevaFotoAsset, setNuevaFotoAsset] =
     useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -91,7 +99,6 @@ export default function PerfilScreen() {
   const [guardandoPassword, setGuardandoPassword] = useState(false);
 
   const opacidadTarjeta = useSharedValue(0);
-
   const { mostrarError, mostrarMensaje } = useAppModal();
 
   useEffect(() => {
@@ -126,13 +133,20 @@ export default function PerfilScreen() {
         if (isMounted) setCargandoCentros(true);
         const centros = await obtenerCentrosTrabajoPorEmpresa(empresaActual.id);
         if (!isMounted) return;
-        setCentrosDisponibles(centros ?? []);
-        if (centros && centros.length > 0) {
+        const centrosDeContrato = !esAdmin
+          ? contratoActual
+            ? (centros ?? []).filter((centro) =>
+                contratoActual.centros_trabajo_ids?.includes(centro.id),
+              )
+            : []
+          : centros ?? [];
+        setCentrosDisponibles(centrosDeContrato);
+        if (centrosDeContrato.length > 0) {
           if (
             !centroTrabajoActual ||
-            centroTrabajoActual.empresa_id !== empresaActual.id
+            !centrosDeContrato.some((centro) => centro.id === centroTrabajoActual.id)
           ) {
-            setCentroTrabajoActual(centros[0]);
+            setCentroTrabajoActual(centrosDeContrato[0]);
           }
         } else {
           setCentroTrabajoActual(null);
@@ -150,7 +164,7 @@ export default function PerfilScreen() {
     return () => {
       isMounted = false;
     };
-  }, [empresaActual?.id]);
+  }, [empresaActual?.id, contratoActual?.id, esAdmin]);
 
   const handleCambiarFoto = async () => {
     if (!isEditing || !trabajadorActual) return;
@@ -191,7 +205,10 @@ export default function PerfilScreen() {
     try {
       const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permiso.granted) {
-        mostrarMensaje("Permiso denegado", "Se requiere acceso a la galería para elegir un avatar.");
+        mostrarMensaje(
+          "Permiso denegado",
+          "Se requiere acceso a la galería para elegir un avatar.",
+        );
         return;
       }
       const resultado = await ImagePicker.launchImageLibraryAsync({
@@ -201,21 +218,38 @@ export default function PerfilScreen() {
         quality: 0.8,
       });
       if (resultado.canceled || !resultado.assets?.length) return;
-
       setGuardandoFotoUsuario(true);
       const asset = resultado.assets[0];
-      const fileName = asset.fileName || asset.uri.split("/").pop() || "avatar.jpg";
+      const fileName =
+        asset.fileName || asset.uri.split("/").pop() || "avatar.jpg";
       const extension = /\.(\w+)$/.exec(fileName)?.[1]?.toLowerCase();
-      const fileType = extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
-      const usuarioActualizado = await actualizarFotoUsuario(asset.uri, fileName, fileType);
+      const fileType =
+        extension === "png"
+          ? "image/png"
+          : extension === "webp"
+            ? "image/webp"
+            : "image/jpeg";
+      const usuarioActualizado = await actualizarFotoUsuario(
+        asset.uri,
+        fileName,
+        fileType,
+      );
       const fotoConCacheBust = usuarioActualizado.foto_url
         ? `${usuarioActualizado.foto_url.split("?")[0]}?t=${Date.now()}`
         : "";
-      setUsuarioActual({ ...usuarioActual, ...usuarioActualizado, foto_url: fotoConCacheBust });
+      setUsuarioActual({
+        ...usuarioActual,
+        ...usuarioActualizado,
+        activo: usuarioActualizado.activo ?? usuarioActual.activo,
+        foto_url: fotoConCacheBust,
+      });
       setFotoUsuarioUrl(fotoConCacheBust);
       mostrarMensaje("Éxito", "Avatar de la cuenta actualizado.");
     } catch (error: any) {
-      mostrarError("No se pudo actualizar el avatar: " + obtenerMensajeAmigableError(error));
+      mostrarError(
+        "No se pudo actualizar el avatar: " +
+          obtenerMensajeAmigableError(error),
+      );
     } finally {
       setGuardandoFotoUsuario(false);
     }
@@ -225,8 +259,6 @@ export default function PerfilScreen() {
     try {
       setGuardando(true);
       if (!trabajadorActual) return;
-
-      // 1. Si el usuario seleccionó una nueva foto, la subimos al servidor ahora al guardar
       if (nuevaFotoAsset) {
         const filename =
           nuevaFotoAsset.fileName ||
@@ -234,7 +266,6 @@ export default function PerfilScreen() {
           "foto.jpg";
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : `image/jpeg`;
-
         await actualizarFotoTrabajador(
           trabajadorActual.id,
           nuevaFotoAsset.uri,
@@ -242,18 +273,13 @@ export default function PerfilScreen() {
           type,
         );
       }
-
-      // 2. Actualizamos los datos de texto (teléfono y NSS)
       await actualizarTrabajador(trabajadorActual.id, {
         numero_seguridad_social: nss.trim() || undefined,
       });
-
-      // 3. Obtenemos los datos limpios y definitivos desde el servidor
       const datosFrescos = await obtenerTrabajador(trabajadorActual.id);
       const cacheBustUrl = datosFrescos.foto_url
         ? `${datosFrescos.foto_url.split("?")[0]}?t=${Date.now()}`
         : "";
-
       setTrabajadorActual({
         ...datosFrescos,
         foto_url: cacheBustUrl,
@@ -261,7 +287,6 @@ export default function PerfilScreen() {
       setFotoUrl(cacheBustUrl);
       setNuevaFotoAsset(null);
       setIsEditing(false);
-
       mostrarMensaje("Éxito", "Perfil actualizado correctamente.");
     } catch (error: any) {
       mostrarError(
@@ -285,13 +310,11 @@ export default function PerfilScreen() {
         );
         return;
       }
-
       await solicitarCambioEmail(nuevoEmail.trim());
       mostrarMensaje(
         "Verificación enviada",
         "Se ha enviado un enlace de confirmación a tu nuevo correo. Tu email no cambiará hasta que lo verifiques.",
       );
-
       setIsEditingEmail(false);
       setNuevoEmail("");
     } catch (error: any) {
@@ -306,7 +329,6 @@ export default function PerfilScreen() {
   const handleGuardarPassword = async () => {
     try {
       setGuardandoPassword(true);
-
       if (!passwordActual) {
         mostrarError("Debes introducir tu contraseña actual.");
         return;
@@ -323,14 +345,11 @@ export default function PerfilScreen() {
         mostrarError("La nueva contraseña debe tener al menos 6 caracteres.");
         return;
       }
-
       await solicitarCambioPassword(passwordActual);
-
       mostrarMensaje(
         "Éxito",
         "Proceso de contraseña iniciado. Sigue las instrucciones enviadas.",
       );
-
       setIsEditingPassword(false);
       setPasswordActual("");
       setNuevaPassword("");
@@ -360,9 +379,7 @@ export default function PerfilScreen() {
           );
         }
       }
-
       await cerrarSesionCompleta();
-
       setTimeout(() => {
         router.replace({ pathname: "/" });
       }, 50);
@@ -373,15 +390,16 @@ export default function PerfilScreen() {
     }
   };
 
-  // Función para consultar los datos actualizados del usuario en el backend
   const handleRefrescarDatosUsuario = async () => {
     try {
-      // Si el usuario tiene trabajador asociado, refrescamos sus datos (puedes ajustar esta llamada según tu API de usuario/trabajador)
       if (trabajadorActual?.id) {
         const usuarioFresco = await obtenerUsuarioActual();
-
         if (usuarioFresco) {
-          setUsuarioActual(usuarioFresco);
+          setUsuarioActual({
+            ...usuarioActual,
+            ...usuarioFresco,
+            activo: usuarioFresco.activo ?? usuarioActual?.activo ?? true,
+          });
         }
       }
     } catch (error: any) {
@@ -392,7 +410,6 @@ export default function PerfilScreen() {
     }
   };
 
-  // Se ejecuta cada vez que el usuario entra o vuelve a enfocar la pantalla de Perfil
   useFocusEffect(
     useCallback(() => {
       handleRefrescarDatosUsuario();
@@ -413,7 +430,9 @@ export default function PerfilScreen() {
 
   return (
     <AppScreen
-      title={cuentaSinFichaTrabajador && esAdmin ? "Panel de Gestión" : "Mi Perfil"}
+      title={
+        cuentaSinFichaTrabajador && esAdmin ? "Panel de Gestión" : "Mi Perfil"
+      }
     >
       <Row>
         {cuentaSinFichaTrabajador ? (
@@ -425,7 +444,12 @@ export default function PerfilScreen() {
             />
             <StatCard
               label="Rol de sistema"
-              value={usuarioActual?.tipo_usuario?.toString().replaceAll("_", " ").toUpperCase() ?? "SIN ROL"}
+              value={
+                usuarioActual?.tipo_usuario
+                  ?.toString()
+                  .replaceAll("_", " ")
+                  .toUpperCase() ?? "SIN ROL"
+              }
             />
           </>
         ) : (
@@ -443,7 +467,6 @@ export default function PerfilScreen() {
         )}
       </Row>
 
-
       <Animated.View
         style={[estiloTarjetaAnimada, { gap: 16, paddingBottom: 30 }]}
       >
@@ -451,29 +474,42 @@ export default function PerfilScreen() {
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="person" size={20} color="#2563EB" />
-              <ThemedText style={styles.perfilTitle}>Perfil de usuario</ThemedText>
+              <ThemedText style={styles.perfilTitle}>
+                Perfil de usuario
+              </ThemedText>
             </View>
             <View style={styles.separadorPerfil} />
             <View style={styles.avatarContainer}>
               <Pressable
                 onPress={handleCambiarFotoUsuario}
                 disabled={guardandoFotoUsuario}
-                style={styles.avatarPressableEditing}
+                style={[
+                  styles.avatarPressableUsuario,
+                  styles.avatarPressableEditing,
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel="Cambiar foto de perfil de usuario"
               >
                 {guardandoFotoUsuario ? (
                   <ActivityIndicator size="small" color="#2563EB" />
                 ) : fotoUsuarioUrl ? (
-                  <ImagenConToken rutaRelativa={fotoUsuarioUrl} style={{ width: 72, height: 72 }} />
+                  <ImagenConToken
+                    rutaRelativa={fotoUsuarioUrl}
+                    style={{ width: 72, height: 72, borderRadius: 36 }}
+                  />
                 ) : (
                   <ThemedText style={{ fontSize: 28 }}>👤</ThemedText>
                 )}
               </Pressable>
-              <ThemedText style={styles.avatarHintText}>Toca la foto para cambiar tu avatar</ThemedText>
+              <ThemedText style={styles.avatarHintText}>
+                Toca la foto para cambiar tu avatar
+              </ThemedText>
             </View>
             <View style={styles.detailGrid}>
-              <Detail label="Nombre de la cuenta" value={usuarioActual.nombre} />
+              <Detail
+                label="Nombre de la cuenta"
+                value={usuarioActual.nombre}
+              />
               <Detail label="Correo electrónico" value={usuarioActual.email} />
             </View>
           </Card>
@@ -483,10 +519,14 @@ export default function PerfilScreen() {
           <Card>
             <View style={styles.seccionPerfilHeader}>
               <IconSymbol name="business" size={20} color="#EA580C" />
-              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>Mi ficha de trabajador</ThemedText>
+              <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
+                Mi ficha de trabajador
+              </ThemedText>
             </View>
             <View style={styles.separadorPerfil} />
-            <ThemedText style={styles.detailLabel}>Empresa activa y ficha laboral</ThemedText>
+            <ThemedText style={styles.detailLabel}>
+              Empresa activa y ficha laboral
+            </ThemedText>
             <View style={styles.pickerWrapperHorizontal}>
               {empresas.map((empresa) => (
                 <Pressable
@@ -500,7 +540,8 @@ export default function PerfilScreen() {
                   <ThemedText
                     style={[
                       styles.chipCentroText,
-                      empresaActual?.id === empresa.id && styles.chipCentroTextActivo,
+                      empresaActual?.id === empresa.id &&
+                        styles.chipCentroTextActivo,
                     ]}
                   >
                     {empresa.nombre_comercial}
@@ -514,22 +555,34 @@ export default function PerfilScreen() {
         {usuarioActual && cuentaSinFichaTrabajador ? (
           esAdmin && empresaActual ? (
             <Card>
-                <View style={styles.seccionPerfilHeader}>
-                  <IconSymbol name="business" size={20} color="#EA580C" />
-                  <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
-                    Mi Empresa Activa
-                  </ThemedText>
-                </View>
-                <View style={styles.separadorPerfil} />
-                <View style={styles.detailGrid}>
-                  <Detail label="Empresa vinculada" value={empresaActual.nombre_comercial} />
-                  <Detail label="CIF / NIF" value={empresaActual.cif ?? "No disponible"} />
-                  <Detail label="Zona Horaria" value={empresaActual.zona_horaria ?? "Europe/Madrid"} />
-                </View>
+              <View style={styles.seccionPerfilHeader}>
+                <IconSymbol name="business" size={20} color="#EA580C" />
+                <ThemedText style={[styles.perfilTitle, { color: "#EA580C" }]}>
+                  {" "}
+                  Mi Empresa Activa{" "}
+                </ThemedText>
+              </View>
+              <View style={styles.separadorPerfil} />
+              <View style={styles.detailGrid}>
+                <Detail
+                  label="Empresa vinculada"
+                  value={empresaActual.nombre_comercial}
+                />
+                <Detail
+                  label="CIF / NIF"
+                  value={empresaActual.cif ?? "No disponible"}
+                />
+                <Detail
+                  label="Zona Horaria"
+                  value={empresaActual.zona_horaria ?? "Europe/Madrid"}
+                />
+              </View>
             </Card>
           ) : !esSuperadministrador ? (
             <Card>
-              <ThemedText style={styles.perfilTitle}>Datos laborales</ThemedText>
+              <ThemedText style={styles.perfilTitle}>
+                Datos laborales
+              </ThemedText>
               <View style={styles.separadorPerfil} />
               <ThemedText style={styles.detailValue}>
                 No hay una ficha de trabajador vinculada a la empresa activa.
@@ -544,7 +597,8 @@ export default function PerfilScreen() {
                 <View style={styles.seccionPerfilHeader}>
                   <IconSymbol name="person" size={20} color="#2563EB" />
                   <ThemedText style={styles.perfilTitle}>
-                    Información Personal
+                    {" "}
+                    Información Personal{" "}
                   </ThemedText>
                 </View>
                 <Pressable
@@ -564,8 +618,7 @@ export default function PerfilScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-            <View style={styles.separadorPerfil} />
-
+              <View style={styles.separadorPerfil} />
               <View style={styles.avatarContainer}>
                 <Pressable
                   onPress={handleCambiarFoto}
@@ -580,7 +633,7 @@ export default function PerfilScreen() {
                   ) : fotoUrl ? (
                     <ImagenConToken
                       rutaRelativa={fotoUrl}
-                      style={{ width: 64, height: 64 }}
+                      style={{ width: 64, height: 64, borderRadius: 32 }}
                     />
                   ) : (
                     <ThemedText style={{ fontSize: 26 }}>👤</ThemedText>
@@ -592,7 +645,6 @@ export default function PerfilScreen() {
                   </ThemedText>
                 )}
               </View>
-
               <View style={styles.detailGrid}>
                 <Detail
                   label="Nombre Completo"
@@ -602,11 +654,11 @@ export default function PerfilScreen() {
                   label="Documento (NIF/NIE)"
                   value={trabajadorActual?.dni_nif_nie ?? "-"}
                 />
-
                 {isEditing ? (
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Número Seguridad Social
+                      {" "}
+                      Número Seguridad Social{" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -625,11 +677,11 @@ export default function PerfilScreen() {
                     }
                   />
                 )}
-
                 {isEditing ? (
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Teléfono Móvil
+                      {" "}
+                      Teléfono Móvil{" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -647,7 +699,6 @@ export default function PerfilScreen() {
                   />
                 )}
               </View>
-
               {isEditing && (
                 <Pressable
                   style={styles.saveButton}
@@ -658,7 +709,8 @@ export default function PerfilScreen() {
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <ThemedText style={styles.saveButtonText}>
-                      Guardar Cambios
+                      {" "}
+                      Guardar Cambios{" "}
                     </ThemedText>
                   )}
                 </Pressable>
@@ -673,7 +725,8 @@ export default function PerfilScreen() {
                   <ThemedText
                     style={[styles.perfilTitle, { color: "#16A34A" }]}
                   >
-                    Condiciones Contractuales
+                    {" "}
+                    Condiciones Contractuales{" "}
                   </ThemedText>
                 </View>
                 <View style={styles.separadorPerfil} />
@@ -720,15 +773,16 @@ export default function PerfilScreen() {
                   <ThemedText
                     style={[styles.perfilTitle, { color: "#EA580C" }]}
                   >
-                    Organización y Centro de Fichaje
+                    {" "}
+                    Organización y Centro de Fichaje{" "}
                   </ThemedText>
                 </View>
                 <View style={styles.separadorPerfil} />
-
                 <View style={styles.detailGrid}>
                   <View style={styles.selectorContainer}>
                     <ThemedText style={styles.detailLabel}>
-                      Empresa vinculada
+                      {" "}
+                      Empresa vinculada{" "}
                     </ThemedText>
                     <View style={styles.pickerWrapper}>
                       <ThemedText style={styles.selectorSingleText}>
@@ -737,10 +791,10 @@ export default function PerfilScreen() {
                       </ThemedText>
                     </View>
                   </View>
-
                   <View style={styles.selectorContainer}>
                     <ThemedText style={styles.detailLabel}>
-                      Seleccionar Centro
+                      {" "}
+                      Seleccionar Centro{" "}
                     </ThemedText>
                     {cargandoCentros ? (
                       <ActivityIndicator
@@ -750,8 +804,8 @@ export default function PerfilScreen() {
                       />
                     ) : (
                       <View style={styles.pickerWrapperHorizontal}>
-                        {centrosDisponibles && centrosDisponibles.length > 0 ? (
-                          centrosDisponibles.map((centro: CentroTrabajo) => (
+                        {centrosPerfil.length > 0 ? (
+                          centrosPerfil.map((centro: CentroTrabajo) => (
                             <Pressable
                               key={centro.id}
                               style={[
@@ -778,13 +832,14 @@ export default function PerfilScreen() {
                           ))
                         ) : (
                           <ThemedText style={styles.detailValue}>
-                            No hay centros configurados para esta empresa
+                            {esAdmin
+                              ? "No hay centros configurados para esta empresa"
+                              : "No hay centros asociados al contrato vigente"}
                           </ThemedText>
                         )}
                       </View>
                     )}
                   </View>
-
                   <View style={styles.zonaHorariaCard}>
                     <IconSymbol name="schedule" size={16} color="#475569" />
                     <ThemedText style={styles.zonaHorariaTexto}>
@@ -796,7 +851,6 @@ export default function PerfilScreen() {
                       </ThemedText>
                     </ThemedText>
                   </View>
-
                   <Detail
                     label="Dirección de la Sede"
                     value={centroTrabajoActual?.direccion ?? "No registrada"}
@@ -816,17 +870,18 @@ export default function PerfilScreen() {
           <View style={styles.seccionPerfilHeader}>
             <IconSymbol name="manage-accounts" size={20} color="#475569" />
             <ThemedText style={[styles.perfilTitle, { color: "#475569" }]}>
-              Seguridad y Cuenta
+              {" "}
+              Seguridad y Cuenta{" "}
             </ThemedText>
           </View>
           <View style={styles.separadorPerfil} />
-
           <View style={styles.detailGrid}>
             {/* 1. SECCIÓN DE CORREO ELECTRÓNICO */}
             <View style={styles.subseccionSeguridad}>
               <View style={styles.headerSubseccion}>
                 <ThemedText style={styles.subseccionTitle}>
-                  Correo Electrónico
+                  {" "}
+                  Correo Electrónico{" "}
                 </ThemedText>
                 <Pressable
                   style={styles.botonAccionHeader}
@@ -844,12 +899,12 @@ export default function PerfilScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-
               {isEditingEmail ? (
                 <View style={{ gap: 10, marginTop: 8 }}>
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Nuevo Correo (Requiere Confirmación)
+                      {" "}
+                      Nuevo Correo (Requiere Confirmación){" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -870,7 +925,8 @@ export default function PerfilScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <ThemedText style={styles.saveButtonText}>
-                        Actualizar Correo
+                        {" "}
+                        Actualizar Correo{" "}
                       </ThemedText>
                     )}
                   </Pressable>
@@ -889,7 +945,8 @@ export default function PerfilScreen() {
             <View style={styles.subseccionSeguridad}>
               <View style={styles.headerSubseccion}>
                 <ThemedText style={styles.subseccionTitle}>
-                  Contraseña
+                  {" "}
+                  Contraseña{" "}
                 </ThemedText>
                 <Pressable
                   style={styles.botonAccionHeader}
@@ -907,12 +964,12 @@ export default function PerfilScreen() {
                   </ThemedText>
                 </Pressable>
               </View>
-
               {isEditingPassword ? (
                 <View style={{ gap: 10, marginTop: 8 }}>
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Contraseña Actual (Obligatoria)
+                      {" "}
+                      Contraseña Actual (Obligatoria){" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -923,10 +980,10 @@ export default function PerfilScreen() {
                       secureTextEntry
                     />
                   </View>
-
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Nueva Contraseña
+                      {" "}
+                      Nueva Contraseña{" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -937,10 +994,10 @@ export default function PerfilScreen() {
                       secureTextEntry
                     />
                   </View>
-
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.detailLabel}>
-                      Confirmar Nueva Contraseña
+                      {" "}
+                      Confirmar Nueva Contraseña{" "}
                     </ThemedText>
                     <TextInput
                       style={styles.inputEdit}
@@ -951,7 +1008,6 @@ export default function PerfilScreen() {
                       secureTextEntry
                     />
                   </View>
-
                   <Pressable
                     style={styles.saveButton}
                     onPress={handleGuardarPassword}
@@ -961,7 +1017,8 @@ export default function PerfilScreen() {
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <ThemedText style={styles.saveButtonText}>
-                        Actualizar Contraseña
+                        {" "}
+                        Actualizar Contraseña{" "}
                       </ThemedText>
                     )}
                   </Pressable>
@@ -972,7 +1029,6 @@ export default function PerfilScreen() {
             </View>
 
             <View style={styles.separadorPerfil} />
-
             <Detail
               label="Rol Autorizado Sistema"
               value={
@@ -1060,6 +1116,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    overflow: "hidden",
+  },
+  avatarPressableUsuario: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 1,
     borderColor: "#CBD5E1",
     justifyContent: "center",

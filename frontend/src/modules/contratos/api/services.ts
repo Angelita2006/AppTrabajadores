@@ -1,5 +1,6 @@
 import api from "@/src/service/api/api";
-import { Contrato } from "../types/contrato";
+import { Platform } from "react-native";
+import { Contrato, ContratoCreate, ContratoUpdate } from "../types/contrato";
 
 /**
  * Registra un nuevo contrato laboral asociándolo al expediente del empleado en el sistema.
@@ -11,29 +12,42 @@ import { Contrato } from "../types/contrato";
  * @returns {Promise<Contrato>} Promesa con el objeto `Contrato` recién creado.
  * @throws {Error} Lanza un error si falla la creación o existen inconsistencias en los datos proporcionados.
  */
-export const crearContrato = async (payload: {
-  trabajador_id: string;
-  empresa_id: string;
-  centro_trabajo_id: string;
-  departamento_id: string;
-  calendario_laboral_id: string;
-  tipo_contrato: string;
-  tipo_jornada: string;
-  horas_semana: number;
-  fecha_inicio: string;
-  puesto_trabajo: string;
-  categoria_profesional: string;
-  fecha_fin?: string | null;
-}): Promise<Contrato> => {
+export const crearContrato = async (payload: ContratoCreate): Promise<Contrato> => {
   try {
     const response = await api.post<Contrato>("/api/contratos", payload);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Error de integridad al registrar el nuevo contrato laboral.",
     );
+  }
+};
+
+/** Sube un PDF privado vinculado al contrato. */
+export const subirDocumentoContrato = async (
+  idContrato: string,
+  archivo: { uri: string; name: string; mimeType?: string | null },
+): Promise<Contrato> => {
+  try {
+    const formData = new FormData();
+    if (Platform.OS === "web") {
+      const blob = await fetch(archivo.uri).then((response) => response.blob());
+      formData.append("file", blob, archivo.name);
+    } else {
+      formData.append("file", {
+        uri: archivo.uri,
+        name: archivo.name,
+        type: archivo.mimeType || "application/pdf",
+      } as any);
+    }
+    return (await api.put<Contrato>(`/api/contratos/${idContrato}/documento`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })).data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al subir el PDF del contrato.");
   }
 };
 
@@ -51,7 +65,7 @@ export const obtenerTodosLosContratos = async (empresaId: string): Promise<Contr
     const response = await api.get<Contrato[]>(`/api/contratos/empresa/${empresaId}`);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener el listado global de contratos.",
     );
@@ -77,7 +91,7 @@ export const obtenerContratosPorEmpresa = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener los contratos de la empresa ${idEmpresa}.`,
@@ -104,7 +118,7 @@ export const obtenerContratosPorTrabajador = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener la secuencia histórica de contratos del trabajador ${idTrabajador}.`,
@@ -136,7 +150,7 @@ export const obtenerContratoActivoTrabajador = async (
     if (error?.response?.status === 404) {
       return null;
     }
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al obtener el contrato activo del trabajador ${idTrabajador} en la empresa ${idEmpresa}.`,
@@ -157,20 +171,7 @@ export const obtenerContratoActivoTrabajador = async (
  */
 export const actualizarContrato = async (
   idContrato: string,
-  payload: {
-    trabajador_id?: string;
-    empresa_id?: string;
-    centro_trabajo_id?: string;
-    departamento_id?: string | null;
-    calendario_laboral_id?: string | null;
-    tipo_contrato?: string;
-    tipo_jornada?: string;
-    puesto_trabajo?: string;
-    categoria_profesional?: string;
-    horas_semana?: number;
-    fecha_inicio?: string;
-    fecha_fin?: string | null;
-  },
+  payload: ContratoUpdate,
 ): Promise<Contrato> => {
   try {
     const response = await api.put<Contrato>(
@@ -179,7 +180,7 @@ export const actualizarContrato = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al actualizar los datos del contrato ${idContrato}.`,
     );
@@ -225,7 +226,7 @@ export const rescindirContratoActivoTrabajador = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al dar de baja el contrato activo del trabajador ${idTrabajador}.`,
@@ -255,7 +256,7 @@ export const eliminarTodosLosContratosTrabajador = async (
     const deEmpresa = respuesta.data.filter((contrato) => contrato.empresa_id === idEmpresa);
     await Promise.all(deEmpresa.map((contrato) => api.delete(`/api/contratos/${contrato.id}`)));
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al eliminar los contratos del trabajador ${idTrabajador} en la empresa ${idEmpresa}.`,

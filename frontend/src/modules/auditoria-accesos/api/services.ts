@@ -16,9 +16,15 @@ import { AuditoriaAccesoResponse } from "../types/auditoria-acceso";
  * @returns {Promise<AuditoriaAccesoResponse[]>} Eventos de auditoría de la empresa.
  * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerAuditoriaEmpresa = async (idEmpresa: string): Promise<AuditoriaAccesoResponse[]> => {
+export const obtenerAuditoriaEmpresa = async (
+  idEmpresa: string,
+  empresaIdContext: string = idEmpresa,
+): Promise<AuditoriaAccesoResponse[]> => {
   try {
-    const response = await api.get<AuditoriaAccesoResponse[]>(`/api/auditoria-accesos/empresa/${idEmpresa}`);
+    const response = await api.get<AuditoriaAccesoResponse[]>(
+      `/api/auditoria-accesos/empresa/${idEmpresa}`,
+      { empresaIdContext } as any,
+    );
     return response.data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;

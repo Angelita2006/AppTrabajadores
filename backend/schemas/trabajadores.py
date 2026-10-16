@@ -1,9 +1,10 @@
 import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional
 from uuid import UUID
 from core.enums import EstadoTrabajadorEnum
 from schemas.empresas import EmpresaSimpleResponse
+from schemas.usuarios import UsuarioSimpleResponse
 
 # ==========================================
 # ESQUEMAS DE VALIDACIÓN (PYDANTIC) - TRABAJADORES
@@ -35,6 +36,16 @@ class TrabajadorCreate(TrabajadorBase):
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa")
     usuario_id: Optional[UUID] = Field(None, description="Cuenta de usuario vinculada al trabajador para acceso propio")
+    email: Optional[EmailStr] = Field(None, description="Correo de acceso; si ya existe una cuenta se vincula a ella")
+    telefono: Optional[str] = Field(None, max_length=30, description="Teléfono de la cuenta de acceso")
+    password: Optional[str] = Field(None, min_length=12, description="Contraseña inicial si el correo todavía no tiene una cuenta")
+
+    @field_validator("password")
+    @classmethod
+    def validar_longitud_password_bcrypt(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and len(value.encode("utf-8")) > 72:
+            raise ValueError("La contraseña no puede superar 72 bytes.")
+        return value
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,4 +97,5 @@ class TrabajadorResponse(TrabajadorSimpleResponse):
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
+    usuario: Optional[UsuarioSimpleResponse] = Field(None, description="Datos de contacto de la cuenta vinculada")
     model_config = ConfigDict(from_attributes=True)

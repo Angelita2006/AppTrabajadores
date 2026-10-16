@@ -404,8 +404,8 @@ def resolver_correccion_fichaje(
 
                 if not centro_id:
                     contrato = db.query(Contratos).filter(Contratos.trabajador_id == correccion_fichaje.trabajador_id).first()
-                    if contrato and contrato.centro_trabajo_id:
-                        centro_id = contrato.centro_trabajo_id
+                    if contrato and contrato.centros_trabajo_relaciones:
+                        centro_id = contrato.centros_trabajo_relaciones[0].centro_trabajo_id
 
                 if not centro_id:
                     print("No se pudo procesar: El trabajador no posee un contrato con centro de trabajo asignado.")

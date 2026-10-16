@@ -20,7 +20,7 @@ export const obtenerRoles = async (): Promise<Rol[]> => {
     const respuesta = await api.get<Rol[]>("/api/roles");
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al recuperar el catálogo de roles de seguridad.",
     );
@@ -42,7 +42,7 @@ export const obtenerRolPorId = async (idRol: string): Promise<Rol> => {
     const respuesta = await api.get<Rol>(`/api/roles/${idRol}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || `Error al obtener el rol con ID ${idRol}.`);
   }
 };
@@ -62,7 +62,7 @@ export const crearRolSeguridad = async (payload: RolCreate): Promise<Rol> => {
     const respuesta = await api.post<Rol>("/api/roles", payload);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Ha ocurrido un error al guardar el rol.");
   }
 };

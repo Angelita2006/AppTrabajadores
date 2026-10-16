@@ -12,15 +12,16 @@ export type AlcancePermiso = (typeof ALCANCES_PERMISO)[keyof typeof ALCANCES_PER
 export interface PermisoBase {
   tipo: TipoPermiso;
   accion: AccionPermiso;
-  alcance: AlcancePermiso;
+  alcance?: AlcancePermiso;
   descripcion: string;
 }
 
 /** Create payload matching PermisoCreate. */
-export type PermisoCreate = PermisoBase;
+export interface PermisoCreate extends PermisoBase {}
 
 /** Response matching PermisoSimpleResponse. */
 export interface Permiso extends PermisoBase {
+  alcance: AlcancePermiso;
   id: string;
   created_at: string;
   updated_at: string;

@@ -9,6 +9,8 @@ import { ThemedText } from "@/src/shared/components/ThemedText";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import React from "react";
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { Turno } from "@/src/modules/turnos/types/turno";
 
 /**
  * Propiedades requeridas para el funcionamiento del componente ModalContratoTrabajador.
@@ -30,15 +32,22 @@ interface ModalContratoTrabajadorProps {
   setPuestoTrabajo: (val: string) => void;
   categoriaProfesional: string;
   setCategoriaProfesional: (val: string) => void;
-  centroTrabajoId: string;
-  setCentroTrabajoId: (val: string) => void;
+  centrosTrabajoIds: string[];
+  setCentrosTrabajoIds: (val: string[]) => void;
   departamentoId: string;
   setDepartamentoId: (val: string) => void;
   calendarioLaboralId: string;
   setCalendarioLaboralId: (val: string) => void;
+  calendariosSeleccionadosIds: string[];
+  setCalendariosSeleccionadosIds: (ids: string[]) => void;
   listaCentros: CentroTrabajo[];
   listaDepartamentos: Departamento[];
   listaCalendariosLaborales: CalendarioFestivo[];
+  turnosEmpresa: Turno[];
+  turnosSeleccionados: Turno[];
+  setTurnosSeleccionados: (turnos: Turno[]) => void;
+  archivoContrato: { uri: string; name: string; mimeType?: string | null } | null;
+  setArchivoContrato: (archivo: { uri: string; name: string; mimeType?: string | null } | null) => void;
   onGuardar: () => void;
   onCancelar?: () => void;
   procesando: boolean;
@@ -72,15 +81,22 @@ export const ModalContratoTrabajador: React.FC<
   setPuestoTrabajo,
   categoriaProfesional,
   setCategoriaProfesional,
-  centroTrabajoId,
-  setCentroTrabajoId,
+  centrosTrabajoIds,
+  setCentrosTrabajoIds,
   departamentoId,
   setDepartamentoId,
   calendarioLaboralId,
   setCalendarioLaboralId,
+  calendariosSeleccionadosIds,
+  setCalendariosSeleccionadosIds,
   listaCentros,
   listaDepartamentos,
   listaCalendariosLaborales,
+  turnosEmpresa,
+  turnosSeleccionados,
+  setTurnosSeleccionados,
+  archivoContrato,
+  setArchivoContrato,
   onGuardar,
   onCancelar,
   procesando,
@@ -148,19 +164,24 @@ export const ModalContratoTrabajador: React.FC<
       }
     }
 
-    if (!centroTrabajoId || centroTrabajoId.trim() === "") {
-      mostrarError("Debes seleccionar un centro de trabajo obligatorio.");
+    if (centrosTrabajoIds.length === 0) {
+      mostrarError("Selecciona al menos un centro de trabajo para el contrato.");
+      return;
+    }
+
+    if (turnosSeleccionados.length === 0) {
+      mostrarError("Selecciona al menos un turno para formalizar el contrato.");
       return;
     }
 
     if (!departamentoId || departamentoId.trim() === "") {
       mostrarError(
-        "Debes seleccionar un departamento asociado al centro de trabajo.",
+        "Debes seleccionar el departamento del contrato.",
       );
       return;
     }
 
-    if (!calendarioLaboralId || calendarioLaboralId.trim() === "") {
+    if (calendariosSeleccionadosIds.length === 0 && !calendarioLaboralId) {
       mostrarError(
         "Debes seleccionar un calendario laboral válido para el contrato.",
       );
@@ -225,6 +246,29 @@ export const ModalContratoTrabajador: React.FC<
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.campoForm}>
+        <ThemedText style={styles.labelForm}>Turnos iniciales *</ThemedText>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+          {turnosEmpresa.filter((turno) => turno.activo !== false).map((turno) => {
+            const seleccionado = turnosSeleccionados.some((item) => item.id === turno.id);
+            return <Pressable key={turno.id} style={getChipStyle(seleccionado)} onPress={() => setTurnosSeleccionados(seleccionado ? turnosSeleccionados.filter((item) => item.id !== turno.id) : [...turnosSeleccionados, turno])}>
+              <ThemedText style={getChipTextStyle(seleccionado)}>{turno.nombre} ({turno.dias_semana.map((dia) => ["", "L", "M", "X", "J", "V", "S", "D"][dia]).join(", ")})</ThemedText>
+            </Pressable>;
+          })}
+        </View>
+      </View>
+
+      <View style={styles.campoForm}>
+        <ThemedText style={styles.labelForm}>Documento PDF (opcional)</ThemedText>
+        <Pressable style={getChipStyle(Boolean(archivoContrato))} onPress={async () => {
+          const resultado = await DocumentPicker.getDocumentAsync({ type: "application/pdf", copyToCacheDirectory: true });
+          if (!resultado.canceled && resultado.assets[0]) setArchivoContrato({ uri: resultado.assets[0].uri, name: resultado.assets[0].name, mimeType: resultado.assets[0].mimeType });
+        }}>
+          <ThemedText style={getChipTextStyle(Boolean(archivoContrato))}>{archivoContrato?.name ?? "Seleccionar PDF"}</ThemedText>
+        </Pressable>
+        {archivoContrato ? <Pressable onPress={() => setArchivoContrato(null)}><ThemedText style={{ color: "#B91C1C", marginTop: 6 }}>Quitar documento</ThemedText></Pressable> : null}
       </View>
 
       {/* Selector de Tipo de Jornada */}
@@ -324,9 +368,10 @@ export const ModalContratoTrabajador: React.FC<
         />
       </View>
 
-      {/* Selector de Centro de Trabajo */}
+      {/* Selector múltiple de centros de trabajo */}
       <View style={styles.campoForm}>
-        <ThemedText style={styles.labelForm}>Centro de Trabajo *</ThemedText>
+        <ThemedText style={styles.labelForm}>Centros de trabajo asociados *</ThemedText>
+        <ThemedText style={{ color: "#64748B", fontSize: 12 }}>Selecciona todos los lugares de prestación, como la sede y el domicilio.</ThemedText>
         <View
           style={{
             flexDirection: "row",
@@ -336,15 +381,17 @@ export const ModalContratoTrabajador: React.FC<
           }}
         >
           {listaCentros.map((centro) => {
-            const seleccionado = centroTrabajoId === centro.id;
+            const seleccionado = centrosTrabajoIds.includes(centro.id);
             return (
               <Pressable
                 key={centro.id}
                 style={getChipStyle(seleccionado)}
                 onPress={() => {
-                  setCentroTrabajoId(centro.id);
-                  setDepartamentoId("");
-                  setCalendarioLaboralId("");
+                  setCentrosTrabajoIds(
+                    seleccionado
+                      ? centrosTrabajoIds.filter((id) => id !== centro.id)
+                      : [...centrosTrabajoIds, centro.id],
+                  );
                 }}
               >
                 <ThemedText style={getChipTextStyle(seleccionado)}>
@@ -357,8 +404,7 @@ export const ModalContratoTrabajador: React.FC<
       </View>
 
       {/* Selector de Departamento */}
-      {centroTrabajoId ? (
-        <View style={styles.campoForm}>
+      <View style={styles.campoForm}>
           <ThemedText style={styles.labelForm}>Departamento *</ThemedText>
           <View
             style={{
@@ -369,9 +415,6 @@ export const ModalContratoTrabajador: React.FC<
             }}
           >
             {listaDepartamentos
-              .filter(
-                (depto: any) => depto.centro_trabajo_id === centroTrabajoId,
-              )
               .map((depto: any) => {
                 const seleccionado = departamentoId === depto.id;
                 return (
@@ -387,13 +430,11 @@ export const ModalContratoTrabajador: React.FC<
                 );
               })}
           </View>
-        </View>
-      ) : null}
+      </View>
 
       {/* Selector de Calendario Laboral */}
-      {centroTrabajoId ? (
-        <View style={styles.campoForm}>
-          <ThemedText style={styles.labelForm}>Calendario Laboral *</ThemedText>
+      <View style={styles.campoForm}>
+          <ThemedText style={styles.labelForm}>Calendarios Laborales vigentes *</ThemedText>
           <View
             style={{
               flexDirection: "row",
@@ -402,24 +443,27 @@ export const ModalContratoTrabajador: React.FC<
               marginTop: 6,
             }}
           >
-            {listaCalendariosLaborales.filter(
-              (cal) => cal.centro_trabajo_id === centroTrabajoId,
-            ).length === 0 ? (
+            {listaCalendariosLaborales.length === 0 ? (
               <ThemedText
                 style={{ color: "#666", fontStyle: "italic", marginBottom: 10 }}
               >
-                No hay calendarios asignados a este centro.
+                No hay calendarios configurados para esta empresa.
               </ThemedText>
             ) : (
-              listaCalendariosLaborales
-                .filter((cal) => cal.centro_trabajo_id === centroTrabajoId)
-                .map((cal) => {
-                  const seleccionado = calendarioLaboralId === String(cal.id);
+              listaCalendariosLaborales.map((cal) => {
+                  const idCalendario = String(cal.id);
+                  const seleccionado = calendariosSeleccionadosIds.includes(idCalendario) || calendarioLaboralId === idCalendario;
                   return (
                     <Pressable
                       key={cal.id}
                       style={getChipStyle(seleccionado)}
-                      onPress={() => setCalendarioLaboralId(String(cal.id))}
+                      onPress={() => {
+                        const siguiente = seleccionado
+                          ? calendariosSeleccionadosIds.filter((id) => id !== idCalendario)
+                          : [...calendariosSeleccionadosIds, idCalendario];
+                        setCalendariosSeleccionadosIds(siguiente);
+                        setCalendarioLaboralId(siguiente[0] ?? "");
+                      }}
                     >
                       <ThemedText style={getChipTextStyle(seleccionado)}>
                         {cal.nombre || `Calendario ${cal.anio}`}
@@ -429,15 +473,7 @@ export const ModalContratoTrabajador: React.FC<
                 })
             )}
           </View>
-        </View>
-      ) : (
-        <ThemedText
-          style={{ color: "#666", fontStyle: "italic", marginBottom: 10 }}
-        >
-          * Selecciona un centro de trabajo para ver los calendarios laborales
-          disponibles.
-        </ThemedText>
-      )}
+      </View>
 
       {/* Botonera de Acciones (Guardar y Cancelar con diseño limpio) */}
       <View

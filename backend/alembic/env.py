@@ -8,7 +8,7 @@ from core import vistas
 
 from models import ( 
     asignaciones_turno, auditoria_accesos, ausencias, calendarios_laborales,
-    centros_trabajo, contratos, correcciones_fichaje, departamentos,
+    centros_trabajo, contratos, contratos_centros_trabajo, correcciones_fichaje, departamentos,
     dispositivos_fichaje, empresas,  festivos, fichajes, motivos_pausa,
     permisos, politicas_retencion, resumenes_jornada, roles_permisos, roles,
     trabajadores, turnos, usuarios, licencias, usuarios_empresas, gestorias_empresas, 
@@ -18,7 +18,7 @@ from models import (
 _modelos = [
     empresas, trabajadores, turnos, asignaciones_turno, ausencias,
     fichajes, auditoria_accesos, calendarios_laborales, centros_trabajo,
-    contratos, correcciones_fichaje, departamentos, dispositivos_fichaje,
+    contratos, contratos_centros_trabajo, correcciones_fichaje, departamentos, dispositivos_fichaje,
     festivos, motivos_pausa, permisos, politicas_retencion, resumenes_jornada, 
     roles_permisos, roles, usuarios, licencias, usuarios_empresas, gestorias_empresas, 
     contratos_calendarios, vistas

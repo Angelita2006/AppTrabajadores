@@ -59,6 +59,7 @@ export const PlantillaProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const trabajadores: Trabajador[] = await obtenerTrabajadores(
         empresaActual.id,
+        true,
       ).catch((error: any) => {
         throw new Error(
           "Error al obtener la lista de trabajadores de la empresa: " +

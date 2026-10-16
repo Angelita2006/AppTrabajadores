@@ -1,4 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { Can } from "@/src/shared/components/Can";
 import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import { Row } from "@/src/shared/ui/AppSurface";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
@@ -245,32 +246,34 @@ export default function TabCentros({
 
   return (
     <View>
-      <Pressable
-        style={[
-          styles.botonAccionHeader,
-          {
-            backgroundColor: mostrarFormCentro ? "#64748B" : "#EA580C",
-          },
-          guardando && { opacity: 0.7 },
-        ]}
-        disabled={guardando}
-        onPress={() => {
-          if (!mostrarFormCentro) {
-            setNombreCentro("");
-            setDireccionCentro("");
-            setZonaHoraria("Europe/Madrid");
-            setCodigoCcc("");
-            setLatitudCentro(0);
-            setLongitudCentro(0);
-          }
-          setMostrarFormCentro(!mostrarFormCentro);
-          setCentroEnEdicion(null);
-        }}
-      >
-        <ThemedText style={styles.textoBotonGuardar}>
-          {mostrarFormCentro ? "✕ Cancelar" : "＋ Añadir Centro de Trabajo"}
-        </ThemedText>
-      </Pressable>
+      <Can recurso="centros_trabajo" accion="crear">
+        <Pressable
+          style={[
+            styles.botonAccionHeader,
+            {
+              backgroundColor: mostrarFormCentro ? "#64748B" : "#EA580C",
+            },
+            guardando && { opacity: 0.7 },
+          ]}
+          disabled={guardando}
+          onPress={() => {
+            if (!mostrarFormCentro) {
+              setNombreCentro("");
+              setDireccionCentro("");
+              setZonaHoraria("Europe/Madrid");
+              setCodigoCcc("");
+              setLatitudCentro(0);
+              setLongitudCentro(0);
+            }
+            setMostrarFormCentro(!mostrarFormCentro);
+            setCentroEnEdicion(null);
+          }}
+        >
+          <ThemedText style={styles.textoBotonGuardar}>
+            {mostrarFormCentro ? "✕ Cancelar" : "＋ Añadir Centro de Trabajo"}
+          </ThemedText>
+        </Pressable>
+      </Can>
 
       {/* ==========================================
           FORMULARIO DE CREACIÓN
@@ -399,54 +402,58 @@ export default function TabCentros({
             </View>
 
             <Row>
-              <Pressable
-                style={[
-                  {
-                    backgroundColor: "#475569",
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 16,
-                    marginRight: 8,
-                  },
-                  guardando && { opacity: 0.7 },
-                ]}
-                disabled={guardando}
-                onPress={() => {
-                  if (centroEnEdicion?.id === centro.id) {
-                    setCentroEnEdicion(null);
-                  } else {
-                    setCentroEnEdicion(centro);
-                    setNombreCentro(centro.nombre);
-                    setActivoCentro(centro.activo ?? false);
-                    setDireccionCentro(centro.direccion || "");
-                    setZonaHoraria(centro.zona_horaria || "");
-                    setCodigoCcc(centro.codigo_ccc?.toString() || "");
-                    setLatitudCentro(centro.latitud ?? 0);
-                    setLongitudCentro(centro.longitud ?? 0);
-                    setMostrarFormCentro(false);
-                  }
-                }}
-              >
-                <ThemedText>✏️</ThemedText>
-              </Pressable>
+              <Can recurso="centros_trabajo" accion="modificar">
+                <Pressable
+                  style={[
+                    {
+                      backgroundColor: "#475569",
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 16,
+                      marginRight: 8,
+                    },
+                    guardando && { opacity: 0.7 },
+                  ]}
+                  disabled={guardando}
+                  onPress={() => {
+                    if (centroEnEdicion?.id === centro.id) {
+                      setCentroEnEdicion(null);
+                    } else {
+                      setCentroEnEdicion(centro);
+                      setNombreCentro(centro.nombre);
+                      setActivoCentro(centro.activo ?? false);
+                      setDireccionCentro(centro.direccion || "");
+                      setZonaHoraria(centro.zona_horaria || "");
+                      setCodigoCcc(centro.codigo_ccc?.toString() || "");
+                      setLatitudCentro(centro.latitud ?? 0);
+                      setLongitudCentro(centro.longitud ?? 0);
+                      setMostrarFormCentro(false);
+                    }
+                  }}
+                >
+                  <ThemedText>✏️</ThemedText>
+                </Pressable>
+              </Can>
 
-              <Pressable
-                style={[
-                  {
-                    backgroundColor: "#fee2e2",
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 16,
-                  },
-                  guardando && { opacity: 0.7 },
-                ]}
-                disabled={guardando}
-                onPress={() => {
-                  handleEliminarCentro(centro.id, centro.nombre);
-                }}
-              >
-                <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
-              </Pressable>
+              <Can recurso="centros_trabajo" accion="eliminar">
+                <Pressable
+                  style={[
+                    {
+                      backgroundColor: "#fee2e2",
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 16,
+                    },
+                    guardando && { opacity: 0.7 },
+                  ]}
+                  disabled={guardando}
+                  onPress={() => {
+                    handleEliminarCentro(centro.id, centro.nombre);
+                  }}
+                >
+                  <ThemedText style={{ color: "#ef4444" }}>🗑</ThemedText>
+                </Pressable>
+              </Can>
             </Row>
           </View>
 

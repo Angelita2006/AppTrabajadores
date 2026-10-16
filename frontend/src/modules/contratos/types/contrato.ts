@@ -38,8 +38,8 @@ export interface ContratoCreate {
   trabajador_id: string;
   /** Identificador UUID único de la empresa u organización contratante. */
   empresa_id: string;
-  /** Identificador UUID único del centro de trabajo asignado. */
-  centro_trabajo_id: string;
+  /** Identificadores UUID de los centros de trabajo asociados. */
+  centros_trabajo_ids: string[];
   /** Identificador UUID del departamento vinculado. */
   departamento_id: string;
   /** Modalidad o tipo de contrato aplicable. */
@@ -58,7 +58,7 @@ export interface ContratoCreate {
   /** Fecha de finalización del contrato en formato "AAAA-MM-DD", o nula si es indefinido. */
   fecha_fin?: string | null;
   /** Indicador booleano que determina si el contrato se encuentra activo. */
-  activo?: boolean;
+  activo?: boolean | null;
 }
 
 /**
@@ -74,7 +74,8 @@ export interface ContratoUpdate {
   pdf_url?: string | null;
   fecha_inicio?: string;
   fecha_fin?: string | null;
-  activo?: boolean;
+  activo?: boolean | null;
+  centros_trabajo_ids?: string[];
 }
 
 /**
@@ -88,8 +89,8 @@ export interface ContratoSimpleResponse {
   trabajador_id: string;
   /** Identificador UUID único de la empresa u organización contratante. */
   empresa_id: string;
-  /** Identificador UUID único del centro de trabajo asignado. */
-  centro_trabajo_id: string;
+  /** Identificadores UUID de los centros de trabajo asociados. */
+  centros_trabajo_ids: string[];
   /** Identificador UUID opcional del departamento al que pertenece el contrato. */
   departamento_id: string;
   /** Modalidad o tipo de contrato aplicable. */
@@ -128,7 +129,7 @@ export interface Contrato extends ContratoSimpleResponse {
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
   /** Relación opcional enriquecida para cargas anidadas del centro de trabajo vinculado. */
-  centro_trabajo?: CentroTrabajo | null;
+  centros_trabajo?: CentroTrabajo[];
   /** Relación opcional enriquecida para cargas anidadas del departamento vinculado. */
   departamento?: Departamento | null;
 }

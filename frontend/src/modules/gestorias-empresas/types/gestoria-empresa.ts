@@ -3,7 +3,7 @@ import { UsuarioSesion } from "../../usuarios/types/usuario";
 
 export interface GestoriaEmpresaBase {
   fecha_inicio: string;
-  fecha_fin: string | null;
+  fecha_fin?: string | null;
 }
 export interface GestoriaEmpresaCreate extends GestoriaEmpresaBase {
   empresa_cliente_id: string;
@@ -17,6 +17,7 @@ export interface GestoriaEmpresaPermisosUpdate {
   permisos_delegados: string[];
 }
 export interface GestoriaEmpresaSimpleResponse extends GestoriaEmpresaBase {
+  fecha_fin: string | null;
   id: string;
   empresa_gestora_id: string;
   empresa_cliente_id: string;
@@ -27,8 +28,8 @@ export interface GestoriaEmpresaSimpleResponse extends GestoriaEmpresaBase {
   updated_at: string;
 }
 export interface GestoriaEmpresaResponse extends GestoriaEmpresaSimpleResponse {
-  empresa_gestora: Empresa | null;
-  empresa_cliente: Empresa | null;
-  usuario_creador: UsuarioSesion | null;
+  empresa_gestora?: Empresa | null;
+  empresa_cliente?: Empresa | null;
+  usuario_creador?: UsuarioSesion | null;
 }
 

@@ -1,5 +1,10 @@
 import api from "@/src/service/api/api";
-import { GestoriaEmpresaCreate, GestoriaEmpresaPermisosUpdate, GestoriaEmpresaResponse, GestoriaEmpresaUpdate } from "../types/gestoria-empresa";
+import {
+  GestoriaEmpresaCreate,
+  GestoriaEmpresaPermisosUpdate,
+  GestoriaEmpresaSimpleResponse,
+  GestoriaEmpresaUpdate,
+} from "../types/gestoria-empresa";
 
 /**
  * Servicio de relaciones entre gestorías y empresas cliente.
@@ -14,8 +19,8 @@ import { GestoriaEmpresaCreate, GestoriaEmpresaPermisosUpdate, GestoriaEmpresaRe
  * @returns {Promise<GestoriaEmpresaResponse[]>} Relaciones de gestoría disponibles.
  * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerAutorizacionesGestorias = async (): Promise<GestoriaEmpresaResponse[]> => {
-  try { return (await api.get<GestoriaEmpresaResponse[]>("/api/gestorias-empresas")).data; }
+export const obtenerAutorizacionesGestorias = async (empresaIdContext?: string): Promise<GestoriaEmpresaSimpleResponse[]> => {
+  try { return (await api.get<GestoriaEmpresaSimpleResponse[]>("/api/gestorias-empresas", { ...(empresaIdContext ? { empresaIdContext } : {}) } as any)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al obtener las relaciones de gestoría."); }
 };
 
@@ -28,8 +33,8 @@ export const obtenerAutorizacionesGestorias = async (): Promise<GestoriaEmpresaR
  * @returns {Promise<GestoriaEmpresaResponse>} Relación entre gestoría y empresa cliente.
  * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerAutorizacionGestoria = async (idRelacion: string): Promise<GestoriaEmpresaResponse> => {
-  try { return (await api.get<GestoriaEmpresaResponse>(`/api/gestorias-empresas/${idRelacion}`)).data; }
+export const obtenerAutorizacionGestoria = async (idRelacion: string): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.get<GestoriaEmpresaSimpleResponse>(`/api/gestorias-empresas/${idRelacion}`)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al obtener la autorización de gestoría."); }
 };
 
@@ -42,8 +47,8 @@ export const obtenerAutorizacionGestoria = async (idRelacion: string): Promise<G
  * @returns {Promise<GestoriaEmpresaResponse>} Autorización creada.
  * @throws {Error} Mensaje de la API o error genérico de creación.
  */
-export const crearAutorizacionGestoria = async (payload: GestoriaEmpresaCreate): Promise<GestoriaEmpresaResponse> => {
-  try { return (await api.post<GestoriaEmpresaResponse>("/api/gestorias-empresas", payload)).data; }
+export const crearAutorizacionGestoria = async (payload: GestoriaEmpresaCreate, empresaIdContext?: string): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.post<GestoriaEmpresaSimpleResponse>("/api/gestorias-empresas", payload, { empresaIdContext } as any)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al crear la autorización de gestoría."); }
 };
 
@@ -57,8 +62,8 @@ export const crearAutorizacionGestoria = async (payload: GestoriaEmpresaCreate):
  * @returns {Promise<GestoriaEmpresaResponse>} Relación con los permisos actualizados.
  * @throws {Error} Mensaje de la API o error genérico de modificación.
  */
-export const actualizarPermisosDelegadosCliente = async (idRelacion: string, payload: GestoriaEmpresaPermisosUpdate): Promise<GestoriaEmpresaResponse> => {
-  try { return (await api.put<GestoriaEmpresaResponse>(`/api/gestorias-empresas/${idRelacion}/permisos-delegados`, payload)).data; }
+export const actualizarPermisosDelegadosCliente = async (idRelacion: string, payload: GestoriaEmpresaPermisosUpdate): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.put<GestoriaEmpresaSimpleResponse>(`/api/gestorias-empresas/${idRelacion}/permisos-delegados`, payload)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al actualizar los permisos delegados."); }
 };
 
@@ -72,8 +77,8 @@ export const actualizarPermisosDelegadosCliente = async (idRelacion: string, pay
  * @returns {Promise<GestoriaEmpresaResponse>} Relación actualizada.
  * @throws {Error} Mensaje de la API o error genérico de modificación.
  */
-export const actualizarPermisosGestoria = async (idRelacion: string, payload: GestoriaEmpresaPermisosUpdate): Promise<GestoriaEmpresaResponse> => {
-  try { return (await api.put<GestoriaEmpresaResponse>(`/api/gestorias-empresas/${idRelacion}/permisos`, payload)).data; }
+export const actualizarPermisosGestoria = async (idRelacion: string, payload: GestoriaEmpresaPermisosUpdate): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.put<GestoriaEmpresaSimpleResponse>(`/api/gestorias-empresas/${idRelacion}/permisos`, payload)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al actualizar los permisos de la gestoría."); }
 };
 
@@ -87,8 +92,8 @@ export const actualizarPermisosGestoria = async (idRelacion: string, payload: Ge
  * @returns {Promise<GestoriaEmpresaResponse>} Autorización actualizada.
  * @throws {Error} Mensaje de la API o error genérico de modificación.
  */
-export const modificarAutorizacionGestoria = async (idRelacion: string, payload: GestoriaEmpresaUpdate): Promise<GestoriaEmpresaResponse> => {
-  try { return (await api.patch<GestoriaEmpresaResponse>(`/api/gestorias-empresas/${idRelacion}`, payload)).data; }
+export const modificarAutorizacionGestoria = async (idRelacion: string, payload: GestoriaEmpresaUpdate): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.patch<GestoriaEmpresaSimpleResponse>(`/api/gestorias-empresas/${idRelacion}`, payload)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al modificar la autorización de gestoría."); }
 };
 
@@ -101,7 +106,7 @@ export const modificarAutorizacionGestoria = async (idRelacion: string, payload:
  * @returns {Promise<{ detail: string }>} Confirmación de la revocación.
  * @throws {Error} Mensaje de la API o error genérico de revocación.
  */
-export const revocarAutorizacionGestoria = async (idRelacion: string): Promise<{ detail: string }> => {
-  try { return (await api.delete<{ detail: string }>(`/api/gestorias-empresas/${idRelacion}`)).data; }
+export const revocarAutorizacionGestoria = async (idRelacion: string): Promise<GestoriaEmpresaSimpleResponse> => {
+  try { return (await api.delete<GestoriaEmpresaSimpleResponse>(`/api/gestorias-empresas/${idRelacion}`)).data; }
   catch (error: any) { throw new Error(error?.response?.data?.detail || error?.response?.data?.message || "Error al revocar la autorización de gestoría."); }
 };

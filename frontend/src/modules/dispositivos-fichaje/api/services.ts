@@ -1,4 +1,4 @@
-﻿import api from "@/src/service/api/api";
+import api from "@/src/service/api/api";
 import {
   Dispositivo,
   DispositivoCreate,
@@ -20,11 +20,11 @@ export const obtenerDispositivosEmpresa = async (
 ): Promise<Dispositivo[]> => {
   try {
     const response = await api.get<Dispositivo[]>(
-      `/api/dispositivos-fichaje/empresa/${idEmpresa}`,
+      `/api/dispositivos/empresa/${idEmpresa}`,
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los dispositivos de la empresa.",
     );
@@ -46,11 +46,11 @@ export const obtenerDispositivosCentro = async (
 ): Promise<Dispositivo[]> => {
   try {
     const response = await api.get<Dispositivo[]>(
-      `/api/dispositivos-fichaje/centro/${idCentro}`,
+      `/api/dispositivos/centro/${idCentro}`,
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al obtener los dispositivos del centro de trabajo.",
     );
@@ -71,10 +71,10 @@ export const crearDispositivo = async (
   payload: DispositivoCreate,
 ): Promise<Dispositivo> => {
   try {
-    const response = await api.post<Dispositivo>("/api/dispositivos-fichaje", payload);
+    const response = await api.post<Dispositivo>("/api/dispositivos", payload);
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar el dispositivo en el servidor.",
     );
@@ -98,15 +98,42 @@ export const editarDispositivo = async (
 ): Promise<Dispositivo> => {
   try {
     const response = await api.put<Dispositivo>(
-      `/api/dispositivos-fichaje/${idDispositivo}`,
+      `/api/dispositivos/${idDispositivo}`,
       payload,
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al actualizar el dispositivo en el servidor.",
     );
+  }
+};
+
+/**
+ * Cambia el estado activo de un dispositivo de fichaje.
+ * URI: PUT /api/dispositivos/{id_dispositivo}/estado
+ *
+ * @async
+ * @function cambiarEstadoDispositivo
+ * @param {string} idDispositivo - Identificador UUID del dispositivo.
+ * @param {boolean} activo - Estado de actividad que se aplicará.
+ * @returns {Promise<Dispositivo>} Dispositivo actualizado.
+ * @throws {Error} Mensaje de la API o error genérico de modificación.
+ */
+export const cambiarEstadoDispositivo = async (
+  idDispositivo: string,
+  activo: boolean,
+): Promise<Dispositivo> => {
+  try {
+    const respuesta = await api.put<Dispositivo>(
+      `/api/dispositivos/${idDispositivo}/estado`,
+      { activo },
+    );
+    return respuesta.data;
+  } catch (error: any) {
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
+    throw new Error(apiMessage || "Error al cambiar el estado del dispositivo.");
   }
 };
 
@@ -122,11 +149,14 @@ export const editarDispositivo = async (
  */
 export const eliminarDispositivo = async (
   idDispositivo: string,
-): Promise<void> => {
+): Promise<{ detail: string }> => {
   try {
-    await api.put(`/api/dispositivos-fichaje/${idDispositivo}/desactivar`);
+    const respuesta = await api.put<{ detail: string }>(
+      `/api/dispositivos/${idDispositivo}/desactivar`,
+    );
+    return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Error al desactivar el dispositivo ${idDispositivo}.`,
     );

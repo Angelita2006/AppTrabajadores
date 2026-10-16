@@ -40,6 +40,9 @@ const MAPPING = {
   error: "error",
   menu: "menu",
   "menu-open": "menu-open",
+  security: "security",
+  devices: "devices",
+  coffee: "coffee",
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;

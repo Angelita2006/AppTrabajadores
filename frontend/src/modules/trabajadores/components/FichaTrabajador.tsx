@@ -1,4 +1,5 @@
 import { ThemedText } from "@/src/shared/components/ThemedText";
+import { Can } from "@/src/shared/components/Can";
 import { Card } from "@/src/shared/ui/AppSurface";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -7,6 +8,8 @@ import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { obtenerContratoActivoTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
+import { obtenerCalendariosContrato } from "../../contratos-calendarios/api/services";
+import { ContratoCalendarioResponse } from "../../contratos-calendarios/types/contrato-calendario";
 import { ImagenConToken } from "../../empresas/components/Archivos";
 import { obtenerTurnoPorId } from "../../turnos/api/services";
 import { Turno } from "../../turnos/types/turno";
@@ -47,6 +50,7 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
   const [turnos, setTurnos] = useState<Turno[]>([]);
 
   const [contratoActivo, setContratoActivo] = useState<Contrato | null>(null);
+  const [calendariosContrato, setCalendariosContrato] = useState<ContratoCalendarioResponse[]>([]);
   const [asignacionesTurno, setAsignacionesTurno] = useState<AsignacionTurno[]>(
     [],
   );
@@ -85,6 +89,12 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
         if (isMounted) {
           setAsignacionesTurno(asignacionesData || []);
           setContratoActivo(contratoData);
+          if (contratoData?.id) {
+            const relacionesCalendario = await obtenerCalendariosContrato(contratoData.id);
+            if (isMounted) setCalendariosContrato(relacionesCalendario.filter((relacion) => relacion.activa));
+          } else {
+            setCalendariosContrato([]);
+          }
         }
       } catch (error) {
         const mensaje = "Error al cargar los datos del trabajador: " + error;
@@ -210,13 +220,13 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
         <View style={styles.bloqueDato}>
           <ThemedText style={styles.labelDato}>Teléfono Móvil</ThemedText>
           <ThemedText style={styles.valorDato}>
-            {item.telefono ?? "No registrado"}
+            {item.usuario?.telefono ?? item.telefono ?? "No registrado"}
           </ThemedText>
         </View>
         <View style={styles.bloqueDato}>
           <ThemedText style={styles.labelDato}>Correo Electrónico</ThemedText>
           <ThemedText style={styles.valorDato}>
-            {item.email ?? "No registrado"}
+            {item.usuario?.email ?? item.email ?? "No registrado"}
           </ThemedText>
         </View>
       </View>
@@ -264,82 +274,103 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
                 {"Tipo: " + (contratoActivo.tipo_contrato || "N/A")}
               </ThemedText>
             )}
+            {contratoActivo?.centros_trabajo?.length ? (
+              <ThemedText style={{ color: "#64748B", fontSize: 12, marginTop: 3 }}>
+                Centros: {contratoActivo.centros_trabajo.map((centro) => centro.nombre).join(", ")}
+              </ThemedText>
+            ) : null}
+            {contratoActivo?.pdf_url ? (
+              <ThemedText style={{ color: "#16803D", fontSize: 12, marginTop: 3 }}>Documento PDF adjunto</ThemedText>
+            ) : contratoActivo ? (
+              <ThemedText style={{ color: "#B45309", fontSize: 12, marginTop: 3 }}>Sin documento PDF adjunto</ThemedText>
+            ) : null}
+            {calendariosContrato.length > 0 ? (
+              <ThemedText style={{ color: "#64748B", fontSize: 12, marginTop: 3 }}>
+                Calendarios vigentes: {calendariosContrato.map((relacion) => `${relacion.calendario_laboral?.nombre ?? "Calendario"} ${relacion.calendario_laboral?.anio ?? ""}`).join(", ")}
+              </ThemedText>
+            ) : null}
 
             <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
               {contratoActivo ? (
                 <>
+                  <Can recurso="contratos" accion="modificar">
+                    <Pressable
+                      style={[
+                        styles.botonAccionSecundario,
+                        { backgroundColor: "#EFF6FF" },
+                      ]}
+                      onPress={() => {
+                        onSeleccionarTrabajador();
+                        abrirEdicionContrato(item);
+                      }}
+                    >
+                      <FontAwesome5 name="edit" size={10} color="#2563EB" />
+                      <ThemedText
+                        style={{
+                          color: "#2563EB",
+                          fontSize: 11,
+                          fontWeight: "600",
+                          marginLeft: 4,
+                        }}
+                      >
+                        Editar Contrato
+                      </ThemedText>
+                    </Pressable>
+                  </Can>
+                  <Can recurso="contratos" accion="eliminar">
+                    <Pressable
+                      style={[
+                        styles.botonAccionSecundario,
+                        { backgroundColor: "#FEF2F2" },
+                      ]}
+                      onPress={() => {
+                        onSeleccionarTrabajador();
+                        setModalActivo("rescindir_contrato");
+                      }}
+                    >
+                      <FontAwesome5
+                        name="file-signature"
+                        size={10}
+                        color="#DC2626"
+                      />
+                      <ThemedText
+                        style={{
+                          color: "#DC2626",
+                          fontSize: 11,
+                          fontWeight: "600",
+                          marginLeft: 4,
+                        }}
+                      >
+                        Rescindir
+                      </ThemedText>
+                    </Pressable>
+                  </Can>
+                </>
+              ) : (
+                <Can recurso="contratos" accion="crear">
                   <Pressable
                     style={[
                       styles.botonAccionSecundario,
-                      { backgroundColor: "#EFF6FF" },
+                      { backgroundColor: "#2563EB" },
                     ]}
                     onPress={() => {
                       onSeleccionarTrabajador();
                       abrirEdicionContrato(item);
                     }}
                   >
-                    <FontAwesome5 name="edit" size={10} color="#2563EB" />
+                    <FontAwesome5 name="plus" size={10} color="#FFFFFF" />
                     <ThemedText
                       style={{
-                        color: "#2563EB",
+                        color: "#FFFFFF",
                         fontSize: 11,
                         fontWeight: "600",
                         marginLeft: 4,
                       }}
                     >
-                      Editar Contrato
+                      Alta Contrato
                     </ThemedText>
                   </Pressable>
-                  <Pressable
-                    style={[
-                      styles.botonAccionSecundario,
-                      { backgroundColor: "#FEF2F2" },
-                    ]}
-                    onPress={() => {
-                      onSeleccionarTrabajador();
-                      setModalActivo("rescindir_contrato");
-                    }}
-                  >
-                    <FontAwesome5
-                      name="file-signature"
-                      size={10}
-                      color="#DC2626"
-                    />
-                    <ThemedText
-                      style={{
-                        color: "#DC2626",
-                        fontSize: 11,
-                        fontWeight: "600",
-                        marginLeft: 4,
-                      }}
-                    >
-                      Rescindir
-                    </ThemedText>
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable
-                  style={[
-                    styles.botonAccionSecundario,
-                    { backgroundColor: "#2563EB" },
-                  ]}
-                  onPress={() => {
-                    onSeleccionarTrabajador();
-                    abrirEdicionContrato(item);
-                  }}
-                >
-                  <FontAwesome5 name="plus" size={10} color="#FFFFFF" />
-                  <ThemedText
-                    style={{
-                      color: "#FFFFFF",
-                      fontSize: 11,
-                      fontWeight: "600",
-                      marginLeft: 4,
-                    }}
-                  >
-                    Alta Contrato
-                  </ThemedText>
-                </Pressable>
+                </Can>
               )}
             </View>
           </View>
@@ -382,88 +413,98 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
             )}
 
             <View style={{ flexDirection: "row", marginTop: 8, gap: 8 }}>
-              {asignacionesVigentes.length > 0 ? (
+              {contratoActivo && asignacionesVigentes.length > 0 ? (
                 <>
-                  <Pressable
-                    style={[
-                      styles.botonAccionSecundario,
-                      { backgroundColor: "#FDF4FF" },
-                    ]}
-                    onPress={() => {
-                      onSeleccionarTrabajador();
-                      prepararAsignarTurno(item);
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name="calendar-refresh"
-                      size={12}
-                      color="#D946EF"
-                    />
-                    <ThemedText
-                      style={{
-                        color: "#D946EF",
-                        fontSize: 11,
-                        fontWeight: "600",
-                        marginLeft: 4,
+                  <Can recurso="asignaciones_turno" accion="crear">
+                    <Pressable
+                      style={[
+                        styles.botonAccionSecundario,
+                        { backgroundColor: "#FDF4FF" },
+                      ]}
+                      onPress={() => {
+                        onSeleccionarTrabajador();
+                        prepararAsignarTurno(item);
                       }}
                     >
-                      Reasignar Turnos
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.botonAccionSecundario,
-                      { backgroundColor: "#FFF5EB" },
-                    ]}
-                    onPress={() => {
-                      onSeleccionarTrabajador();
-                      setModalActivo("eliminar_turno");
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name="calendar-remove"
-                      size={12}
-                      color="#EA580C"
-                    />
-                    <ThemedText
-                      style={{
-                        color: "#EA580C",
-                        fontSize: 11,
-                        fontWeight: "600",
-                        marginLeft: 4,
+                      <MaterialCommunityIcons
+                        name="calendar-refresh"
+                        size={12}
+                        color="#D946EF"
+                      />
+                      <ThemedText
+                        style={{
+                          color: "#D946EF",
+                          fontSize: 11,
+                          fontWeight: "600",
+                          marginLeft: 4,
+                        }}
+                      >
+                        Reasignar Turnos
+                      </ThemedText>
+                    </Pressable>
+                  </Can>
+                  <Can recurso="asignaciones_turno" accion="eliminar">
+                    <Pressable
+                      style={[
+                        styles.botonAccionSecundario,
+                        { backgroundColor: "#FFF5EB" },
+                      ]}
+                      onPress={() => {
+                        onSeleccionarTrabajador();
+                        setModalActivo("eliminar_turno");
                       }}
                     >
-                      Eliminar
-                    </ThemedText>
-                  </Pressable>
+                      <MaterialCommunityIcons
+                        name="calendar-remove"
+                        size={12}
+                        color="#EA580C"
+                      />
+                      <ThemedText
+                        style={{
+                          color: "#EA580C",
+                          fontSize: 11,
+                          fontWeight: "600",
+                          marginLeft: 4,
+                        }}
+                      >
+                        Eliminar
+                      </ThemedText>
+                    </Pressable>
+                  </Can>
                 </>
-              ) : (
-                <Pressable
-                  style={[
-                    styles.botonAccionSecundario,
-                    { backgroundColor: "#16A34A" },
-                  ]}
-                  onPress={() => {
-                    onSeleccionarTrabajador();
-                    setModalActivo("asignar_turno");
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="calendar-plus"
-                    size={12}
-                    color="#FFFFFF"
-                  />
-                  <ThemedText
-                    style={{
-                      color: "#FFFFFF",
-                      fontSize: 11,
-                      fontWeight: "600",
-                      marginLeft: 4,
+              ) : contratoActivo ? (
+                <Can recurso="asignaciones_turno" accion="crear">
+                  <Pressable
+                    style={[
+                      styles.botonAccionSecundario,
+                      { backgroundColor: "#16A34A" },
+                    ]}
+                    onPress={() => {
+                      onSeleccionarTrabajador();
+                      setModalActivo("asignar_turno");
                     }}
                   >
-                    Asignar Turno
-                  </ThemedText>
-                </Pressable>
+                    <MaterialCommunityIcons
+                      name="calendar-plus"
+                      size={12}
+                      color="#FFFFFF"
+                    />
+                    <ThemedText
+                      style={{
+                        color: "#FFFFFF",
+                        fontSize: 11,
+                        fontWeight: "600",
+                        marginLeft: 4,
+                      }}
+                    >
+                      Asignar Turno
+                    </ThemedText>
+                  </Pressable>
+                </Can>
+              ) : (
+                <ThemedText style={{ color: "#64748B", fontSize: 12, marginTop: 8 }}>
+                  El turno se configura al formalizar el contrato.
+                </ThemedText>
               )}
             </View>
           </View>
@@ -483,106 +524,112 @@ export const FichaTrabajador: React.FC<FichaTrabajadorConErrorProps> = ({
             gap: 8,
           }}
         >
-          <Pressable
-            onPress={() => {
-              onSeleccionarTrabajador();
-              setModalActivo("editar_trabajador");
-            }}
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#EFF6FF",
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-            }}
-          >
-            <FontAwesome5 name="user-edit" size={13} color="#2563EB" />
-            <ThemedText
+          <Can recurso="trabajadores" accion="modificar">
+            <Pressable
+              onPress={() => {
+                onSeleccionarTrabajador();
+                setModalActivo("editar_trabajador");
+              }}
               style={{
-                color: "#2563EB",
-                fontSize: 12,
-                fontWeight: "600",
-                marginLeft: 6,
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#EFF6FF",
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 8,
               }}
             >
-              Editar Datos
-            </ThemedText>
-          </Pressable>
+              <FontAwesome5 name="user-edit" size={13} color="#2563EB" />
+              <ThemedText
+                style={{
+                  color: "#2563EB",
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginLeft: 6,
+                }}
+              >
+                Editar Datos
+              </ThemedText>
+            </Pressable>
+          </Can>
 
-          <Pressable
-            onPress={() => {
-              onSeleccionarTrabajador();
-              setModalActivo("baja_trabajador");
-            }}
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#FEF2F2",
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-            }}
-          >
-            <FontAwesome5 name="user-slash" size={12} color="#DC2626" />
-            <ThemedText
+          <Can recurso="trabajadores" accion="eliminar">
+            <Pressable
+              onPress={() => {
+                onSeleccionarTrabajador();
+                setModalActivo("baja_trabajador");
+              }}
               style={{
-                color: "#DC2626",
-                fontSize: 12,
-                fontWeight: "600",
-                marginLeft: 6,
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#FEF2F2",
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 8,
               }}
             >
-              Tramitar Baja
-            </ThemedText>
-          </Pressable>
+              <FontAwesome5 name="user-slash" size={12} color="#DC2626" />
+              <ThemedText
+                style={{
+                  color: "#DC2626",
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginLeft: 6,
+                }}
+              >
+                Tramitar Baja
+              </ThemedText>
+            </Pressable>
+          </Can>
         </View>
       )}
 
       {/* Acción de Reactivación si el trabajador se encuentra dado de baja */}
       {!item.activo && (
-        <View
-          style={{
-            marginTop: 8,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderTopColor: "#E2E8F0",
-            borderStyle: "dashed",
-          }}
-        >
-          <Pressable
-            onPress={() => {
-              onSeleccionarTrabajador();
-              setModalActivo("reactivar_trabajador");
-            }}
+        <Can recurso="trabajadores" accion="modificar">
+          <View
             style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#DCFCE7",
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 8,
+              marginTop: 8,
+              paddingTop: 10,
+              borderTopWidth: 1,
+              borderTopColor: "#E2E8F0",
+              borderStyle: "dashed",
             }}
           >
-            <FontAwesome5 name="user-check" size={13} color="#16803D" />
-            <ThemedText
+            <Pressable
+              onPress={() => {
+                onSeleccionarTrabajador();
+                setModalActivo("reactivar_trabajador");
+              }}
               style={{
-                color: "#16803D",
-                fontSize: 12,
-                fontWeight: "600",
-                marginLeft: 6,
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#DCFCE7",
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 8,
               }}
             >
-              Reactivar Trabajador en Empresa
-            </ThemedText>
-          </Pressable>
-        </View>
+              <FontAwesome5 name="user-check" size={13} color="#16803D" />
+              <ThemedText
+                style={{
+                  color: "#16803D",
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginLeft: 6,
+                }}
+              >
+                Reactivar Trabajador en Empresa
+              </ThemedText>
+            </Pressable>
+          </View>
+        </Can>
       )}
     </Card>
   );

@@ -1,5 +1,12 @@
 import api from "@/src/service/api/api";
-import { CicloFacturacion, EmitirLicencia, Licencia, PlanLicencia } from "../types/licencia";
+import {
+  CicloFacturacion,
+  EmitirLicencia,
+  Licencia,
+  LicenciaResponse,
+  LicenciaUpdate,
+  PlanLicencia,
+} from "../types/licencia";
 
 export interface PrecioPlanComercial {
   plan: PlanLicencia;
@@ -124,9 +131,9 @@ export async function emitirLicencia(payload: EmitirLicencia): Promise<Licencia>
  * @returns {Promise<Licencia>} Licencia solicitada.
  * @throws {Error} Lanza el mensaje de la API o un error genérico si falla la consulta.
  */
-export async function obtenerLicencia(idLicencia: string): Promise<Licencia> {
+export async function obtenerLicencia(idLicencia: string): Promise<LicenciaResponse> {
   try {
-    return (await api.get<Licencia>(`/api/licencias/${idLicencia}`)).data;
+    return (await api.get<LicenciaResponse>(`/api/licencias/${idLicencia}`)).data;
   } catch (error: any) {
     const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(apiMessage || "Error al obtener la licencia.");
@@ -144,7 +151,7 @@ export async function obtenerLicencia(idLicencia: string): Promise<Licencia> {
  * @returns {Promise<Licencia>} Licencia actualizada.
  * @throws {Error} Lanza el mensaje de la API o un error genérico si falla la modificación.
  */
-export async function modificarLicencia(idLicencia: string, payload: Partial<Licencia>): Promise<Licencia> {
+export async function modificarLicencia(idLicencia: string, payload: LicenciaUpdate): Promise<Licencia> {
   try {
     return (await api.patch<Licencia>(`/api/licencias/${idLicencia}`, payload)).data;
   } catch (error: any) {

@@ -150,7 +150,7 @@ export default function ItemDispositivo({
                 setDispositivoEnEdicion(dispositivo);
                 setTipoDispositivoSeleccionado(dispositivo.tipo_dispositivo);
                 setCentroIdAsociado(dispositivo.centro_trabajo_id);
-                setEstadoActivoEdicion(dispositivo.activo);
+                setEstadoActivoEdicion(Boolean(dispositivo.activo));
                 setMostrarFormDispositivo(false);
               }
             }}
@@ -208,36 +208,6 @@ export default function ItemDispositivo({
             </ScrollView>
           </View>
 
-          {/* Selector horizontal para modificar el centro de trabajo asociado */}
-          <View style={styles.campoFormulario}>
-            <Text style={styles.labelInput}>Centro de Trabajo Asociado</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {centrosConfigurados?.map((centro) => {
-                const esEsteCentro = centroIdAsociado === centro.id;
-                return (
-                  <Pressable
-                    key={centro.id}
-                    style={[
-                      styles.chipAno,
-                      esEsteCentro && { backgroundColor: "#2563EB" },
-                    ]}
-                    onPress={() => setCentroIdAsociado(centro.id)}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "600",
-                        color: esEsteCentro ? "#FFFFFF" : "#475569",
-                      }}
-                    >
-                      {centro.nombre} {esEsteCentro ? "✓" : ""}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
           {/* Botón interactivo para alternar el estado activo/inactivo del dispositivo */}
           <View style={styles.campoFormulario}>
             <Text style={styles.labelInput}>Estado</Text>
@@ -270,7 +240,6 @@ export default function ItemDispositivo({
               handleEditarDispositivo({
                 ...dispositivo,
                 tipo_dispositivo: tipoDispositivoSeleccionado,
-                centro_trabajo_id: centroIdAsociado,
                 activo: estadoActivoEdicion,
               });
               setDispositivoEnEdicion(null);

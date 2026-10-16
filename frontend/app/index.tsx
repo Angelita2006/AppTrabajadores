@@ -1,3 +1,5 @@
+import { Colors } from "@/src/constants/theme";
+import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { iniciarSesion } from "@/src/modules/usuarios/api/services";
 import { useSesion } from "@/src/modules/usuarios/store/SesionContextZustand";
 import { NotificationService } from "@/src/notifications/NotificationService";
@@ -6,25 +8,23 @@ import { useAppModal } from "@/src/shared/ui/AppModalNotification";
 import LottieBackground from "@/src/shared/ui/Background.native";
 import VideoBackground from "@/src/shared/ui/Background.web";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
-import { Colors } from "@/src/constants/theme";
-import { useColorScheme } from "@/src/hooks/use-color-scheme";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { ThemedText } from "../src/shared/components/ThemedText";
 import { IconSymbol } from "../src/shared/ui/IconSymbol";
@@ -38,6 +38,7 @@ export default function RootIndexScreen() {
   const {
     usuarioActual,
     setUsuarioActual,
+    limpiarContextoOrganizacion,
     cargandoSesionLocal,
   } = useSesion();
 
@@ -116,9 +117,10 @@ export default function RootIndexScreen() {
       }
 
       const { access_token, usuario } = respuestaLogin;
+      limpiarContextoOrganizacion();
       await setAuthToken(access_token);
       await setEmpresaContext(null);
-      setUsuarioActual(usuario);
+      setUsuarioActual({ ...usuario, activo: usuario.activo ?? true });
     } catch (error: any) {
       mostrarError(
         "Ha fallado el proceso de autenticación: " +
@@ -167,7 +169,7 @@ export default function RootIndexScreen() {
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
               <Image
-                source={require("../assets/icons/logoB.png")}
+                source={require("../assets/icons/logo.png")}
                 style={styles.logoImage}
                 resizeMode="cover"
                 accessibilityLabel="Logotipo de Fichapp"
@@ -352,7 +354,7 @@ export default function RootIndexScreen() {
             <ThemedText
               style={{ fontSize: 12, color: "#64748B", textAlign: "center" }}
             >
-              Al iniciar sesión, aceptas nuestra{" "}
+              Al iniciar sesión, aceptas nuestra{"\n"}
               <ThemedText style={{ color: "#2563EB", fontWeight: "700" }}>
                 Política de Privacidad
               </ThemedText>
@@ -402,11 +404,9 @@ const styles = StyleSheet.create({
   },
   headerContenedor: { alignItems: "center", marginBottom: 28 },
   logoBranding: {
-    width: 56,
-    height: 56,
-    backgroundColor: "#011640",
+    width: 120,
+    height: 120,
     overflow: "hidden",
-    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,

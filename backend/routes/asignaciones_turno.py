@@ -79,7 +79,7 @@ def obtener_asignaciones_contrato(
 
     asignaciones = (
         db.query(AsignacionesTurno)
-        .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
+        .options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
         .filter(AsignacionesTurno.contrato_id == contrato.id)
         .all()
     )
@@ -106,7 +106,7 @@ def obtener_asignacion_id(
     print(f"Petición de consulta de la asignacion de turno ({id_asignacion}) desde la IP ({cliente_ip}) por el usuario: {usuario_actual.email}.")
 
     # Validaciones estructurales básicas
-    asignacion = db.query(AsignacionesTurno).options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno)).filter(AsignacionesTurno.id == id_asignacion).first()
+    asignacion = db.query(AsignacionesTurno).options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno)).filter(AsignacionesTurno.id == id_asignacion).first()
     if not asignacion:
         print(f"Asignación de turno ({id_asignacion}) no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Asiganción de turno no encontrada.")
@@ -193,8 +193,7 @@ def asignar_turnos_masivamente(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El turno no pertenece a la empresa del contrato.")
 
             nueva_asignacion = AsignacionesTurno(
-                empresa_id=contrato.empresa_id,
-                trabajador_id=trabajador.id,
+                contrato_id=contrato.id,
                 turno_id=turno_id,
                 fecha_inicio=payload.fecha_inicio,
                 fecha_fin=payload.fecha_fin
@@ -221,7 +220,7 @@ def asignar_turnos_masivamente(
 
         asignaciones_creadas = (
             db.query(AsignacionesTurno)
-            .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
+            .options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
             .filter(AsignacionesTurno.id.in_(nuevas_asignaciones_ids))
             .all()
         )
@@ -278,7 +277,6 @@ def asignar_turno_contrato(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"El turno debe pertenecer a la empresa del contrato.")
 
     nueva_asignacion = AsignacionesTurno(
-        empresa_id=contrato.empresa_id,
         contrato_id=contrato.id,
         turno_id=payload.turno_id,
         fecha_inicio=payload.fecha_inicio,
@@ -305,7 +303,7 @@ def asignar_turno_contrato(
 
         asignacion_creada = (
             db.query(AsignacionesTurno)
-            .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
+            .options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
             .filter(AsignacionesTurno.id == nueva_asignacion.id)
             .first()
         )
@@ -375,14 +373,13 @@ def finalizar_vigencia_turno(
 
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
-        .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
+        .options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
         .filter(AsignacionesTurno.id == id_asignacion)
         .first()
     )
 
     print(f"Vigencia del turno {id_asignacion} finalizada correctamente.")
     return asignacion_actualizada
-
 
 @router.put(
     "/{id_asignacion}/modificar",
@@ -447,7 +444,7 @@ def modificar_asignacion_turno(
 
     asignacion_actualizada = (
         db.query(AsignacionesTurno)
-        .options(joinedload(AsignacionesTurno.empresa), joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
+        .options(joinedload(AsignacionesTurno.contrato), joinedload(AsignacionesTurno.turno))
         .filter(AsignacionesTurno.id == id_asignacion)
         .first()
     )

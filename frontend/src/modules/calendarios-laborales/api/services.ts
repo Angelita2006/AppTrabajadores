@@ -27,7 +27,7 @@ export const crearCalendarioLaboral = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || "Error al registrar el nuevo calendario laboral.",
     );
@@ -53,7 +53,7 @@ export const obtenerCalendarioLaboral = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage || `Calendario laboral con ID ${idCalendario} no encontrado.`,
     );
@@ -79,7 +79,7 @@ export const obtenerCalendariosFestivosPorEmpresa = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al recuperar los calendarios y festivos de la empresa ${idEmpresa}.`,
@@ -109,7 +109,7 @@ export const actualizarCalendarioLaboral = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al actualizar el calendario laboral ${idCalendario}.`,
@@ -149,7 +149,7 @@ export const importarCalendarioPDF = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         "Error al procesar y guardar el archivo PDF del calendario.",
@@ -169,11 +169,14 @@ export const importarCalendarioPDF = async (
  */
 export const eliminarCalendarioLaboral = async (
   idCalendario: string,
-): Promise<void> => {
+): Promise<{ detail: string }> => {
   try {
-    await api.put(`/api/calendarios-laborales/${idCalendario}/desactivar`);
+    const respuesta = await api.put<{ detail: string }>(
+      `/api/calendarios-laborales/${idCalendario}/desactivar`,
+    );
+    return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
+    const apiMessage = error?.response?.data?.detail || error?.response?.data?.message;
     throw new Error(
       apiMessage ||
         `Error al desactivar el calendario laboral ${idCalendario}.`,

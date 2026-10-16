@@ -52,8 +52,6 @@ export interface DispositivoCreate {
 export interface DispositivoUpdate {
   /** Nuevo tipo o tecnología asignada al dispositivo. */
   tipo_dispositivo?: TipoDispositivo;
-  /** Nuevo centro de trabajo al que se vincula el dispositivo (UUID). */
-  centro_trabajo_id?: string;
   /** Estado actualizado de operatividad del dispositivo. */
   activo?: boolean;
 }
@@ -72,7 +70,7 @@ export interface DispositivoSimpleResponse {
   /** Identificador del centro de trabajo al cual está asignado físicamente el dispositivo. */
   centro_trabajo_id: string;
   /** Indica si el dispositivo se encuentra activo y habilitado para registrar operaciones. */
-  activo: boolean;
+  activo: boolean | null;
   /** Marca de tiempo (ISO 8601) de cuándo fue registrado el dispositivo en el sistema. */
   created_at: string;
   updated_at: string;

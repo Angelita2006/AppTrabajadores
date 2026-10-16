@@ -56,13 +56,6 @@ def _validar_vigencia_calendario(
             detail="El contrato y el calendario deben pertenecer a la misma empresa.",
         )
 
-    if contrato.centro_trabajo_id != calendario.centro_trabajo_id:
-        print("El calendario debe corresponder al centro de trabajo del contrato.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El calendario debe corresponder al centro de trabajo del contrato.",
-        )
-
     anio_inicio = contrato.fecha_inicio.year
     anio_fin = contrato.fecha_fin.year if contrato.fecha_fin else None
     if calendario.anio < anio_inicio or (anio_fin is not None and calendario.anio > anio_fin):
@@ -232,12 +225,27 @@ def crear_contrato_calendario(
         )
         .first()
     )
-    if existente:
+    if existente and existente.activa:
         print("Ya existe una asociación entre este contrato y calendario.")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe una asociación entre este contrato y calendario.",
         )
+
+    if existente and not existente.activa:
+        setattr(existente, "activa", True)
+        setattr(existente, "updated_at", datetime.now(timezone.utc))
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "contratos_calendarios", "accion": "reactivar"},
+            trabajador_id=contrato.trabajador_id,
+        )
+        db.commit()
+        return _relacion_query(db).filter(ContratosCalendarios.id == existente.id).first()
 
     relacion = ContratosCalendarios(
         contrato_id=contrato.id,

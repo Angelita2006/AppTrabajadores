@@ -35,7 +35,9 @@ export const registrarOrganizacionCompleta = async (
         es_gestoria: payload.es_gestoria ?? false,
 
         // Datos del administrador / trabajador inicial
-        nombre_admin: [payload.nombre_admin, payload.apellidos_admin].filter(Boolean).join(" "),
+        nombre_admin: [payload.nombre_admin, payload.apellidos_admin]
+          .filter(Boolean)
+          .join(" "),
         email_admin: payload.email_admin,
         password: payload.password,
         telefono_admin: payload.telefono_admin
@@ -47,8 +49,16 @@ export const registrarOrganizacionCompleta = async (
     return response.data;
   } catch (error: any) {
     // Capturamos el detalle exacto que arroje FastAPI en el HTTPException (detail) o un mensaje genérico
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
+    let apiMessage = error?.response?.data?.detail;
+
+    // Si FastAPI devuelve un array de validación de Pydantic (error 422)
+    if (Array.isArray(apiMessage)) {
+      apiMessage = apiMessage
+        .map((e: any) => `${e.loc?.join(".") || "campo"}: ${e.msg}`)
+        .join("\n");
+    } else if (typeof apiMessage === "object" && apiMessage !== null) {
+      apiMessage = JSON.stringify(apiMessage);
+    }
     throw new Error(
       apiMessage ||
         "Ha ocurrido un error inesperado al procesar el alta de organización.",

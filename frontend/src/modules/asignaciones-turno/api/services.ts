@@ -6,6 +6,13 @@ import {
   AsignacionTurnoMasivaCreate,
 } from "../types/asignacion-turno";
 
+const mensajeErrorApi = (error: any, mensajeGenerico: string): Error =>
+  new Error(
+    error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      mensajeGenerico,
+  );
+
 /**
  * Registra una nueva asignación de turno individual para un trabajador en el sistema.
  * URI: POST /api/asignaciones-turno
@@ -152,5 +159,66 @@ export const eliminarTodasAsignacionesTrabajador = async (
       apiMessage ||
         `Error al eliminar todas las asignaciones del trabajador ${idTrabajador}.`,
     );
+  }
+};
+
+/**
+ * Asigna varios turnos al contrato vigente mediante la ruta masiva real.
+ * URI: POST /api/asignaciones-turno/masiva
+ * @async
+ * @function asignarTurnosTrabajador
+ * @param {string} idContrato - UUID del contrato al que se asignan los turnos.
+ * @param {string[]} turnosIds - UUID de los turnos que se asignarán.
+ * @param {string} fechaInicio - Inicio de vigencia en formato YYYY-MM-DD.
+ * @param {string | null} fechaFin - Fin opcional de vigencia en formato YYYY-MM-DD.
+ * @returns {Promise<AsignacionTurno[]>} Asignaciones creadas.
+ * @throws {Error} Mensaje de la API o error genérico de asignación.
+ */
+export const asignarTurnosTrabajador = async (
+  idContrato: string,
+  turnosIds: string[],
+  fechaInicio: string,
+  fechaFin?: string | null,
+): Promise<AsignacionTurno[]> => {
+  try {
+    const payload: AsignacionTurnoMasivaCreate = {
+      contrato_id: idContrato,
+      turnos_ids: turnosIds,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin ?? null,
+    };
+    return (
+      await api.post<AsignacionTurno[]>("/api/asignaciones-turno/masiva", payload)
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al asignar turnos al contrato.");
+  }
+};
+
+/**
+ * Modifica la vigencia de una asignación existente.
+ * URI: PUT /api/asignaciones-turno/{id_asignacion}/modificar
+ * @async
+ * @function actualizarAsignacionTurno
+ * @param {string} idAsignacion - UUID de la asignación.
+ * @param {string} fechaInicio - Inicio de vigencia en formato YYYY-MM-DD.
+ * @param {string | null} fechaFin - Fin opcional de vigencia en formato YYYY-MM-DD.
+ * @returns {Promise<AsignacionTurno>} Asignación actualizada.
+ * @throws {Error} Mensaje de la API o error genérico de modificación.
+ */
+export const actualizarAsignacionTurno = async (
+  idAsignacion: string,
+  fechaInicio: string,
+  fechaFin: string | null,
+): Promise<AsignacionTurno> => {
+  try {
+    return (
+      await api.put<AsignacionTurno>(
+        `/api/asignaciones-turno/${idAsignacion}/modificar`,
+        { fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+      )
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al actualizar la asignación de turno.");
   }
 };

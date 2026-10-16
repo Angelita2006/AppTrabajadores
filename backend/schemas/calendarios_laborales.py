@@ -2,7 +2,6 @@ import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from uuid import UUID
-from schemas.centros_trabajo import CentroTrabajoSimpleResponse
 from schemas.empresas import EmpresaSimpleResponse
 from schemas.festivos import FestivoSimpleResponse
 
@@ -25,10 +24,9 @@ class CalendarioLaboralBase(BaseModel):
 class CalendarioLaboralCreate(CalendarioLaboralBase):
     """
     Esquema utilizado para recibir los datos desde el cliente al dar de alta un calendario.
-    Permite acotar el calendario a un centro de trabajo específico si fuera necesario.
+    El calendario pertenece a la empresa y no a un centro físico.
     """
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado al calendario laboral")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,7 +45,6 @@ class CalendarioLaboralSimpleResponse(CalendarioLaboralBase):
     """
     id: UUID = Field(..., description="ID único UUID autogenerado (gen_random_uuid) del calendario laboral")
     empresa_id: UUID = Field(..., description="ID único UUID de la empresa cliente (tenant)")
-    centro_trabajo_id: UUID = Field(..., description="ID único UUID del centro de trabajo asociado al calendario laboral")
 
     created_at: datetime.datetime = Field(..., description="Marca de tiempo de inserción real del registro (now)")
     updated_at: datetime.datetime = Field(..., description="Marca de tiempo de última actualización real del registro (now)")
@@ -59,7 +56,6 @@ class CalendarioLaboralResponse(CalendarioLaboralSimpleResponse):
     Esquema completo que extiende al simple añadiendo las relaciones anidadas.
     """
     empresa: Optional[EmpresaSimpleResponse] = Field(None, description="Detalles de la empresa asociada")
-    centro_trabajo: Optional[CentroTrabajoSimpleResponse] = Field(None, description="Detalles del centro de trabajo asociado")
 
     model_config = ConfigDict(from_attributes=True)
 

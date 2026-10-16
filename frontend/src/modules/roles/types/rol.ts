@@ -10,12 +10,12 @@ export type RolEnum = TipoRol;
 
 export interface RolBase {
   nombre: string;
-  descripcion: string | null;
+  descripcion?: string | null;
 }
 
 /** Request body matching RolCreate. */
 export interface RolCreate extends RolBase {
-  empresa_id?: string | null;
+  empresa_id: string | null;
   tipo?: TipoRol;
 }
 
@@ -27,6 +27,7 @@ export interface RolUpdate {
 
 /** Response matching RolSimpleResponse. */
 export interface RolSimpleResponse extends RolBase {
+  descripcion: string | null;
   id: string;
   empresa_id: string | null;
   tipo: TipoRol;
@@ -36,5 +37,5 @@ export interface RolSimpleResponse extends RolBase {
 
 /** Response matching RolResponse. */
 export interface Rol extends RolSimpleResponse {
-  empresa: Empresa | null;
+  empresa?: Empresa | null;
 }

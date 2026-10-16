@@ -13,7 +13,6 @@ from core.security import (
     get_db_with_advanced_security,
     verificar_permisos_requeridos,
 )
-from models.centros_trabajo import CentrosTrabajo
 from models.departamentos import Departamentos
 from models.empresas import Empresas
 from models.usuarios import Usuarios
@@ -52,9 +51,7 @@ def obtener_departamentos_empresa(
 
     # Validaciones estructurales básicas
     resultados = (
-        db.query(Departamentos).options(
-        joinedload(Departamentos.empresa),
-        joinedload(Departamentos.centro_trabajo))
+        db.query(Departamentos).options(joinedload(Departamentos.empresa))
         .filter(Departamentos.empresa_id == id_empresa, Departamentos.activo.is_(True))
         .all()
     )
@@ -99,9 +96,7 @@ def obtener_departamento_id(
 
     # Validaciones estructurales básicas
     departamento = (
-        db.query(Departamentos).options(
-        joinedload(Departamentos.empresa),
-        joinedload(Departamentos.centro_trabajo))
+        db.query(Departamentos).options(joinedload(Departamentos.empresa))
         .filter(Departamentos.id == id_departamento)
         .first()
     )
@@ -158,32 +153,17 @@ def crear_departamento(
             detail=f"Empresa con ID ({payload.empresa_id}) no encontrada."
         )
 
-    if payload.centro_trabajo_id:
-        centro = db.query(CentrosTrabajo).filter(
-            CentrosTrabajo.id == payload.centro_trabajo_id,
-            CentrosTrabajo.activo.is_(True),
-        ).first()
-        if not centro:
-            print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Centro de trabajo no encontrado."
-            )
-
     try:
         nuevo_departamento = Departamentos(
             empresa_id=payload.empresa_id,
             nombre=payload.nombre,
-            centro_trabajo_id=payload.centro_trabajo_id
         )
 
         db.add(nuevo_departamento)
         db.commit()
 
         departamento_creado = (
-            db.query(Departamentos).options(
-            joinedload(Departamentos.empresa),
-            joinedload(Departamentos.centro_trabajo))
+            db.query(Departamentos).options(joinedload(Departamentos.empresa))
             .filter(Departamentos.id == nuevo_departamento.id)
             .first()
         )
@@ -294,9 +274,7 @@ def modificar_departamento(
 
     # Validaciones estructurales básicas
     departamento = (
-        db.query(Departamentos).options(
-        joinedload(Departamentos.empresa),
-        joinedload(Departamentos.centro_trabajo))
+        db.query(Departamentos).options(joinedload(Departamentos.empresa))
         .filter(Departamentos.id == id_departamento)
         .first()
     )
@@ -317,9 +295,7 @@ def modificar_departamento(
         db.commit()
 
         departamento_actualizado = (
-            db.query(Departamentos).options(
-            joinedload(Departamentos.empresa),
-            joinedload(Departamentos.centro_trabajo))
+            db.query(Departamentos).options(joinedload(Departamentos.empresa))
             .filter(Departamentos.id == id_departamento)
             .first()
         )

@@ -87,14 +87,15 @@ export default function EmpresasScreen() {
     useState<CalendarioFestivo | null>(null);
   const [editAnio, setEditAnio] = useState("");
   const [editNombre, setEditNombre] = useState("");
-  const [editCentroId, setEditCentroId] = useState<string | null>(null);
 
   // Estados para roles
   const esGestoria = usuarioActual?.tipo_usuario === "Admin_gestoría";
-  const esAdminEmpresa = usuarioActual?.tipo_usuario === "Admin_empresa";
+  const esAdminEmpresa =
+    usuarioActual?.tipo_usuario === "Admin_empresa" ||
+    usuarioActual?.tipo_usuario === "Superadministrador";
   const esRRHH = usuarioActual?.tipo_usuario === "Rrhh";
-  const puedeConsultarEmpresa = tienePermiso("EMPRESAS", "consultar");
-  const puedeModificarEmpresa = tienePermiso("EMPRESAS", "modificar");
+  const puedeConsultarEmpresa = tienePermiso("empresas", "consultar");
+  const puedeModificarEmpresa = tienePermiso("empresas", "modificar");
   const esAutorizado = puedeConsultarEmpresa;
 
   // Estados para la gestión de la entidad y su logo corporativo
@@ -154,7 +155,6 @@ export default function EmpresasScreen() {
         setCalendarioActual(primerCalendario);
         setEditAnio(primerCalendario.anio.toString());
         setEditNombre(primerCalendario.nombre || "");
-        setEditCentroId(primerCalendario.centro_trabajo_id || "");
       }
     } catch (error: any) {
       mostrarError(
@@ -499,7 +499,6 @@ export default function EmpresasScreen() {
                   {...{
                     departamentosEmpresa,
                     setDepartamentosEmpresa,
-                    centrosEmpresa,
                     empresaActual,
                     guardando,
                     setGuardando,
@@ -513,16 +512,13 @@ export default function EmpresasScreen() {
                   {...{
                     calendariosEmpresa,
                     setCalendariosEmpresa,
-                    centrosEmpresa,
                     empresaActual,
                     calendarioActual,
                     setCalendarioActual,
                     editAnio,
                     editNombre,
-                    editCentroId,
                     setEditAnio,
                     setEditNombre,
-                    setEditCentroId,
                     guardando,
                     setGuardando,
                     styles,

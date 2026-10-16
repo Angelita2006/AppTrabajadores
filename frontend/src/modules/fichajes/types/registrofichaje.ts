@@ -84,8 +84,6 @@ export interface FichajeCreateParams {
   centro_trabajo_id: string;
   /** Identificador del tipo de evento horario. */
   tipo_evento: TipoFichaje;
-  /** Estado aceptado actualmente por el flujo de fichaje de la interfaz. */
-  estado?: EstadoFichaje;
   /** Canal: app_movil, web, qr, etc. */
   metodo_fichaje: MetodoFichaje;
   fecha_hora?: string;
@@ -137,12 +135,12 @@ export interface FichajeSimpleResponse extends FichajeBase {
 }
 
 export interface FichajeResponse extends FichajeSimpleResponse {
-  empresa: import("../../empresas/types/empresa").Empresa | null;
-  trabajador: Trabajador | null;
-  centro_trabajo: import("../../centros-trabajo/types/centro-trabajo").CentroTrabajo | null;
-  dispositivo: import("../../dispositivos-fichaje/types/dispositivo-fichaje").DispositivoSimpleResponse | null;
-  fichaje_sustituido: FichajeSimpleResponse | null;
-  motivo_pausa: import("../../motivos-pausa/types/motivo-pausa").MotivoPausaSimpleResponse | null;
+  empresa?: import("../../empresas/types/empresa").Empresa | null;
+  trabajador?: Trabajador | null;
+  centro_trabajo?: import("../../centros-trabajo/types/centro-trabajo").CentroTrabajo | null;
+  dispositivo?: import("../../dispositivos-fichaje/types/dispositivo-fichaje").DispositivoSimpleResponse | null;
+  fichaje_sustituido?: FichajeSimpleResponse | null;
+  motivo_pausa?: import("../../motivos-pausa/types/motivo-pausa").MotivoPausaSimpleResponse | null;
 }
 
 /**
@@ -155,9 +153,9 @@ export interface RegistroFichaje extends Omit<FichajeResponse, "tipo_evento"> {
   /** Algunos endpoints de detalle incluyen la firma digital. */
   firma_digital?: string | null;
   /** Nombre del turno laboral asignado al trabajador en el momento del fichaje (campo complementario). */
-  turno_nombre: string;
+  turno_nombre?: string;
   /** Detalles del trabajador asociado. */
-  trabajador: Trabajador;
+  trabajador?: Trabajador | null;
   correccion_aprobada?: {
     id: string;
     tipo_correccion: string;

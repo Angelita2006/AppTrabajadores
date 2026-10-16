@@ -36,6 +36,8 @@ interface ModalAltaEditarTrabajadorProps {
   telefono: string;
   /** Función para actualizar el teléfono móvil. */
   setTelefono: (val: string) => void;
+  passwordInicial: string;
+  setPasswordInicial: (val: string) => void;
   /** Valor actual del número de la seguridad social. */
   nss: string;
   /** Función para actualizar el número de la seguridad social. */
@@ -86,6 +88,8 @@ export const ModalAltaEditarTrabajador: React.FC<
   setEmail,
   telefono,
   setTelefono,
+  passwordInicial,
+  setPasswordInicial,
   nss,
   setNss,
   fechaNacimiento,
@@ -144,23 +148,14 @@ export const ModalAltaEditarTrabajador: React.FC<
       return;
     }
 
-    // 5. Validar Teléfono móvil obligatorio
-    if (!telefono || telefono.trim() === "") {
-      mostrarError("Por favor, introduce el número de teléfono móvil.");
+    if (!esEdicion && passwordInicial && passwordInicial.length < 12) {
+      mostrarError("La contraseña inicial debe tener al menos 12 caracteres.");
       return;
     }
 
-    // 6. Validar Número de Seguridad Social (NSS) obligatorio
-    if (!nss || nss.trim() === "") {
-      mostrarError("Por favor, introduce el número de la seguridad social.");
-      return;
-    }
-
-    // 7. Validar Fecha de Nacimiento obligatoria, formato YYYY-MM-DD y existencia real
-    if (!fechaNacimiento || fechaNacimiento.trim() === "") {
-      mostrarError("Por favor, introduce la fecha de nacimiento.");
-      return;
-    }
+    // Número de Seguridad Social y fecha de nacimiento son datos opcionales.
+    // Si se indica la fecha, se comprueba su formato y que exista.
+    if (fechaNacimiento?.trim()) {
     const fechaRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
     if (!fechaRegex.test(fechaNacimiento.trim())) {
       mostrarError(
@@ -184,6 +179,7 @@ export const ModalAltaEditarTrabajador: React.FC<
         "La fecha introducida no corresponde a una fecha real del calendario.",
       );
       return;
+    }
     }
 
     // Mensaje de éxito previo a la ejecución del guardado
@@ -246,6 +242,7 @@ export const ModalAltaEditarTrabajador: React.FC<
           style={styles.inputForm}
           value={email}
           onChangeText={setEmail}
+          editable={!esEdicion && !procesando}
           keyboardType="email-address"
           autoCapitalize="none"
           placeholder="correo@empresa.com"
@@ -255,12 +252,13 @@ export const ModalAltaEditarTrabajador: React.FC<
       </View>
 
       <View style={styles.campoForm}>
-        <ThemedText style={styles.labelForm}>Teléfono Móvil *</ThemedText>
+        <ThemedText style={styles.labelForm}>Teléfono Móvil (opcional)</ThemedText>
         <TextInput
           ref={inputRefs.telefonoRef}
           style={styles.inputForm}
           value={telefono}
           onChangeText={setTelefono}
+          editable={!esEdicion && !procesando}
           keyboardType="phone-pad"
           placeholder="Ej: +34600111222"
           returnKeyType="next"
@@ -268,10 +266,27 @@ export const ModalAltaEditarTrabajador: React.FC<
         />
       </View>
 
+      {!esEdicion ? (
+        <View style={styles.campoForm}>
+          <ThemedText style={styles.labelForm}>
+            Contraseña inicial (si el correo es nuevo)
+          </ThemedText>
+          <TextInput
+            style={styles.inputForm}
+            value={passwordInicial}
+            onChangeText={setPasswordInicial}
+            secureTextEntry
+            autoCapitalize="none"
+            placeholder="Mínimo 12 caracteres"
+          />
+          <ThemedText>
+            Si el correo ya tiene una cuenta, se vinculará y conservará su contraseña actual.
+          </ThemedText>
+        </View>
+      ) : null}
+
       <View style={styles.campoForm}>
-        <ThemedText style={styles.labelForm}>
-          Número Seguridad Social *
-        </ThemedText>
+          <ThemedText style={styles.labelForm}>Número Seguridad Social (opcional)</ThemedText>
         <TextInput
           ref={inputRefs.nssRef}
           style={styles.inputForm}
@@ -286,7 +301,7 @@ export const ModalAltaEditarTrabajador: React.FC<
 
       <View style={styles.campoForm}>
         <ThemedText style={styles.labelForm}>
-          Fecha Nacimiento (AAAA-MM-DD) *
+          Fecha Nacimiento (AAAA-MM-DD, opcional)
         </ThemedText>
         <TextInput
           ref={inputRefs.fechaNacRef}

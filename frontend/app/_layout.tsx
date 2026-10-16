@@ -21,7 +21,6 @@ import {
 import { Colors } from "../src/constants/theme";
 import { useColorScheme } from "../src/hooks/use-color-scheme";
 import { useTemaStore } from "../src/modules/tema/store/temaStore";
-import { TipoRolEnum } from "../src/constants/enums";
 import {
   ProveedorSesion,
   useSesion,
@@ -41,7 +40,7 @@ Notifications.setNotificationHandler({
 SplashScreen.preventAutoHideAsync?.();
 
 function InitialLayout() {
-  const { usuarioActual, rolActual, cargandoSesionLocal } = useSesion();
+  const { usuarioActual, cargandoSesionLocal } = useSesion();
   const temaInicializado = useTemaStore((state) => state.inicializado);
   const inicializarTema = useTemaStore((state) => state.inicializarTema);
   const tema = useColorScheme();
@@ -76,15 +75,12 @@ function InitialLayout() {
 
     if (tieneSesion && !enGrupoTabs && !enFlujoCompra) {
       // Todos los usuarios van directamente al perfil tras iniciar sesión
-      const esSuperadministrador =
-        rolActual === TipoRolEnum.SUPERADMINISTRADOR ||
-        usuarioActual?.tipo_usuario === TipoRolEnum.SUPERADMINISTRADOR;
-      router.replace(esSuperadministrador ? "/(tabs)/superadministracion" : "/(tabs)/perfil");
+      router.replace("/(tabs)/perfil");
     } else if (!tieneSesion && enGrupoTabs) {
       // Si no hay sesión y está intentando ver las pestañas, lo mandamos al inicio
       router.replace("/");
     }
-  }, [usuarioActual, rolActual, cargandoSesionLocal, estaListo, segments]);
+  }, [usuarioActual, cargandoSesionLocal, estaListo, segments]);
 
   if (!estaListo || cargandoSesionLocal || !temaInicializado) {
     return (

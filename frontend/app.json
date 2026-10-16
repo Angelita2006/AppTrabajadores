@@ -4,7 +4,7 @@
     "slug": "FICHAPP",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/icons/logoB.png",
+    "icon": "./assets/icons/logo.png",
     "scheme": "fichapp",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -33,7 +33,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/icons/faviconNB2.png",
+      "favicon": "./assets/icons/favicon.png",
       "bundler": "metro"
     },
     "plugins": [

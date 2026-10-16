@@ -25,7 +25,7 @@ class RegistroOrganizacionCompleta(BaseModel):
 
     # Datos del Administrador
     nombre_admin: str = Field(..., max_length=150, description="Nombre completo del administrador")
-    email_admin: EmailStr = Field(..., max_length=30, description="Correo electrÃ³nico Ãºnico de acceso del administrador")
+    email_admin: EmailStr = Field(..., max_length=150, description="Correo electrÃ³nico Ãºnico de acceso del administrador")
     telefono_admin: Optional[str] = Field(None, max_length=30, description="NÃºmero de telÃ©fono Ãºnico de acceso del administrador")
     password: str = Field(..., description="ContraseÃ±a Ãºnica de acceso del administrador")
 

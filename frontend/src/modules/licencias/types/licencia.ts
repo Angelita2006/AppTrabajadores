@@ -1,13 +1,21 @@
-import { CicloFacturacionEnum, EstadoSuscripcionEnum, PlanLicenciaEnum } from "../../../constants/enums";
+import {
+  CicloFacturacionEnum,
+  EstadoSuscripcionEnum,
+  PlanLicenciaEnum,
+} from "../../../constants/enums";
+import { Empresa } from "../../empresas/types/empresa";
 
 export const PLANES_LICENCIA = PlanLicenciaEnum;
-export type PlanLicencia = (typeof PLANES_LICENCIA)[keyof typeof PLANES_LICENCIA];
+export type PlanLicencia =
+  (typeof PLANES_LICENCIA)[keyof typeof PLANES_LICENCIA];
 
 export const CICLOS_FACTURACION = CicloFacturacionEnum;
-export type CicloFacturacion = (typeof CICLOS_FACTURACION)[keyof typeof CICLOS_FACTURACION];
+export type CicloFacturacion =
+  (typeof CICLOS_FACTURACION)[keyof typeof CICLOS_FACTURACION];
 
 export const ESTADOS_LICENCIA = EstadoSuscripcionEnum;
-export type EstadoLicencia = (typeof ESTADOS_LICENCIA)[keyof typeof ESTADOS_LICENCIA];
+export type EstadoLicencia =
+  (typeof ESTADOS_LICENCIA)[keyof typeof ESTADOS_LICENCIA];
 
 /** Fields returned by LicenciaSimpleResponse. */
 export interface Licencia {
@@ -27,7 +35,10 @@ export interface Licencia {
 }
 
 /** Request body matching LicenciaCreate. */
-export interface LicenciaCreate extends Omit<Licencia, "id" | "created_at" | "updated_at" | "revocada_at"> {}
+export interface LicenciaCreate extends Omit<
+  Licencia,
+  "id" | "created_at" | "updated_at" | "revocada_at"
+> {}
 
 /** Request body matching LicenciaUpdate. */
 export interface LicenciaUpdate {
@@ -47,5 +58,5 @@ export interface EmitirLicencia {
 }
 
 export interface LicenciaResponse extends Licencia {
-  empresa: import("../../empresas/types/empresa").Empresa | null;
+  empresa?: Empresa | null;
 }

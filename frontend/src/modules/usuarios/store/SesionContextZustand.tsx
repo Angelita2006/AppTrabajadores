@@ -7,15 +7,15 @@ import { obtenerMisAccesos } from "../api/services";
 import { obtenerAsignacionesTurnoTrabajador } from "../../asignaciones-turno/api/services";
 import { AsignacionTurno } from "../../asignaciones-turno/types/asignacion-turno";
 import { CalendarioFestivo } from "../../calendarios-laborales/types/calendario";
-import { obtenerCentroTrabajo } from "../../centros-trabajo/api/services";
 import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { obtenerContratosPorTrabajador } from "../../contratos/api/services";
 import { Contrato } from "../../contratos/types/contrato";
 import { Dispositivo } from "../../dispositivos-fichaje/types/dispositivo-fichaje";
-import { obtenerEmpresas } from "../../empresas/api/services";
+import { obtenerEmpresa, obtenerEmpresas } from "../../empresas/api/services";
 import { Empresa } from "../../empresas/types/empresa";
 import { obtenerMiTrabajador, obtenerTrabajador } from "../../trabajadores/api/services";
 import { Trabajador } from "../../trabajadores/types/trabajador";
+import { TipoRolEnum } from "@/src/constants/enums";
 import { TipoUsuarioEnum, UsuarioSesion } from "../../usuarios/types/usuario";
 
 const STORAGE_KEY_VERSION = "@fichapp_cache_version";
@@ -80,6 +80,7 @@ interface SesionState {
     nuevoUsuario: UsuarioSesion | null,
   ) => Promise<void>;
   cerrarSesionCompleta: () => Promise<void>;
+  limpiarContextoOrganizacion: () => void;
 }
 
 export const useSesionStore = create<SesionState>((set, get) => ({
@@ -89,17 +90,61 @@ export const useSesionStore = create<SesionState>((set, get) => ({
   setEmpresas: (empresas) => set({ empresas }),
   accesos: [],
   setAccesos: (accesos) => set({ accesos }),
-  tienePermiso: (recurso, accion, alcance) =>
-    get().accesos.some(
+  tienePermiso: (recurso, accion, alcance) => {
+    const estado = get();
+    // 1. Superadministrador global: bypass total de permisos en todos los alcances
+    const esSuperadmin =
+      estado.rolActual === TipoRolEnum.SUPERADMINISTRADOR ||
+      estado.usuarioActual?.tipo_usuario === TipoRolEnum.SUPERADMINISTRADOR ||
+      estado.accesos.some(
+        (acceso) =>
+          acceso.empresa_id === null &&
+          acceso.rol.tipo === TipoRolEnum.SUPERADMINISTRADOR,
+      );
+    if (esSuperadmin) {
+      return true;
+    }
+
+    // 2. Permisos globales estrictamente reservados a membresía de superadministrador
+    if (alcance === "global") {
+      return false;
+    }
+
+    const empresaActivaId =
+      estado.empresaActual?.id ?? estado.usuarioActual?.empresa_id ?? null;
+
+    // 3. Filtrar membresías activas correspondientes al tenant seleccionado
+    const accesosAplicables = estado.accesos.filter(
       (acceso) =>
-        (acceso.empresa_id === get().empresaActual?.id || acceso.empresa_id === null) &&
-        acceso.permisos.some(
-          (permiso) =>
-            permiso.recurso === recurso &&
-            permiso.accion === accion &&
-            (!alcance || permiso.alcance === alcance),
-        ),
-    ),
+        acceso.empresa_id === empresaActivaId ||
+        (empresaActivaId === null && acceso.empresa_id !== null),
+    );
+
+    return accesosAplicables.some((acceso) =>
+      acceso.permisos.some((permiso) => {
+        if (permiso.recurso !== recurso || permiso.accion !== accion) {
+          return false;
+        }
+        if (!alcance) {
+          return true;
+        }
+        // Jerarquía de alcances del backend (_permiso_satisfecho):
+        // 'propio' se satisface con 'propio' o 'empresa' o 'global'
+        if (alcance === "propio") {
+          return (
+            permiso.alcance === "propio" ||
+            permiso.alcance === "empresa" ||
+            permiso.alcance === "global"
+          );
+        }
+        // 'empresa' se satisface con 'empresa' o 'global'
+        if (alcance === "empresa") {
+          return permiso.alcance === "empresa" || permiso.alcance === "global";
+        }
+        return permiso.alcance === alcance;
+      }),
+    );
+  },
   empresaActual: null,
   setEmpresaActual: (empresaActual) => {
     const empresaAnterior = get().empresaActual;
@@ -227,6 +272,31 @@ export const useSesionStore = create<SesionState>((set, get) => ({
         "Error al cerrar la sesión: " + obtenerMensajeAmigableError(error),
       );
     }
+  },
+
+  limpiarContextoOrganizacion: () => {
+    void setEmpresaContext(null);
+    set({
+      empresas: [],
+      accesos: [],
+      empresaActual: null,
+      trabajadores: [],
+      trabajadorActual: null,
+      contratos: [],
+      contratoActual: null,
+      turnos: [],
+      turnoActual: null,
+      centrosTrabajo: [],
+      centroTrabajoActual: null,
+      calendarios: [],
+      calendarioLaboralActual: null,
+      dispositivos: [],
+      dispositivoFichajeActual: null,
+      roles: [],
+      rolActual: null,
+      departamentos: [],
+      departamentoActual: null,
+    });
   },
 }));
 
@@ -398,6 +468,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         }
 
         const empresaContextoInicial = empresaGuardada?.id ??
+          usuarioActual.empresa_id ??
           accesos.find((acceso) => acceso.empresa_id)?.empresa_id ?? null;
         await setEmpresaContext(empresaContextoInicial);
 
@@ -408,11 +479,18 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
           const empresaRespaldo = accesos.find(
             (acceso) => acceso.empresa_id,
           )?.empresa_id ?? null;
-          if (!empresaRespaldo || empresaRespaldo === empresaContextoInicial) {
+          if (!empresaRespaldo) {
             throw error;
           }
           await setEmpresaContext(empresaRespaldo);
-          empresasDisponibles = await obtenerEmpresas();
+          try {
+            empresasDisponibles = await obtenerEmpresas();
+          } catch {
+            empresasDisponibles = [await obtenerEmpresa(empresaRespaldo)];
+          }
+        }
+        if (empresasDisponibles.length === 0 && empresaContextoInicial) {
+          empresasDisponibles = [await obtenerEmpresa(empresaContextoInicial)];
         }
         if (isCancelled) return;
         setEmpresas(empresasDisponibles);
@@ -515,22 +593,13 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         );
         setContratoActual(contratoVigente ?? null);
 
-        if (contratoVigente?.centro_trabajo_id) {
-          try {
-            const datosCentro = await obtenerCentroTrabajo(
-              contratoVigente.centro_trabajo_id,
-            );
-            if (!isCancelled) setCentroTrabajoActual(datosCentro);
-          } catch (errCentro) {
-            if (!isCancelled) {
-              console.error(
-                "Error al cargar el centro de trabajo: " + errCentro,
-              );
-              setCentroTrabajoActual(null);
-            }
-          }
-        } else {
-          setCentroTrabajoActual(null);
+        const centrosContrato = contratoVigente?.centros_trabajo ?? [];
+        const centroSeleccionado = centrosContrato.find(
+          (centro) =>
+            centro.id === useSesionStore.getState().centroTrabajoActual?.id,
+        );
+        if (!isCancelled) {
+          setCentroTrabajoActual(centroSeleccionado ?? centrosContrato[0] ?? null);
         }
 
         const hoyStr = new Date().toISOString().split("T")[0];

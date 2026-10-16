@@ -1,22 +1,22 @@
-import { router, useLocalSearchParams } from "expo-router";
 import { Colors } from "@/src/constants/theme";
 import { useColorScheme } from "@/src/hooks/use-color-scheme";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 
 import { registrarOrganizacionCompleta } from "@/src/modules/another-services/services";
@@ -27,18 +27,21 @@ import VideoBackground from "@/src/shared/ui/Background.web";
 import { IconSymbol } from "@/src/shared/ui/IconSymbol";
 import { obtenerMensajeAmigableError } from "@/src/utils/errorHandler";
 import {
-    validarCifNifOrganizacion,
-    validarDniEspanol,
-    validarEmail,
-    validarPassword,
-    validarTextoObligatorio,
+  validarCifNifOrganizacion,
+  validarDniEspanol,
+  validarEmail,
+  validarPassword,
+  validarTextoObligatorio,
 } from "@/src/utils/validators";
 
 /**
  * Componente principal que renderiza el formulario de alta de organización, trabajador admin y usuario.
  */
 export default function RegistroOrganizacionScreen() {
-  const parametros = useLocalSearchParams<{ prueba?: string; codigo_licencia?: string }>();
+  const parametros = useLocalSearchParams<{
+    prueba?: string;
+    codigo_licencia?: string;
+  }>();
   const esPrueba = parametros.prueba === "1";
   const theme = useColorScheme();
   const colors = Colors[theme];
@@ -115,7 +118,8 @@ export default function RegistroOrganizacionScreen() {
   }, [parametros.codigo_licencia]);
 
   const validarFormulario = () => {
-    const esLicenciaValida = esPrueba || validarTextoObligatorio(codigoLicencia, 3);
+    const esLicenciaValida =
+      esPrueba || validarTextoObligatorio(codigoLicencia, 3);
     const esRazonValida = validarTextoObligatorio(razonSocial, 3);
     const esCifValido = validarCifNifOrganizacion(cif);
     const esNombreAdminValido = validarTextoObligatorio(nombreAdmin, 2);
@@ -287,7 +291,7 @@ export default function RegistroOrganizacionScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      {mostrarFondo && theme === "dark" &&
+      {mostrarFondo &&
         (Platform.OS === "web" ? <VideoBackground /> : <LottieBackground />)}
 
       <ScrollView
@@ -305,7 +309,7 @@ export default function RegistroOrganizacionScreen() {
           <View style={styles.headerContenedor}>
             <View style={styles.logoBranding}>
               <Image
-                source={require("../../assets/icons/logoB.png")}
+                source={require("../../assets/icons/logo.png")}
                 style={styles.logoImage}
                 resizeMode="cover"
                 accessibilityLabel="Logotipo de Fichapp"
@@ -316,53 +320,57 @@ export default function RegistroOrganizacionScreen() {
             </ThemedText>
           </View>
 
-          {!esPrueba && <>
-          {/* SECCIÓN: DATOS DE LICENCIA */}
-          <ThemedText style={styles.seccionSubtitulo}>
-            Licencia de Activación
-          </ThemedText>
-
-          <View style={styles.field}>
-            <ThemedText style={styles.label}>Código de Licencia *</ThemedText>
-            <View
-              style={[
-                styles.inputWrapper,
-                errorLicencia && styles.inputWrapperError,
-              ]}
-            >
-              <IconSymbol
-                name="vpn-key"
-                size={20}
-                color="#94A3B8"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                ref={licenciaRef}
-                value={codigoLicencia}
-                textContentType="none"
-                autoCapitalize="characters"
-                onChangeText={(text) => {
-                  setCodigoLicencia(text.toUpperCase());
-                  if (errorLicencia) setErrorLicencia(false);
-                }}
-                style={styles.inputContainer}
-                placeholder="Introduce tu código de licencia"
-                placeholderTextColor="#94A3B8"
-                editable={!cargando}
-                returnKeyType="next"
-                onSubmitEditing={() => razonSocialRef.current?.focus()}
-                blurOnSubmit={false}
-              />
-            </View>
-            {errorLicencia && (
-              <ThemedText style={styles.errorText}>
-                El código de licencia es obligatorio.
+          {!esPrueba && (
+            <>
+              {/* SECCIÓN: DATOS DE LICENCIA */}
+              <ThemedText style={styles.seccionSubtitulo}>
+                Licencia de Activación
               </ThemedText>
-            )}
-          </View>
 
-          <View style={styles.divisor} />
-          </>}
+              <View style={styles.field}>
+                <ThemedText style={styles.label}>
+                  Código de Licencia *
+                </ThemedText>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    errorLicencia && styles.inputWrapperError,
+                  ]}
+                >
+                  <IconSymbol
+                    name="vpn-key"
+                    size={20}
+                    color="#94A3B8"
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    ref={licenciaRef}
+                    value={codigoLicencia}
+                    textContentType="none"
+                    autoCapitalize="characters"
+                    onChangeText={(text) => {
+                      setCodigoLicencia(text.toUpperCase());
+                      if (errorLicencia) setErrorLicencia(false);
+                    }}
+                    style={styles.inputContainer}
+                    placeholder="Introduce tu código de licencia"
+                    placeholderTextColor="#94A3B8"
+                    editable={!cargando}
+                    returnKeyType="next"
+                    onSubmitEditing={() => razonSocialRef.current?.focus()}
+                    blurOnSubmit={false}
+                  />
+                </View>
+                {errorLicencia && (
+                  <ThemedText style={styles.errorText}>
+                    El código de licencia es obligatorio.
+                  </ThemedText>
+                )}
+              </View>
+
+              <View style={styles.divisor} />
+            </>
+          )}
 
           {/* SECCIÓN: DATOS DE LA EMPRESA */}
           <ThemedText style={styles.seccionSubtitulo}>
@@ -925,11 +933,9 @@ const styles = StyleSheet.create({
   },
   headerContenedor: { alignItems: "center", marginBottom: 24 },
   logoBranding: {
-    width: 56,
-    height: 56,
-    backgroundColor: "#011640",
+    width: 120,
+    height: 120,
     overflow: "hidden",
-    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,

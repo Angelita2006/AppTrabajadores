@@ -1,4 +1,3 @@
-import { CentroTrabajo } from "../../centros-trabajo/types/centro-trabajo";
 import { Empresa } from "../../empresas/types/empresa";
 import { Festivo } from "../../festivos/types/festivo";
 
@@ -12,7 +11,6 @@ export interface CalendarioFestivo {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID único del centro de trabajo o sede física vinculada. */
-  centro_trabajo_id: string;
   /** Nombre identificativo o descriptivo del calendario laboral, o nulo si no se especifica. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
@@ -25,8 +23,8 @@ export interface CalendarioFestivo {
   updated_at?: string;
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
+  /** Campo legado recibido en instalaciones que aún no han migrado calendarios. */
   /** Relación opcional enriquecida para cargas anidadas del centro de trabajo vinculado. */
-  centro_trabajo?: CentroTrabajo | null;
 }
 
 /**
@@ -37,7 +35,6 @@ export interface CalendarioLaboralCreate {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID del centro de trabajo vinculado, o nulo si es general. */
-  centro_trabajo_id: string;
   /** Nombre identificativo del calendario laboral. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
@@ -64,7 +61,6 @@ export interface CalendarioLaboralResponse {
   /** Identificador UUID único de la empresa u organización propietaria (tenant). */
   empresa_id: string;
   /** Identificador UUID del centro de trabajo vinculado. */
-  centro_trabajo_id: string;
   /** Nombre identificativo o descriptivo del calendario laboral. */
   nombre: string;
   /** Año natural al que corresponde el calendario laboral. */
@@ -78,7 +74,6 @@ export interface CalendarioLaboralResponse {
   /** Relación opcional enriquecida para cargas anidadas de la empresa vinculada. */
   empresa?: Empresa | null;
   /** Relación opcional enriquecida para cargas anidadas del centro de trabajo vinculado. */
-  centro_trabajo?: CentroTrabajo | null;
 }
 
 /** Respuesta para el calendario junto con sus festivos asociados. */

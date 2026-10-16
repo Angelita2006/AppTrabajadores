@@ -1,6 +1,13 @@
 import api from "../../../service/api/api";
 import { Turno, TurnoCreate, TurnoUpdate } from "../types/turno";
 
+const mensajeErrorApi = (error: any, mensajeGenerico: string): Error =>
+  new Error(
+    error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      mensajeGenerico,
+  );
+
 /**
  * Servicio de Gestión de Turnos Laborales.
  * Contiene todas las operaciones CRUD y lógicas de negocio para el registro, consulta, edición y eliminación de turnos.
@@ -8,7 +15,7 @@ import { Turno, TurnoCreate, TurnoUpdate } from "../types/turno";
 
 /**
  * Devuelve el catálogo completo de turnos aplicando aislamiento multi-tenant.
- * URI: GET /api/turnos
+ * URI: GET /api/turnos/empresa/{idEmpresa}
  *
  * @async
  * @function obtenerTodosLosTurnos
@@ -17,11 +24,13 @@ import { Turno, TurnoCreate, TurnoUpdate } from "../types/turno";
  */
 export const obtenerTodosLosTurnos = async (idEmpresa: string): Promise<Turno[]> => {
   try {
-    const respuesta = await api.get<Turno[]>(`/api/turnos/empresa/${idEmpresa}`);
+    const respuesta = await api.get<Turno[]>(
+      `/api/turnos/empresa/${idEmpresa}`,
+      { empresaIdContext: idEmpresa } as any,
+    );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || "Error al recuperar el catálogo de turnos.");
+    throw mensajeErrorApi(error, "Error al recuperar el catálogo de turnos.");
   }
 };
 
@@ -37,18 +46,12 @@ export const obtenerTodosLosTurnos = async (idEmpresa: string): Promise<Turno[]>
  */
 export const crearTurno = async (payload: TurnoCreate): Promise<Turno> => {
   try {
-    const respuesta = await api.post<Turno>("/api/turnos", {
-      empresa_id: payload.empresa_id,
-      nombre: payload.nombre,
-      hora_inicio: payload.hora_inicio,
-      hora_fin: payload.hora_fin,
-      duracion_pausa_minutos: payload.duracion_pausa_minutos ?? 0,
-      dias_semana: payload.dias_semana ?? [1, 2, 3, 4, 5],
-    });
+    const respuesta = await api.post<Turno>("/api/turnos", payload, {
+      empresaIdContext: payload.empresa_id,
+    } as any);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || "Error al registrar el nuevo turno laboral.");
+    throw mensajeErrorApi(error, "Error al registrar el nuevo turno laboral.");
   }
 };
 
@@ -68,13 +71,11 @@ export const obtenerTurnosEmpresa = async (
   try {
     const respuesta = await api.get<Turno[]>(
       `/api/turnos/empresa/${idEmpresa}`,
+      { empresaIdContext: idEmpresa } as any,
     );
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al recuperar los turnos de la empresa.",
-    );
+    throw mensajeErrorApi(error, "Error al recuperar los turnos de la empresa.");
   }
 };
 
@@ -93,8 +94,7 @@ export const obtenerTurnoPorId = async (idTurno: string): Promise<Turno> => {
     const respuesta = await api.get<Turno>(`/api/turnos/${idTurno}`);
     return respuesta.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || `Error al obtener el turno ${idTurno}.`);
+    throw mensajeErrorApi(error, `Error al obtener el turno ${idTurno}.`);
   }
 };
 
@@ -120,8 +120,7 @@ export const editarTurno = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || `Error al editar el turno ${idTurno}.`);
+    throw mensajeErrorApi(error, `Error al editar el turno ${idTurno}.`);
   }
 };
 
@@ -144,7 +143,6 @@ export const eliminarTurno = async (
     );
     return response.data;
   } catch (error: any) {
-    const apiMessage = error.response?.data?.message;
-    throw new Error(apiMessage || `Error al desactivar el turno ${idTurno}.`);
+    throw mensajeErrorApi(error, `Error al desactivar el turno ${idTurno}.`);
   }
 };

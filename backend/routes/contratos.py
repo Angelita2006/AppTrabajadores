@@ -1,14 +1,16 @@
 from datetime import date, datetime
+from pathlib import Path
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from core.auditoria import registrar_auditoria
+from core.config import obtener_directorio_archivos
 from core.enums import AccionAuditoriaEnum, AccionPermisoEnum, AlcancePermisoEnum, TipoPermisoEnum
 from core.security import (
     get_db_with_advanced_security,
@@ -16,6 +18,7 @@ from core.security import (
 )
 from models.centros_trabajo import CentrosTrabajo
 from models.contratos import Contratos
+from models.contratos_centros_trabajo import ContratosCentrosTrabajo
 from models.contratos_calendarios import ContratosCalendarios
 from models.departamentos import Departamentos
 from models.empresas import Empresas
@@ -28,6 +31,58 @@ router = APIRouter(prefix="/api/contratos", tags=["Contratos"])
 
 # Configuración del limitador de tasa (Rate Limiting) basado en la dirección IP remota del cliente.
 limiter = Limiter(key_func=get_remote_address)
+
+@router.put(
+    "/{id_contrato}/documento",
+    response_model=ContratoResponse,
+    summary="Subir el documento PDF del contrato",
+    description="Guarda el PDF del contrato en almacenamiento privado y lo vincula al expediente laboral.",
+)
+@limiter.limit("10/minute")
+async def subir_documento_contrato(
+    request: Request,
+    id_contrato: UUID,
+    file: UploadFile = File(...),
+    usuario_actual: Usuarios = Depends(verificar_permisos_requeridos([
+        AccionPermisoEnum.MODIFICAR + "-" + TipoPermisoEnum.CONTRATOS
+    ])),
+    db: Session = Depends(get_db_with_advanced_security),
+):
+    """Sube un PDF validado y lo asocia al contrato existente."""
+    contrato = db.query(Contratos).filter(Contratos.id == id_contrato).first()
+    if contrato is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato no encontrado.")
+    contenido = await file.read(15_000_001)
+    if len(contenido) > 15_000_000:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="El PDF supera el límite de 15 MB.")
+    if file.content_type != "application/pdf" or not contenido.startswith(b"%PDF-"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El archivo debe ser un PDF válido.")
+
+    carpeta = obtener_directorio_archivos() / "contratos"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    nombre_archivo = f"contrato_{id_contrato}_{uuid4().hex}.pdf"
+    destino = carpeta / nombre_archivo
+    try:
+        destino.write_bytes(contenido)
+        setattr(contrato, "pdf_url", f"/api/archivos/contratos/{nombre_archivo}")
+        setattr(contrato, "updated_at", datetime.now())
+        registrar_auditoria(
+            db=db,
+            request=request,
+            usuario_id=usuario_actual.id,
+            empresa_id=contrato.empresa_id,
+            accion=AccionAuditoriaEnum.MODIFICACION,
+            detalle={"recurso": "contratos", "accion": "subir_documento"},
+            trabajador_id=contrato.trabajador_id,
+        )
+        db.commit()
+        db.refresh(contrato)
+        return contrato
+    except Exception as e:
+        db.rollback()
+        destino.unlink(missing_ok=True)
+        print(f"No se ha podido guardar el documento del contrato ({id_contrato}): {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se ha podido guardar el documento del contrato.")
 
 @router.get(
     "/empresa/{id_empresa}",
@@ -54,11 +109,11 @@ def obtener_contratos_laborales_empresa(
     contratos = (
         db.query(Contratos).options(
         joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
+        selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
         joinedload(Contratos.trabajador),
         joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
+        joinedload(Contratos.calendarios_laborales)
+        .joinedload(ContratosCalendarios.calendario_laboral))
         .filter(Contratos.empresa_id == id_empresa)
         .all()
     )
@@ -119,11 +174,11 @@ def obtener_contratos_laborales_trabajador(
     contratos = (
         db.query(Contratos).options(
         joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
+        selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
         joinedload(Contratos.trabajador),
         joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
+        joinedload(Contratos.calendarios_laborales)
+        .joinedload(ContratosCalendarios.calendario_laboral))
         .filter(Contratos.trabajador_id == id_trabajador)
         .all()
     )
@@ -171,11 +226,11 @@ def obtener_contrato_laboral_activo_trabajador_empresa(
     contrato_activo = (
         db.query(Contratos).options(
         joinedload(Contratos.empresa),
-        joinedload(Contratos.centro_trabajo),
+        selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
         joinedload(Contratos.trabajador),
         joinedload(Contratos.departamento),
-        joinedload(Contratos.calendarios_asociados)
-        .joinedload(ContratosCalendarios.calendario))
+        joinedload(Contratos.calendarios_laborales)
+        .joinedload(ContratosCalendarios.calendario_laboral))
         .filter(
             Contratos.trabajador_id == id_trabajador,
             Contratos.empresa_id == id_empresa,
@@ -209,6 +264,7 @@ def obtener_contrato_laboral_activo_trabajador_empresa(
     db.commit()
 
     return contrato_activo
+
 @router.post(
     "",
     response_model=ContratoResponse,
@@ -248,16 +304,21 @@ def crear_contrato_laboral(
             detail=f"Trabajador no encontrado."
         )
 
-    centro = db.query(CentrosTrabajo).filter(CentrosTrabajo.id == payload.centro_trabajo_id, CentrosTrabajo.activo.is_(True)).first()
-    if not centro:
-        print(f"Centro de trabajo ({payload.centro_trabajo_id}) no encontrado.")
+    centros_ids = set(payload.centros_trabajo_ids)
+    centros = db.query(CentrosTrabajo).filter(
+        CentrosTrabajo.id.in_(centros_ids),
+        CentrosTrabajo.empresa_id == payload.empresa_id,
+        CentrosTrabajo.activo.is_(True),
+    ).all()
+    if len(centros) != len(centros_ids):
+        print(f"Uno o más centros de trabajo del contrato del trabajador ({payload.trabajador_id}) no existen, están inactivos o pertenecen a otra empresa.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Centro de trabajo no encontrado."
+            detail="Uno o más centros de trabajo no están disponibles para esta empresa."
         )
 
-    if trabajador.empresa_id != payload.empresa_id or centro.empresa_id != payload.empresa_id:
-        print(f"El trabajador ({trabajador.empresa_id}), centro de trabajo ({centro.empresa_id}) y contrato laboral ({payload.empresa_id}) deben pertenecer a la misma empresa.")
+    if trabajador.empresa_id != payload.empresa_id:
+        print(f"El trabajador ({trabajador.id}) y el contrato laboral ({payload.empresa_id}) deben pertenecer a la misma empresa.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El trabajador, centro de trabajo y contrato laboral deben pertenecer a la misma empresa.")
 
     departamento = db.query(Departamentos).filter(
@@ -271,7 +332,6 @@ def crear_contrato_laboral(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Departamento no encontrado."
         )
-
     contrato_activo = db.query(Contratos).filter(
         Contratos.empresa_id == payload.empresa_id,
         Contratos.trabajador_id == payload.trabajador_id,
@@ -284,7 +344,6 @@ def crear_contrato_laboral(
     nuevo_contrato = Contratos(
         trabajador_id=payload.trabajador_id,
         empresa_id=payload.empresa_id,
-        centro_trabajo_id=payload.centro_trabajo_id,
         tipo_contrato=payload.tipo_contrato,
         tipo_jornada=payload.tipo_jornada,
         horas_semana=payload.horas_semana,
@@ -298,16 +357,25 @@ def crear_contrato_laboral(
 
     try:
         db.add(nuevo_contrato)
+        db.flush()
+        db.add_all([
+            ContratosCentrosTrabajo(
+                empresa_id=payload.empresa_id,
+                contrato_id=nuevo_contrato.id,
+                centro_trabajo_id=centro.id,
+            )
+            for centro in centros
+        ])
         db.commit()
 
         contrato_creado = (
             db.query(Contratos).options(
             joinedload(Contratos.empresa),
-            joinedload(Contratos.centro_trabajo),
+            selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendarios_asociados)
-            .joinedload(ContratosCalendarios.calendario))
+            joinedload(Contratos.calendarios_laborales)
+            .joinedload(ContratosCalendarios.calendario_laboral))
             .filter(Contratos.id == nuevo_contrato.id)
             .first()
         )
@@ -383,11 +451,11 @@ def finalizar_contrato_laboral(
         contrato_finalizado = (
             db.query(Contratos).options(
             joinedload(Contratos.empresa),
-            joinedload(Contratos.centro_trabajo),
+            selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendarios_asociados)
-            .joinedload(ContratosCalendarios.calendario))
+            joinedload(Contratos.calendarios_laborales)
+            .joinedload(ContratosCalendarios.calendario_laboral))
             .filter(Contratos.id == id_contrato)
             .first()
         )
@@ -446,27 +514,52 @@ def modificar_contrato_laboral(
             detail=f"Contrato laboral no encontrado."
         )
 
+    centros_actualizados = None
+    if "centros_trabajo_ids" in payload.model_fields_set:
+        centros_ids = set(payload.centros_trabajo_ids or [])
+        if not centros_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El contrato debe tener al menos un centro de trabajo asociado.",
+            )
+        centros_actualizados = db.query(CentrosTrabajo).filter(
+            CentrosTrabajo.id.in_(centros_ids),
+            CentrosTrabajo.empresa_id == contrato.empresa_id,
+            CentrosTrabajo.activo.is_(True),
+        ).all()
+        if len(centros_actualizados) != len(centros_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uno o varios centros de trabajo no están disponibles para esta empresa.",
+            )
+
     try:
-        setattr(contrato, "tipo_contrato", payload.tipo_contrato)
-        setattr(contrato, "tipo_jornada", payload.tipo_jornada)
-        setattr(contrato, "horas_semana", payload.horas_semana)
-        setattr(contrato, "puesto_trabajo", payload.puesto_trabajo)
-        setattr(contrato, "categoria_profesional", payload.categoria_profesional)
-        setattr(contrato, "pdf_url", payload.pdf_url)
-        setattr(contrato, "fecha_inicio", payload.fecha_inicio)
-        setattr(contrato, "fecha_fin", payload.fecha_fin)
-        setattr(contrato, "activo", payload.activo)
+        cambios = payload.model_dump(
+            exclude_unset=True,
+            exclude={"centros_trabajo_ids"},
+        )
+        for campo, valor in cambios.items():
+            setattr(contrato, campo, valor)
         setattr(contrato, "updated_at", datetime.now())
+        if centros_actualizados is not None:
+            contrato.centros_trabajo_relaciones.clear()
+            contrato.centros_trabajo_relaciones.extend(
+                ContratosCentrosTrabajo(
+                    empresa_id=contrato.empresa_id,
+                    centro_trabajo=centro,
+                )
+                for centro in centros_actualizados
+            )
         db.commit()
 
         contrato_actualizado = (
             db.query(Contratos).options(
             joinedload(Contratos.empresa),
-            joinedload(Contratos.centro_trabajo),
+            selectinload(Contratos.centros_trabajo_relaciones).joinedload(ContratosCentrosTrabajo.centro_trabajo),
             joinedload(Contratos.trabajador),
             joinedload(Contratos.departamento),
-            joinedload(Contratos.calendarios_asociados)
-            .joinedload(ContratosCalendarios.calendario))
+            joinedload(Contratos.calendarios_laborales)
+            .joinedload(ContratosCalendarios.calendario_laboral))
             .filter(Contratos.id == id_contrato)
             .first()
         )

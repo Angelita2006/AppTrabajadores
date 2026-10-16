@@ -133,7 +133,6 @@ export default function TabDispositivos({
       setGuardando(true);
       await editarDispositivo(dispositivo.id, {
         tipo_dispositivo: tipoDispositivoSeleccionado,
-        centro_trabajo_id: centroIdAsociado.trim(),
         activo: estadoActivoEdicion,
       });
 
@@ -144,7 +143,6 @@ export default function TabDispositivos({
             ? {
                 ...d,
                 tipo_dispositivo: tipoDispositivoSeleccionado,
-                centro_trabajo_id: centroIdAsociado.trim(),
                 activo: estadoActivoEdicion,
               }
             : d,

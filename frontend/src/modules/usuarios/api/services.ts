@@ -1,346 +1,124 @@
-﻿import api from "@/src/service/api/api";
+import api from "@/src/service/api/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import {
+  AccesoUsuario,
+  ConfirmarPasswordRecuperacionRequest,
+  LoginRequest,
   LoginResponse,
-  UsuarioRegisterRequest,
-  UsuarioResponse,
+  PasswordCambioRequest,
+  UsuarioCreate,
+  UsuarioSimpleResponse,
+  UsuarioUpdate,
 } from "../types/usuario";
 
+interface RespuestaDetalle {
+  detail: string;
+}
+
+const mensajeErrorApi = (error: any, mensajeGenerico: string): Error =>
+  new Error(
+    error?.response?.data?.detail ||
+      error?.response?.data?.message ||
+      mensajeGenerico,
+  );
+
 /**
- * Servicio de Autenticación y Gestión de Usuarios.
- * Contiene todas las peticiones HTTP contra la API de usuarios y control de acceso.
+ * Servicio de autenticación y gestión de usuarios.
+ * Consume los endpoints declarados por el router /api/usuarios.
  */
 
 /**
- * Obtiene el listado completo de todas las cuentas de usuario registradas en el sistema.
+ * Lista las cuentas de usuario visibles para el superadministrador.
  * URI: GET /api/usuarios
- * *Nota: Requiere privilegios de rol de Administrador.*
- *
  * @async
  * @function obtenerTodosLosUsuarios
- * @returns {Promise<UsuarioResponse[]>} Un array con la lista de todos los usuarios de la plataforma.
- * @throws {Error} Lanza un error si el usuario no tiene permisos o si ocurre un fallo de red.
+ * @returns {Promise<UsuarioSimpleResponse[]>} Usuarios de la plataforma.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerTodosLosUsuarios = async (): Promise<UsuarioResponse[]> => {
+export const obtenerTodosLosUsuarios = async (): Promise<UsuarioSimpleResponse[]> => {
   try {
-    const respuesta = await api.get<UsuarioResponse[]>("/api/usuarios");
-    return respuesta.data;
+    return (await api.get<UsuarioSimpleResponse[]>("/api/usuarios")).data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al listar los usuarios de la plataforma.",
-    );
+    throw mensajeErrorApi(error, "Error al listar los usuarios de la plataforma.");
   }
 };
 
 /**
- * Busca y recupera la información de un usuario mediante su ID único de cuenta.
- * URI: GET /api/usuarios/{id_usuario}
- *
- * @async
- * @function obtenerUsuarioPorId
- * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
- * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario solicitado.
- * @throws {Error} Lanza un error si el ID no es válido o no se encuentra el registro.
- */
-export const obtenerUsuarioPorId = async (
-  idUsuario: string,
-): Promise<UsuarioResponse> => {
-  try {
-    const respuesta = await api.get<UsuarioResponse>(
-      `/api/usuarios/${idUsuario}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || `Error al obtener el usuario con ID ${idUsuario}.`,
-    );
-  }
-};
-
-/**
- * Recupera la información de la cuenta de usuario vinculada a un trabajador específico.
- * URI: GET /api/usuarios/trabajador/{id_trabajador}
- *
- * @async
- * @function obtenerUsuarioPorTrabajador
- * @param {string} idTrabajador - Identificador único universal (UUID) del trabajador.
- * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario asociado.
- * @throws {Error} Lanza un error si el trabajador no existe o falla la comunicación con el servidor.
- */
-export const obtenerUsuarioPorTrabajador = async (
-  idTrabajador: string,
-): Promise<UsuarioResponse> => {
-  try {
-    const respuesta = await api.get<UsuarioResponse>(
-      `/api/usuarios/trabajador/${idTrabajador}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.detail;
-    throw new Error(
-      apiMessage ||
-        "Error al recuperar la cuenta de usuario vinculada al trabajador.",
-    );
-  }
-};
-
-/**
- * Registra una nueva cuenta de usuario de acceso en la plataforma mediante validación previa.
+ * Registra una cuenta con los campos de UsuarioCreate.
  * URI: POST /api/usuarios/registro
- *
  * @async
  * @function registrarUsuarioAcceso
- * @param {UsuarioRegisterRequest} payload - Objeto con los datos necesarios para el registro (NIF/NIE, credenciales, empresa, etc.).
- * @returns {Promise<UsuarioResponse>} Datos del usuario recién creado.
- * @throws {Error} Lanza un error si los datos son incorrectos o ya existe el registro.
+ * @param {UsuarioCreate} payload - Datos de la cuenta y contraseña.
+ * @returns {Promise<UsuarioSimpleResponse>} Cuenta creada sin datos sensibles.
+ * @throws {Error} Mensaje de la API o error genérico de registro.
  */
 export const registrarUsuarioAcceso = async (
-  payload: UsuarioRegisterRequest,
-): Promise<UsuarioResponse> => {
+  payload: UsuarioCreate,
+): Promise<UsuarioSimpleResponse> => {
   try {
-    const respuesta = await api.post<UsuarioResponse>(
-      "/api/usuarios/registro",
-      payload,
-    );
-    return respuesta.data;
+    return (
+      await api.post<UsuarioSimpleResponse>("/api/usuarios/registro", payload)
+    ).data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al completar el registro del usuario.",
-    );
+    throw mensajeErrorApi(error, "Error al completar el registro del usuario.");
   }
 };
 
 /**
- * Inicia sesión validando las credenciales del usuario y gestionando el token de acceso.
+ * Inicia sesión y almacena el token devuelto por la API.
  * URI: POST /api/usuarios/login
- *
  * @async
  * @function iniciarSesion
- * @param {string} email - Correo electrónico registrado del usuario.
- * @param {string} password - Contraseña en texto plano del usuario.
- * @returns {Promise<LoginResponse>} Objeto con la respuesta del login que incluye el token de acceso y los datos del usuario.
- * @throws {Error} Lanza un error si la autenticación falla o si la API devuelve un mensaje de error personalizado.
+ * @param {string} email - Correo de la cuenta.
+ * @param {string} password - Contraseña de acceso.
+ * @returns {Promise<LoginResponse>} Token y datos simples del usuario.
+ * @throws {Error} Mensaje de la API o error genérico de autenticación.
  */
 export const iniciarSesion = async (
   email: string,
   password: string,
 ): Promise<LoginResponse> => {
   try {
-    const respuesta = await api.post<LoginResponse>("/api/usuarios/login", {
-      email,
-      password,
-    });
+    const credenciales: LoginRequest = { email, password };
+    const { data } = await api.post<LoginResponse>(
+      "/api/usuarios/login",
+      credenciales,
+    );
 
-    if (respuesta.data?.access_token) {
-      await AsyncStorage.setItem("user_token", respuesta.data.access_token);
-      api.defaults.headers.common["Authorization"] =
-        `Bearer ${respuesta.data.access_token}`;
+    if (data.access_token) {
+      await AsyncStorage.setItem("user_token", data.access_token);
+      api.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
     }
 
-    return respuesta.data;
+    return data;
   } catch (error: any) {
-    const apiMessage = error.detail;
-    throw new Error(apiMessage || "Error al iniciar sesión en la plataforma.");
+    throw mensajeErrorApi(error, "Error al iniciar sesión en la plataforma.");
   }
 };
 
 /**
- * Sube el avatar global de la cuenta, separado de la fotografía laboral.
- * URI: PUT /api/usuarios/me/foto
- *
- * @async
- * @function actualizarFotoUsuario
- * @param {string} fileUri - URI local de la imagen seleccionada.
- * @param {string} fileName - Nombre del archivo de imagen.
- * @param {string} fileType - Tipo MIME de la imagen.
- * @returns {Promise<UsuarioResponse>} Datos de la cuenta con su nuevo avatar.
- * @throws {Error} Mensaje de la API o error genérico de subida.
- */
-export const actualizarFotoUsuario = async (
-  fileUri: string,
-  fileName: string,
-  fileType: string,
-): Promise<UsuarioResponse> => {
-  const formData = new FormData();
-  if (Platform.OS === "web") {
-    const response = await fetch(fileUri);
-    const blob = await response.blob();
-    formData.append("file", blob, fileName);
-  } else {
-    formData.append("file", { uri: fileUri, name: fileName, type: fileType } as any);
-  }
-
-  try {
-    const respuesta = await api.put<UsuarioResponse>("/api/usuarios/me/foto", formData, {
-      ...(Platform.OS === "web"
-        ? { headers: { "Content-Type": "multipart/form-data" } }
-        : {}),
-    });
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message ?? error?.response?.data?.detail;
-    throw new Error(apiMessage || "No se pudo actualizar el avatar de la cuenta.");
-  }
-};
-
-/**
- * Modifica el estado de activación de una cuenta de usuario permitiendo o bloqueando su acceso.
- * URI: PUT /api/usuarios/{id_usuario}/estado
- * *Nota: Requiere permisos de administrador.*
- *
- * @async
- * @function cambiarEstadoUsuario
- * @param {string} idUsuario - Identificador único universal (UUID) de la cuenta de usuario.
- * @param {boolean} activo - Estado booleano al que se desea cambiar (true para activar, false para bloquear).
- * @returns {Promise<UsuarioResponse>} Datos actualizados del usuario modificado.
- * @throws {Error} Lanza un error si no se tienen permisos o la operación falla.
- */
-export const cambiarEstadoUsuario = async (
-  idUsuario: string,
-  activo: boolean,
-): Promise<UsuarioResponse> => {
-  try {
-    const respuesta = await api.put<UsuarioResponse>(
-      `/api/usuarios/${idUsuario}/estado?activo=${activo}`,
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al cambiar el estado de la cuenta.");
-  }
-};
-
-/**
- * Solicita el cambio de correo electrónico generando un enlace de verificación.
- * URI: POST /api/usuarios/solicitar-cambio-email
- */
-export const solicitarCambioEmail = async (
-  nuevoEmail: string,
-): Promise<any> => {
-  try {
-    const respuesta = await api.put(
-      "/api/usuarios/solicitar-cambio-email",
-      null,
-      { params: { nuevo_email: nuevoEmail } },
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al solicitar el cambio de correo electrónico.",
-    );
-  }
-};
-
-/**
- * Confirma el cambio de correo electrónico mediante el token recibido.
- * URI: POST /api/usuarios/confirmar-cambio-email?token={token}
- *
- * @async
- * @function confirmarCambioEmail
- * @param {string} token - Token de verificación del cambio de correo.
- * @returns {Promise<any>} Respuesta de confirmación de la API.
- * @throws {Error} Mensaje de la API o error genérico de confirmación.
- */
-export const confirmarCambioEmail = async (token: string): Promise<any> => {
-  try {
-    const response = await api.post(
-      "/api/usuarios/confirmar-cambio-email",
-      null,
-      { params: { token } },
-    );
-    return response.data;
-  } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al confirmar el cambio de correo electrónico.",
-    );
-  }
-};
-
-/**
- * Solicita un código de 6 dígitos para el cambio de contraseña (Paso 1).
- * URI: POST /api/usuarios/solicitar-cambio-password
- */
-export const solicitarCambioPassword = async (
-  antiguaPassword: string,
-): Promise<any> => {
-  try {
-    const respuesta = await api.put("/api/usuarios/solicitar-cambio-password", {
-      antigua_password: antiguaPassword,
-    });
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al solicitar el código de cambio de contraseña.",
-    );
-  }
-};
-
-/**
- * Confirma el cambio de contraseña introduciendo el código y la nueva contraseña (Paso 2).
- * URI: POST /api/usuarios/confirmar-cambio-password
- */
-export const confirmarCambioPassword = async (
-  codigoVerificacion: string,
-  nuevaPassword: string,
-): Promise<any> => {
-  try {
-    const respuesta = await api.post(
-      "/api/usuarios/confirmar-cambio-password",
-      {
-        codigo_verificacion: codigoVerificacion,
-        nueva_password: nuevaPassword,
-      },
-    );
-    return respuesta.data;
-  } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al confirmar la nueva contraseña.");
-  }
-};
-
-/**
- * Obtiene la información completa del usuario actualmente autenticado mediante el token de sesión.
+ * Obtiene el perfil de la cuenta autenticada.
  * URI: GET /api/usuarios/me
- *
  * @async
  * @function obtenerUsuarioActual
- * @returns {Promise<UsuarioResponse>} Objeto con los datos detallados del usuario de la sesión.
- * @throws {Error} Lanza un error si el token ha expirado o no es válido.
+ * @returns {Promise<UsuarioSimpleResponse>} Perfil sin contraseña ni campos de rol.
+ * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
-export const obtenerUsuarioActual = async (): Promise<UsuarioResponse> => {
+export const obtenerUsuarioActual = async (): Promise<UsuarioSimpleResponse> => {
   try {
-    const respuesta = await api.get<UsuarioResponse>("/api/usuarios/me");
-    return respuesta.data;
+    return (await api.get<UsuarioSimpleResponse>("/api/usuarios/me")).data;
   } catch (error: any) {
-    const apiMessage = error?.response?.data?.message;
-    throw new Error(
-      apiMessage || "Error al recuperar la información del usuario actual.",
-    );
+    throw mensajeErrorApi(error, "Error al recuperar el perfil del usuario.");
   }
 };
 
-export interface AccesoUsuario {
-  membresia_id: string;
-  empresa_id: string | null;
-  rol: { id: string; nombre: string; tipo: string };
-  permisos: Array<{ recurso: string; accion: string; alcance: string }>;
-}
-
 /**
- * Obtiene membresías y permisos efectivos de la cuenta autenticada.
- * URI: GET /api/usuarios/me/accesos
- *
+ * Obtiene las empresas, roles y permisos efectivos de la cuenta autenticada.
+ * URI: GET /api/usuarios/me/accesos?empresa_id={empresaId}
  * @async
  * @function obtenerMisAccesos
- * @param {string} [empresaId] - Empresa para filtrar los accesos cuando se indique.
+ * @param {string} [empresaId] - Empresa por la que filtrar los accesos.
  * @returns {Promise<AccesoUsuario[]>} Membresías y permisos efectivos.
  * @throws {Error} Mensaje de la API o error genérico de consulta.
  */
@@ -348,17 +126,173 @@ export const obtenerMisAccesos = async (
   empresaId?: string,
 ): Promise<AccesoUsuario[]> => {
   try {
-    const respuesta = await api.get<AccesoUsuario[]>(
-      "/api/usuarios/me/accesos",
-      {
+    return (
+      await api.get<AccesoUsuario[]>("/api/usuarios/me/accesos", {
         params: empresaId ? { empresa_id: empresaId } : undefined,
         skipEmpresaContext: true,
-      } as any,
-    );
-    return respuesta.data;
+      } as any)
+    ).data;
   } catch (error: any) {
-    const apiMessage =
-      error?.response?.data?.detail || error?.response?.data?.message;
-    throw new Error(apiMessage || "Error al obtener los accesos de la cuenta.");
+    throw mensajeErrorApi(error, "Error al obtener los accesos de la cuenta.");
   }
 };
+
+/**
+ * Sube el avatar de la cuenta autenticada.
+ * URI: PUT /api/usuarios/me/foto (multipart/form-data, campo `file`).
+ * @async
+ * @function actualizarFotoUsuario
+ * @param {string} fileUri - URI local del archivo.
+ * @param {string} fileName - Nombre del archivo.
+ * @param {string} fileType - Tipo MIME del archivo.
+ * @returns {Promise<UsuarioSimpleResponse>} Perfil con el avatar actualizado.
+ * @throws {Error} Mensaje de la API o error genérico de subida.
+ */
+export const actualizarFotoUsuario = async (
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+): Promise<UsuarioSimpleResponse> => {
+  try {
+    const formData = new FormData();
+    if (Platform.OS === "web") {
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+      formData.append("file", blob, fileName);
+    } else {
+      formData.append(
+        "file",
+        { uri: fileUri, name: fileName, type: fileType } as any,
+      );
+    }
+
+    return (
+      await api.put<UsuarioSimpleResponse>("/api/usuarios/me/foto", formData)
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "No se pudo actualizar el avatar de la cuenta.");
+  }
+};
+
+/**
+ * Cambia el estado de una cuenta de usuario.
+ * URI: PUT /api/usuarios/{id_usuario}/estado
+ * @async
+ * @function cambiarEstadoUsuario
+ * @param {string} idUsuario - UUID del usuario.
+ * @param {boolean} activo - Nuevo estado enviado en el body.
+ * @returns {Promise<UsuarioSimpleResponse>} Usuario actualizado.
+ * @throws {Error} Mensaje de la API o error genérico de modificación.
+ */
+export const cambiarEstadoUsuario = async (
+  idUsuario: string,
+  activo: boolean,
+): Promise<UsuarioSimpleResponse> => {
+  try {
+    return (
+      await api.put<UsuarioSimpleResponse>(
+        `/api/usuarios/${idUsuario}/estado`,
+        { activo } satisfies UsuarioUpdate,
+      )
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al cambiar el estado de la cuenta.");
+  }
+};
+
+/**
+ * Solicita cambiar el correo y envía el enlace al nuevo email.
+ * URI: PUT /api/usuarios/solicitar-cambio-email?nuevo_email={email}
+ * @async
+ * @function solicitarCambioEmail
+ * @param {string} nuevoEmail - Correo nuevo enviado como query param.
+ * @returns {Promise<RespuestaDetalle>} Confirmación del envío.
+ * @throws {Error} Mensaje de la API o error genérico de solicitud.
+ */
+export const solicitarCambioEmail = async (
+  nuevoEmail: string,
+): Promise<RespuestaDetalle> => {
+  try {
+    return (
+      await api.put<RespuestaDetalle>("/api/usuarios/solicitar-cambio-email", null, {
+        params: { nuevo_email: nuevoEmail },
+      })
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al solicitar el cambio de correo electrónico.");
+  }
+};
+
+/**
+ * Confirma el cambio de correo usando el token de la URL.
+ * URI: POST /api/usuarios/confirmar-cambio-email?token={token}
+ * @async
+ * @function confirmarCambioEmail
+ * @param {string} token - Token de confirmación.
+ * @returns {Promise<RespuestaDetalle>} Confirmación del cambio.
+ * @throws {Error} Mensaje de la API o error genérico de confirmación.
+ */
+export const confirmarCambioEmail = async (
+  token: string,
+): Promise<RespuestaDetalle> => {
+  try {
+    return (
+      await api.post<RespuestaDetalle>("/api/usuarios/confirmar-cambio-email", null, {
+        params: { token },
+      })
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al confirmar el cambio de correo electrónico.");
+  }
+};
+
+/**
+ * Solicita un código de verificación para cambiar la contraseña.
+ * URI: PUT /api/usuarios/solicitar-cambio-password
+ * @async
+ * @function solicitarCambioPassword
+ * @param {string} antiguaPassword - Contraseña actual enviada en el body.
+ * @returns {Promise<RespuestaDetalle>} Confirmación del envío del código.
+ * @throws {Error} Mensaje de la API o error genérico de solicitud.
+ */
+export const solicitarCambioPassword = async (
+  antiguaPassword: string,
+): Promise<RespuestaDetalle> => {
+  try {
+    const payload: PasswordCambioRequest = { antigua_password: antiguaPassword };
+    return (
+      await api.put<RespuestaDetalle>(
+        "/api/usuarios/solicitar-cambio-password",
+        payload,
+      )
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al solicitar el código de cambio de contraseña.");
+  }
+};
+
+/**
+ * Confirma el cambio de contraseña usando el código de recuperación.
+ * URI: POST /api/usuarios/confirmar-cambio-password
+ * @async
+ * @function confirmarCambioPassword
+ * @param {ConfirmarPasswordRecuperacionRequest} payload - Código y nueva contraseña.
+ * @returns {Promise<RespuestaDetalle>} Confirmación de la operación.
+ * @throws {Error} Mensaje de la API o error genérico de confirmación.
+ */
+export const confirmarCambioPassword = async (
+  payload: ConfirmarPasswordRecuperacionRequest,
+): Promise<RespuestaDetalle> => {
+  try {
+    return (
+      await api.post<RespuestaDetalle>(
+        "/api/usuarios/confirmar-cambio-password",
+        payload,
+      )
+    ).data;
+  } catch (error: any) {
+    throw mensajeErrorApi(error, "Error al confirmar la nueva contraseña.");
+  }
+};
+
+export type { AccesoUsuario } from "../types/usuario";
